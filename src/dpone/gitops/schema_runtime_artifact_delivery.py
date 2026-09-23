@@ -5,6 +5,7 @@ from typing import Any
 from dpone.contracts.runtime_artifact_delivery import (
     ARTIFACT_REGISTRY_LOGICAL_REF_PATTERN,
     CONFIG_MAP_KEY_PATTERN,
+    ENV_NAME_PATTERN,
     INIT_FETCH_REQUIRED_FIELDS,
     OCI_RUNTIME_IMAGE_REF_PATTERN,
     STRICT_INIT_FETCH_REQUIRED_FIELDS,
@@ -141,9 +142,54 @@ def init_fetch_verification_schema(*, strict: bool) -> dict[str, Any]:
 
 
 def registry_credentials_schema() -> dict[str, Any]:
-    """Return the closed, non-secret registry credential coordinate schema."""
+    """Return the closed credential source and init-only projection schema."""
 
-    return {
+    canonical = {
+        "type": "object",
+        "required": ["connection_type", "connection_id", "projection"],
+        "additionalProperties": False,
+        "properties": {
+            "connection_type": {"enum": ["airflow", "env", "vault"]},
+            "connection_id": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+            },
+            "projection": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "mode": {"enum": ["k8s_secret", "env"]},
+                    "env_name": {
+                        "type": "string",
+                        "pattern": ENV_NAME_PATTERN,
+                        "maxLength": 253,
+                    },
+                    "secret_ref": {
+                        "type": "object",
+                        "required": ["name", "key"],
+                        "additionalProperties": False,
+                        "properties": {
+                            "name": kubernetes_dns_label_schema(),
+                            "key": {
+                                "type": "string",
+                                "pattern": CONFIG_MAP_KEY_PATTERN,
+                                "maxLength": 253,
+                            },
+                        },
+                    },
+                },
+                "required": ["mode", "env_name"],
+                "allOf": [
+                    {
+                        "if": {"properties": {"mode": {"const": "k8s_secret"}}},
+                        "then": {"required": ["secret_ref"]},
+                        "else": {"not": {"required": ["secret_ref"]}},
+                    }
+                ],
+            },
+        },
+    }
+    legacy = {
         "type": "object",
         "required": ["method", "connection_id", "secret_ref"],
         "additionalProperties": False,
@@ -168,6 +214,7 @@ def registry_credentials_schema() -> dict[str, Any]:
             },
         },
     }
+    return {"oneOf": [canonical, legacy]}
 
 
 def _trust_tier_delivery_guard(

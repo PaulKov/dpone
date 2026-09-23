@@ -438,42 +438,132 @@
           "type": "object"
         },
         "registry_credentials": {
-          "additionalProperties": false,
-          "properties": {
-            "connection_id": {
-              "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
-              "type": "string"
-            },
-            "method": {
-              "const": "airflow_connection_kubernetes_secret"
-            },
-            "secret_ref": {
+          "oneOf": [
+            {
               "additionalProperties": false,
               "properties": {
-                "key": {
-                  "maxLength": 253,
-                  "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+                "connection_id": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
                   "type": "string"
                 },
-                "name": {
-                  "maxLength": 63,
-                  "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-                  "type": "string"
+                "connection_type": {
+                  "enum": [
+                    "airflow",
+                    "env",
+                    "vault"
+                  ]
+                },
+                "projection": {
+                  "additionalProperties": false,
+                  "allOf": [
+                    {
+                      "else": {
+                        "not": {
+                          "required": [
+                            "secret_ref"
+                          ]
+                        }
+                      },
+                      "if": {
+                        "properties": {
+                          "mode": {
+                            "const": "k8s_secret"
+                          }
+                        }
+                      },
+                      "then": {
+                        "required": [
+                          "secret_ref"
+                        ]
+                      }
+                    }
+                  ],
+                  "properties": {
+                    "env_name": {
+                      "maxLength": 253,
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]{0,252}$",
+                      "type": "string"
+                    },
+                    "mode": {
+                      "enum": [
+                        "k8s_secret",
+                        "env"
+                      ]
+                    },
+                    "secret_ref": {
+                      "additionalProperties": false,
+                      "properties": {
+                        "key": {
+                          "maxLength": 253,
+                          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+                          "type": "string"
+                        },
+                        "name": {
+                          "maxLength": 63,
+                          "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name",
+                        "key"
+                      ],
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "mode",
+                    "env_name"
+                  ],
+                  "type": "object"
                 }
               },
               "required": [
-                "name",
-                "key"
+                "connection_type",
+                "connection_id",
+                "projection"
+              ],
+              "type": "object"
+            },
+            {
+              "additionalProperties": false,
+              "properties": {
+                "connection_id": {
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$",
+                  "type": "string"
+                },
+                "method": {
+                  "const": "airflow_connection_kubernetes_secret"
+                },
+                "secret_ref": {
+                  "additionalProperties": false,
+                  "properties": {
+                    "key": {
+                      "maxLength": 253,
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,252}$",
+                      "type": "string"
+                    },
+                    "name": {
+                      "maxLength": 63,
+                      "pattern": "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "key"
+                  ],
+                  "type": "object"
+                }
+              },
+              "required": [
+                "method",
+                "connection_id",
+                "secret_ref"
               ],
               "type": "object"
             }
-          },
-          "required": [
-            "method",
-            "connection_id",
-            "secret_ref"
-          ],
-          "type": "object"
+          ]
         },
         "runtime_authority": {
           "additionalProperties": false,

@@ -35,14 +35,15 @@ from dpone_airflow_pack.init_fetch_pod_contract import (
     WORKTREE_VOLUME,
 )
 from dpone_airflow_pack.init_fetch_pod_guard import (
-    provider_env,
     reserved_collision,
     validate_operator_kwargs,
     validate_strict_pack_extensions,
 )
 from dpone_airflow_pack.init_fetch_secret_env import (
     ensure_registry_credential_env_available,
+    prepare_registry_credential_env,
     project_registry_credential,
+    without_registry_credential,
 )
 from dpone_airflow_pack.provider_execution import (
     RUNTIME_POD_CONTRACT_KEY,
@@ -117,7 +118,10 @@ def compose_init_fetch_operator_kwargs(
         hook_execution=hook_execution,
         hook_name=hook_name,
     )
-    env_vars = provider_env(kwargs.get("env_vars"))
+    env_vars = prepare_registry_credential_env(
+        context.registry_credentials,
+        kwargs.get("env_vars"),
+    )
     if PLAN_B64_ENV in env_vars or PLAN_SHA256_ENV in env_vars:
         raise reserved_collision("pack cannot provide strict init-fetch plan variables")
     env_vars[PLAN_B64_ENV] = encoded.base64
@@ -159,7 +163,7 @@ def compose_init_fetch_operator_kwargs(
             "arguments": [],
             "namespace": context.identity.namespace,
             "service_account_name": context.identity.service_account,
-            "env_vars": env_vars,
+            "env_vars": without_registry_credential(context.registry_credentials, env_vars),
             "annotations": annotations,
             "labels": runtime_labels,
             "full_pod_spec": patch_pod_spec_runtime_authority(
@@ -220,7 +224,7 @@ def _strict_pod(
         "command": ["dpone", "airflow", "runtime-pack-exec"],
         "args": [],
         "workingDir": WORKTREE_ROOT,
-        "env": _env_list(env_vars),
+        "env": _env_list(without_registry_credential(context.registry_credentials, env_vars)),
         "volumeMounts": _base_mounts(
             context,
             include_dev_evidence=workload_id.startswith("dbt__"),

@@ -46,6 +46,7 @@ _DEV_EVIDENCE_KEYS = frozenset({"mode", "claim_name", "mount_path", "worker_queu
 _WORKER_QUEUE_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
 _DEV_EVIDENCE_MOUNT_PATH = "/var/lib/dpone/dev-evidence"
 _CONNECTION_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$")
+_ENV_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,252}$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,15 +120,48 @@ def _registry_credentials(
 ) -> RegistryCredentialSource | None:
     if value is None:
         return None
+    if isinstance(value, Mapping) and "method" in value:
+        legacy = exact_mapping(
+            value,
+            "runtime_artifact_delivery.registry_credentials",
+            frozenset({"method", "connection_id", "secret_ref"}),
+            path=path,
+        )
+        if legacy.get("method") != "airflow_connection_kubernetes_secret":
+            raise field_invalid(
+                "runtime_artifact_delivery.registry_credentials.method is invalid",
+                path,
+            )
+        legacy_connection_id = legacy.get("connection_id")
+        expected_env_name = (
+            _airflow_connection_env_name(legacy_connection_id) if isinstance(legacy_connection_id, str) else ""
+        )
+        legacy_secret_ref = legacy.get("secret_ref")
+        if isinstance(legacy_secret_ref, Mapping) and legacy_secret_ref.get("key") != expected_env_name:
+            raise field_invalid(
+                "runtime_artifact_delivery.registry_credentials.secret_ref.key "
+                "must match the canonical Airflow connection environment name",
+                path,
+            )
+        value = {
+            "connection_type": "airflow",
+            "connection_id": legacy_connection_id,
+            "projection": {
+                "mode": "k8s_secret",
+                "env_name": expected_env_name,
+                "secret_ref": legacy_secret_ref,
+            },
+        }
     item = exact_mapping(
         value,
         "runtime_artifact_delivery.registry_credentials",
-        frozenset({"method", "connection_id", "secret_ref"}),
+        frozenset({"connection_type", "connection_id", "projection"}),
         path=path,
     )
-    if item["method"] != "airflow_connection_kubernetes_secret":
+    connection_type = item["connection_type"]
+    if connection_type not in {"airflow", "env", "vault"}:
         raise field_invalid(
-            "runtime_artifact_delivery.registry_credentials.method is invalid",
+            "runtime_artifact_delivery.registry_credentials.connection_type is invalid",
             path,
         )
     connection_id = item["connection_id"]
@@ -136,27 +170,68 @@ def _registry_credentials(
             "runtime_artifact_delivery.registry_credentials.connection_id is invalid",
             path,
         )
-    secret_ref = exact_mapping(
-        item["secret_ref"],
-        "runtime_artifact_delivery.registry_credentials.secret_ref",
-        frozenset({"name", "key"}),
+    projection_value = item["projection"]
+    if not isinstance(projection_value, Mapping):
+        raise field_invalid(
+            "runtime_artifact_delivery.registry_credentials.projection is invalid",
+            path,
+        )
+    projection_mode = projection_value.get("mode")
+    projection_fields = (
+        frozenset({"mode", "env_name", "secret_ref"})
+        if projection_mode == "k8s_secret"
+        else frozenset({"mode", "env_name"})
+    )
+    projection = exact_mapping(
+        projection_value,
+        "runtime_artifact_delivery.registry_credentials.projection",
+        projection_fields,
         path=path,
     )
-    secret_key = secret_ref["key"]
-    if secret_key != _airflow_connection_env_name(connection_id):
+    if projection_mode not in {"k8s_secret", "env"}:
         raise field_invalid(
-            "runtime_artifact_delivery.registry_credentials.secret_ref.key "
+            "runtime_artifact_delivery.registry_credentials.projection.mode is invalid",
+            path,
+        )
+    env_name = projection["env_name"]
+    if not isinstance(env_name, str) or _ENV_NAME_RE.fullmatch(env_name) is None:
+        raise field_invalid(
+            "runtime_artifact_delivery.registry_credentials.projection.env_name is invalid",
+            path,
+        )
+    if connection_type == "airflow" and env_name != _airflow_connection_env_name(connection_id):
+        raise field_invalid(
+            "runtime_artifact_delivery.registry_credentials.projection.env_name "
             "must match the canonical Airflow connection environment name",
             path,
         )
-    return RegistryCredentialSource(
-        method="airflow_connection_kubernetes_secret",
-        connection_id=connection_id,
-        secret_name=dns_label(
+    secret_name: str | None = None
+    secret_key: str | None = None
+    if projection_mode == "k8s_secret":
+        secret_ref = exact_mapping(
+            projection["secret_ref"],
+            "runtime_artifact_delivery.registry_credentials.projection.secret_ref",
+            frozenset({"name", "key"}),
+            path=path,
+        )
+        secret_key = secret_ref["key"]
+        if secret_key != env_name:
+            raise field_invalid(
+                "runtime_artifact_delivery.registry_credentials.projection.secret_ref.key "
+                "must match projection.env_name",
+                path,
+            )
+        secret_name = dns_label(
             secret_ref["name"],
-            "runtime_artifact_delivery.registry_credentials.secret_ref.name",
+            "runtime_artifact_delivery.registry_credentials.projection.secret_ref.name",
             path,
-        ),
+        )
+    return RegistryCredentialSource(
+        connection_type=connection_type,
+        connection_id=connection_id,
+        projection_mode=projection_mode,
+        env_name=env_name,
+        secret_name=secret_name,
         secret_key=secret_key,
     )
 

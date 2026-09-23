@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+
+- Align artifact-registry credential lookup with the standard
+  `connection_type: airflow | env | vault` vocabulary and separate it from the
+  init-only `projection.mode: k8s_secret | env` transport contract.
+
 ## 0.83.8 - 2026-09-23
 
 ### Fixed
