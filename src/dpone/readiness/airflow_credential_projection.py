@@ -23,6 +23,8 @@ from dpone.contracts.configuration_errors import ETLConfigurationError
 from dpone.contracts.dbt_execution_pack import DBT_EXECUTION_PACK_SCHEMA_V2, DbtExecutionPack
 from dpone.contracts.dbt_release_workload_binding import runtime_payload_member
 from dpone.gitops.airflow_connection_projection_closure import required_runtime_connection_refs
+from dpone.manifest.batch_loader import BatchYamlManifestLoader
+from dpone.manifest.bounded_yaml import load_bounded_yaml
 from dpone.manifest.confined_files import read_confined_file
 from dpone.manifest.loader import ManifestLoaderRouter
 from dpone.readiness.airflow_connection_bridge_report import airflow_connection_bridge_report
@@ -92,10 +94,28 @@ def _transfer_requirements(pack: Mapping[str, Any], workload_id: str) -> tuple[s
         payload = read_confined_file(root, runtime["path"], max_bytes=8 * 1024 * 1024)
         if _sha(payload) != runtime.get("sha256"):
             raise CredentialProjectionError("MISMATCH")
-        loaded = ManifestLoaderRouter(registry_paths=()).load(root / runtime["path"], metadata_only=True)
+        _require_detached_manifest(load_bounded_yaml(payload))
+        loader = ManifestLoaderRouter(batch_loader=BatchYamlManifestLoader(registry_paths=()))
+        loaded = loader.load(root / runtime["path"], metadata_only=True)
         if not loaded.processes:
             raise CredentialProjectionError("UNSUPPORTED")
         return required_runtime_connection_refs(loaded.processes)
+
+
+def _require_detached_manifest(manifest: object) -> None:
+    """Deny unpinned metadata locators before the ordinary metadata loader runs."""
+    if not isinstance(manifest, Mapping) or {"registry", "registries"} & manifest.keys():
+        raise CredentialProjectionError("UNSUPPORTED")
+    conventions = manifest.get("conventions", [])
+    if not isinstance(conventions, list):
+        raise CredentialProjectionError("UNSUPPORTED")
+    values = [*conventions, *([manifest["convention"]] if "convention" in manifest else [])]
+    # These are the existing loader's builtins, not a new file-read capability.
+    if any(
+        not isinstance(value, str) or value.strip().lower() not in {"landing", "landing_raw", "landing_raw_v1"}
+        for value in values
+    ):
+        raise CredentialProjectionError("UNSUPPORTED")
 
 
 def build_credential_projection(

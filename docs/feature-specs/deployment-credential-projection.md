@@ -337,7 +337,10 @@ Build-only source acquisition is separate from the pure metadata join. Native
 execution profiles use their bounded single-member contract. Mixed ordinary
 transfers, flows and batches use the existing bounded multi-file archive reader,
 private temporary staging and pinned runtime-manifest digest. The metadata-only
-manifest loader disables ambient source registries; the canonical runtime
+manifest loader explicitly injects a registry-free batch loader (an empty router
+registry argument alone does not disable ambient defaults). Unpinned registry
+and custom-preset locators are rejected before loading; existing normalized
+builtin conventions remain accepted. The canonical runtime
 connection-closure policy covers every compiled process, including active state,
 object-storage and materialization authorities. Disabled/reused state contributes
 no extra ref. No credential is resolved or process executed. Unsafe or incomplete

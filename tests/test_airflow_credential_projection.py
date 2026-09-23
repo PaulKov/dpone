@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
+import os
+import subprocess
+import sys
 from copy import deepcopy
 
 import pytest
@@ -102,6 +106,53 @@ def test_mixed_native_and_ordinary_closure_uses_canonical_processes(tmp_path, fl
     refs = native_workload_requirements({native["workload"]["workload_id"]: native, "orders": ordinary})
     assert refs["orders"] == ("source", "target")
     assert refs[native["workload"]["workload_id"]] == ("warehouse",)
+
+
+def test_mixed_flow_closure_ignores_ambient_source_registry(tmp_path):
+    from tests.test_release_composition_ordinary import ordinary_root
+
+    root = ordinary_root(tmp_path, flow=True)
+    ordinary = json.loads((root / "orders/airflow-pack.json").read_bytes())
+    native, _kwargs, _context = _native_case()
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import json,sys; from dpone.readiness.airflow_credential_projection import native_workload_requirements; print(json.dumps(native_workload_requirements(json.load(sys.stdin))))",
+        ],
+        input=json.dumps({native["workload"]["workload_id"]: native, "orders": ordinary}),
+        capture_output=True,
+        text=True,
+        timeout=30,
+        env={**os.environ, "DPONE_SOURCES_REGISTRY": str(tmp_path / "unavailable-registry.yaml")},
+    )
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["orders"] == ["source", "target"]
+
+
+@pytest.mark.parametrize(
+    "locator",
+    [
+        "registry: /unavailable.yaml",
+        "registries: [/unavailable.yaml]",
+        "convention: /unavailable.yaml",
+        "conventions: [/unavailable.yaml]",
+    ],
+)
+def test_resealed_runtime_manifest_cannot_add_external_metadata_locators(tmp_path, locator):
+    from dpone_airflow_pack.pack_identity import compute_pack_fingerprint
+
+    from tests.test_release_composition_ordinary import _replace_archive, ordinary_root
+
+    root = ordinary_root(tmp_path)
+    ordinary = json.loads((root / "orders/airflow-pack.json").read_bytes())
+    payload = (tmp_path / "author/transfer.yaml").read_bytes() + (locator + "\n").encode()
+    _replace_archive(ordinary, {"transfer.yaml": payload})
+    ordinary["runtime_manifest"]["sha256"] = "sha256:" + hashlib.sha256(payload).hexdigest()
+    ordinary["pack_fingerprint"] = compute_pack_fingerprint(ordinary)
+    native, _kwargs, _context = _native_case()
+    with pytest.raises(CredentialProjectionError, match="unsupported"):
+        native_workload_requirements({native["workload"]["workload_id"]: native, "orders": ordinary})
 
 
 @pytest.mark.parametrize("state", ["disabled", "reuse"])
