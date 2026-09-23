@@ -133,6 +133,28 @@ class MssqlNativeStagedLoadService:
 
         journal = context.journal_factory()
         state = journal.publication.state()
+        journal_data = getattr(journal, "data", None)
+        if isinstance(journal_data, dict) and journal_data.get("version") == 4 and state is not None:
+            phase = state["phase"]
+            if (
+                phase in {"aborted", "retirement_required", "retiring"}
+                and state.get("authority", {}).get("kind") == "aborted"
+            ):
+                if context.settle_parent is None:
+                    raise RuntimeError("mssql_native.sqlclient_parent_settlement_required")
+                context.settle_parent()
+                raise ValueError("mssql_native.sqlclient_parent_aborted")
+            if phase in {
+                "published",
+                "retirement_required",
+                "retiring",
+                "retired",
+                "checkpoint_required",
+                "succeeded",
+            }:
+                if context.terminal_result is None:
+                    raise RuntimeError("mssql_native.sqlclient_terminal_result_required")
+                return context.terminal_result(state)
         if state is None or state["phase"] == "preparing":
             if journal.data is None:
                 return None
@@ -172,6 +194,9 @@ class MssqlNativeStagedLoadService:
         state = context.journal_factory().publication.state()
         if state is None or state["phase"] != "succeeded":
             raise RuntimeError("mssql_native.recovered_completion_required")
+        data = getattr(context.journal_factory(), "data", None)
+        if isinstance(data, dict) and data.get("version") == 4:
+            return
         prepared = self._preparer.restore(load_config, context, admission)
         if prepared is None:
             raise ValueError("mssql_native.prepared_journal_required")
@@ -181,7 +206,16 @@ class MssqlNativeStagedLoadService:
         owned = self._require_owned(handle)
         if owned.status in {"publishing", "outcome_unknown", "published"}:
             raise RuntimeError("mssql_native.publication_unresolved")
-        self._preparer.cleanup(owned.prepared)
+        resources = owned.prepared.resources
+        context = resources[0].context if len(resources) == 1 and hasattr(resources[0], "context") else None
+        data = None if context is None else context.journal_factory().data
+        if isinstance(data, dict) and data.get("version") == 4:
+            assert context is not None
+            if context.abort_parent is None:
+                raise RuntimeError("mssql_native.sqlclient_parent_abort_required")
+            context.abort_parent(owned.prepared)
+        else:
+            self._preparer.cleanup(owned.prepared)
         self._owned.pop(str(handle.metadata["mssql_native_owner"]))
 
     def cleanup(self, handle: StagedLoadHandle) -> None:
@@ -190,7 +224,11 @@ class MssqlNativeStagedLoadService:
         owned = self._require_owned(handle)
         if owned.status != "published":
             raise RuntimeError("mssql_native.publication_unresolved")
-        self._preparer.cleanup(owned.prepared)
+        resources = owned.prepared.resources
+        context = resources[0].context if len(resources) == 1 and hasattr(resources[0], "context") else None
+        data = None if context is None else context.journal_factory().data
+        if not (isinstance(data, dict) and data.get("version") == 4):
+            self._preparer.cleanup(owned.prepared)
         self._owned.pop(str(handle.metadata["mssql_native_owner"]))
 
     def load(self, load_config: Any, payload: Any) -> LoadResult:

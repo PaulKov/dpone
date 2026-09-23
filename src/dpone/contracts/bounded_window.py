@@ -12,7 +12,7 @@ import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
-from typing import cast
+from typing import TypeGuard, cast
 
 
 class WindowContractError(RuntimeError):
@@ -181,6 +181,24 @@ class WindowRecord:
 
     revision: int
     payload: str
+
+
+def window_record_ack_matches(record: object, *, revision: int | None, payload: str) -> TypeGuard[WindowRecord]:
+    """Match one save response to its exact admitted payload and prior revision.
+
+    Store revisions are opaque: gaps are valid, but bools, non-increasing or
+    out-of-range revisions and altered payloads are not acknowledgements. Callers
+    supply their already validated prior revision/payload and retain ownership of
+    error classification, exception chaining and writer poisoning. This predicate
+    performs no I/O and cannot establish commit success without the store contract.
+    """
+    return (
+        type(record) is WindowRecord
+        and type(record.revision) is int
+        and (revision or 0) < record.revision <= 2**63 - 1
+        and type(record.payload) is str
+        and record.payload == payload
+    )
 
 
 @dataclass(frozen=True)

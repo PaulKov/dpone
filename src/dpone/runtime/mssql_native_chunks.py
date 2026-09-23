@@ -8,14 +8,12 @@ An interrupted partial query is never reconstructed from a mutable row offset.
 from __future__ import annotations
 
 import multiprocessing
-import os
 import pickle
 import sys
 import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import FIRST_COMPLETED, Future, ProcessPoolExecutor, ThreadPoolExecutor, wait
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
 from pathlib import Path
 from threading import Event, Thread, get_ident
 from typing import TYPE_CHECKING, Any, cast
@@ -32,15 +30,16 @@ from dpone.contracts.mssql_native_chunks import (
 from dpone.ports.bounded_window import WindowStore
 from dpone.ports.mssql_native_chunks import NativeChunkImporter
 from dpone.runtime.mssql_native_capacity import require_native_spool_capacity
+from dpone.runtime.mssql_native_chunk_workers import Work as _Work
+from dpone.runtime.mssql_native_chunk_workers import encode as _encode
+from dpone.runtime.mssql_native_chunk_workers import encode_observed as _encode_observed
 from dpone.runtime.mssql_native_chunks_files import (
     NativeRow,
     discard_native_files,
-    encode_native_frame,
     verify_native_file,
 )
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session, frame_observation
 from dpone.runtime.mssql_native_sized_frames import sized_native_frames
-from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
 from dpone.runtime.native_wire_models import SourceNativeWireContract
 
 if TYPE_CHECKING:
@@ -51,32 +50,6 @@ ImporterFactory = Callable[[], AbstractContextManager[NativeChunkImporter]]
 
 class NativeReextractRequired(WindowContractError):
     """Partial staging is settled; restart the complete query with a new invocation."""
-
-
-def _encode(*args: Any, observed: bool = False) -> tuple[Any, dict[str, Any], dict[str, Any] | None]:
-    start = time.monotonic()
-    session = delivery_session(BoundedNativeDeliveryObserver(max_observations=2) if observed else None)
-    try:
-        with session.recorder("encoder").phase("encode", ordinal=args[3], rows=len(args[1]), encoded_bytes=args[5]):
-            value: EncodedNativeFile | Exception = encode_native_frame(*args)
-    except Exception as error:
-        if not observed:
-            raise
-        value = error
-    legacy = dict(phase="encode", start=start, end=time.monotonic(), worker=os.getpid())
-    return value, legacy, session.snapshot() if observed else None
-
-
-def _encode_observed(*args: Any) -> tuple[Any, dict[str, Any], dict[str, Any] | None]:
-    return _encode(*args, observed=True)
-
-
-@dataclass
-class _Work:
-    ordinal: int
-    encoded_bytes: int
-    file: EncodedNativeFile | None = None
-    attempt: int = 0
 
 
 class BoundedNativeChunks:
@@ -96,11 +69,13 @@ class BoundedNativeChunks:
         limits: NativeChunkLimits,
         lease_ttl: float = 60.0,
         observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
+        parent_schema_version: int | None = None,
     ) -> None:
         if lease_ttl <= 0:
             raise ValueError("mssql_native.invalid_lease_ttl")
         self.store, self.importer_factory, self.work_dir = store, importer_factory, work_dir
         self.limits, self.lease_ttl = limits, lease_ttl
+        self.parent_schema_version = parent_schema_version
         self.observations = delivery_session(observer)
 
     def _check(self, lease: WindowLease, cancelled: Event) -> None:
@@ -143,7 +118,7 @@ class BoundedNativeChunks:
         try:
             if plan.wire_fingerprint != contract.type_layout_hash:
                 raise WindowContractError("mssql_native.wire_identity_changed")
-            journal = NativeChunkJournal(self.store, lease, plan)
+            journal = NativeChunkJournal(self.store, lease, plan, parent_schema_version=self.parent_schema_version)
             if journal.data is not None:
                 return self.recover(plan, lease)
             self._check(lease, cancel)
@@ -173,7 +148,7 @@ class BoundedNativeChunks:
         This is a staging-only recovery API. A publication owner must reconcile its
         target transaction receipt before asking to settle any partial extraction.
         """
-        journal = NativeChunkJournal(self.store, lease, plan)
+        journal = NativeChunkJournal(self.store, lease, plan, parent_schema_version=self.parent_schema_version)
         journal.bind_limits(self.limits.to_dict())
         publication = journal.publication.state()
         if publication is not None and publication["phase"] not in ("preparing", "prepared"):
@@ -333,7 +308,10 @@ class BoundedNativeChunks:
                             ] = work
                         else:
                             journal.verified(cast(NativeChunkReceipt, value))
-                            work.file.path.unlink()
+                            # SqlClient v4 custody survives P10f verification. Parent
+                            # settlement is the sole authority allowed to remove it.
+                            if self.parent_schema_version != 4:
+                                work.file.path.unlink()
                 self._check(lease, cancelled)
                 return journal.complete(
                     source_eof=eof,

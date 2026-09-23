@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from dpone.manifest.mssql_native_policy import native_limits
+from dpone.manifest.mssql_native_policy import native_limits, native_source_read_mode, native_transport_policy
 
 
 def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
@@ -17,6 +17,8 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
     native = config.options.get("native_transfer")
     if not isinstance(native, Mapping):
         return
+    source_read_mode = native_source_read_mode(config)
+    transport = native_transport_policy(config)
     wire, execution = native.get("wire"), native.get("execution")
     chunking = execution.get("chunking") if isinstance(execution, Mapping) else None
     if not (
@@ -28,6 +30,8 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
         and isinstance(chunking, Mapping)
         and chunking.get("mode") == "bounded_stream"
     ):
+        if transport is not None:
+            raise ValueError("mssql_native.transport_requires_native_route")
         return
     limits = native_limits(config)
     authored: dict[str, Any] = {
@@ -59,8 +63,28 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
             "import_parallelism": limits.effective_import_parallelism,
             "retained_work_capacity": limits.retained_work_capacity,
         }
+    if source_read_mode is not None:
+        authored["source_read_mode"] = source_read_mode
+    if transport is not None:
+        authored["bulk_transport"] = transport.to_dict()
+        authored["worker_platform"] = "linux"
+        authored["worker_memory_bound"] = "address_space_not_rss"
+        authored["writer_authority"] = "separate_restricted_writer_and_coordinator"
+        if transport.backend == "mssql_sqlclient":
+            authored["worker_platform"] = "linux_arm64"
+            authored["status"] = "composition_required"
+            authored["required_dependencies"].extend(
+                ["dpone-mssql-sqlclient", ".NET==8.0.31", "Microsoft.Data.SqlClient==7.0.2", "fenced_worker_lifecycle"]
+            )
+            if transport.input == "arrow":
+                authored["required_dependencies"].append("Apache.Arrow==23.0.0")
+        else:
+            authored["required_dependencies"].extend(["mssql-python==1.13.0", "fenced_worker_lifecycle"])
+            if transport.input == "arrow":
+                authored["required_dependencies"].append("pyarrow==25.0.1")
     plan["mssql_native"] = authored
-    plan["bulk_path"] = "clickhouse_bounded_mssql_native_bcp"
+    ingest_method = "bounded_mssql_native_bcp" if transport is None else "bounded_mssql_native_tds"
+    plan["bulk_path"] = "clickhouse_" + ingest_method
     # These generic stream/snapshot optimizers do not govern this executor.
     for key in ("native_transfer_execution", "native_transfer_transport", "native_transfer_snapshot_optimization"):
         plan[key] = {}
@@ -102,7 +126,7 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
         decision = dict(intelligence.get("decision") or {})
         decision["native_transfer_plan"] = {
             "export_method": "one_clickhouse_query",
-            "ingest_method": "bounded_mssql_native_bcp",
+            "ingest_method": ingest_method,
             "finalizer": "existing_target_transaction_with_commit_receipt",
             "partitioning": {"strategy": "one_authored_scope", "column": authored["publication_scope"].get("column")},
         }

@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Any
 
-from dpone.contracts.mssql_native_chunks import NativeChunkLimits
+from dpone.contracts.mssql_native_chunks import NativeBulkTransportPolicy, NativeChunkLimits
 from dpone.runtime.native_transfer_route_models import RouteCertificationPolicy
 from dpone.runtime.native_transfer_transport import NativeTransferTransportPolicy
 from dpone.runtime.storage_policy import parse_byte_size
@@ -53,6 +53,14 @@ class NativeTransferExecutionPolicy:
     warnings: tuple[str, ...] = ()
     chunking: dict[str, Any] | None = None
     native_chunks: NativeChunkLimits | None = None
+    native_bulk_transport: NativeBulkTransportPolicy | None = field(default=None, kw_only=True)
+
+    def __post_init__(self) -> None:
+        if self.native_bulk_transport is not None:
+            if not isinstance(self.native_bulk_transport, NativeBulkTransportPolicy):
+                raise ValueError("mssql_native.transport_invalid")
+            if self.native_chunks is None:
+                raise ValueError("mssql_native.transport_requires_native_chunks")
 
     @classmethod
     def from_mapping(cls, value: dict[str, Any] | None = None) -> NativeTransferExecutionPolicy:
@@ -60,15 +68,19 @@ class NativeTransferExecutionPolicy:
         profile = str(raw.get("profile") or "balanced")
         chunking = raw.get("chunking")
         native_chunks = None
+        native_bulk_transport = None
         if "native_chunks" in raw:
             from types import SimpleNamespace
 
-            from dpone.manifest.mssql_native_policy import native_limits
+            from dpone.manifest.mssql_native_policy import native_limits, native_transport_policy
 
-            native_chunks = native_limits(SimpleNamespace(options={"native_transfer": {"execution": raw}}))
+            config = SimpleNamespace(options={"native_transfer": {"execution": raw}})
+            native_chunks = native_limits(config)
+            native_bulk_transport = native_transport_policy(config)
         return cls(
             chunking=dict(chunking) if isinstance(chunking, dict) else None,
             native_chunks=native_chunks,
+            native_bulk_transport=native_bulk_transport,
             mode=str(raw.get("mode") or "auto"),
             profile=profile,
             cleanup_policy=str(raw.get("cleanup_policy") or "eager"),
@@ -91,7 +103,12 @@ class NativeTransferExecutionPolicy:
             **(
                 {
                     "native_chunks": {
-                        key: value for key, value in self.native_chunks.to_dict().items() if key != "parallelism"
+                        **{key: value for key, value in self.native_chunks.to_dict().items() if key != "parallelism"},
+                        **(
+                            {"transport": self.native_bulk_transport.to_dict()}
+                            if self.native_bulk_transport is not None
+                            else {}
+                        ),
                     }
                 }
                 if self.native_chunks is not None

@@ -12,12 +12,20 @@ from dataclasses import asdict
 from typing import Any
 
 from dpone.adapters.mssql_native_publication_journal import NativePublicationJournal, validate_publication_state
-from dpone.contracts.bounded_window import WindowContractError, WindowLease
-from dpone.contracts.mssql_native_chunks import (
+from dpone.adapters.mssql_native_v4_snapshot_validation import (
+    decode_native_chunk_receipt as _receipt,
+)
+from dpone.adapters.mssql_native_v4_snapshot_validation import (
+    validate_native_v4_snapshot,
+)
+from dpone.contracts.mssql_tds_api import (
     EncodedNativeFile,
+    NativeBulkTransportPolicy,
     NativeChunkPlan,
     NativeChunkReceipt,
     NativeStageComplete,
+    WindowContractError,
+    WindowLease,
 )
 from dpone.ports.bounded_window import WindowStore
 
@@ -26,43 +34,34 @@ def _digest(value: object) -> str:
     return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
 
 
-def _receipt(value: Any) -> NativeChunkReceipt:
-    try:
-        receipt = NativeChunkReceipt(**json.loads(json.dumps(value)))
-        if any(
-            type(getattr(receipt, name)) is not int or getattr(receipt, name) < 0
-            for name in ("ordinal", "rows", "encoded_bytes")
-        ):
-            raise ValueError("invalid counters")
-        if any(
-            not isinstance(getattr(receipt, name), str) or not getattr(receipt, name)
-            for name in ("attempt_id", "stage_id", "file_sha256", "typed_digest")
-        ):
-            raise ValueError("invalid identity")
-        for name in ("file_sha256", "typed_digest"):
-            digest = getattr(receipt, name)
-            if len(digest) != 64 or any(char not in "0123456789abcdef" for char in digest):
-                raise ValueError("invalid digest")
-        if not isinstance(receipt.consumed_part_evidence, dict):
-            raise ValueError("invalid evidence")
-        return receipt
-    except (TypeError, ValueError) as error:
-        raise WindowContractError("mssql_native.invalid_receipt") from error
-
-
 class NativeChunkJournal:
     """Persist immutable plan bindings and ordered attempt progress under fencing."""
 
-    def __init__(self, store: WindowStore, lease: WindowLease, plan: NativeChunkPlan) -> None:
-        if plan.target_id != lease.target_id or any(not value for value in asdict(plan).values()):
+    def __init__(
+        self,
+        store: WindowStore,
+        lease: WindowLease,
+        plan: NativeChunkPlan,
+        *,
+        parent_schema_version: int | None = None,
+    ) -> None:
+        if plan.target_id != lease.target_id or any(not value for value in plan.to_dict().values()):
             raise WindowContractError("mssql_native.invalid_plan_identity")
+        if parent_schema_version not in (None, 4) or (
+            parent_schema_version == 4 and (plan.transport is None or plan.transport.backend != "mssql_sqlclient")
+        ):
+            raise WindowContractError("mssql_native.invalid_parent_schema_version")
         self.store, self.lease, self.plan = store, lease, plan
+        self.parent_schema_version = parent_schema_version
         self.key = "mssql-native-chunks-v1/" + _digest([plan.target_id, plan.run_id])
         self.revision: int | None = None
         self._data: dict[str, Any] | None = None
         self._load()
         self.publication = NativePublicationJournal(
-            snapshot=lambda: self.data, save=self._save, completed=self.completed
+            snapshot=lambda: self.data,
+            save=self._save,
+            completed=self.completed,
+            fence=lambda: self.lease.fence,
         )
 
     @property
@@ -77,6 +76,12 @@ class NativeChunkJournal:
             return
         try:
             value = json.loads(record.payload)
+            if isinstance(value, dict) and value.get("version") == 4:
+                if self.parent_schema_version != 4:
+                    raise WindowContractError("mssql_native.parent_schema_changed")
+                validate_native_v4_snapshot(value, self.plan.to_dict())
+                self.revision, self._data = record.revision, value
+                return
             if not isinstance(value, dict) or set(value) != {
                 "version",
                 "identity",
@@ -90,9 +95,37 @@ class NativeChunkJournal:
                 "limits",
             }:
                 raise ValueError("invalid record")
-            if type(value["version"]) is not int or value["version"] != 1:
+            if type(value["version"]) is not int or value["version"] not in (1, 2, 3, 4):
                 raise ValueError("invalid version")
-            if value["identity"] != asdict(self.plan):
+            if (value["version"] == 4 and self.parent_schema_version != 4) or (
+                self.parent_schema_version is not None and value["version"] != self.parent_schema_version
+            ):
+                raise WindowContractError("mssql_native.parent_schema_changed")
+            identity = value["identity"]
+            keys = {
+                "run_id",
+                "target_id",
+                "source_query_id",
+                "window_fingerprint",
+                "schema_fingerprint",
+                "wire_fingerprint",
+            }
+            if not isinstance(identity, dict):
+                raise ValueError("invalid identity")
+            if value["version"] == 2:
+                keys.add("source_read_mode")
+            if value["version"] in (3, 4):
+                keys.add("transport")
+                if "source_read_mode" in identity:
+                    keys.add("source_read_mode")
+                policy = NativeBulkTransportPolicy.from_mapping(identity.get("transport"))
+                if policy.to_dict() != identity["transport"]:
+                    raise ValueError("unresolved transport")
+            if set(identity) != keys:
+                raise ValueError("invalid identity shape")
+            if "source_read_mode" in identity and identity["source_read_mode"] != "raw_single_query":
+                raise ValueError("invalid source read mode")
+            if identity != self.plan.to_dict():
                 raise WindowContractError("mssql_native.journal_identity_changed")
             if value["phase"] not in ("staging", "stage_complete", "reextract_required"):
                 raise ValueError("invalid phase")
@@ -134,8 +167,16 @@ class NativeChunkJournal:
             raise WindowContractError("mssql_native.reextract_required")
         self._save(
             dict(
-                version=1,
-                identity=asdict(self.plan),
+                version=(
+                    self.parent_schema_version
+                    if self.parent_schema_version is not None
+                    else 3
+                    if self.plan.transport is not None
+                    else 1
+                    if self.plan.source_read_mode is None
+                    else 2
+                ),
+                identity=self.plan.to_dict(),
                 phase="staging",
                 chunks={},
                 complete=None,
@@ -247,10 +288,20 @@ class NativeChunkJournal:
 
     def attempts(self) -> tuple[str, ...]:
         """All owned attempts, including abandoned retries, for fenced settlement."""
+        return tuple(self.attempt_id(ordinal, attempt) for ordinal, attempt in self.attempt_coordinates())
+
+    def attempt_coordinates(self) -> tuple[tuple[int, int], ...]:
+        """Read all persisted (chunk ordinal, retry number) pairs without I/O.
+
+        Recovery can derive child-journal lookup keys without parsing opaque run
+        or attempt identifiers. Abandoned retries remain discoverable after EOF.
+        This is only an inventory: it neither settles attempts nor prevents later
+        reservations; publication must hold the corresponding admission barrier.
+        """
         if self._data is None:
             return ()
         return tuple(
-            self.attempt_id(int(ordinal), attempt)
+            (int(ordinal), attempt)
             for ordinal, chunk in self._data["chunks"].items()
             for attempt in range(chunk["attempt"] + 1)
         )

@@ -38,6 +38,17 @@ def test_strict_limits_and_legacy_admission():
     assert not native_requested(SimpleNamespace(options={}))
 
 
+def test_explicit_sqlclient_is_valid_but_requires_runtime_composition():
+    value = config(
+        transport={
+            "backend": "mssql_sqlclient",
+            "input": "rows",
+            "max_worker_address_space_bytes": 8 << 30,
+        }
+    )
+    validate_native_config(value)
+
+
 @pytest.mark.parametrize(
     "values",
     [{"max_rows": True}, {"max_bytes": 0}, {"max_row_bytes": 20000000}, {"max_pending": 65}, {"unexpected": 1}],

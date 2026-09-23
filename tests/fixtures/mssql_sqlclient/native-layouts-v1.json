@@ -1,0 +1,98 @@
+[
+  {
+    "encoding": null,
+    "fixed_length": 8,
+    "name": "c_000",
+    "nullable": false,
+    "precision": null,
+    "prefix_width": 0,
+    "scale": null,
+    "source_type": "bigint",
+    "storage_type": "bigint",
+    "target_type": "Int64"
+  },
+  {
+    "encoding": null,
+    "fixed_length": 8,
+    "name": "c_001",
+    "nullable": true,
+    "precision": null,
+    "prefix_width": 1,
+    "scale": null,
+    "source_type": "bigint nullable",
+    "storage_type": "bigint",
+    "target_type": "Nullable(Int64)"
+  },
+  {
+    "encoding": null,
+    "fixed_length": 8,
+    "name": "c_002",
+    "nullable": false,
+    "precision": 53,
+    "prefix_width": 0,
+    "scale": null,
+    "source_type": "float(53)",
+    "storage_type": "float",
+    "target_type": "Float64"
+  },
+  {
+    "encoding": null,
+    "fixed_length": 8,
+    "name": "c_003",
+    "nullable": true,
+    "precision": 53,
+    "prefix_width": 1,
+    "scale": null,
+    "source_type": "float(53) nullable",
+    "storage_type": "float",
+    "target_type": "Nullable(Float64)"
+  },
+  {
+    "encoding": "utf-16le",
+    "fixed_length": null,
+    "name": "c_004",
+    "nullable": false,
+    "precision": null,
+    "prefix_width": 8,
+    "scale": null,
+    "source_type": "nvarchar(max)",
+    "storage_type": "nvarchar",
+    "target_type": "String"
+  },
+  {
+    "encoding": "utf-16le",
+    "fixed_length": null,
+    "name": "c_005",
+    "nullable": true,
+    "precision": null,
+    "prefix_width": 8,
+    "scale": null,
+    "source_type": "nvarchar(max) nullable",
+    "storage_type": "nvarchar",
+    "target_type": "Nullable(String)"
+  },
+  {
+    "encoding": null,
+    "fixed_length": 8,
+    "name": "c_006",
+    "nullable": false,
+    "precision": null,
+    "prefix_width": 0,
+    "scale": 7,
+    "source_type": "datetime2(6)",
+    "storage_type": "datetime2",
+    "target_type": "DateTime64(6)"
+  },
+  {
+    "encoding": null,
+    "fixed_length": 8,
+    "name": "c_007",
+    "nullable": true,
+    "precision": null,
+    "prefix_width": 1,
+    "scale": 7,
+    "source_type": "datetime2(6) nullable",
+    "storage_type": "datetime2",
+    "target_type": "Nullable(DateTime64(6))"
+  }
+]

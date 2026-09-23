@@ -150,3 +150,99 @@ def _fsync(file_fd: int, label: str) -> None:
 
 
 __all__ = ["DescriptorPinnedCreateOnlyEvidenceWriter", "EvidenceWriteError"]
+
+
+def _read_metadata(value: os.stat_result) -> tuple[int, ...]:
+    return (value.st_dev, value.st_ino, value.st_mode, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
+
+
+class PinnedEvidenceReader:
+    """Actor-owned descriptor for an independently admitted root and ancestors.
+
+    Deployment custody excludes pre-entry replacement and adversarial changes
+    restored between observations. Metadata checks are race detection, not origin
+    authentication; the trusted seal supplies each expected payload digest.
+    """
+
+    def __init__(self, directory_fd: int) -> None:
+        self._fd = directory_fd
+
+    def read(self, relative_name: str, byte_count: int, payload_sha256: str) -> bytes:
+        from hashlib import sha256
+
+        if (
+            type(relative_name) is not str
+            or type(byte_count) is not int
+            or not 1 <= byte_count <= 262144
+            or type(payload_sha256) is not str
+            or len(payload_sha256) != 64
+        ):
+            raise ValueError("evidence read receipt invalid")
+        _require_safe_name(relative_name)
+        before = os.stat(relative_name, dir_fd=self._fd, follow_symlinks=False)
+        if not stat.S_ISREG(before.st_mode) or before.st_size != byte_count:
+            raise ValueError("evidence read target invalid")
+        fd = os.open(relative_name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=self._fd)
+        try:
+            opened = os.fstat(fd)
+            if _read_metadata(before) != _read_metadata(opened):
+                raise ValueError("evidence read target changed")
+            chunks, remaining = [], byte_count
+            while remaining:
+                chunk = os.read(fd, remaining)
+                if not chunk:
+                    raise ValueError("evidence read truncated")
+                chunks.append(chunk)
+                remaining -= len(chunk)
+            if os.read(fd, 1):
+                raise ValueError("evidence read oversized")
+            payload = b"".join(chunks)
+            after = os.stat(relative_name, dir_fd=self._fd, follow_symlinks=False)
+            if (
+                sha256(payload).hexdigest() != payload_sha256
+                or _read_metadata(opened) != _read_metadata(os.fstat(fd))
+                or _read_metadata(opened) != _read_metadata(after)
+            ):
+                raise ValueError("evidence read changed")
+            return payload
+        finally:
+            os.close(fd)
+
+
+@dataclass(frozen=True)
+class PinnedEvidenceReadFactory:
+    """Allocation-only root admission input; all filesystem I/O occurs on entry.
+
+    One context pins the same root for all six files. The absolute path and its
+    ancestors must be independently controlled by deployment, never by a locator.
+    """
+
+    root: Path
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.root, Path) or not self.root.is_absolute():
+            raise ValueError("absolute evidence root required")
+
+    def __call__(self):
+        from contextlib import contextmanager
+
+        @contextmanager
+        def context():
+            if not all(hasattr(os, flag) for flag in ("O_NOFOLLOW", "O_DIRECTORY", "O_NONBLOCK")):
+                raise ValueError("confined evidence reads unsupported")
+            before = self.root.lstat()
+            if not stat.S_ISDIR(before.st_mode):
+                raise ValueError("evidence root invalid")
+            fd = os.open(self.root, os.O_RDONLY | os.O_NOFOLLOW | os.O_DIRECTORY)
+            try:
+                opened = os.fstat(fd)
+                if not stat.S_ISDIR(opened.st_mode) or (before.st_dev, before.st_ino) != (opened.st_dev, opened.st_ino):
+                    raise ValueError("evidence root replaced")
+                yield PinnedEvidenceReader(fd)
+                after = self.root.lstat()
+                if (after.st_dev, after.st_ino, after.st_mode) != (opened.st_dev, opened.st_ino, opened.st_mode):
+                    raise ValueError("evidence root replaced")
+            finally:
+                os.close(fd)
+
+        return context()

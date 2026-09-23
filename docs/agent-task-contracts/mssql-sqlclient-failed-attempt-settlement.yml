@@ -1,0 +1,72 @@
+schema_version: 1
+task_id: "DPONE-DDA-SQLCLIENT-FAILED-SETTLEMENT"
+title: "Close SqlClient failed-attempt settlement and retry ordering"
+goal: "Permit a successor attempt only after exact contained predecessor retirement is durably proven."
+specification: "docs/feature-specs/mssql-sqlclient-route-activation.md"
+base_commit: "182dcd6629ae4be241cb0dbd25e7ee94f7093cd9"
+integrator: "root"
+
+acceptance_criteria:
+  - "Closed retryable errors settle the predecessor before attempt n+1 is recorded."
+  - "Unknown or non-retryable errors never auto-retry."
+  - "Settlement reuses exact P10g DROP/reconciliation and returns one durable receipt."
+  - "Recovery is source-free and duplicate settlement performs no second DROP."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "Python failed-attempt settlement capability"
+    - "SqlClient durable state and evidence"
+    - "retry/recovery classification"
+  migration_required: true
+
+owned_paths:
+  - "src/dpone/contracts/mssql_sqlclient_failed_attempt_settlement.py"
+  - "src/dpone/ports/mssql_sqlclient_failed_attempt_settlement.py"
+  - "src/dpone/services/mssql_sqlclient_failed_attempt_settlement.py"
+  - "src/dpone/adapters/mssql_sqlclient_failed_attempt_settlement.py"
+  - "src/dpone/app/mssql_sqlclient_failed_attempt_composition.py"
+  - "src/dpone/app/mssql_sqlclient_fresh_chunk_executor.py"
+  - "src/dpone/app/mssql_sqlclient_native_deployment_composition.py"
+  - "tests/test_mssql_sqlclient_failed_attempt_settlement.py"
+  - "tests/test_mssql_sqlclient_fresh_chunk_executor.py"
+integrator_owned_paths:
+  - "docs/feature-specs/mssql-sqlclient-route-activation.md"
+  - "docs/adr/0073-mssql-sqlclient-route-activation.md"
+  - "CHANGELOG.md"
+read_only_paths:
+  - "src/dpone/services/mssql_native_chunk_retirement.py"
+  - "src/dpone/adapters/mssql_sqlclient_native_retirement_operator.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "mkdocs.yml"
+  - ".github/workflows"
+
+shared_file_owner: "integrator"
+dependencies:
+  - "P10g exact retirement"
+  - "schema-v4 native parent journal"
+  - "admitted TDS state domain"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_mssql_sqlclient_failed_attempt_settlement.py tests/test_mssql_sqlclient_fresh_chunk_executor.py -q"
+  broad:
+    - "uv run ruff check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+  live:
+    - "exact-source Docker narrow and 100-column retry/recovery fault matrix"
+required_outputs:
+  - "implementation"
+  - "tests"
+  - "documentation_impact"
+  - "completion_report"
+completion_statuses:
+  allowed: ["PASS", "FAIL", "SKIP", "N/A", "UNVERIFIED"]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

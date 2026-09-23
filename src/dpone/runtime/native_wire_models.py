@@ -2,30 +2,13 @@
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from hashlib import sha256
 from typing import Any
 
+from dpone.contracts.native_wire_layout import NativeWireColumnLayout
+
 NATIVE_WIRE_SCHEMA_VERSION = "dpone.native_transfer.native_wire.v1"
-
-
-@dataclass(frozen=True, slots=True)
-class NativeWireColumnLayout:
-    """Physical layout for one source-native column."""
-
-    name: str
-    source_type: str
-    target_type: str
-    nullable: bool
-    storage_type: str
-    prefix_width: int = 0
-    fixed_length: int | None = None
-    precision: int | None = None
-    scale: int | None = None
-    encoding: str | None = None
-
-    def to_dict(self) -> dict[str, Any]:
-        return asdict(self)
 
 
 @dataclass(frozen=True, slots=True)

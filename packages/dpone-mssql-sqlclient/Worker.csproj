@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Dpone.Mssql.SqlClient.Worker</AssemblyName>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <RuntimeIdentifier>linux-arm64</RuntimeIdentifier>
+    <RuntimeFrameworkVersion>8.0.31</RuntimeFrameworkVersion>
+    <RollForward>Disable</RollForward>
+    <SelfContained>false</SelfContained>
+    <UseAppHost>false</UseAppHost>
+    <PublishSingleFile>false</PublishSingleFile>
+    <PublishAot>false</PublishAot>
+    <PublishReadyToRun>false</PublishReadyToRun>
+    <PublishTrimmed>false</PublishTrimmed>
+    <ServerGarbageCollection>false</ServerGarbageCollection>
+    <Deterministic>true</Deterministic>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <NuGetLockFilePath>$(MSBuildThisFileDirectory)Worker.packages.lock.json</NuGetLockFilePath>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="worker/Startup/**/*.cs" />
+    <Compile Include="worker/Job/**/*.cs" />
+    <Compile Include="worker/Session/**/*.cs" />
+    <Compile Include="worker/Input/**/*.cs" />
+    <Compile Include="worker/Bulk/**/*.cs" />
+    <Compile Include="worker/Execution/**/*.cs" />
+    <Compile Include="worker/Entry/**/*.cs" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="[7.0.2]" />
+    <PackageReference Include="Apache.Arrow" Version="[23.0.0]" />
+    <RuntimeHostConfigurationOption Include="System.GC.HeapHardLimit" Value="536870912" />
+  </ItemGroup>
+</Project>

@@ -12,7 +12,17 @@ from dpone.runtime.sinks.load_result import LoadResult
 from tests.test_mssql_native_policy import config
 
 
-def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+def runtime(
+    tmp_path,
+    *,
+    recovered=False,
+    evidence_fails=False,
+    quality_fails=False,
+    observer=None,
+    v4=False,
+    journal_override=None,
+    settlement=None,
+):
     events = []
 
     class Journal:
@@ -29,11 +39,19 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
             self.phase = "evidence-complete"
             events.append("evidence-marker")
 
-        def succeeded(self):
+        def succeeded(self, *args):
             self.phase = "succeeded"
             events.append("state-marker")
 
-    journal = Journal()
+        @property
+        def data(self):
+            return {"version": 4} if v4 else {"version": 3}
+
+        def checkpoint_required(self):
+            self.phase = "checkpoint_required"
+            events.append("checkpoint-required")
+
+    journal = Journal() if journal_override is None else journal_override
     handle = StagedLoadHandle(None, (), 2)
     result = LoadResult(inserted_rows=2, updated_rows=0, total_rows=2, staging_rows=2, commit_receipt_id="synthetic")
 
@@ -63,7 +81,11 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
 
     def bindings(cfg, owner, lease, cancelled):
         context = SimpleNamespace(
-            plan=SimpleNamespace(target_id="target"), lease=lease, journal_factory=lambda: journal, cancelled=cancelled
+            plan=SimpleNamespace(target_id="target"),
+            lease=lease,
+            journal_factory=lambda: journal,
+            cancelled=cancelled,
+            settle_parent=settlement or (lambda: (events.append("retire"), setattr(journal, "phase", "succeeded"))),
         )
         return NativeRuntimeBindings(service, context, None)
 
@@ -185,3 +207,36 @@ def test_runtime_observations_identify_the_executing_thread(tmp_path):
         worker = pool.submit(execute).result()
     assert worker != get_ident()
     assert {item["worker_id"] for item in observer.snapshot()["observations"]} == {f"runtime:{worker}"}
+
+
+def test_v4_retires_before_checkpoint_and_never_uses_legacy_markers(tmp_path):
+    value, events, journal = runtime(tmp_path, recovered=True, v4=True)
+    value.run(config(), owner="invocation")
+    assert events == [
+        "preflight",
+        "resume",
+        "evidence",
+        "retire",
+        "cleanup-recovered",
+    ]
+    assert journal.phase == "succeeded"
+
+
+def test_runtime_executes_real_source_free_parent_settlement(tmp_path):
+    from tests.test_mssql_native_parent_settlement import Journal, _service
+
+    journal = Journal()
+    journal.data = {"version": 4}
+    journal.publication = journal
+    settlement, effects = _service(journal)
+    value, events, _ = runtime(
+        tmp_path,
+        recovered=True,
+        v4=True,
+        journal_override=journal,
+        settlement=settlement.settle,
+    )
+    value.run(config(), owner="invocation")
+    assert journal.phase == "succeeded"
+    assert effects[:4] == ["inspect:0", "retire:0", "inspect:1", "retire:1"]
+    assert "source" not in events and "publish" not in events

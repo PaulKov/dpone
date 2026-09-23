@@ -21,6 +21,76 @@ NATIVE_STAGE_LIMIT_FIELDS = ("encoding_parallelism", "import_parallelism")
 
 
 @dataclass(frozen=True)
+class NativeBulkTransportPolicy:
+    """Explicit TDS input and finite worker bounds; omission continues to use BCP.
+
+    Values are never coerced, inferred from installed drivers, or clamped. The
+    resolved mapping forms part of durable invocation identity, so changing a
+    limit requires settling the previous invocation before starting another.
+    """
+
+    backend: str
+    input: str
+    max_worker_address_space_bytes: int
+    batch_rows: int = 65536
+    startup_timeout_seconds: int = 30
+    operation_timeout_seconds: int = 300
+    terminate_timeout_seconds: int = 10
+    drop_timeout_seconds: int = 30
+    max_input_batch_bytes: int | None = field(default=None, kw_only=True)
+
+    def __post_init__(self) -> None:
+        for name, admitted in (("backend", ("mssql_python", "mssql_sqlclient")), ("input", ("rows", "arrow"))):
+            if type(getattr(self, name)) is not str or getattr(self, name) not in admitted:
+                raise ValueError(f"mssql_native.transport_invalid:{name}")
+        bounds = {
+            "max_worker_address_space_bytes": (8 << 30 if self.backend == "mssql_sqlclient" else 64 << 20, 16 << 30),
+            "batch_rows": (1, 65536),
+            "startup_timeout_seconds": (1, 120),
+            "operation_timeout_seconds": (1, 3600),
+            "terminate_timeout_seconds": (1, 60),
+            "drop_timeout_seconds": (1, 300),
+        }
+        for name, (low, high) in bounds.items():
+            value = getattr(self, name)
+            if type(value) is not int or not low <= value <= high:
+                raise ValueError(f"mssql_native.transport_invalid:{name}")
+        if self.operation_timeout_seconds < self.startup_timeout_seconds:
+            raise ValueError("mssql_native.transport_invalid:operation_timeout_seconds")
+        if self.backend == "mssql_sqlclient":
+            if self.max_input_batch_bytes is None:
+                object.__setattr__(self, "max_input_batch_bytes", 64 << 20)
+            if type(self.max_input_batch_bytes) is not int or not 1 << 20 <= self.max_input_batch_bytes <= 256 << 20:
+                raise ValueError("mssql_native.transport_invalid:max_input_batch_bytes")
+        elif self.max_input_batch_bytes is not None:
+            raise ValueError("mssql_native.transport_invalid:max_input_batch_bytes")
+
+    @classmethod
+    def from_mapping(cls, value: Any) -> NativeBulkTransportPolicy:
+        """Parse a closed explicit opt-in without leaking authored values in errors."""
+        if not isinstance(value, Mapping):
+            raise ValueError("mssql_native.transport_invalid:transport")
+        if set(value) - set(cls.__dataclass_fields__):
+            raise ValueError("mssql_native.transport_invalid:unknown_field")
+        for required in ("backend", "input", "max_worker_address_space_bytes"):
+            if required not in value:
+                raise ValueError(f"mssql_native.transport_required:{required}")
+        if "max_input_batch_bytes" in value and (
+            value.get("backend") != "mssql_sqlclient" or type(value["max_input_batch_bytes"]) is not int
+        ):
+            raise ValueError("mssql_native.transport_invalid:max_input_batch_bytes")
+        return cls(**dict(value))
+
+    def to_dict(self) -> dict[str, str | int]:
+        """Return a detached canonical record including every resolved bound."""
+        return {
+            name: getattr(self, name)
+            for name in self.__dataclass_fields__
+            if name != "max_input_batch_bytes" or self.backend == "mssql_sqlclient"
+        }
+
+
+@dataclass(frozen=True)
 class NativeChunkLimits:
     """Encoded/IPC bounds; SQL allocation is an observed stop threshold."""
 
@@ -97,6 +167,32 @@ class NativeChunkPlan:
     window_fingerprint: str
     schema_fingerprint: str
     wire_fingerprint: str
+    source_read_mode: str | None = field(default=None, kw_only=True)
+    transport: NativeBulkTransportPolicy | None = field(default=None, kw_only=True)
+
+    def __post_init__(self) -> None:
+        if self.transport is not None and type(self.transport) is not NativeBulkTransportPolicy:
+            raise ValueError("mssql_native.transport_invalid:transport")
+        if self.source_read_mode is not None and (
+            type(self.source_read_mode) is not str or self.source_read_mode != "raw_single_query"
+        ):
+            raise ValueError("mssql_native.source_read_invalid")
+
+    def to_dict(self) -> dict[str, Any]:
+        """Preserve legacy identity bytes and order; absence is not a default mode."""
+        identity: dict[str, Any] = {
+            "run_id": self.run_id,
+            "target_id": self.target_id,
+            "source_query_id": self.source_query_id,
+            "window_fingerprint": self.window_fingerprint,
+            "schema_fingerprint": self.schema_fingerprint,
+            "wire_fingerprint": self.wire_fingerprint,
+        }
+        if self.source_read_mode is not None:
+            identity["source_read_mode"] = self.source_read_mode
+        if self.transport is not None:
+            identity["transport"] = self.transport.to_dict()
+        return identity
 
 
 @dataclass(frozen=True)
@@ -109,6 +205,30 @@ class EncodedNativeFile:
     encoded_bytes: int
     file_sha256: str
     typed_digest: str
+
+
+@dataclass(frozen=True)
+class TdsInputReceipt:
+    """Complete consumed native-file identity, not proof of SQL publication.
+
+    This narrow contract crosses the runtime/SDK boundary without exposing a
+    decoder implementation or importing a vendor SDK into the contract layer.
+    """
+
+    rows: int
+    encoded_bytes: int
+    file_sha256: str
+
+    def __post_init__(self) -> None:
+        for value in (self.rows, self.encoded_bytes):
+            if type(value) is not int or not 0 <= value <= 2**63 - 1:
+                raise ValueError("mssql_native.tds_invalid_input_receipt")
+        if (
+            type(self.file_sha256) is not str
+            or len(self.file_sha256) != 64
+            or any(char not in "0123456789abcdef" for char in self.file_sha256)
+        ):
+            raise ValueError("mssql_native.tds_invalid_input_receipt")
 
 
 @dataclass(frozen=True)

@@ -7,21 +7,71 @@ ownership; it must not return while a previous BCP writer remains active.
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Sequence
-from dataclasses import asdict
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.mssql_native_chunks import EncodedNativeFile, NativeChunkPlan, NativeChunkReceipt
-from dpone.contracts.mssql_type_contract import normalize_mssql_physical_type
 from dpone.runtime.consumed_payload_evidence import ConsumedPayloadEvidence, canonical_source_provenance_sha256
 from dpone.runtime.file_artifacts import FileExportArtifact
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session
-from dpone.runtime.native_wire_models import stable_hash
+from dpone.runtime.native_wire_models import SourceNativeWireContract, stable_hash
+from dpone.runtime.native_wire_mssql import MssqlBcpNativeDecoder, build_mssql_bcp_native_contract
+from dpone.runtime.sinks.mssql_target_catalog_types import (
+    mssql_physical_schema_matches,
+    normalize_mssql_physical_schema,
+)
 
 if TYPE_CHECKING:
     from dpone.ports.native_delivery_observer import NativeDeliveryObserver
+
+
+def admit_native_bcp_file(
+    file: EncodedNativeFile, contract: SourceNativeWireContract, *, max_row_bytes: int | None
+) -> None:
+    """Scan before BCP effects; never reinterpret the unsupported value as empty.
+
+    Composition supplies its admitted row limit. Existing standalone importers
+    without a separate row limit remain bounded by the verified whole-file size;
+    absence of that optional tighter limit never skips the scan. Counts, bytes
+    and SHA256 are checked against the same file authority as vendor ingestion.
+    """
+    if any(type(value) is not int or not 0 <= value <= 2**63 - 1 for value in (file.rows, file.encoded_bytes)):
+        raise ValueError("mssql_native.file_bounds_invalid")
+    if max_row_bytes is None:
+        max_row_bytes = max(1, file.encoded_bytes)
+    if type(max_row_bytes) is not int or not 1 <= max_row_bytes <= 2**63 - 1:
+        raise ValueError("mssql_native.row_bound_invalid")
+    if len({column.name for column in contract.columns}) != len(contract.columns):
+        raise ValueError("mssql_native.columns_mismatch")
+    decoder = MssqlBcpNativeDecoder(contract)
+    text = tuple(
+        column.name for column in contract.columns if column.storage_type == "nvarchar" and column.prefix_width == 8
+    )
+    digest, consumed, rows = sha256(), 0, 0
+
+    def observe(payload: bytes) -> None:
+        nonlocal consumed
+        consumed += len(payload)
+        if consumed > file.encoded_bytes:
+            raise ValueError("mssql_native.file_identity_mismatch")
+        digest.update(payload)
+
+    try:
+        with file.path.open("rb") as handle:
+            for row in decoder.iter_stream(handle, max_row_bytes=max_row_bytes, on_bytes=observe):
+                rows += 1
+                if rows > file.rows:
+                    raise ValueError("mssql_native.file_row_count_mismatch")
+                if any(row[name] == "\0" for name in text):
+                    raise ValueError("mssql_native.single_nul_not_representable")
+    except EOFError:
+        raise ValueError("mssql_native.file_truncated") from None
+    if rows != file.rows:
+        raise ValueError("mssql_native.file_row_count_mismatch")
+    if consumed != file.encoded_bytes or digest.hexdigest() != file.file_sha256:
+        raise ValueError("mssql_native.file_identity_mismatch")
 
 
 class MssqlNativeChunkImporter:
@@ -39,6 +89,7 @@ class MssqlNativeChunkImporter:
         mutation_scope: Callable[..., Any],
         options_factory: Callable[..., Any],
         observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
+        max_row_bytes: int | None = None,
     ) -> None:
         self.connector = connector
         self.observations = delivery_session(observer)
@@ -46,11 +97,15 @@ class MssqlNativeChunkImporter:
         self.schema = schema
         self.columns = tuple(columns)
         self._encode = encode_row
+        self._max_row_bytes = max_row_bytes
         self._assert_lease = assert_lease
         self._mutation_scope = mutation_scope
         self._options_factory = options_factory
         self._types = tuple(
-            normalize_mssql_physical_type(column.source_type.removesuffix(" nullable")) for column in columns
+            dtype
+            for _, dtype, _ in normalize_mssql_physical_schema(
+                (column.name, column.source_type.removesuffix(" nullable"), column.nullable) for column in columns
+            )
         )
         if any(dtype.startswith(("varchar", "char(")) for dtype in self._types):
             raise ValueError("mssql_native.utf8_collation_authority_required")
@@ -60,7 +115,7 @@ class MssqlNativeChunkImporter:
     def table_name(self, plan: NativeChunkPlan, attempt_id: str) -> str:
         """Derive an owned identifier from the complete invocation and attempt."""
 
-        return "dpone_native_" + sha256(repr((asdict(plan), attempt_id)).encode()).hexdigest()[:40]
+        return "dpone_native_" + sha256(repr((plan.to_dict(), attempt_id)).encode()).hexdigest()[:40]
 
     def qualified(self, table: str) -> str:
         return str(self.connector.qualified_name(self.schema, table, database=self.database))
@@ -79,6 +134,16 @@ class MssqlNativeChunkImporter:
         integrity = artifact.require_integrity_receipt()
         if integrity.sha256 != file.file_sha256 or integrity.size_bytes != file.encoded_bytes:
             raise ValueError("mssql_native.file_identity_mismatch")
+        contract = build_mssql_bcp_native_contract(
+            schema=tuple(
+                (column.name, dtype + (" nullable" if column.nullable else ""))
+                for column, dtype in zip(self.columns, self._types, strict=True)
+            ),
+            query="native BCP import admission",
+        )
+        admit_native_bcp_file(file, contract, max_row_bytes=self._max_row_bytes)
+        if artifact.require_integrity_receipt() != integrity:
+            raise ValueError("mssql_native.file_identity_changed")
         with self._mutation_scope(plan, attempt_id, lease):
             self._assert_lease(lease)
             ddl = ", ".join(
@@ -147,7 +212,7 @@ class MssqlNativeChunkImporter:
             part = evidence.parts[0].to_payload()
             part["native_typed_sum"] = typed_sum
             part["native_object_id"] = object_id
-            part["native_plan_binding"] = stable_hash(asdict(plan))
+            part["native_plan_binding"] = stable_hash(plan.to_dict())
             return NativeChunkReceipt(
                 file.ordinal,
                 attempt_id,
@@ -170,7 +235,7 @@ class MssqlNativeChunkImporter:
             require_prepared_owner(self.connector, self._ownership(plan, receipt.attempt_id))
             part = receipt.consumed_part_evidence
             if (
-                part.get("native_plan_binding") != stable_hash(asdict(plan))
+                part.get("native_plan_binding") != stable_hash(plan.to_dict())
                 or part.get("native_object_id") != self._object_id(table)
                 or part.get("artifact_sha256") != receipt.file_sha256
                 or part.get("declared_rows") != receipt.rows
@@ -227,9 +292,8 @@ class MssqlNativeChunkImporter:
         expected = tuple(
             (column.name, dtype, column.nullable) for column, dtype in zip(self.columns, self._types, strict=True)
         )
-        if (
-            tuple((column.name, normalize_mssql_physical_type(column.dtype), column.nullable) for column in actual)
-            != expected
+        if not mssql_physical_schema_matches(
+            ((column.name, column.dtype, column.nullable) for column in actual), expected
         ):
             raise ValueError("mssql_native.stage_schema_changed")
         count = self.connector.get_records(f"SELECT COUNT_BIG(*) FROM {self.qualified(table)}")
@@ -248,7 +312,7 @@ class MssqlNativeChunkImporter:
             "database": self.database,
             "schema": self.schema,
             "table": self.table_name(plan, attempt_id),
-            "binding": sha256(repr((asdict(plan), attempt_id)).encode()).hexdigest(),
+            "binding": sha256(repr((plan.to_dict(), attempt_id)).encode()).hexdigest(),
         }
 
     def _object_id(self, table: str) -> int:
