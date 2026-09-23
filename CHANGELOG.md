@@ -11,6 +11,10 @@
 
 ### Fixed
 
+- Preserve the original Airflow TaskGroup during strict init-fetch composition,
+  keeping workload tasks visible in the DAG hierarchy and connected through
+  ordinary upstream/downstream group dependencies. No authoring changes required.
+
 - Stop Airflow live-log fallback polling promptly when an init container cannot
   recover or the pod terminates before the base container starts. Cleanup now
   receives the latest pod status; healthy workloads retain status-only polling.
