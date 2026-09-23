@@ -89,6 +89,14 @@ def test_native_requires_protected_authority():
         build_credential_projection(**inputs)
 
 
+@pytest.mark.parametrize("missing_ref", ["source", "target"])
+def test_missing_ordinary_workload_binding_is_not_omitted(missing_ref):
+    inputs = projection_case()
+    inputs["requirements"]["orders"] = ("warehouse", missing_ref)
+    with pytest.raises(CredentialProjectionError, match="mismatch"):
+        build_credential_projection(**inputs)
+
+
 def test_native_source_reader_uses_execution_profile():
     pack, _kwargs, _context = _native_case()
     assert native_workload_requirements({pack["workload"]["workload_id"]: pack}) == {

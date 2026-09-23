@@ -259,7 +259,7 @@ def verify_delivery(tmp_path, compiled):
     for key in preserved:
         assert release[key] == original[key]
     assert release["artifacts"]["runtime_payloads"] == original["artifacts"]["runtime_payloads"]
-    workspace_authority = write_native_environment(tmp_path)
+    workspace_authority = write_native_environment(tmp_path, ordinary=release["schema"] == "dpone.release-set.v3")
     projection = AirflowDeploymentProjectionService(root=tmp_path).materialize(
         release_id=materialized.release_id,
         environment="prod",
@@ -309,6 +309,17 @@ def verify_delivery(tmp_path, compiled):
             hook_execution="externalized",
         )
         assert kwargs["image"] == IMAGE
+        if item["id"] == "orders":
+            assert {row.connection_ref for row in context.credential_projection_data.membership("orders")} == {
+                "source",
+                "target",
+                "workspace_control",
+            }
+            assert {row.secret_key for row in context.credential_projection_data.selected_sources("orders")} == {
+                "AIRFLOW_CONN_SQL_SOURCE_LOGIN",
+                "AIRFLOW_CONN_SQL_TARGET_LOGIN",
+                "AIRFLOW_CONN_SQL_CONTROL_LOGIN",
+            }
         encoded = context.encode_plan(
             workload_id=item["id"], execution_kind="runtime", execution_scope="workload", hook_execution="externalized"
         )

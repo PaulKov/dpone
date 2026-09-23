@@ -128,7 +128,7 @@ def test_v6_has_no_development_only_requirement():
     assert init_fetch_context_from_payload(index).development_authority_required is False
 
 
-def write_native_environment(tmp_path):
+def write_native_environment(tmp_path, *, ordinary=False):
     """Build explicit synthetic target/control registry and protected authority."""
     import yaml
 
@@ -138,10 +138,23 @@ def write_native_environment(tmp_path):
     binding_path = tmp_path / "environments/prod/binding-set.yaml"
     bindings = yaml.safe_load(binding_path.read_text())
     bindings["bindings"]["workspace_control"] = {"connection_ref": "control_runtime"}
+    if ordinary:
+        bindings["bindings"].update({ref: {"connection_ref": f"{ref}_runtime"} for ref in ("source", "target")})
     binding_path.write_text(yaml.safe_dump(bindings))
     registry_path = tmp_path / "platform/connection-registries/prod.yaml"
     registry = yaml.safe_load(registry_path.read_text())
     registry["connections"]["control_runtime"] = projection_case()["source_registry"]["connections"]["control_runtime"]
+    if ordinary:
+        for ref in ("source", "target"):
+            registry["connections"][f"{ref}_runtime"] = {
+                "type": "postgres",
+                "connection": {"database": f"{ref}_database"},
+                "credentials": {
+                    "resolver": "airflow_connection",
+                    "connection_id": f"sql_{ref}_login",
+                    "execution_mode": "operator_bridge",
+                },
+            }
     registry_path.write_text(yaml.safe_dump(registry))
     return replace(projection_case()["authority"], artifact_registry_ref="synthetic-artifacts")
 
