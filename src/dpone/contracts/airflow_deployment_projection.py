@@ -19,6 +19,7 @@ _MIRRORED_FIELDS = (
     "dev_evidence_delivery",
     "mssql_asset_outlet_projection",
     "development_authority_required",
+    "credential_projection",
 )
 _DELIVERY_MODES = frozenset({"local_preview", "init_fetch", "shared_pvc", "embedded_bundle", "csi_volume", "inline"})
 _OPTIONAL_DIGEST_FIELDS = (
@@ -34,6 +35,7 @@ _EXECUTABLE_DEPLOYMENT_SCHEMAS = frozenset(
         "dpone.deployment-set.v3",
         "dpone.deployment-set.v4",
         "dpone.deployment-set.v5",
+        "dpone.deployment-set.v6",
     }
 )
 
@@ -51,6 +53,17 @@ def deployment_projection_violation(
     """Return the first deterministic identity or mirror-contract violation."""
 
     declared_id = deployment.get("deployment_id")
+    if deployment.get("schema") == "dpone.deployment-set.v6":
+        from dpone_airflow_pack.credential_projection_contract import (
+            CredentialProjectionError,
+            require_projection_descriptor,
+        )
+
+        try:
+            require_projection_descriptor(deployment.get("credential_projection"))
+            require_projection_descriptor(airflow_index.get("credential_projection"))
+        except CredentialProjectionError as exc:
+            return _violation(exc.code, str(exc))
     index_id = airflow_index.get("deployment_id")
     if not is_canonical_sha256_digest(declared_id) or not is_canonical_sha256_digest(index_id):
         return _violation("DPONE_DEPLOYMENT_ID_INVALID", "deployment identities must be sha256 digests")

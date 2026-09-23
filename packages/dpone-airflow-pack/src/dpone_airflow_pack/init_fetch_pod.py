@@ -7,6 +7,7 @@ from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 
+from dpone_airflow_pack.credential_projection_pod import project_credential_pod
 from dpone_airflow_pack.init_fetch_contract import (
     ConfigMapReference,
     InitFetchDeliveryContext,
@@ -179,6 +180,13 @@ def compose_init_fetch_operator_kwargs(
                 context.runtime_authority,
             ),
         }
+    )
+    clean["full_pod_spec"] = project_credential_pod(
+        clean["full_pod_spec"],
+        context=context,
+        workload_id=workload_id,
+        control_ref=env_vars.get("DPONE_DBT_WORKSPACE_AUTHORITY_CONNECTION_REF"),
+        native_empty_projection=pack.get("connection_projection") == {},
     )
     execution_timeout_seconds = projection.kpo_kwargs.get("execution_timeout_seconds")
     if execution_timeout_seconds is not None:

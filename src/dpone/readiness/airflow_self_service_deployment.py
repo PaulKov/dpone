@@ -12,6 +12,7 @@ from dpone.readiness.airflow_deployment_projection import (
     AirflowDeploymentProjectionError,
     AirflowDeploymentProjectionService,
 )
+from dpone.readiness.airflow_desired_state_authority import AirflowDesiredStateAuthority
 from dpone.readiness.airflow_self_service_models import SelfServiceResult
 
 _STRICT_V2_MIGRATION_CODE = "DPONE_RUNTIME_ARTIFACT_DELIVERY_MIGRATION_REQUIRED"
@@ -35,6 +36,7 @@ def build_deployment_result(
     dev_evidence_worker_queue: str | None = None,
     runtime_authority_ref: Mapping[str, Any] | None = None,
     registry_credentials: Mapping[str, Any] | None = None,
+    desired_state_authority: AirflowDesiredStateAuthority | None = None,
 ) -> SelfServiceResult:
     """Materialize an environment deployment projection without promoting current."""
 
@@ -68,6 +70,7 @@ def build_deployment_result(
             dev_evidence_worker_queue=dev_evidence_worker_queue,
             runtime_authority_ref=runtime_authority_ref,
             registry_credentials=registry_credentials,
+            desired_state_authority=desired_state_authority,
         )
     except AirflowDeploymentProjectionError as exc:
         return SelfServiceResult(

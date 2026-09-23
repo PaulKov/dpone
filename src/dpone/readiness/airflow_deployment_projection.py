@@ -6,10 +6,17 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from dpone_airflow_pack.credential_projection_contract import (
+    CredentialProjectionError,
+    canonical_projection_bytes,
+    projection_descriptor,
+)
+
 from dpone.manifest.confined_files import read_confined_file
 from dpone.readiness.airflow_connection_runtime_registry import (
     runtime_connection_snapshots as build_runtime_connection_snapshots,
 )
+from dpone.readiness.airflow_credential_projection import build_credential_projection, native_workload_requirements
 from dpone.readiness.airflow_deployment_artifacts import (
     json_bytes,
     load_local_safe_sample_v1_inputs,
@@ -63,6 +70,7 @@ from dpone.runtime.deployment_cache_common import DeploymentCacheError, promotio
 
 if TYPE_CHECKING:
     from dpone.readiness.airflow_deployment_artifacts import DeploymentProjectionInputs
+    from dpone.readiness.airflow_desired_state_authority import AirflowDesiredStateAuthority
 
 
 class AirflowDeploymentProjectionService:
@@ -102,6 +110,7 @@ class AirflowDeploymentProjectionService:
         semantic_refresh_sidecars: SemanticRefreshDagSidecarFactory | None = None,
         runtime_authority_ref: Mapping[str, Any] | None = None,
         registry_credentials: Mapping[str, Any] | None = None,
+        desired_state_authority: AirflowDesiredStateAuthority | None = None,
     ) -> AirflowDeploymentProjection:
         """Materialize a strict executable v2 environment projection."""
 
@@ -173,6 +182,22 @@ class AirflowDeploymentProjectionService:
             cache_root=self._cache_root,
             reader=read_confined_file,
         )
+        try:
+            credential_projection = build_credential_projection(
+                environment=environment,
+                release_id=release_id,
+                artifact_registry_ref=artifact_registry_ref,
+                requirements=native_workload_requirements(pack_payloads),
+                binding_set=inputs.binding_set,
+                source_registry=inputs.connection_registry,
+                snapshots=runtime_connection_snapshots,
+                authority=desired_state_authority,
+            )
+        except CredentialProjectionError as exc:
+            raise AirflowDeploymentProjectionError(exc.code, str(exc)) from None
+        credential_bytes = (
+            canonical_projection_bytes(credential_projection.to_dict()) if credential_projection is not None else None
+        )
         mssql_outlet_projection = build_mssql_asset_outlet_projection(
             environment=environment,
             binding_set=inputs.binding_set,
@@ -203,8 +228,11 @@ class AirflowDeploymentProjectionService:
             release_bytes=inputs.release_bytes,
             mssql_outlet_projection=mssql_outlet_projection,
             development_authority_required=inputs.development_authority_required,
+            credential_projection=projection_descriptor(credential_bytes) if credential_bytes is not None else None,
         )
         sidecar_files: dict[str, bytes] = {}
+        if credential_bytes is not None:
+            sidecar_files["credential-projection.json"] = credential_bytes
         if semantic_refresh_sidecars is not None:
             sidecars = semantic_refresh_sidecars.build(
                 release_id=release_id,

@@ -1,0 +1,109 @@
+"""Offline source-provenance and bounded-closure tests for native deployment."""
+
+from __future__ import annotations
+
+import json
+from copy import deepcopy
+
+import pytest
+from dpone_airflow_pack.credential_projection_contract import (
+    CredentialProjectionError,
+    canonical_projection_bytes,
+    projection_descriptor,
+)
+
+from dpone.readiness.airflow_credential_projection import build_credential_projection, native_workload_requirements
+from dpone.readiness.airflow_desired_state_authority import AirflowDesiredStateAuthority
+from tests.test_native_deployment_credential_projection_gap import _native_case, _registry, _snapshots
+
+
+def projection_case(*, shared: bool = False):
+    """Return only synthetic metadata and exact snapshot bytes; no credentials."""
+    registry = _registry(shared_connection=shared)
+    snapshots = _snapshots(registry)
+    authority = AirflowDesiredStateAuthority(
+        environment="prod",
+        desired_state_uri="s3://artifacts/desired/current.json",
+        certified_s3_endpoint_url="https://objects.example.test",
+        artifact_registry_uri="s3://artifacts/immutable",
+        artifact_registry_ref="registry",
+        watcher_identity="watcher",
+        source_project="example/project",
+        source_ref="main",
+        workspace_authority_connection_ref="workspace_control",
+    )
+    return dict(
+        environment="prod",
+        release_id="sha256:" + "a" * 64,
+        artifact_registry_ref="registry",
+        requirements={"dbt__example": ("warehouse",)},
+        binding_set=json.loads(snapshots["binding_set"]),
+        source_registry=registry,
+        snapshots=snapshots,
+        authority=authority,
+    )
+
+
+@pytest.mark.parametrize("shared", [False, True])
+def test_exact_source_keys_and_control_closure(shared):
+    inputs = projection_case(shared=shared)
+    before = deepcopy(inputs["source_registry"])
+    result = build_credential_projection(**inputs)
+    assert result is not None
+    assert {row.connection_ref for row in result.membership("dbt__example")} == {"warehouse", "workspace_control"}
+    assert {source.secret_key for source in result.sources} == (
+        {"AIRFLOW_CONN_SQL_TARGET_LOGIN"}
+        if shared
+        else {"AIRFLOW_CONN_SQL_TARGET_LOGIN", "AIRFLOW_CONN_SQL_CONTROL_LOGIN"}
+    )
+    assert len({source.mount_path for source in result.sources}) == 2
+    assert inputs["source_registry"] == before
+    assert "password" not in canonical_projection_bytes(result.to_dict()).decode()
+
+
+@pytest.mark.parametrize("ref", ["warehouse_runtime", "control_runtime"])
+def test_exact_source_change_changes_projection_identity(ref):
+    inputs = projection_case()
+    original = build_credential_projection(**inputs)
+    inputs["source_registry"]["connections"][ref]["credentials"]["connection_id"] = "replacement_login"
+    changed = build_credential_projection(**inputs)
+    assert projection_descriptor(canonical_projection_bytes(original.to_dict())) != projection_descriptor(
+        canonical_projection_bytes(changed.to_dict())
+    )
+
+
+def test_no_native_requirements_preserve_legacy_lane():
+    inputs = projection_case()
+    inputs.update(requirements={}, authority=None)
+    assert build_credential_projection(**inputs) is None
+
+
+def test_native_requires_protected_authority():
+    inputs = projection_case()
+    inputs["authority"] = None
+    with pytest.raises(CredentialProjectionError, match="required"):
+        build_credential_projection(**inputs)
+
+
+def test_native_source_reader_uses_execution_profile():
+    pack, _kwargs, _context = _native_case()
+    assert native_workload_requirements({pack["workload"]["workload_id"]: pack}) == {
+        pack["workload"]["workload_id"]: ("warehouse",),
+    }
+
+
+def test_unused_registry_entry_not_mounted():
+    inputs = projection_case()
+    inputs["source_registry"]["connections"]["unused"] = deepcopy(
+        inputs["source_registry"]["connections"]["warehouse_runtime"]
+    )
+    result = build_credential_projection(**inputs)
+    assert {row.registry_ref for row in result.sources} == {"warehouse_runtime", "control_runtime"}
+
+
+def test_normalized_source_key_collision_is_rejected():
+    inputs = projection_case()
+    inputs["source_registry"]["connections"]["warehouse_runtime"]["credentials"]["connection_id"] = "sql-login"
+    inputs["source_registry"]["connections"]["control_runtime"]["credentials"]["connection_id"] = "sql_login"
+    with pytest.raises(CredentialProjectionError):
+        build_credential_projection(**inputs)

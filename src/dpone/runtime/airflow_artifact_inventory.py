@@ -33,6 +33,7 @@ from dpone.runtime.airflow_artifact_inventory_files import (
 from dpone.runtime.airflow_artifact_inventory_files import (
     runtime_connection_artifact as _runtime_connection_artifact,
 )
+from dpone.runtime.airflow_credential_projection_inventory import credential_projection_publication_file
 from dpone.runtime.airflow_runtime_connection_inventory import (
     runtime_connection_publication_files,
     validate_deployment_auxiliary_files,
@@ -133,6 +134,7 @@ def build_publish_inventory(
         "dpone.deployment-set.v3",
         "dpone.deployment-set.v4",
         "dpone.deployment-set.v5",
+        "dpone.deployment-set.v6",
     }:
         deployment_files.extend(
             _runtime_connection_artifact(item)
@@ -142,6 +144,11 @@ def build_publish_inventory(
                 root=request.cache_root,
             )
         )
+    credential_spec = credential_projection_publication_file(
+        projection.deployment, deployment_dir=deployment_dir, root=request.cache_root
+    )
+    if credential_spec is not None:
+        deployment_files.append(_runtime_connection_artifact(credential_spec))
     attestation_spec = attestation_publication_spec(
         request,
         release_schema=str(release.get("schema", "dpone.release-set.v1")),
@@ -272,6 +279,8 @@ def deployment_file_names(
     index: Mapping[str, Any] | None = None,
 ) -> tuple[str, ...]:
     names = list(_BASE_DEPLOYMENT_FILES)
+    if deployment.get("schema") == "dpone.deployment-set.v6":
+        names.append("credential-projection.json")
     if deployment.get("binding_set_ref") is not None:
         names.append("binding-set.json")
     if deployment.get("connection_registry_ref") is not None:

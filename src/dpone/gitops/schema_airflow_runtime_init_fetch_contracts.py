@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from dpone.gitops.schema_contract_primitives import GitOpsSchemaContract
 
+from copy import deepcopy
+
 from dpone.gitops.schema_airflow_init_fetch_execution import (
     bounded_execution_token_schema,
     init_fetch_execution_schema,
@@ -23,6 +25,7 @@ from dpone.gitops.schema_runtime_connection_context import (
     runtime_connection_artifact_schema,
     runtime_pinned_cache_ref_schema,
 )
+from dpone.gitops.schema_runtime_credential_projection import credential_projection_descriptor_schema
 
 
 def airflow_runtime_init_fetch_schema_contracts() -> tuple[GitOpsSchemaContract, ...]:
@@ -32,6 +35,7 @@ def airflow_runtime_init_fetch_schema_contracts() -> tuple[GitOpsSchemaContract,
         runtime_init_fetch_plan_v3_contract(),
         _runtime_init_fetch_plan_contract(version=4),
         _runtime_init_fetch_plan_contract(version=5),
+        runtime_init_fetch_plan_v6_contract(),
         runtime_fetch_ready_contract(),
     )
 
@@ -46,6 +50,31 @@ def runtime_init_fetch_plan_v2_contract() -> GitOpsSchemaContract:
 
 def runtime_init_fetch_plan_v3_contract() -> GitOpsSchemaContract:
     return _runtime_init_fetch_plan_contract(version=3)
+
+
+def runtime_init_fetch_plan_v6_contract() -> GitOpsSchemaContract:
+    """Credential closure is required; development authorization is orthogonal."""
+    source = runtime_init_fetch_plan_v3_contract()
+    schema = deepcopy(source.schema)
+    schema["$id"] = schema["$id"].replace("-v3", "-v6")
+    schema["title"] = schema["title"].replace("v3", "v6")
+    schema["properties"]["schema"] = {"const": "dpone.airflow-runtime-init-fetch-plan.v6"}
+    schema["properties"]["credential_projection"] = credential_projection_descriptor_schema()
+    schema["required"].append("credential_projection")
+    schema["properties"]["development_authority_required"] = {"const": True}
+    schema["properties"]["runtime_authority"] = immutable_runtime_authority_source_schema()
+    schema["allOf"].extend(
+        [
+            {
+                "if": {"required": ["development_authority_required"]},
+                "then": {"properties": {"trust_tier": {"const": "non_production"}}},
+            },
+            {"if": {"required": ["runtime_authority"]}, "then": {"required": ["development_authority_required"]}},
+        ]
+    )
+    return type(source)(
+        name="airflow-runtime-init-fetch-plan-v6", kind="dpone.airflow-runtime-init-fetch-plan.v6", schema=schema
+    )
 
 
 def _runtime_init_fetch_plan_contract(*, version: int) -> GitOpsSchemaContract:

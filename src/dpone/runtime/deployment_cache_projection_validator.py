@@ -6,7 +6,10 @@ import os
 from pathlib import Path
 from typing import Any
 
+from dpone_airflow_pack.credential_projection_contract import CredentialProjectionError
+
 from dpone.contracts.airflow_deployment_projection import deployment_projection_violation
+from dpone.runtime.airflow_credential_projection_inventory import verify_credential_projection_files
 from dpone.runtime.deployment_cache_common import (
     DeploymentCacheError,
     open_regular_file,
@@ -203,6 +206,10 @@ class DeploymentCacheProjectionValidator:
             )
             raise DeploymentCacheError(violation.code, violation.message, path=violation_path.as_posix())
         release_id = str(deployment["release_ref"])
+        try:
+            verify_credential_projection_files(deployment, deployment_dir=deployment_dir, root=self._cache_root)
+        except CredentialProjectionError as exc:
+            raise DeploymentCacheError(exc.code, str(exc)) from None
         wire_contract = self._integrity_verifier.verify_details(
             index=index, index_path=index_path, release_id=release_id
         )
@@ -218,6 +225,7 @@ _DEPLOYMENT_SCHEMAS = frozenset(
         "dpone.deployment-set.v3",
         "dpone.deployment-set.v4",
         "dpone.deployment-set.v5",
+        "dpone.deployment-set.v6",
     }
 )
 _INDEX_SCHEMAS = frozenset(
@@ -227,6 +235,7 @@ _INDEX_SCHEMAS = frozenset(
         "dpone.airflow-deployment-index.v3",
         "dpone.airflow-deployment-index.v4",
         "dpone.airflow-deployment-index.v5",
+        "dpone.airflow-deployment-index.v6",
     }
 )
 _SCHEMA_WIRE_PAIRS = frozenset(
@@ -236,6 +245,7 @@ _SCHEMA_WIRE_PAIRS = frozenset(
         ("dpone.deployment-set.v3", "dpone.airflow-deployment-index.v3"),
         ("dpone.deployment-set.v4", "dpone.airflow-deployment-index.v4"),
         ("dpone.deployment-set.v5", "dpone.airflow-deployment-index.v5"),
+        ("dpone.deployment-set.v6", "dpone.airflow-deployment-index.v6"),
     }
 )
 

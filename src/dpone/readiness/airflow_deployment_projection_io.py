@@ -142,6 +142,14 @@ def _ordered_projection_files(expected_files: Mapping[str, bytes]) -> tuple[tupl
     expected_names = set(expected_files)
     base_names = set(_PROJECTION_FILE_ORDER)
     sidecar_names = expected_names - base_names
+    credential_name = "credential-projection.json"
+    if credential_name in sidecar_names:
+        import json
+
+        deployment = json.loads(expected_files["deployment.json"])
+        if deployment.get("schema") != "dpone.deployment-set.v6":
+            raise ValueError("credential projection requires deployment v6")
+        sidecar_names.remove(credential_name)
     if (
         not base_names.issubset(expected_names)
         or len(sidecar_names) > _MAX_SEMANTIC_REFRESH_PROJECTIONS
@@ -150,6 +158,7 @@ def _ordered_projection_files(expected_files: Mapping[str, bytes]) -> tuple[tupl
         raise ValueError("projection file set is incomplete")
     order = (
         *_PROJECTION_FILE_ORDER[:-1],
+        *((credential_name,) if credential_name in expected_names else ()),
         *sorted(sidecar_names),
         _PROJECTION_FILE_ORDER[-1],
     )

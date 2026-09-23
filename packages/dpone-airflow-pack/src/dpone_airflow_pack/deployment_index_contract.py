@@ -34,6 +34,7 @@ from dpone_airflow_pack.init_fetch_contract import (
     AIRFLOW_INDEX_SCHEMA_V3,
     AIRFLOW_INDEX_SCHEMA_V4,
     AIRFLOW_INDEX_SCHEMA_V5,
+    AIRFLOW_INDEX_SCHEMA_V6,
     InitFetchDeliveryContext,
     init_fetch_context_from_payload,
 )
@@ -51,9 +52,12 @@ INDEX_SCHEMA_V2 = AIRFLOW_INDEX_SCHEMA_V2
 INDEX_SCHEMA_V3 = AIRFLOW_INDEX_SCHEMA_V3
 INDEX_SCHEMA_V4 = AIRFLOW_INDEX_SCHEMA_V4
 INDEX_SCHEMA_V5 = AIRFLOW_INDEX_SCHEMA_V5
+INDEX_SCHEMA_V6 = AIRFLOW_INDEX_SCHEMA_V6
 INDEX_SCHEMA = INDEX_SCHEMA_V1
-_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V1, INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4, INDEX_SCHEMA_V5})
-_STRICT_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4, INDEX_SCHEMA_V5})
+_INDEX_SCHEMAS = frozenset(
+    {INDEX_SCHEMA_V1, INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4, INDEX_SCHEMA_V5, INDEX_SCHEMA_V6}
+)
+_STRICT_INDEX_SCHEMAS = frozenset({INDEX_SCHEMA_V2, INDEX_SCHEMA_V3, INDEX_SCHEMA_V4, INDEX_SCHEMA_V5, INDEX_SCHEMA_V6})
 DEFAULT_MAX_INDEX_BYTES = 8 * 1024 * 1024
 _legacy_missing_bytes_warning_pid: int | None = None
 
@@ -149,6 +153,12 @@ def _load_airflow_deployment_index(
     runtime_artifact_delivery = validate_runtime_artifact_delivery(payload, path=path)
     strict_index = schema in _STRICT_INDEX_SCHEMAS
     delivery_context = init_fetch_context_from_payload(payload, path=path) if strict_index else None
+    if delivery_context is not None and verify_artifacts:
+        from dpone_airflow_pack.credential_projection_pod import load_credential_projection_context
+
+        delivery_context = load_credential_projection_context(
+            delivery_context, index_path=path, cache_root=root, activation=activation
+        )
     _validate_current_activation_identity(
         activation,
         payload=payload,

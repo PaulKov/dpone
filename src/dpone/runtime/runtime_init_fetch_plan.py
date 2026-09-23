@@ -34,6 +34,7 @@ RUNTIME_INIT_FETCH_PLAN_SCHEMA_V2 = "dpone.airflow-runtime-init-fetch-plan.v2"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3 = "dpone.airflow-runtime-init-fetch-plan.v3"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4 = "dpone.airflow-runtime-init-fetch-plan.v4"
 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5 = "dpone.airflow-runtime-init-fetch-plan.v5"
+RUNTIME_INIT_FETCH_PLAN_SCHEMA_V6 = "dpone.airflow-runtime-init-fetch-plan.v6"
 MAX_RUNTIME_INIT_FETCH_PLAN_BYTES = 16 * 1024
 
 _ENVIRONMENT_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,62}$")
@@ -112,6 +113,7 @@ class RuntimeInitFetchPlan:
     runtime_payloads: tuple[RuntimePayloadDescriptor, ...] = ()
     development_authority_required: bool = False
     runtime_authority: ImmutableRuntimeAuthorityPayload | None = None
+    credential_projection: RuntimeArtifactDescriptor | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -156,6 +158,7 @@ class RuntimeInitFetchPlan:
             self.binding_set,
             self.connection_registry,
             self.credential_runtime,
+            *((self.credential_projection,) if self.credential_projection is not None else ()),
             *self.runtime_payloads,
         )
 
@@ -166,6 +169,7 @@ class RuntimeInitFetchPlan:
                 self.execution.hook_execution is not None,
                 bool(self.runtime_payloads),
                 self.runtime_authority is not None,
+                self.credential_projection is not None,
             ),
             "environment": self.environment,
             "trust_tier": self.trust_tier,
@@ -194,6 +198,8 @@ class RuntimeInitFetchPlan:
             payload["runtime_payloads"] = [item.to_dict() for item in self.runtime_payloads]
         if self.development_authority_required:
             payload["development_authority_required"] = True
+        if self.credential_projection is not None:
+            payload["credential_projection"] = self.credential_projection.to_dict()
         if self.runtime_authority is not None:
             payload["runtime_authority"] = self.runtime_authority.to_dict()
         return payload
@@ -275,6 +281,14 @@ def _validate_plan(plan: RuntimeInitFetchPlan) -> None:
         raise ValueError("runtime init-fetch payload ids must be unique")
     _require_artifact_prefix(plan.deployment, ("deployments", plan.environment, deployment_dir))
     _require_runtime_connection_context(plan)
+    if plan.credential_projection is not None:
+        from dpone_airflow_pack.credential_projection_contract import require_projection_descriptor
+
+        require_projection_descriptor(plan.credential_projection.to_dict())
+        if plan.execution.hook_execution is None:
+            raise ValueError("credential projection requires explicit hook execution")
+        if plan.development_authority_required and plan.trust_tier != "non_production":
+            raise ValueError("development authority requires non_production trust tier")
     artifact_refs = tuple(artifact.artifact_ref for artifact in plan.artifacts)
     if len(set(artifact_refs)) != len(artifact_refs):
         raise ValueError("runtime init-fetch artifact_ref values must be unique")
