@@ -236,6 +236,14 @@ grant deadlines. These are post-startup component checks, not guarded production
 startup, durable parent evidence or complete-route certification. SDK disposal
 exception injection remains unverified. The seven-day TDS comparison has not run.
 
+P10f verification after local writer exit keeps its existing exact typed
+multiset contract but computes row hashes on SQL Server. The management helper
+receives one aggregate row with count and fixed word sums; it never fetches
+business rows. A temporary hash heap bounds work at expected rows plus one and
+requires `tempdb` capacity for 32 hash bytes per expected row plus heap overhead.
+Python/T-SQL differential tests for every admitted type are a deployment
+requirement. `count/min/max` is not publication authority.
+
 
 ## Fixed production entry candidate
 

@@ -112,8 +112,6 @@ def run_departure(
         from dpone.contracts.mssql_tds_coordinator_ipc import TdsCoordinatorStartup, encode_startup
         from dpone.contracts.mssql_tds_validation import deadline_nanoseconds
         from dpone.runtime.mssql_native_chunks_files import native_multiset_digest
-        from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
-        from dpone.runtime.native_wire_models import NATIVE_WIRE_SCHEMA_VERSION, SourceNativeWireContract, stable_hash
 
         send = partial(
             send_departure_frame,
@@ -250,26 +248,13 @@ def run_departure(
         elif restricted_writer_departure.is_request(request):
             restricted_writer_result = restricted_writer_departure.observe_child(connection, request, verifier_nonce)
         elif type(request) is SqlClientWriterSettlementRequest:
-            columns = request.plan.input_descriptor.columns
-            layout = tuple(column.to_dict() for column in columns)
-            wire = SourceNativeWireContract(
-                schema_version=NATIVE_WIRE_SCHEMA_VERSION,
-                source_system="mssql",
-                source_format="mssql-bcp-native",
-                target_format="RowBinary",
-                columns=columns,
-                schema_hash=stable_hash(tuple((column.name, column.source_type) for column in columns)),
-                query_hash=stable_hash("p10f-stage-readback-v1"),
-                type_layout_hash=stable_hash(layout),
-            )
-            encoder = MssqlNativeEncoder(wire, max_row_bytes=request.plan.input_descriptor.max_row_bytes)
+            connection.set_query_deadline(deadline=operation_deadline, clock=time.monotonic)
             settlement_observer = SqlClientWriterSettlementObserver(
                 connection.cursor,
                 management_admission=request.plan.management_admission,
                 operation_deadline_ns=operation_ns,
                 operation_deadline=operation_deadline,
                 monotonic_ns=time.monotonic_ns,
-                encode_row=encoder.encode_row,
                 finalize_digest=native_multiset_digest,
                 close_connection=lambda: None,
             )

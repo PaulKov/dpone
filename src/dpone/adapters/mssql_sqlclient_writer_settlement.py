@@ -1,13 +1,12 @@
-"""One-connection P10f departure and typed stage-content observation.
+"""One-connection P10f departure and target-local typed stage observation.
 
 The caller provides an independently admitted management connection and a
-canonical native-row encoder. Synchronous driver calls require external process
+canonical digest finalizer. Synchronous driver calls require external process
 containment. The adapter never reconnects, retries, mutates business data, or
 publishes the stage.
 """
 
-from collections.abc import Callable, Sequence
-from hashlib import sha256
+from collections.abc import Callable
 from typing import Any, Protocol
 
 from dpone.adapters.mssql_sqlclient_create_exclusion_v2 import _partition
@@ -19,6 +18,7 @@ from dpone.adapters.mssql_sqlclient_create_exclusion_v2_sql import (
 )
 from dpone.adapters.mssql_sqlclient_observation_cursor import ObservationCursor
 from dpone.adapters.mssql_sqlclient_observer_incarnation import capture_observer_incarnation
+from dpone.adapters.mssql_sqlclient_server_digest import build_server_digest_sql, decode_server_digest_row
 from dpone.adapters.mssql_sqlclient_stage_catalog import SqlClientStageObserver
 from dpone.contracts.mssql_sqlclient_create_departure_v2 import (
     SqlClientDepartureSampleKind as Kind,
@@ -33,7 +33,6 @@ from dpone.contracts.mssql_tds_api import (
     SqlClientWriterSettlementObservation,
     TdsCreateType,
     observer_incarnation_digest,
-    quote_stage_identifier,
 )
 
 _ERROR = "mssql_native.sqlclient_writer_settlement_unavailable"
@@ -44,10 +43,6 @@ class SettlementCursor(Protocol):
     def fetchone(self) -> Any: ...
     def nextset(self) -> Any: ...
     def close(self) -> Any: ...
-
-
-def _target(stage: SqlClientStageIdentity) -> str:
-    return quote_stage_identifier(stage.schema_name) + "." + quote_stage_identifier(stage.table_name)
 
 
 def _layout_matches(stage: SqlClientStageIdentity, descriptor: SqlClientInputDescriptor) -> bool:
@@ -78,7 +73,6 @@ class SqlClientWriterSettlementObserver:
         operation_deadline_ns: int,
         operation_deadline: float,
         monotonic_ns: Callable[[], int],
-        encode_row: Callable[[Sequence[Any]], bytes],
         finalize_digest: Callable[[int, int], str],
         close_connection: Callable[[], None],
     ) -> None:
@@ -88,7 +82,6 @@ class SqlClientWriterSettlementObserver:
             or operation_deadline_ns < 1
             or type(operation_deadline) is not float
             or operation_deadline <= 0
-            or not callable(encode_row)
             or not callable(finalize_digest)
             or not callable(close_connection)
         ):
@@ -102,7 +95,6 @@ class SqlClientWriterSettlementObserver:
             admission=management_admission,
             operation_deadline_ns=operation_deadline_ns,
         )
-        self._encode_row = encode_row
         self._finalize_digest = finalize_digest
         self._close_connection = close_connection
         self._operation_deadline = operation_deadline
@@ -172,34 +164,26 @@ class SqlClientWriterSettlementObserver:
             samples=tuple(samples),
         )
 
-    def _contents(self, stage: SqlClientStageIdentity, expected_rows: int) -> tuple[int, str, int]:
-        columns = ", ".join(quote_stage_identifier(column.name) for column in stage.columns)
-        sql = "SELECT " + columns + " FROM " + _target(stage) + " WITH (HOLDLOCK, TABLOCK);"
+    def _contents(
+        self, stage: SqlClientStageIdentity, descriptor: SqlClientInputDescriptor, expected_rows: int
+    ) -> tuple[int, str, int]:
+        sql = build_server_digest_sql(stage, descriptor)
         self._current()
         self._cursor.execute(sql)
         self._current()
-        count, total = 0, 0
-        while True:
-            self._current()
-            row = self._cursor.fetchone()
-            self._current()
-            if row is None:
-                break
-            count += 1
-            if count > expected_rows:
-                raise ValueError(_ERROR)
-            payload = self._encode_row(tuple(row))
-            if type(payload) is not bytes:
-                raise ValueError(_ERROR)
-            total = (total + int.from_bytes(sha256(payload).digest(), "big")) % (1 << 256)
+        row = self._cursor.fetchone()
+        self._current()
+        if self._cursor.fetchone() is not None:
+            raise ValueError(_ERROR)
         self._current()
         if self._cursor.nextset() not in (None, False):
             raise ValueError(_ERROR)
         self._current()
-        digest = self._finalize_digest(count, total)
-        if type(digest) is not str or len(digest) != 64:
-            raise ValueError(_ERROR)
-        return count, digest, total
+        return decode_server_digest_row(
+            row,
+            expected_rows=expected_rows,
+            finalize_digest=self._finalize_digest,
+        )
 
     def observe(
         self,
@@ -252,10 +236,7 @@ class SqlClientWriterSettlementObserver:
                 database_id=db.database_id,
                 database_name=db.database_name,
             )
-            count_row = self._query("SELECT COUNT_BIG(*) FROM " + _target(stage) + " WITH (HOLDLOCK, TABLOCK);")
-            if len(count_row) != 1 or len(count_row[0]) != 1 or type(count_row[0][0]) is not int:
-                raise ValueError(_ERROR)
-            row_count, typed_digest, typed_sum = self._contents(stage, expectation.rows)
+            row_count, typed_digest, typed_sum = self._contents(stage, input_descriptor, expectation.rows)
             after, final_permissions = self._stage.catalog_in_existing_session(
                 stage,
                 lease=self._lease,
@@ -265,7 +246,6 @@ class SqlClientWriterSettlementObserver:
             )
             if (
                 permissions != final_permissions
-                or count_row[0][0] != row_count
                 or row_count != expectation.rows
                 or typed_digest != expectation.typed_digest
             ):

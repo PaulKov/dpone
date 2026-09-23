@@ -42,6 +42,12 @@ class Cursor:
             self.rows = [(0, 0, 0, None, None, None, None)]
         elif sql == TRANSACTIONS_SQL:
             self.rows = [(0,)]
+        elif "HASHBYTES('SHA2_256'" in sql:
+            hashes = tuple(sha256(int(row[0]).to_bytes(8, "little", signed=True)).digest() for row in self.data_rows)
+            words = tuple(
+                sum(int.from_bytes(value[offset : offset + 4], "big") for value in hashes) for offset in range(0, 32, 4)
+            )
+            self.rows = [(len(hashes), len(hashes), *words)]
         elif "COUNT_BIG" in sql:
             self.rows = [(len(self.data_rows),)]
         elif sql.startswith("SELECT ["):
@@ -123,7 +129,7 @@ def _inputs(value=7):
     return record, writer_admission, management_admission, management, observed_stage, descriptor, expectation
 
 
-def test_happy_path_streams_exact_typed_digest_under_transaction(monkeypatch):
+def test_happy_path_computes_exact_target_local_digest_under_transaction(monkeypatch):
     record, writer_admission, management_admission, management, observed_stage, descriptor, expectation = _inputs()
     cursor = Cursor([(7,)])
     monkeypatch.setattr(
@@ -140,7 +146,6 @@ def test_happy_path_streams_exact_typed_digest_under_transaction(monkeypatch):
         operation_deadline_ns=100,
         operation_deadline=1.0,
         monotonic_ns=lambda: 1,
-        encode_row=lambda row: int(row[0]).to_bytes(8, "little", signed=True),
         finalize_digest=native_multiset_digest,
         close_connection=cursor.close,
     )
@@ -179,7 +184,6 @@ def test_content_mismatch_is_fail_closed(monkeypatch):
         operation_deadline_ns=100,
         operation_deadline=1.0,
         monotonic_ns=lambda: 1,
-        encode_row=lambda row: int(row[0]).to_bytes(8, "little", signed=True),
         finalize_digest=native_multiset_digest,
         close_connection=cursor.close,
     )
@@ -213,7 +217,6 @@ def test_replay_and_second_close_are_rejected(monkeypatch):
         operation_deadline_ns=100,
         operation_deadline=1.0,
         monotonic_ns=lambda: 1,
-        encode_row=lambda row: int(row[0]).to_bytes(8, "little", signed=True),
         finalize_digest=native_multiset_digest,
         close_connection=cursor.close,
     )

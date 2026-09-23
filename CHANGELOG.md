@@ -169,6 +169,11 @@
 
 ### Performance
 
+- Compute the SQLClient P10f native typed multiset inside SQL Server and return
+  one bounded aggregate row instead of streaming every staged business row back
+  through the management connection. Preserve the exact digest, settlement,
+  evidence, recovery and publication contracts.
+
 - Avoid a repeated Python character scan when encoding bounded variable-width
   native MSSQL text. Preserve native bytes, capacity diagnostics, allocation-free
   sizing and every independent staging verification and recovery boundary.

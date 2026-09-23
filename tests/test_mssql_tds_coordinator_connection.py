@@ -15,6 +15,7 @@ from dpone.adapters.mssql_tds_coordinator_connection import (
     TdsConnectionProfile,
     TdsCoordinatorBuild,
     TdsCoordinatorConnection,
+    TdsSqlConnection,
 )
 
 
@@ -124,6 +125,94 @@ def test_close_attempts_connection_even_if_cursor_close_fails(driver, monkeypatc
     assert events[-1] == "connection-close"
     with pytest.raises(TdsConnectionError, match="owner"):
         connection.close()
+
+
+def test_long_query_timeout_is_bound_to_remaining_operation_deadline(driver):
+    build, events, raw = driver
+    connection = TdsCoordinatorConnection(build, TdsConnectionProfile.VERIFIED_TLS, clock=lambda: 0.0).connect(
+        material(), deadline=11.0
+    )
+    original_cursor = connection.cursor
+    replacement_cursor = SimpleNamespace(close=lambda: events.append("replacement-cursor-close"))
+    raw.cursor = lambda: replacement_cursor
+
+    connection.set_query_deadline(deadline=101.25, clock=lambda: 1.0)
+
+    assert raw.timeout == 101
+    assert connection.cursor is replacement_cursor
+    assert connection.cursor is not original_cursor
+    assert events[-1] == "cursor-close"
+    connection.close()
+    assert events[-2:] == ["replacement-cursor-close", "connection-close"]
+
+
+def test_query_deadline_detaches_ambiguous_old_cursor_before_cleanup() -> None:
+    events = []
+
+    def fail_old_close():
+        events.append("old-close")
+        raise RuntimeError("ambiguous")
+
+    old = SimpleNamespace(close=fail_old_close)
+    replacement = SimpleNamespace(close=lambda: events.append("replacement-close"))
+    raw = SimpleNamespace(
+        timeout=None,
+        cursor=lambda: replacement,
+        close=lambda: events.append("connection-close"),
+    )
+    connection = TdsSqlConnection(raw, old)
+
+    with pytest.raises(TdsConnectionError, match="timeout_unknown"):
+        connection.set_query_deadline(deadline=10.0, clock=lambda: 0.0)
+
+    assert connection.cursor is None
+    assert events == ["old-close", "replacement-close"]
+    connection.close()
+    assert events == ["old-close", "replacement-close", "connection-close"]
+
+
+def test_query_deadline_keeps_unattempted_old_cursor_when_replacement_fails() -> None:
+    events = []
+    old = SimpleNamespace(close=lambda: events.append("old-close"))
+
+    def fail_cursor():
+        events.append("replacement-create")
+        raise RuntimeError("unavailable")
+
+    raw = SimpleNamespace(
+        timeout=None,
+        cursor=fail_cursor,
+        close=lambda: events.append("connection-close"),
+    )
+    connection = TdsSqlConnection(raw, old)
+
+    with pytest.raises(TdsConnectionError, match="timeout_unknown"):
+        connection.set_query_deadline(deadline=10.0, clock=lambda: 0.0)
+
+    assert connection.cursor is old
+    assert events == ["replacement-create"]
+    connection.close()
+    assert events == ["replacement-create", "old-close", "connection-close"]
+
+
+def test_expired_query_deadline_does_not_touch_connection_or_cursor() -> None:
+    events = []
+    old = SimpleNamespace(close=lambda: events.append("old-close"))
+    raw = SimpleNamespace(
+        timeout=3,
+        cursor=lambda: events.append("replacement-create"),
+        close=lambda: events.append("connection-close"),
+    )
+    connection = TdsSqlConnection(raw, old)
+
+    with pytest.raises(TdsConnectionError, match="tds_sql_deadline"):
+        connection.set_query_deadline(deadline=1.0, clock=lambda: 1.0)
+
+    assert connection.cursor is old
+    assert raw.timeout == 3
+    assert events == []
+    connection.close()
+    assert events == ["old-close", "connection-close"]
 
 
 def test_unadmitted_platform_and_preimported_driver_fail_before_loading(tmp_path, monkeypatch):

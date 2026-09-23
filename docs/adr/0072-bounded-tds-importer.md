@@ -1820,9 +1820,35 @@ numbers; P10f therefore uses the exact descriptor recorded in writer
 registration and requires its digest to equal the writer-observation binding.
 
 The helper observes the original writer session as departed, captures its own
-management-session incarnation before and after the queries, catalogs the exact
-stage before and after readback, and recomputes the versioned typed multiset
-digest. It closes SQL before returning the result. The parent authenticates the
+management-session incarnation before and after the queries, and catalogs the
+exact stage before and after content verification. SQL Server reproduces the
+admitted native row bytes, hashes each row with SHA-256 and returns only
+`COUNT_BIG`, a non-null hash count and eight decimal sums of unsigned 32-bit
+hash words. The helper folds carries modulo `2**256` and applies the unchanged
+`mssql-native-sha256-sum-v1` envelope. Business rows never cross the management
+connection. Nullable framing, little-endian fixed values, UTF-16LE text and
+`datetime2(6)` native time/date bytes must match the existing Python encoder
+under differential tests. A temporary fixed-width hash heap forces one SHA-256
+evaluation per row and is capped at the expected row count plus one, so an
+oversized stage fails without hashing an unbounded tail. The heap is dropped
+inside the settlement transaction. Operators must provision `tempdb` for up to
+32 hash bytes per expected row plus SQL Server heap overhead. Unsupported SQL
+builds or layouts fail closed.
+
+The admitted connection starts with a short default query timeout. Before the
+complete P10f settlement sequence, the helper replaces its cursor and binds the
+replacement to the remaining immutable operation deadline. The parent process
+containment deadline remains authoritative. This prevents departure, catalog
+and aggregate statements from inheriting the three-second default without
+introducing a fresh time budget.
+
+This changes the computation location, not the evidence contract. The same
+serializable transaction, `HOLDLOCK`, `TABLOCK`, stage identity, row count,
+typed sum, digest profile and one-shot failure closure remain authoritative.
+Legacy readback evidence stays readable; there is no manifest, journal or
+receipt migration. The companion implementation digest changes, so unresolved
+attempts must settle before upgrade. The helper closes SQL before returning the
+result. The parent authenticates the
 startup, canonical request and result, exact reaped zero exit, implementation
 and admission digests. It persists their hashes with the settlement record,
 acknowledges `VERIFICATION`, and only then advances `Exited → Verified`.

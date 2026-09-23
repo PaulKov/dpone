@@ -169,6 +169,32 @@ class TdsSqlConnection:
             )
         return self.client_connection_id, self.client_session_id
 
+    def set_query_deadline(self, *, deadline: float, clock: Callable[[], float]) -> None:
+        """Bind future SQL statements to the remaining parent-owned deadline.
+
+        pyodbc copies ``Connection.timeout`` into an ODBC statement when the
+        cursor is created.  Replace the still-unused admission cursor so the
+        settlement statement cannot retain the short catalog-probe timeout.
+        """
+        self.check_owner()
+        replacement = None
+        try:
+            seconds = max(1, min(2**31 - 1, math.ceil(_before(deadline, clock))))
+            self._connection.timeout = seconds
+            replacement = self._connection.cursor()
+            previous, self.cursor = self.cursor, None
+            previous.close()
+            self.cursor = replacement
+        except TdsConnectionError:
+            raise
+        except BaseException:
+            if replacement is not None:
+                try:
+                    replacement.close()
+                except BaseException:
+                    pass
+            raise TdsConnectionError("mssql_native.tds_sql_timeout_unknown") from None
+
     def close(self) -> None:
         self.check_owner()
         self._closed = True

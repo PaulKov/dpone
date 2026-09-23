@@ -218,7 +218,7 @@ Contract tests cover the boundary from a controlled PREPARED producer through
 remote writer settlement. Release qualification must additionally exercise the
 exact candidate source through the production composer for both a narrow input
 and a 100-column input, including local writer exit, independent writer-session
-departure, typed stage readback, publication, retirement, custody release and
+departure, exact target-local typed stage verification, publication, retirement, custody release and
 checkpoint advancement. Preparation baseline admission must be bound to one
 pinned SQL Server image/build, database profile and frozen query producer using
 two distinct fresh-storage controls, verified TLS, equal reviewed projections
@@ -231,8 +231,17 @@ configuration. BCP remains the default.
 P10f launches a fresh contained management helper after P10e. Its public request
 uses the input descriptor stored in writer registration, whose digest must match
 the writer-observation binding. The helper performs no retry or publication. It
-checks the exact stage identity around bounded readback, computes the same
-versioned typed multiset digest as preparation, closes SQL, and returns one
+checks the exact stage identity around one target-local aggregate. SQL Server
+reproduces the admitted native row bytes, hashes each row and returns only row
+counts plus eight fixed-shape numeric word sums; Python folds those sums into the
+same versioned typed multiset digest used by preparation. No business row is
+returned over the management connection. A temporary fixed-width hash heap
+prevents repeated SHA-256 evaluation and is capped at expected rows plus one;
+capacity planning must include 32 hash bytes per expected row plus SQL Server
+heap overhead in `tempdb`. Before the complete P10f settlement sequence, the
+child replaces the initial cursor and binds the ODBC query timeout to the
+remaining original operation deadline; it does not create a new budget. The
+helper closes SQL and returns one
 request-bound result. Parent evidence binds startup, request, result, reaped
 local exit, implementation and admission hashes before lifecycle `VERIFIED`.
 Local descriptor numbers from preparation and the inherited writer process are
