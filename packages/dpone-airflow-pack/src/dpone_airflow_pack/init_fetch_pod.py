@@ -35,13 +35,13 @@ from dpone_airflow_pack.init_fetch_pod_contract import (
     WORKTREE_VOLUME,
 )
 from dpone_airflow_pack.init_fetch_pod_guard import (
-    provider_env,
     reserved_collision,
     validate_operator_kwargs,
     validate_strict_pack_extensions,
 )
 from dpone_airflow_pack.init_fetch_secret_env import (
     ensure_registry_credential_env_available,
+    prepare_registry_credential_env,
     project_registry_credential,
     without_registry_credential,
 )
@@ -118,20 +118,10 @@ def compose_init_fetch_operator_kwargs(
         hook_execution=hook_execution,
         hook_name=hook_name,
     )
-    raw_env_vars = kwargs.get("env_vars")
-    credential_env_value: Any | None = None
-    if (
-        context.registry_credentials is not None
-        and context.registry_credentials.projection_mode == "env"
-        and isinstance(raw_env_vars, Mapping)
-    ):
-        credential_env_value = raw_env_vars.get(context.registry_credentials.env_name)
-        raw_env_vars = {
-            key: value for key, value in raw_env_vars.items() if str(key) != context.registry_credentials.env_name
-        }
-    env_vars = provider_env(raw_env_vars)
-    if credential_env_value is not None and context.registry_credentials is not None:
-        env_vars[context.registry_credentials.env_name] = deepcopy(credential_env_value)
+    env_vars = prepare_registry_credential_env(
+        context.registry_credentials,
+        kwargs.get("env_vars"),
+    )
     if PLAN_B64_ENV in env_vars or PLAN_SHA256_ENV in env_vars:
         raise reserved_collision("pack cannot provide strict init-fetch plan variables")
     env_vars[PLAN_B64_ENV] = encoded.base64
@@ -147,7 +137,6 @@ def compose_init_fetch_operator_kwargs(
             "if dag_run is defined and dag_run else '' }}"
         )
     ensure_registry_credential_env_available(context.registry_credentials, env_vars)
-    base_env_vars = without_registry_credential(context.registry_credentials, env_vars)
 
     clean = {key: deepcopy(value) for key, value in effective_kwargs.items() if key in _PRESERVED_KPO_FIELDS}
     runtime_labels = _runtime_labels(projection.kpo_kwargs["labels"])
@@ -174,7 +163,7 @@ def compose_init_fetch_operator_kwargs(
             "arguments": [],
             "namespace": context.identity.namespace,
             "service_account_name": context.identity.service_account,
-            "env_vars": base_env_vars,
+            "env_vars": without_registry_credential(context.registry_credentials, env_vars),
             "annotations": annotations,
             "labels": runtime_labels,
             "full_pod_spec": patch_pod_spec_runtime_authority(
