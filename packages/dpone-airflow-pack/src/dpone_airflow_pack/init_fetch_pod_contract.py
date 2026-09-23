@@ -1,6 +1,16 @@
 """Reserved names and allowlists for strict init-fetch pod composition."""
 
+from collections.abc import Mapping
+from copy import deepcopy
+from typing import Any
+
 from dpone_airflow_pack.deployment_identity import AIRFLOW_DEPLOYMENT_IDENTITY_ENV
+from dpone_airflow_pack.provider_execution_contract import (
+    RUNTIME_POD_CONTRACT_KEY,
+    RUNTIME_POD_CONTRACT_VALUE,
+    RUNTIME_POD_MANAGED_BY_KEY,
+    RUNTIME_POD_MANAGED_BY_VALUE,
+)
 
 PLAN_B64_ENV = "DPONE_INIT_FETCH_PLAN_B64"
 PLAN_SHA256_ENV = "DPONE_INIT_FETCH_PLAN_SHA256"
@@ -111,6 +121,16 @@ FORBIDDEN_POD_SPEC_FIELDS = frozenset(
         "automountServiceAccountToken",
     }
 )
+
+
+def runtime_pod_labels(labels: Mapping[str, Any]) -> dict[str, Any]:
+    """Copy workload labels and pin the strict runtime ownership contract."""
+    return {
+        **deepcopy(dict(labels)),
+        RUNTIME_POD_MANAGED_BY_KEY: RUNTIME_POD_MANAGED_BY_VALUE,
+        RUNTIME_POD_CONTRACT_KEY: RUNTIME_POD_CONTRACT_VALUE,
+    }
+
 
 __all__ = [
     "ALLOWED_PACK_ENV",

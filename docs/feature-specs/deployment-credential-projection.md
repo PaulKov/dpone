@@ -475,6 +475,7 @@ Provider/base-runtime projection and verification:
 
 - `packages/dpone-airflow-pack/src/dpone_airflow_pack/credential_projection_pod.py` (new)
 - `packages/dpone-airflow-pack/src/dpone_airflow_pack/init_fetch_pod.py`
+- `packages/dpone-airflow-pack/src/dpone_airflow_pack/init_fetch_pod_contract.py` (existing strict label policy relocation)
 - `src/dpone/runtime/runtime_init_fetch_plan.py`
 - `src/dpone/runtime/runtime_init_fetch_plan_codec.py`
 - `src/dpone/runtime/runtime_init_fetch_schema.py`
