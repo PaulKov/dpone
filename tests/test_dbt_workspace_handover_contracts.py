@@ -11,6 +11,32 @@ from dpone.contracts.dbt_workspace_handover import WorkspaceHandoverClaim
 from tests.test_airflow_desired_state import _desired_payload
 
 
+def test_handover_error_preserves_closed_operational_diagnostics():
+    error = WorkspaceHandoverError("acknowledgement", code="DPONE_WORKSPACE_HANDOVER_COMMIT_UNKNOWN")
+    assert error.code == "DPONE_WORKSPACE_HANDOVER_COMMIT_UNKNOWN"
+    assert error.reason == "acknowledgement"
+    with pytest.raises(ValueError):
+        WorkspaceHandoverError("reason", code="unrecognized")
+
+
+def test_claim_request_binding_checks_immutable_coordinates_not_fresh_observation():
+    from dpone.contracts.dbt_workspace_activation import DbtWorkspaceActivationRequest
+    from tests.test_dbt_workspace_handover_state_machine import _prepared
+
+    prepared = _prepared()
+    claim = prepared.pending
+    request = prepared.pending_occurrence.request
+    claim.require_request(request)
+    arguments = {name: getattr(request, name) for name in request.__dataclass_fields__ if name != "request_sha256"}
+    arguments["resources"] = (replace(request.resources[0], observation_sha256="sha256:" + "f" * 64),)
+    claim.require_request(DbtWorkspaceActivationRequest.build(**arguments))
+    arguments["source_inventory_sha256"] = "sha256:" + "e" * 64
+    with pytest.raises(WorkspaceHandoverError):
+        claim.require_request(DbtWorkspaceActivationRequest.build(**arguments))
+    with pytest.raises(WorkspaceHandoverError):
+        claim.require_request(object())
+
+
 def _channel() -> WorkspaceChannel:
     return WorkspaceChannel(
         "s3://bucket/control/dev/desired.json", "sha256:" + "e" * 64, "dev", "group/repository", "master"

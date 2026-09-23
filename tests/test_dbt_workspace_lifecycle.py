@@ -83,3 +83,12 @@ def test_historical_readback_cannot_change_owned_subjects_or_epochs(mutation):
 def test_terminal_readback_may_preserve_historical_epochs():
     active = _readback()
     replace(active, state="RETIRED").require_same_ownership(active)
+
+
+def test_historical_readback_binds_complete_original_request():
+    _readback().require_request(_request())
+    changed = replace(_readback().guards[0], resource_sha256=_digest("e"))
+    with pytest.raises(DbtWorkspaceActivationError):
+        replace(_readback(), guards=(changed,)).require_request(_request())
+    with pytest.raises(DbtWorkspaceActivationError):
+        replace(_readback(), request_sha256=_digest("e")).require_request(_request())

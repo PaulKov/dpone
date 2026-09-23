@@ -24,7 +24,18 @@ class WorkspaceHandoverError(ValueError):
 
     code = "DPONE_WORKSPACE_CHANNEL_AUTHORITY_MISMATCH"
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, *, code: str = "DPONE_WORKSPACE_CHANNEL_AUTHORITY_MISMATCH") -> None:
+        if code not in {
+            "DPONE_WORKSPACE_CHANNEL_UNREGISTERED",
+            "DPONE_WORKSPACE_CHANNEL_CAS_CONFLICT",
+            "DPONE_WORKSPACE_HANDOVER_WAITING_ATTEMPTS",
+            "DPONE_WORKSPACE_HANDOVER_COMMIT_UNKNOWN",
+            "DPONE_WORKSPACE_HANDOVER_CONTINUATION_REQUIRED",
+            "DPONE_WORKSPACE_CHANNEL_AUTHORITY_MISMATCH",
+            "DPONE_WORKSPACE_REGISTRATION_PROOF_INVALID",
+        }:
+            raise ValueError("workspace handover diagnostic code is invalid")
+        self.code = code
         self.reason = reason
         super().__init__(f"{self.code}: {reason}")
 

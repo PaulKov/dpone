@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, fields
+from typing import TYPE_CHECKING
 
-from dpone.contracts.airflow_deployment import canonical_fingerprint as activation_fingerprint
 from dpone.contracts.airflow_desired_state import AirflowDesiredDeployment, DesiredStateRevision
 from dpone.contracts.airflow_desired_state_validation import canonical_uuid, digest
 from dpone.contracts.dbt_contract_validation import canonical_fingerprint
-from dpone.contracts.dbt_workspace_activation import DbtWorkspaceActivationRequest
 from dpone.contracts.dbt_workspace_channel import (
     WorkspaceChannel,
     WorkspaceHandoverError,
@@ -22,6 +21,9 @@ from dpone.contracts.dbt_workspace_lifecycle import (
     parse_workspace_request,
 )
 from dpone.contracts.strict_json import strict_json_object
+
+if TYPE_CHECKING:
+    from dpone.contracts.dbt_workspace_activation import DbtWorkspaceActivationRequest
 
 BASELINE_SCHEMA = "dpone.dbt-workspace-adopted-current.v1"
 
@@ -61,13 +63,7 @@ class WorkspaceAdoptedCurrent:
                 raise ValueError
             DbtWorkspaceLifecycleReadback(
                 DbtWorkspaceLifecycleIdentity.from_request(request), self.request_sha256, self.state, self.guard_epochs
-            )
-            expected = {
-                item.guard_id: (activation_fingerprint(item.to_dict()), item.write_subjects)
-                for item in request.resources
-            }
-            if {item.guard_id: (item.resource_sha256, item.write_subjects) for item in self.guard_epochs} != expected:
-                raise ValueError
+            ).require_request(request)
             require_workspace_size(self.to_dict(), 31 * 1024 * 1024)
         except (TypeError, ValueError, AttributeError, UnicodeError):
             raise WorkspaceHandoverError("adoption_baseline") from None

@@ -6,7 +6,7 @@ import re
 from dataclasses import asdict, dataclass
 from uuid import UUID
 
-from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
+from dpone.contracts.airflow_deployment import canonical_fingerprint, is_canonical_sha256_digest
 from dpone.contracts.dbt_workspace_activation import (
     MAX_WORKSPACE_ACTIVATION_RESOURCES,
     DbtWorkspaceActivationError,
@@ -129,6 +129,23 @@ class DbtWorkspaceLifecycleReadback:
             previous.guards,
         ):
             raise DbtWorkspaceActivationError("historical_ownership_changed")
+
+    def require_request(self, request: DbtWorkspaceActivationRequest) -> None:
+        """Bind complete original request coordinates and physical/write partition."""
+        self.__post_init__()
+        if not isinstance(request, DbtWorkspaceActivationRequest):
+            raise DbtWorkspaceActivationError("historical_request_changed")
+        request.__post_init__()
+        expected_resources = {
+            item.guard_id: (canonical_fingerprint(item.to_dict()), item.write_subjects) for item in request.resources
+        }
+        actual_resources = {item.guard_id: (item.resource_sha256, item.write_subjects) for item in self.guards}
+        if (
+            self.identity != DbtWorkspaceLifecycleIdentity.from_request(request)
+            or self.request_sha256 != request.request_sha256
+            or actual_resources != expected_resources
+        ):
+            raise DbtWorkspaceActivationError("historical_request_changed")
 
 
 def workspace_request_payload(request: DbtWorkspaceActivationRequest) -> dict[str, object]:

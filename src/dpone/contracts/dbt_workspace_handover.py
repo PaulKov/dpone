@@ -12,6 +12,7 @@ from dataclasses import asdict, dataclass, fields
 from dpone.contracts.airflow_desired_state import AirflowDesiredDeployment, DesiredStateRevision
 from dpone.contracts.airflow_desired_state_validation import canonical_uuid, digest
 from dpone.contracts.dbt_contract_validation import canonical_fingerprint
+from dpone.contracts.dbt_workspace_activation import DbtWorkspaceActivationRequest
 from dpone.contracts.dbt_workspace_channel import (
     WorkspaceChannel,
     WorkspaceHandoverError,
@@ -96,6 +97,39 @@ class WorkspaceHandoverClaim:
 
     def _body(self) -> dict[str, object]:
         return {"schema": CLAIM_SCHEMA, **asdict(self), "channel": self.channel.to_dict()}
+
+    def require_request(self, request: DbtWorkspaceActivationRequest) -> None:
+        """Bind a fresh proposal to the claim without inventing historical epochs.
+
+        Physical observations are not part of the pre-retirement claim. Once a
+        request is durably PREPARED, the separate historical readback additionally
+        binds its exact resource fingerprints, write partition and fencing epochs.
+        """
+        try:
+            self.__post_init__()
+            if not isinstance(request, DbtWorkspaceActivationRequest):
+                raise ValueError
+            request.__post_init__()
+            if (
+                request.activation_id,
+                request.environment,
+                request.release_id,
+                request.deployment_id,
+                request.previous_deployment_id,
+                request.source_inventory_sha256,
+                request.runtime_context_sha256,
+            ) != (
+                self.successor_activation_id,
+                self.channel.environment,
+                self.successor_release_id,
+                self.successor_deployment_id,
+                self.predecessor_deployment_id,
+                self.source_inventory_sha256,
+                self.runtime_context_sha256,
+            ):
+                raise ValueError
+        except (ValueError, TypeError, AttributeError):
+            raise WorkspaceHandoverError("claim_request") from None
 
     @property
     def claim_sha256(self) -> str:

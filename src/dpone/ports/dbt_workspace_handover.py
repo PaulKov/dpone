@@ -3,14 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
 
-from dpone.contracts.airflow_deployment import canonical_fingerprint
-from dpone.contracts.dbt_workspace_activation import DbtWorkspaceActivationRequest
 from dpone.contracts.dbt_workspace_channel import WorkspaceChannel, WorkspaceHandoverError
 from dpone.contracts.dbt_workspace_handover import MAX_CHANNEL_REVISION, WorkspaceHandoverClaim
-from dpone.contracts.dbt_workspace_lifecycle import DbtWorkspaceLifecycleIdentity, DbtWorkspaceLifecycleReadback
+from dpone.contracts.dbt_workspace_lifecycle import DbtWorkspaceLifecycleReadback
 from dpone.contracts.dbt_workspace_registration_baseline import WorkspaceAdoptedCurrent
+
+if TYPE_CHECKING:
+    from dpone.contracts.dbt_workspace_activation import DbtWorkspaceActivationRequest
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,48 +24,15 @@ class WorkspaceStoredOccurrence:
 
     def __post_init__(self) -> None:
         try:
-            if not isinstance(self.request, DbtWorkspaceActivationRequest) or not isinstance(
-                self.lifecycle, DbtWorkspaceLifecycleReadback
-            ):
+            if not isinstance(self.lifecycle, DbtWorkspaceLifecycleReadback):
                 raise ValueError
-            self.request.__post_init__()
-            self.lifecycle.__post_init__()
-            if (
-                self.lifecycle.identity != DbtWorkspaceLifecycleIdentity.from_request(self.request)
-                or self.lifecycle.request_sha256 != self.request.request_sha256
-                or {item.guard_id: (item.resource_sha256, item.write_subjects) for item in self.lifecycle.guards}
-                != {
-                    item.guard_id: (canonical_fingerprint(item.to_dict()), item.write_subjects)
-                    for item in self.request.resources
-                }
-            ):
-                raise ValueError
+            self.lifecycle.require_request(self.request)
             if isinstance(self.snapshot, WorkspaceAdoptedCurrent):
                 self.snapshot.__post_init__()
                 if self.snapshot.request != self.request or self.snapshot.guard_epochs != self.lifecycle.guards:
                     raise ValueError
             elif isinstance(self.snapshot, WorkspaceHandoverClaim):
-                self.snapshot.__post_init__()
-                expected = (
-                    self.snapshot.successor_activation_id,
-                    self.snapshot.channel.environment,
-                    self.snapshot.successor_release_id,
-                    self.snapshot.successor_deployment_id,
-                    self.snapshot.predecessor_deployment_id,
-                    self.snapshot.source_inventory_sha256,
-                    self.snapshot.runtime_context_sha256,
-                )
-                actual = (
-                    self.request.activation_id,
-                    self.request.environment,
-                    self.request.release_id,
-                    self.request.deployment_id,
-                    self.request.previous_deployment_id,
-                    self.request.source_inventory_sha256,
-                    self.request.runtime_context_sha256,
-                )
-                if actual != expected:
-                    raise ValueError
+                self.snapshot.require_request(self.request)
             else:
                 raise ValueError
         except (ValueError, TypeError, AttributeError):
