@@ -103,7 +103,7 @@ def load_promotion_input(path: Path) -> PromotionInput:
     if not isinstance(payload, dict):
         raise ValueError("promotion evidence fields do not match the v2 contract")
     schema = payload.get("schema_version")
-    if schema not in {_PROMOTION_SCHEMA, CREDENTIAL_PROMOTION_SCHEMA}:
+    if not isinstance(schema, str) or schema not in {_PROMOTION_SCHEMA, CREDENTIAL_PROMOTION_SCHEMA}:
         raise ValueError("promotion evidence schema is unsupported")
     extra_fields = (
         {"credential_projection", "workspace_authority_connection_ref", "publish_authority_sha256"}

@@ -26,6 +26,14 @@ def _authority(workspace: bool = True) -> AirflowDesiredStateAuthority:
     )
 
 
+@pytest.mark.parametrize("schema", [[], {}, None, True, 6])
+def test_malformed_promotion_schema_is_a_closed_error(tmp_path, schema):
+    path = tmp_path / "promotion.json"
+    path.write_text(json.dumps({"schema_version": schema}))
+    with pytest.raises(ValueError, match="schema is unsupported"):
+        load_promotion_input(path)
+
+
 def _promotion(authority: AirflowDesiredStateAuthority) -> PromotionInput:
     return PromotionInput(
         environment=authority.environment,
