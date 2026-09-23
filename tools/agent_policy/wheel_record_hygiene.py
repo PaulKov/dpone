@@ -11,8 +11,27 @@ import base64
 import csv
 import hashlib
 import io
+import struct
 from collections.abc import Callable
 from typing import BinaryIO, cast
+
+
+def check_directory(stream: BinaryIO, archive_size: int, *, max_members: int) -> None:
+    """Bound the ZIP central directory before allocating its member inventory."""
+    tail_size = min(archive_size, 65_557)
+    stream.seek(archive_size - tail_size)
+    tail = stream.read(tail_size)
+    offset = tail.rfind(b"PK\x05\x06")
+    if offset < 0 or len(tail) - offset < 22:
+        raise ValueError
+    _, disk, start_disk, disk_entries, entries, size, _, comment = struct.unpack_from("<4s4H2IH", tail, offset)
+    if disk or start_disk or disk_entries != entries or offset + 22 + comment != len(tail):
+        raise ValueError
+    if entries > max_members:
+        raise OverflowError
+    if size > 64 * 1024**2:
+        raise ValueError
+    stream.seek(0)
 
 
 class _DigestReader:

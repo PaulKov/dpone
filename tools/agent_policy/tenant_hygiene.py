@@ -8,7 +8,6 @@ import json
 import os
 import re
 import stat
-import struct
 import subprocess
 import sys
 import tarfile
@@ -307,20 +306,10 @@ def _scan_members(archive: Any, policy: _Policy, archive_size: int, *, wheel: bo
 
 
 def _check_wheel_directory(stream: BinaryIO, archive_size: int) -> None:
-    tail_size = min(archive_size, 65_557)
-    stream.seek(archive_size - tail_size)
-    tail = stream.read(tail_size)
-    offset = tail.rfind(b"PK\x05\x06")
-    if offset < 0 or len(tail) - offset < 22:
-        raise ValueError
-    _, disk, start_disk, disk_entries, entries, size, _, comment = struct.unpack_from("<4s4H2IH", tail, offset)
-    if disk or start_disk or disk_entries != entries or offset + 22 + comment != len(tail):
-        raise ValueError
-    if entries > MAX_ARCHIVE_MEMBERS:
-        raise _Unable("DPONE_HYGIENE_ARCHIVE_MEMBER_COUNT_LIMIT", "$ARCHIVE")
-    if size > 64 * 1024**2:
-        raise ValueError
-    stream.seek(0)
+    try:
+        _load_sibling("wheel_record_hygiene").check_directory(stream, archive_size, max_members=MAX_ARCHIVE_MEMBERS)
+    except OverflowError as exc:
+        raise _Unable("DPONE_HYGIENE_ARCHIVE_MEMBER_COUNT_LIMIT", "$ARCHIVE") from exc
 
 
 def _inspect_archive(path: Path, archive_format: str, policy: _Policy) -> list[Finding]:
