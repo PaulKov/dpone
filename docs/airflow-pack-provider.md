@@ -449,6 +449,16 @@ delivery context and cannot claim strict `init_fetch`. A deployment-scoped
 `cached://` workload resolved through a v2 `index_path` receives that index's
 immutable delivery context and uses the strict path.
 
+The returned group owns the generated tasks in the canonical Airflow DAG tree,
+including when nested inside another TaskGroup. Use ordinary Airflow dependency
+operators (`upstream >> group >> downstream`); no separate task registration or
+manual workload inventory is needed. Strict init-fetch composition preserves
+this live graph handle while copying mutable pod configuration independently.
+When upgrading from a provider affected by detached groups, allow the DAG to
+reparse and verify the serialized graph shows its workload tasks and dependencies
+before starting a new run. The fix does not repair historical run states or
+require changes to workload manifests.
+
 Environment deployment promotion uses the separate content-addressed
 release/deployment cache contract. Platform operators should follow the
 [Airflow cache sync and recovery runbook](airflow-cache-sync.md) for pinned

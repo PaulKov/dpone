@@ -136,7 +136,13 @@ def compose_init_fetch_operator_kwargs(
         )
     ensure_registry_credential_env_available(context.registry_credentials, env_vars)
 
-    clean = {key: deepcopy(value) for key, value in effective_kwargs.items() if key in _PRESERVED_KPO_FIELDS}
+    # TaskGroup is a live graph owner, not pod configuration. Cloning it detaches
+    # operators from the canonical DAG hierarchy and loses group dependencies.
+    clean = {
+        key: value if key == "task_group" else deepcopy(value)
+        for key, value in effective_kwargs.items()
+        if key in _PRESERVED_KPO_FIELDS
+    }
     runtime_labels = runtime_pod_labels(projection.kpo_kwargs["labels"])
     annotations = {
         PLAN_SHA256_ANNOTATION: encoded.sha256,

@@ -216,6 +216,78 @@ def _write_index(tmp_path: Path, payload: dict[str, Any]) -> Path:
     return path
 
 
+@pytest.mark.parametrize("execution_kind", ["runtime", "pre_hook"])
+def test_init_fetch_preserves_graph_handle_identity_and_isolates_config(execution_kind: str) -> None:
+    group = object()
+    params = {"example": {"values": ["original"]}}
+    pack = _strict_pack()
+    composed = compose_init_fetch_operator_kwargs(
+        pack=pack,
+        kwargs={**pack["provider_execution"]["kpo_kwargs"], "task_group": group, "params": params},
+        context=init_fetch_context_from_payload(_v2_payload()),
+        workload_id="orders",
+        execution_kind=execution_kind,
+        execution_scope="workload",
+        hook_execution="externalized",
+        hook_name="prepare_source" if execution_kind == "pre_hook" else None,
+    )
+
+    assert composed["task_group"] is group
+    composed["params"]["example"]["values"].append("changed")
+    assert params == {"example": {"values": ["original"]}}
+
+
+def test_real_airflow_indexed_group_keeps_runtime_in_canonical_graph(tmp_path: Path) -> None:
+    airflow = pytest.importorskip("airflow")
+    if not getattr(airflow, "__version__", None):
+        pytest.skip("real Airflow distribution is not installed")
+    from datetime import UTC, datetime
+
+    from airflow.providers.dpone import DponeTaskGroup
+
+    try:
+        from airflow.serialization.serialized_objects import DagSerialization
+    except ImportError:
+        from airflow.serialization.serialized_objects import SerializedDAG as DagSerialization
+
+    try:
+        from airflow.sdk import DAG, TaskGroup
+    except ImportError:
+        from airflow import DAG
+        from airflow.utils.task_group import TaskGroup
+    try:
+        from airflow.providers.standard.operators.empty import EmptyOperator
+    except ImportError:
+        from airflow.operators.empty import EmptyOperator
+
+    pack = _strict_pack()
+    pack_bytes = json.dumps(pack).encode()
+    payload = _v2_payload()
+    payload["workload_packs"][0].update(
+        sha256="sha256:" + hashlib.sha256(pack_bytes).hexdigest(), bytes=len(pack_bytes)
+    )
+    index_path = _write_index(tmp_path, payload)
+    pack_path = tmp_path / f".dpone-cache/releases/{RELEASE_DIR}/packs/orders.json"
+    pack_path.parent.mkdir(parents=True)
+    pack_path.write_bytes(pack_bytes)
+    with DAG("example_mixed", schedule=None, start_date=datetime(2026, 1, 1, tzinfo=UTC)) as dag:
+        before = EmptyOperator(task_id="before")
+        with TaskGroup("pipeline"):
+            group = DponeTaskGroup.from_pack("cached://workloads/orders", dag=dag, index_path=index_path)
+        after = EmptyOperator(task_id="after")
+        before >> group >> after
+
+    runtime = next(task for task in dag.tasks if task.task_id.endswith("orders__dpone_runtime"))
+    # Airflow 2 exposes task_group as a weak proxy; check actual ownership.
+    assert group.children[runtime.task_id] is runtime
+    assert {task.task_id for task in dag.task_group} == set(dag.task_ids)
+    assert runtime.upstream_task_ids == {before.task_id}
+    assert runtime.downstream_task_ids == {after.task_id}
+    restored = DagSerialization.from_dict(DagSerialization.to_dict(dag))
+    assert {task.task_id for task in restored.task_group} == set(dag.task_ids)
+    assert restored.get_task(runtime.task_id).upstream_task_ids == {before.task_id}
+
+
 def test_wire_v1_preserves_local_preview_and_rejects_init_fetch_before_dag_install(
     tmp_path: Path,
 ) -> None:
