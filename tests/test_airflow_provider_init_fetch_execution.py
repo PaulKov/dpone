@@ -244,6 +244,7 @@ def test_real_airflow_indexed_group_keeps_runtime_in_canonical_graph(tmp_path: P
     from datetime import UTC, datetime
 
     from airflow.providers.dpone import DponeTaskGroup
+
     try:
         from airflow.serialization.serialized_objects import DagSerialization
     except ImportError:
@@ -277,7 +278,8 @@ def test_real_airflow_indexed_group_keeps_runtime_in_canonical_graph(tmp_path: P
         before >> group >> after
 
     runtime = next(task for task in dag.tasks if task.task_id.endswith("orders__dpone_runtime"))
-    assert runtime.task_group is group
+    # Airflow 2 exposes task_group as a weak proxy; check actual ownership.
+    assert group.children[runtime.task_id] is runtime
     assert {task.task_id for task in dag.task_group} == set(dag.task_ids)
     assert runtime.upstream_task_ids == {before.task_id}
     assert runtime.downstream_task_ids == {after.task_id}
