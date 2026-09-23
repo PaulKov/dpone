@@ -90,6 +90,14 @@ bounds and an oversized-schema digest forgery. Without the enable flag, these
 tests report SKIP. Passing them certifies only those primitive cases, not gateway
 permissions, registration or end-to-end handover.
 
+Request validation vectors also distinguish the retained original guard ID from
+the legacy slash-normalized request fingerprint. Full-width slash/backslash
+characters are not ASCII replacements: SQL collation must not change that
+meaning. An equal normalized hash does not authorize replacing a retained
+request with different original identifiers. The private request validator checks
+the complete resource/write partition and the existing physical storage bounds;
+it never acquires ownership or changes the request.
+
 ## Failure and rollback boundaries
 
 An unregistered channel, changed immutable payload, unknown acknowledgement or

@@ -10,6 +10,7 @@ until the complete gateway and its live certification are available.
 from __future__ import annotations
 
 import json
+import re
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -101,11 +102,29 @@ class MssqlWorkspaceHandoverStore:
             return _channel_readback(observed[0], channel)
         except WorkspaceHandoverError:
             raise
-        except Exception:
-            raise WorkspaceHandoverError("gateway_read_unavailable") from None
+        except Exception as error:
+            raise _gateway_error(error) from None
         finally:
             close(cursor)
             close(connection)
+
+
+def _gateway_error(error: Exception) -> WorkspaceHandoverError:
+    """Translate fixed native numbers without retaining raw driver diagnostics."""
+    codes = {
+        "51000": "DPONE_WORKSPACE_CHANNEL_AUTHORITY_MISMATCH",
+        "51001": "DPONE_WORKSPACE_HANDOVER_WAITING_ATTEMPTS",
+        "51002": "DPONE_WORKSPACE_HANDOVER_COMMIT_UNKNOWN",
+        "51004": "DPONE_WORKSPACE_CHANNEL_CAS_CONFLICT",
+        "51005": "DPONE_WORKSPACE_CHANNEL_UNREGISTERED",
+        "51006": "DPONE_WORKSPACE_REGISTRATION_PROOF_INVALID",
+    }
+    for argument in error.args:
+        if isinstance(argument, str) and len(argument) <= 16384:
+            match = re.search(r"\((5100[0-6])\)(?:\s|$)", argument)
+            if match and match[1] in codes:
+                return WorkspaceHandoverError("gateway_rejected", code=codes[match[1]])
+    return WorkspaceHandoverError("gateway_read_unavailable")
 
 
 def _closed(value: object, names: set[str]) -> dict[str, Any]:

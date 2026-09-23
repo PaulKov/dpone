@@ -88,6 +88,11 @@ ASCII-escaped finite JSON, UTF-8 bytes, and lowercase `sha256:` digest. Keep
 existing desired-byte, activation-request and physical-resource fingerprint
 algorithms unchanged; they are separately validated nested contracts. SQL and
 Python golden vectors must include non-ASCII strings and escaped nested JSON.
+The existing activation/resource fingerprint also normalizes backslashes in
+string values to slashes. Validate that normalized fingerprint while retaining
+the exact original request and guard identifiers; an equal fingerprint is not
+permission to substitute different original bytes. SQL comparisons/replacement
+must be binary and independent of the database's width/case sensitivity.
 
 `desired.source.occurrence_id` is always the successor UUID. Never generate a
 replacement UUID for a durable claimed transition. Exact UUID reuse with changed

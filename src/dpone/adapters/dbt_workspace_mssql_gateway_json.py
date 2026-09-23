@@ -49,21 +49,22 @@ IF @invalid <> 0 THROW 51000, 'workspace JSON surrogate is invalid', 1;
 
 def _escape(schema: str) -> str:
     return rf"""CREATE OR ALTER PROCEDURE [{schema}].[workspace_json_escape]
-    @value nvarchar(max), @result nvarchar(max) OUTPUT, @ensure_ascii bit = 1
+    @value nvarchar(max), @result nvarchar(max) OUTPUT, @ensure_ascii bit = 1, @normalize_slashes bit = 0
 AS
 BEGIN
     SET NOCOUNT ON;
-    IF @value IS NULL OR DATALENGTH(@value) > 67108864 OR @ensure_ascii IS NULL
+    IF @value IS NULL OR DATALENGTH(@value) > 67108864 OR @ensure_ascii IS NULL OR @normalize_slashes IS NULL
         THROW 51000, 'workspace JSON string bound differs', 1;
+    IF @normalize_slashes = 1 SET @value = REPLACE(@value COLLATE Latin1_General_100_BIN2, N'\', N'/');
     IF @value COLLATE Latin1_General_100_BIN2 NOT LIKE N'%[^ -~]%' COLLATE Latin1_General_100_BIN2
     BEGIN
-        SET @result = N'"' + REPLACE(STRING_ESCAPE(@value, 'json'), N'\/', N'/') + N'"';
+        SET @result = N'"' + REPLACE(STRING_ESCAPE(@value, 'json') COLLATE Latin1_General_100_BIN2, N'\/', N'/') + N'"';
         RETURN;
     END;
     DECLARE @invalid bigint;
     {_unicode_check("@value")}
     -- STRING_ESCAPE differs from Python only for slash and non-ASCII characters.
-    DECLARE @escaped nvarchar(max) = REPLACE(STRING_ESCAPE(@value, 'json'), N'\/', N'/');
+    DECLARE @escaped nvarchar(max) = REPLACE(STRING_ESCAPE(@value, 'json') COLLATE Latin1_General_100_BIN2, N'\/', N'/');
     IF DATALENGTH(@escaped) > 67108864
         THROW 51000, 'workspace JSON escaped string bound differs', 1;
     IF @ensure_ascii = 0
@@ -82,7 +83,7 @@ END;"""
 
 def _utf8_sha256(schema: str) -> str:
     return f"""CREATE OR ALTER PROCEDURE [{schema}].[workspace_json_utf8_sha256]
-    @value nvarchar(max), @result varchar(71) OUTPUT
+    @value nvarchar(max), @result varchar(71) OUTPUT, @utf8 varbinary(max) = NULL OUTPUT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -92,6 +93,7 @@ BEGIN
     IF @value COLLATE Latin1_General_100_BIN2 NOT LIKE N'%[^ -~]%' COLLATE Latin1_General_100_BIN2
     BEGIN
         SET @bytes = CONVERT(varbinary(max), CONVERT(varchar(max), @value));
+        SET @utf8 = @bytes;
         SET @result = 'sha256:' + LOWER(CONVERT(varchar(64), HASHBYTES('SHA2_256', @bytes), 2));
         RETURN;
     END;
@@ -122,21 +124,23 @@ BEGIN
     SET @bytes = CONVERT(varbinary(max), @encoded, 2);
     IF DATALENGTH(@bytes) > 33554432
         THROW 51000, 'workspace UTF-8 output bound differs', 1;
+    SET @utf8 = @bytes;
     SET @result = 'sha256:' + LOWER(CONVERT(varchar(64), HASHBYTES('SHA2_256', @bytes), 2));
 END;"""
 
 
 def _canonical(schema: str) -> str:
     return f"""CREATE OR ALTER PROCEDURE [{schema}].[workspace_json_canonical]
-    @document nvarchar(max), @result nvarchar(max) OUTPUT, @depth int = 0, @ensure_ascii bit = 1
+    @document nvarchar(max), @result nvarchar(max) OUTPUT, @depth int = 0,
+    @ensure_ascii bit = 1, @normalize_slashes bit = 0
 AS
 BEGIN
     SET NOCOUNT ON;
     IF @document IS NULL OR DATALENGTH(@document) > 67108864 OR ISJSON(@document) <> 1
-       OR @depth IS NULL OR @depth < 0 OR @depth > 16 OR @ensure_ascii IS NULL
+       OR @depth IS NULL OR @depth < 0 OR @depth > 16 OR @ensure_ascii IS NULL OR @normalize_slashes IS NULL
         THROW 51000, 'workspace JSON document bound differs', 1;
     DECLARE @first nchar(1) = LEFT(LTRIM(REPLACE(REPLACE(REPLACE(
-        @document, NCHAR(9), N' '), NCHAR(10), N' '), NCHAR(13), N' ')), 1);
+        @document COLLATE Latin1_General_100_BIN2, NCHAR(9), N' '), NCHAR(10), N' '), NCHAR(13), N' ')), 1);
     IF @first NOT IN (N'{{', N'[')
         THROW 51000, 'workspace JSON root is not a collection', 1;
     DECLARE @members TABLE (
@@ -164,7 +168,7 @@ BEGIN
     BEGIN
         SET @piece = NULL;
         IF @kind = 0 SET @piece = N'null';
-        ELSE IF @kind = 1 EXEC [{schema}].[workspace_json_escape] @value, @piece OUTPUT, @ensure_ascii;
+        ELSE IF @kind = 1 EXEC [{schema}].[workspace_json_escape] @value, @piece OUTPUT, @ensure_ascii, @normalize_slashes;
         ELSE IF @kind = 2
         BEGIN
             IF TRY_CONVERT(bigint, @value) IS NULL
@@ -174,7 +178,7 @@ BEGIN
         END
         ELSE IF @kind = 3 SET @piece = @value;
         ELSE IF @kind IN (4, 5)
-            EXEC [{schema}].[workspace_json_canonical] @value, @piece OUTPUT, @next_depth, @ensure_ascii;
+            EXEC [{schema}].[workspace_json_canonical] @value, @piece OUTPUT, @next_depth, @ensure_ascii, @normalize_slashes;
         IF @piece IS NULL THROW 51000, 'workspace JSON member type differs', 1;
         SET @result = @result + @separator;
         IF @first = N'{{'

@@ -81,6 +81,7 @@ def render_workspace_gateway_security(control_schema: str) -> str:
                 "workspace_json_escape",
                 "workspace_json_utf8_sha256",
                 "workspace_json_canonical",
+                "workspace_request_require",
             },
         )
     )

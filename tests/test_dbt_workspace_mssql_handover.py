@@ -104,6 +104,8 @@ class _GatewayConnection:
     def execute(self, sql, *parameters):
         assert self.autocommit is True
         self.factory.calls.append((sql, parameters))
+        if isinstance(self.factory.failure, Exception):
+            raise self.factory.failure
         if self.factory.failure:
             raise OSError("injected failure; do not expose connection diagnostics")
         return self
@@ -170,6 +172,21 @@ def test_read_failure_is_content_free_and_does_not_run_mutation():
         MssqlWorkspaceHandoverStore(factory).read_channel(_registration().channel)
     assert "injected" not in str(caught.value)
     assert len(factory.calls) == 1
+
+
+@pytest.mark.parametrize(
+    ("native", "code"),
+    [(51005, "DPONE_WORKSPACE_CHANNEL_UNREGISTERED"), (51004, "DPONE_WORKSPACE_CHANNEL_CAS_CONFLICT")],
+)
+def test_adapter_preserves_safe_gateway_error_code_without_driver_details(native, code):
+    from dpone.adapters.dbt_workspace_mssql_handover import MssqlWorkspaceHandoverStore
+
+    factory = _GatewayFactory()
+    factory.failure = OSError("42000", f"private diagnostics ({native}) (SQLExecDirectW)")
+    with pytest.raises(WorkspaceHandoverError) as caught:
+        MssqlWorkspaceHandoverStore(factory).read_channel(_registration().channel)
+    assert caught.value.code == code
+    assert "private" not in str(caught.value)
 
 
 def test_cold_readback_uses_exact_request_and_historical_epochs_after_physical_reownership():

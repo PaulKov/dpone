@@ -39,6 +39,7 @@ owned_paths:
   - src/dpone/adapters/dbt_workspace_mssql_gateway_security.py
   - src/dpone/adapters/dbt_workspace_mssql_gateway_json.py
   - src/dpone/adapters/dbt_workspace_mssql_gateway_validation.py
+  - src/dpone/adapters/dbt_workspace_mssql_request_validation.py
   - src/dpone/adapters/dbt_workspace_mssql_gateway_transaction.py
   - src/dpone/adapters/dbt_workspace_mssql_registration.py
   - src/dpone/adapters/semantic_refresh_mssql_activation.py

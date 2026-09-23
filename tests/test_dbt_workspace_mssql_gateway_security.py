@@ -10,6 +10,7 @@ runtime roles must not receive this capability. Offline checks are not SQL proof
 import hashlib
 import json
 import os
+from dataclasses import replace
 
 import pytest
 
@@ -51,6 +52,7 @@ def workspace_json_live_cursor():
         '{"value":"\\u0416\\u00e9\\u6c34\\ud83d\\ude00"}',
         '{"nested":[{"desired":"{\\"ref\\":\\"Ж/😀\\"}"},{}]}',
         '{"value":"space  "}',
+        '{"value":"＼／\\\\／＼/"}',
     ],
 )
 def test_live_sql_python_canonical_and_digest_parity(workspace_json_live_cursor, raw, ensure_ascii):
@@ -145,6 +147,8 @@ def test_private_json_helpers_are_fixed_bounded_batches():
     assert "duplicate key" in batches[2]
     assert "@depth > 16" in batches[2]
     assert "8192" in batches[2]
+    assert "REPLACE(@value COLLATE Latin1_General_100_BIN2" in batches[0]
+    assert batches[0].count("STRING_ESCAPE(@value, 'json') COLLATE Latin1_General_100_BIN2") == 2
 
 
 def test_private_json_helpers_cannot_be_called_by_any_runtime_role():
@@ -157,6 +161,136 @@ def test_private_json_helpers_cannot_be_called_by_any_runtime_role():
             "dpone_semantic_guard_runtime",
         ):
             assert f"DENY EXECUTE ON OBJECT::[dpone_control].[workspace_json_{name}] TO [{role}];" in sql
+
+
+def test_request_validator_retains_original_json_and_verifies_legacy_normalized_hash():
+    from dpone.adapters.dbt_workspace_mssql_request_validation import render_workspace_request_validation
+
+    sql = render_workspace_request_validation("dpone_control")
+    assert sql.startswith("CREATE OR ALTER PROCEDURE [dpone_control].[workspace_request_require]")
+    assert "@normalize_slashes = 1" in sql
+    assert "@ensure_ascii = 0" in sql
+    assert "@canonical = @request_canonical" in sql and "@request_body" in sql
+    assert "workspace request resource partition differs" in sql
+    assert "workspace request resource order differs" in sql
+    assert "8192" in sql and "16777216" in sql
+    grants = render_workspace_gateway_security("dpone_control")
+    assert "DENY EXECUTE ON OBJECT::[dpone_control].[workspace_request_require] TO [dpone_workspace_runtime]" in grants
+
+
+def _request_payload(guard_id):
+    from dpone.contracts.dbt_workspace_activation import DbtWorkspaceActivationRequest
+    from dpone.contracts.dbt_workspace_lifecycle import workspace_request_payload
+    from tests.test_dbt_workspace_mssql_activation_admission import _request
+
+    original = _request()
+    arguments = {key: getattr(original, key) for key in original.__dataclass_fields__ if key != "request_sha256"}
+    arguments["resources"] = (replace(original.resources[0], guard_id=guard_id),)
+    return workspace_request_payload(DbtWorkspaceActivationRequest.build(**arguments))
+
+
+def test_legacy_normalized_digest_does_not_replace_original_resource_identity():
+    slash = _request_payload("guard:/original")
+    backslash = _request_payload("guard:\\original")
+    assert slash["request_sha256"] == backslash["request_sha256"]
+    assert slash["resources"] != backslash["resources"]
+
+
+@pytest.mark.integration_live
+@pytest.mark.parametrize(
+    "guard_id",
+    [
+        "guard:/plain",
+        "guard:\\original",
+        "guard:Ж\\水/😀",
+        'guard:"quote"',
+        "guard:line\nend ",
+        "guard:＼original",
+        "guard:＼／\\／/mixed",
+    ],
+)
+def test_live_request_retains_raw_resource_and_validates_normalized_digest(workspace_json_live_cursor, guard_id):
+    cursor, schema = workspace_json_live_cursor
+    payload = _request_payload(guard_id)
+    raw = json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    cursor.execute(
+        f"DECLARE @canonical nvarchar(max); EXEC [{schema}].[workspace_request_require] ?, @canonical OUTPUT; SELECT @canonical;",
+        raw,
+    )
+    observed = cursor.fetchone()[0]
+    assert observed == raw
+    assert json.loads(observed)["resources"][0]["guard_id"] == guard_id
+    unsigned = {key: value for key, value in payload.items() if key != "request_sha256"}
+    raw_digest = (
+        "sha256:"
+        + hashlib.sha256(
+            json.dumps(unsigned, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()
+        ).hexdigest()
+    )
+    assert (raw_digest == payload["request_sha256"]) == ("\\" not in guard_id)
+
+
+@pytest.mark.integration_live
+@pytest.mark.parametrize("value", ["＼", "＼／", "\\／"])
+@pytest.mark.parametrize("ensure_ascii", [False, True])
+@pytest.mark.parametrize("normalize", [False, True])
+def test_live_slash_replacement_is_binary_not_database_width_equivalence(
+    workspace_json_live_cursor, value, ensure_ascii, normalize
+):
+    cursor, schema = workspace_json_live_cursor
+    cursor.execute(
+        f"DECLARE @quoted nvarchar(max); EXEC [{schema}].[workspace_json_escape] ?, @quoted OUTPUT, ?, ?; SELECT @quoted;",
+        value,
+        ensure_ascii,
+        normalize,
+    )
+    expected = value.replace("\\", "/") if normalize else value
+    assert cursor.fetchone()[0] == json.dumps(expected, ensure_ascii=ensure_ascii)
+
+
+@pytest.mark.integration_live
+@pytest.mark.parametrize(
+    "mutation",
+    [
+        "extra",
+        "wrong_hash",
+        "duplicate_subject",
+        "empty_partition",
+        "nul_guard",
+        "oversized_previous",
+        "wrong_uuid",
+        "resource_extra",
+    ],
+)
+def test_live_request_rejects_forged_closed_payload_even_with_recomputed_digest(workspace_json_live_cursor, mutation):
+    from dpone.contracts.airflow_deployment import canonical_fingerprint
+
+    cursor, schema = workspace_json_live_cursor
+    payload = _request_payload("guard:original")
+    if mutation == "extra":
+        payload["unexpected"] = "value"
+    elif mutation == "duplicate_subject":
+        payload["write_subjects"] *= 2
+    elif mutation == "empty_partition":
+        payload["resources"][0]["write_subjects"] = []
+    elif mutation == "nul_guard":
+        payload["resources"][0]["guard_id"] = "guard:\x00unsafe"
+    elif mutation == "oversized_previous":
+        payload["previous_deployment_id"] = "x" * 4001
+    elif mutation == "wrong_uuid":
+        payload["activation_id"] = "invalid"
+    elif mutation == "resource_extra":
+        payload["resources"][0]["unexpected"] = "value"
+    payload["request_sha256"] = canonical_fingerprint(
+        {key: value for key, value in payload.items() if key != "request_sha256"}
+    )
+    if mutation == "wrong_hash":
+        payload["request_sha256"] = "sha256:" + "f" * 64
+    with pytest.raises(Exception, match="51000"):
+        cursor.execute(
+            f"DECLARE @canonical nvarchar(max); EXEC [{schema}].[workspace_request_require] ?, @canonical OUTPUT;",
+            json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")),
+        )
 
 
 def test_security_cutover_is_transactional_and_requires_all_gateway_objects():

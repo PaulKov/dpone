@@ -42,6 +42,10 @@ def render_workspace_channel_read(control_schema: str) -> str:
     IF NOT EXISTS (
         SELECT 1 FROM [{schema}].[dbt_workspace_channels] WITH (HOLDLOCK)
         WHERE channel_sha256 = @channel_sha256
+    ) THROW 51005, 'workspace channel is unregistered', 1;
+    IF NOT EXISTS (
+        SELECT 1 FROM [{schema}].[dbt_workspace_channels] WITH (HOLDLOCK)
+        WHERE channel_sha256 = @channel_sha256
           AND CONVERT(varbinary(max), channel_json) = CONVERT(varbinary(max), @channel_canonical)
     ) THROW 51000, 'workspace registered channel differs', 1;
     SELECT @snapshot = (
