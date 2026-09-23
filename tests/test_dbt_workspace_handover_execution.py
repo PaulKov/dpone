@@ -28,9 +28,9 @@ def _latest(claim=None, occurrence_id=None):
     return VerifiedWorkspaceDesired(desired.to_json_bytes().decode(), "revision-1")
 
 
-def _request(claim, resources=None):
+def _request(claim, resources=None, *, activation_id=None):
     return DbtWorkspaceActivationRequest.build(
-        activation_id=claim.successor_activation_id,
+        activation_id=activation_id or claim.successor_activation_id,
         environment=claim.channel.environment,
         release_id=claim.successor_release_id,
         deployment_id=claim.successor_deployment_id,
@@ -416,3 +416,18 @@ def test_lost_mutation_acknowledgement_recovers_exact_same_occurrence_next_cycle
     assert events.count("claim") == 1 and events.count("prepare") == 1 and events.count("complete") == 1
     if phase != "claim":
         assert store.state.current.request is saved.request
+
+
+@pytest.mark.parametrize("field", ["activation_id", "source_inventory_sha256", "runtime_context_sha256"])
+def test_successor_observation_cannot_change_claim_identity(field, monkeypatch):
+    executor, store, driver, events = _system(_pending("RETIRED"))
+    claim_field = "successor_activation_id" if field == "activation_id" else field
+    changed = "323e4567-e89b-42d3-a456-426614174000" if field == "activation_id" else "sha256:" + "f" * 64
+    if field == "activation_id":
+        request = _request(store.state.pending, activation_id=changed)
+    else:
+        request = _request(replace(store.state.pending, **{claim_field: changed}))
+    monkeypatch.setattr(driver, "observe_successor", lambda claim: request)
+    with pytest.raises(WorkspaceHandoverError, match="claim_request"):
+        executor.run_cycle()
+    assert "prepare" not in events and "replicate" not in events

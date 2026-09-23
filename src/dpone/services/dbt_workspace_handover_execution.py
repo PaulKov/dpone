@@ -10,7 +10,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from dpone.contracts.dbt_workspace_activation import DbtWorkspaceActivationRequest
 from dpone.contracts.dbt_workspace_channel import WorkspaceChannel, WorkspaceHandoverError
 from dpone.contracts.dbt_workspace_handover import WorkspaceHandoverClaim
 from dpone.ports.dbt_workspace_handover import WorkspaceChannelReadback, WorkspaceHandoverStorePort
@@ -122,7 +121,7 @@ class WorkspaceHandoverExecutor:
             if readback.current is not None and readback.current.lifecycle.state != "RETIRED":
                 raise WorkspaceHandoverError("predecessor_not_retired")
             request = self._driver.observe_successor(claim)
-            self._require_request(claim, request)
+            claim.require_request(request)
             return self._store.prepare_successor(claim, request)
         if action is WorkspaceHandoverAction.COMPLETE:
             return self._store.complete(claim)
@@ -178,30 +177,6 @@ class WorkspaceHandoverExecutor:
             != expected_previous
         ):
             raise WorkspaceHandoverError("claim_proposal")
-
-    @staticmethod
-    def _require_request(claim: WorkspaceHandoverClaim, request: DbtWorkspaceActivationRequest) -> None:
-        if not isinstance(request, DbtWorkspaceActivationRequest):
-            raise WorkspaceHandoverError("successor_request")
-        request.__post_init__()
-        if (
-            request.activation_id,
-            request.environment,
-            request.release_id,
-            request.deployment_id,
-            request.previous_deployment_id,
-            request.source_inventory_sha256,
-            request.runtime_context_sha256,
-        ) != (
-            claim.successor_activation_id,
-            claim.channel.environment,
-            claim.successor_release_id,
-            claim.successor_deployment_id,
-            claim.predecessor_deployment_id,
-            claim.source_inventory_sha256,
-            claim.runtime_context_sha256,
-        ):
-            raise WorkspaceHandoverError("successor_request")
 
     @staticmethod
     def _result(
