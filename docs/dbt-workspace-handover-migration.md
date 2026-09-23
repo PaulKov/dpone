@@ -81,6 +81,12 @@ from ordinary runtime roles, which are denied direct helper execution.
 
 Configure `DPONE_WORKSPACE_JSON_TEST_DSN` through the approved secret delivery
 mechanism and set `DPONE_WORKSPACE_JSON_TEST_SCHEMA` to the reviewed test schema.
+The test-only `DPONE_WORKSPACE_JSON_TEST_DRIVER` defaults to `pyodbc`, using its
+ordinary DSN string. The explicit `pymssql` alternative accepts the same DSN
+environment variable as a JSON object with exactly `server`, `user`, `password`,
+`database`, and optional `port` (default 1433). The helper binds strings as UTF-16
+binary values converted to SQL variables, preserving embedded NUL test vectors;
+it does not change production drivers or perform provisioning.
 Do not paste a credential-bearing DSN into logs, shell history or evidence.
 After the environment and exact test scope are explicitly approved:
 

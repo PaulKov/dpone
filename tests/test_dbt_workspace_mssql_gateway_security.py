@@ -5,12 +5,16 @@ explicitly approved disposable environment, with DPONE_WORKSPACE_JSON_LIVE=1,
 DPONE_WORKSPACE_JSON_TEST_DSN and DPONE_WORKSPACE_JSON_TEST_SCHEMA. The supplied
 certification principal must be allowed to execute the private helpers; ordinary
 runtime roles must not receive this capability. Offline checks are not SQL proof.
+DPONE_WORKSPACE_JSON_TEST_DRIVER defaults to pyodbc; pymssql accepts a JSON DSN
+with server/user/password/database and optional port, exclusively from the env.
 """
 
 import hashlib
 import json
 import os
+import re
 from dataclasses import replace
+from types import SimpleNamespace
 
 import pytest
 
@@ -20,21 +24,144 @@ from dpone.adapters.dbt_workspace_mssql_gateway_security import (
 )
 
 
+def _workspace_json_connect(driver, dsn, connect):
+    if driver == "pyodbc":
+        return connect(dsn, autocommit=True, timeout=10)
+    try:
+        options = json.loads(dsn)
+    except ValueError:
+        raise ValueError("live driver configuration is invalid") from None
+    required = {"server", "user", "password", "database"}
+    if (
+        driver != "pymssql"
+        or not isinstance(options, dict)
+        or not required <= options.keys()
+        or options.keys() - required - {"port"}
+        or any(not isinstance(options[key], str) or not options[key] for key in required)
+        or not str(options.get("port", "1433")).isdigit()
+        or not 1 <= int(options.get("port", "1433")) <= 65535
+    ):
+        raise ValueError("live driver configuration is invalid")
+    options["port"] = str(options.get("port", "1433"))
+    return connect(**options, autocommit=True, login_timeout=10, timeout=10, charset="UTF-8")
+
+
+class _WorkspaceJsonCursor:
+    """Adapt this test's qmark batches only; do not emulate a production driver."""
+
+    def __init__(self, cursor):
+        self.cursor = cursor
+
+    def execute(self, query, *parameters):
+        # pymssql recognizes %s/%d even inside SQL literals; fail closed on ambiguity.
+        if re.search(r"%[sd]|@dpone_test_arg", query):
+            raise ValueError("ambiguous test SQL placeholder")
+        bound = iter(parameters)
+        converted = []
+        declarations = []
+
+        def token(match):
+            if match[0] != "?":
+                return match[0]
+            try:
+                value = next(bound)
+            except StopIteration:
+                raise ValueError("test SQL placeholder count differs") from None
+            # TDS language batches cannot carry literal NUL. Bind UTF-16 binary
+            # through the driver and convert on-server without changing input bytes.
+            name = f"@dpone_test_arg{len(converted)}"
+            if isinstance(value, str):
+                expression, kind = "CONVERT(nvarchar(max), %s)", "nvarchar(max)"
+                value = bytearray(value.encode("utf-16-le"))
+            elif type(value) in (bool, int):
+                expression, kind = "%s", "bigint"
+            else:
+                raise ValueError("unsupported test SQL placeholder value")
+            converted.append(value)
+            declarations.append(f"DECLARE {name} {kind} = {expression}; ")
+            return name
+
+        query = re.sub(
+            r"'(?:''|[^'])*'|\[(?:\]\]|[^\]])*\]|\"(?:\"\"|[^\"])*\"|--[^\r\n]*|/\*.*?\*/|\?",
+            token,
+            query,
+            flags=re.DOTALL,
+        )
+        if len(converted) != len(parameters):
+            raise ValueError("test SQL placeholder count differs")
+        return self.cursor.execute("".join(declarations) + query, tuple(converted))
+
+    def fetchone(self):
+        return self.cursor.fetchone()
+
+
+def test_live_helper_injects_driver_without_changing_default_odbc_contract():
+    calls = []
+
+    def connect(*args, **kwargs):
+        calls.append((args, kwargs))
+
+    _workspace_json_connect("pyodbc", "opaque-dsn", connect)
+    assert calls == [(("opaque-dsn",), {"autocommit": True, "timeout": 10})]
+    _workspace_json_connect(
+        "pymssql", json.dumps(dict(server="example", user="tester", password="secret", database="scratch")), connect
+    )
+    assert calls[1][1] == dict(
+        server="example",
+        user="tester",
+        password="secret",
+        database="scratch",
+        port="1433",
+        charset="UTF-8",
+        autocommit=True,
+        login_timeout=10,
+        timeout=10,
+    )
+
+
+@pytest.mark.parametrize("driver,dsn", [("other", "{}"), ("pymssql", "opaque"), ("pymssql", "{}")])
+def test_live_helper_rejects_invalid_configuration_before_connect(driver, dsn):
+    with pytest.raises(ValueError, match="configuration"):
+        _workspace_json_connect(driver, dsn, lambda **kwargs: pytest.fail("unexpected connection"))
+
+
+def test_live_helper_converts_only_bind_tokens_and_preserves_unicode_nul_and_percent():
+    calls = []
+    cursor = _WorkspaceJsonCursor(SimpleNamespace(execute=lambda *args: calls.append(args)))
+    cursor.execute("SELECT ?, ?, N'it''s ? 10%', [?] -- ?\n/* ? */;", "Ж\x00😀", True)
+    assert calls == [
+        (
+            "DECLARE @dpone_test_arg0 nvarchar(max) = CONVERT(nvarchar(max), %s); "
+            "DECLARE @dpone_test_arg1 bigint = %s; "
+            "SELECT @dpone_test_arg0, @dpone_test_arg1, N'it''s ? 10%', [?] -- ?\n/* ? */;",
+            (bytearray("Ж\x00😀".encode("utf-16-le")), True),
+        )
+    ]
+    with pytest.raises(ValueError, match="placeholder"):
+        cursor.execute("SELECT ?, ?", 1)
+    with pytest.raises(ValueError, match="placeholder"):
+        cursor.execute("SELECT N'%s', ?", 1)
+    assert len(calls) == 1
+
+
 @pytest.fixture
 def workspace_json_live_cursor():
     if os.environ.get("DPONE_WORKSPACE_JSON_LIVE") != "1":
         pytest.skip("UNVERIFIED: workspace SQL JSON certification environment is not enabled")
-    pyodbc = pytest.importorskip("pyodbc")
+    driver = os.environ.get("DPONE_WORKSPACE_JSON_TEST_DRIVER", "pyodbc")
+    if driver not in {"pyodbc", "pymssql"}:
+        pytest.fail("workspace SQL JSON certification driver is unsupported", pytrace=False)
+    module = pytest.importorskip(driver)
     if not os.environ.get("DPONE_WORKSPACE_JSON_TEST_DSN"):
         pytest.fail("workspace SQL JSON certification DSN is not configured")
     schema = workspace_gateway_identifier(os.environ.get("DPONE_WORKSPACE_JSON_TEST_SCHEMA", ""))
     try:
-        connection = pyodbc.connect(os.environ["DPONE_WORKSPACE_JSON_TEST_DSN"], autocommit=True, timeout=10)
+        connection = _workspace_json_connect(driver, os.environ["DPONE_WORKSPACE_JSON_TEST_DSN"], module.connect)
     except Exception:
         pytest.fail("workspace SQL JSON certification connection is unavailable", pytrace=False)
     cursor = connection.cursor()
     try:
-        yield cursor, schema
+        yield (_WorkspaceJsonCursor(cursor) if driver == "pymssql" else cursor), schema
     finally:
         cursor.close()
         connection.close()
