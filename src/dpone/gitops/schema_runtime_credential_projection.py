@@ -67,7 +67,7 @@ def runtime_credential_projection_contract() -> GitOpsSchemaContract:
     return documented_contract(
         name="runtime-credential-projection",
         kind="dpone.runtime-credential-projection.v1",
-        title="dpone deployment-owned runtime credential projection",
+        title="dpone GitOps deployment-owned runtime credential projection",
         required=tuple(properties),
         properties=properties,
         additional_properties=False,
