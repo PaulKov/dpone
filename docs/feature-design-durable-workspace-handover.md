@@ -109,8 +109,10 @@ A closed `dpone.dbt-workspace-handover-claim.v1` object contains exactly:
 - `successor_activation_id`, `successor_release_id`, `successor_deployment_id`;
 - `desired_state_sha256`, exact `desired_state_json`, `observed_remote_revision`;
 - `source_inventory_sha256`, `runtime_context_sha256`;
-- `authorization_subject_sha256`, identifying the independently verified
-  immutable promotion/authority evidence used when claiming.
+- `authorization_subject_sha256`, exactly the verified
+  `AirflowArtifactAttestation.attestation_id`: the digest of all canonical
+  attestation claims, not a raw statement, CI promotion JSON, artifact publication
+  report or verification-decision digest.
 
 The digest covers the entire object except itself. The desired JSON is the
 bounded exact verified UTF-8 object, not a reserialized partial summary.
@@ -369,9 +371,28 @@ cannot reactivate an occurrence later retired by another claim.
    Remote publication after the claim does not replace its UUID or revoke its
    completion authority. **Complete the claimed saga first, then reconcile the
    latest desired state.** This explicit new semantic avoids unsafe PREPARED
-   abandonment. Source/promotion signatures, channel binding, retained artifact
-   integrity and current credential/capability revocation are still enforced;
-   replay does not require the claimed historical Git SHA to remain today's head.
+   abandonment. Both initial managed claiming and replay require a valid
+   artifact-attestation signature even when the legacy policy permits unsigned
+   packages. Fetch and verify one
+   immutable package, then compare its full `ExpectedSubject`, including the
+   deployment index hash, exact signed project/ref/Git SHA against the original
+   durable desired object, and the pinned `attestation_id`. The signed deployment
+   and index/runtime-plan validation bind the native dbt artifact pair transitively;
+   absent index/package or a changed pair blocks replay. Use a fresh policy, key
+   and revocation snapshot each cycle, and retain all current channel-authority,
+   configuration, credential-projection and capability checks. Mismatch blocks;
+   never rewrite saved hashes to fit current inputs. Replay does not require the
+   claimed historical Git SHA to remain today's head.
+
+   The artifact signature does not prove an occurrence UUID, CI job or initial
+   selection. The protected exact original desired object and claim, persisted
+   after full initial validation and remote-revision recheck, provide that
+   execution witness. `desired.promotion.publication_evidence_sha256` identifies
+   CI promotion JSON, whereas `attestation.claims.publication.evidence_sha256`
+   identifies the artifact publication report. These are distinct evidence
+   domains: never compare or substitute their hashes. The existing immutable
+   signed package is the replay artifact; no new archive, wire field or raw CI
+   promotion-JSON retention requirement is introduced.
 4. Begin exact predecessor RETIRING, closing new attempts. Existing admitted
    attempts retain their epochs and may terminalize. Finalize only after every
    attempt is durably terminal and connector-specific quiescence holds. RUNNING,
@@ -497,9 +518,13 @@ request remains unchanged; do not rewrite it from later publication lineage.
 exactly `guard_id`, `resource_sha256`, `fencing_epoch`, and `write_subjects`
 (sorted unique hashes). Verify the original request digest against the protected
 activation, the complete resource/write partition, and every currently owned
-epoch. The authorization digest identifies the verified immutable promotion
-evidence retained with the desired release; the offline validator must resolve
-and verify those artifacts exactly as for a claimed transition.
+epoch. `authorization_subject_sha256` is exactly the verified
+`AirflowArtifactAttestation.attestation_id`, with the same mandatory signature,
+complete subject/source binding and fresh trust checks as algorithm step 3.
+Adoption also requires original historical desired/request binding and the
+privileged registrar's attestation; a signed deployment alone cannot fabricate
+that history. The offline validator must resolve and verify the same immutable
+package as for a claimed transition.
 
 This is an immutable **baseline**, not a fictitious completed handover claim.
 `read_channel` returns a discriminated current snapshot: `kind` is
@@ -647,6 +672,7 @@ Synthetic evidence proves contracts only; it is not live SQL certification.
 | Stateful integration | Cold cache at CLAIMED, RETIRING, RETIRED, PREPARED, pointer-written and ACTIVE; two roots same desired; idle warm/cold same-current no-op with unchanged revision/epochs; adopted-current cold replication; same deployment/new UUID; skipped revisions; disjoint and foreign channels |
 | Failure/concurrency | Lost claim/retirement/prepare/completion acknowledgement; stale channel CAS; request-write race; remote supersession at each boundary; unavailable remote after completion; partial pointer and whole cache loss |
 | Safety | RUNNING/COMMIT_UNKNOWN/missing receipt refusal; source/runtime drift rejection; live observation drift during old retirement; no PREPARED cancellation; no success from pointer/journal alone |
+| Replay authorization | Reject optional-policy unsigned packages, different otherwise-allowed source, changed attestation ID, missing index/package, mutated native dbt pair and revocation after claim; accept differing legitimate CI-promotion and artifact-publication evidence hashes without comparing them |
 | Migration/compatibility | Full empty attestation; disjoint unbound ACTIVE blocks empty registration; missing/altered proof and stale inventory rejected; exact old ACTIVE baseline adoption and cold replay; duplicate adoption/registration UUID and lost registration acknowledgement; actor derived by SQL; old direct-DML binaries denied; unchanged legacy gateway behavior; v1/composed or explicit mode-migration rejection; old/new projection readers |
 | Live certification | Disposable SQL Server transactions, lock contention, process kills/cache replacement and independent replicas under approved credentials; unavailable environments report UNVERIFIED |
 | Performance/security | 8192-bound closure/inventory and 16 MiB request; canonical SQL/Python hash vectors; secret-free diagnostics; runtime direct DML/DDL/IMPERSONATE and registrar access denied; old request APIs cannot mutate managed occurrence; semantic guard procedures cannot forge/release workspace owners; inherited/alternate credential bypass probes; no lock held over remote/file I/O |

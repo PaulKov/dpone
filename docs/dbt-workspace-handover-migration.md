@@ -25,7 +25,12 @@ must not split that channel. Retain the existing desired occurrence UUID.
   No live check is a pass merely because the offline renderer tests pass.
 - SQL Server supports `CREATE OR ALTER PROCEDURE`, `OPENJSON` and large
   `HASHBYTES` inputs: the renderer requires SQL Server 2016 SP1 or later and
-  database compatibility level 130 or later.
+  database compatibility level 130 or later. It uses `Latin1_General_100_BIN2`,
+  not a SQL Server 2019 `_UTF8` collation; the private helper encodes UTF-8
+  explicitly. Before any DDL or enablement, the future installer must perform a
+  read-only server version/build, database compatibility and required-collation
+  preflight and refuse unsupported or unverified capabilities. No installer or
+  such preflight is implemented by the current renderer-only slice.
 - The schema and fixed gateway modules share a reviewed non-runtime owner.
   Module creation uses `ANSI_NULLS ON` and `QUOTED_IDENTIFIER ON`; the permission
   renderer rejects modules whose recorded settings differ.
@@ -47,7 +52,8 @@ must not split that channel. Retain the existing desired occurrence UUID.
    treating a prior migration as installed. A name-only existence check is not
    an authority check.
 2. Install and certify the exact renderer output in the approved disposable
-   environment. Procedure batches are separate batches, without embedded `GO`.
+   environment only after the version/capability preflight passes. Procedure
+   batches are separate batches, without embedded `GO`.
    Apply the session settings before creating modules, not only inside them.
 3. Verify canonical JSON/UTF-8 parity, closed input rejection, transaction races,
    lost acknowledgements, complete cache loss and effective SQL permissions.
