@@ -8,7 +8,6 @@ import json
 import os
 import re
 import stat
-import struct
 import subprocess
 import sys
 import tarfile
@@ -104,6 +103,17 @@ def _unchanged(stream: BinaryIO, path: Path, expected: tuple[int, ...]) -> bool:
         return False
 
 
+def _load_sibling(filename: str) -> Any:
+    name = "dpone_" + filename
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name(filename + ".py"))
+    if spec is None or spec.loader is None:
+        raise ValueError
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def _load_policy(path: Path) -> _Policy:
     stream, identity = _open_regular(path, MAX_POLICY_BYTES, "DPONE_HYGIENE_POLICY_INVALID", "$POLICY")
     with stream:
@@ -111,14 +121,7 @@ def _load_policy(path: Path) -> _Policy:
         if len(payload) > MAX_POLICY_BYTES or not _unchanged(stream, path, identity):
             raise _Unable("DPONE_HYGIENE_POLICY_INVALID", "$POLICY")
     try:
-        name = "dpone_tenant_hygiene_policy"
-        spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name("tenant_hygiene_policy.py"))
-        if spec is None or spec.loader is None:
-            raise ValueError
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[name] = module
-        spec.loader.exec_module(module)
-        return module.parse_policy(payload)
+        return _load_sibling("tenant_hygiene_policy").parse_policy(payload)
     except (UnicodeError, ValueError, TypeError, RecursionError) as exc:
         raise _Unable("DPONE_HYGIENE_POLICY_INVALID", "$POLICY") from exc
 
@@ -238,6 +241,7 @@ def _stream_matches(stream: BinaryIO, size: int, policy: _Policy) -> tuple[bool,
 
 def _scan_members(archive: Any, policy: _Policy, archive_size: int, *, wheel: bool) -> list[Finding]:
     findings: list[Finding] = []
+    records = _load_sibling("wheel_record_hygiene").WheelRecordInspector() if wheel else None
     aggregate = 0
     seen: set[str] = set()
     members = archive.infolist() if wheel else archive
@@ -282,29 +286,30 @@ def _scan_members(archive: Any, policy: _Policy, archive_size: int, *, wheel: bo
             continue
         opened = opener()
         with opened:
-            matched, nested = _stream_matches(opened, size, policy)
+            matched, nested = (
+                records.scan(path, opened, size, lambda stream, length: _stream_matches(stream, length, policy))
+                if records is not None
+                else _stream_matches(opened, size, policy)
+            )
             if nested:
                 return [*findings, Finding("DPONE_HYGIENE_ARCHIVE_NESTED_ARCHIVE", display)]
             if matched:
                 findings.append(Finding(TENANT_CODE, display))
+    if records is not None and records.record is not None:
+        try:
+            verified = records.verified_text()
+        except (ValueError, UnicodeError):
+            return [*findings, Finding("DPONE_HYGIENE_WHEEL_RECORD_INVALID", "$RECORD")]
+        if policy.matches(verified):
+            findings.append(Finding(TENANT_CODE, _path(records.record[0].encode(), policy)[1]))
     return findings
 
 
 def _check_wheel_directory(stream: BinaryIO, archive_size: int) -> None:
-    tail_size = min(archive_size, 65_557)
-    stream.seek(archive_size - tail_size)
-    tail = stream.read(tail_size)
-    offset = tail.rfind(b"PK\x05\x06")
-    if offset < 0 or len(tail) - offset < 22:
-        raise ValueError
-    _, disk, start_disk, disk_entries, entries, size, _, comment = struct.unpack_from("<4s4H2IH", tail, offset)
-    if disk or start_disk or disk_entries != entries or offset + 22 + comment != len(tail):
-        raise ValueError
-    if entries > MAX_ARCHIVE_MEMBERS:
-        raise _Unable("DPONE_HYGIENE_ARCHIVE_MEMBER_COUNT_LIMIT", "$ARCHIVE")
-    if size > 64 * 1024**2:
-        raise ValueError
-    stream.seek(0)
+    try:
+        _load_sibling("wheel_record_hygiene").check_directory(stream, archive_size, max_members=MAX_ARCHIVE_MEMBERS)
+    except OverflowError as exc:
+        raise _Unable("DPONE_HYGIENE_ARCHIVE_MEMBER_COUNT_LIMIT", "$ARCHIVE") from exc
 
 
 def _inspect_archive(path: Path, archive_format: str, policy: _Policy) -> list[Finding]:

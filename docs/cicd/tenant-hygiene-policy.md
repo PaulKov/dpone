@@ -64,6 +64,23 @@ matching, preventing missed Unicode/separator matches at read boundaries. The
 32 MiB member limit remains; decoded and normalized representations require
 additional bounded memory. Legacy policies retain streaming literal matching.
 
+Wheel metadata `*.dist-info/RECORD` is interpreted as strict UTF-8 CSV rather
+than arbitrary prose. The scanner computes SHA-256 and byte counts while scanning
+every regular member. It excludes only the checksum column after verifying exact
+equality with those observations, complete membership, unique rows, three columns,
+and the empty checksum/size of RECORD itself. Paths and sizes remain subject to
+the policy; every referenced member's full body is still scanned. Ordinary files
+named RECORD, Git blobs and sdists have no checksum exemption. This prevents
+random base64 checksum substrings from being mistaken for tenant identifiers.
+
+Malformed, incomplete or inconsistent RECORD metadata fails closed. The supported
+release-builder format is SHA-256; other algorithms and signed wheel layouts
+are not certified by this path. This is not a general wheel-format validator:
+archive fragments without RECORD retain full content scanning. Existing archive
+size, compression, path, link and replacement guards still apply. No private
+deny-list values are needed to validate this behavior. The layout follows the
+[PyPA wheel specification](https://packaging.python.org/en/latest/specifications/binary-distribution-format/).
+
 Frozen source identity, no-follow archive access, replacement detection, archive
 limits, report schema and exit codes are unchanged. Reports contain safe codes
 and paths, never matched values. Protected paths are redacted. A finding returns
