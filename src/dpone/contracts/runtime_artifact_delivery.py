@@ -176,9 +176,7 @@ def normalize_registry_credentials(value: object) -> dict[str, object]:
             },
         }
     if set(value) != {"connection_type", "connection_id", "projection"}:
-        raise ValueError(
-            "registry_credentials must contain exactly connection_type, connection_id and projection"
-        )
+        raise ValueError("registry_credentials must contain exactly connection_type, connection_id and projection")
     connection_type = value.get("connection_type")
     if connection_type not in {"airflow", "env", "vault"}:
         raise ValueError("registry_credentials.connection_type is unsupported")
@@ -189,10 +187,14 @@ def normalize_registry_credentials(value: object) -> dict[str, object]:
     if not isinstance(projection, Mapping):
         raise ValueError("registry_credentials.projection must be a mapping")
     mode = projection.get("mode")
-    expected_projection_keys = {"mode", "env_name", "secret_ref"} if mode == "k8s_secret" else {
-        "mode",
-        "env_name",
-    }
+    expected_projection_keys = (
+        {"mode", "env_name", "secret_ref"}
+        if mode == "k8s_secret"
+        else {
+            "mode",
+            "env_name",
+        }
+    )
     if set(projection) != expected_projection_keys or mode not in {"k8s_secret", "env"}:
         raise ValueError("registry_credentials.projection is invalid")
     env_name = projection.get("env_name")
@@ -206,19 +208,13 @@ def normalize_registry_credentials(value: object) -> dict[str, object]:
     if mode == "k8s_secret":
         secret_ref = projection.get("secret_ref")
         if not isinstance(secret_ref, Mapping) or set(secret_ref) != {"name", "key"}:
-            raise ValueError(
-                "registry_credentials.projection.secret_ref must contain exactly name and key"
-            )
+            raise ValueError("registry_credentials.projection.secret_ref must contain exactly name and key")
         name = secret_ref.get("name")
         key = secret_ref.get("key")
         if not is_valid_kubernetes_dns_label(name):
-            raise ValueError(
-                "registry_credentials.projection.secret_ref.name must be a Kubernetes DNS label"
-            )
+            raise ValueError("registry_credentials.projection.secret_ref.name must be a Kubernetes DNS label")
         if key != env_name:
-            raise ValueError(
-                "registry_credentials.projection.secret_ref.key must match projection.env_name"
-            )
+            raise ValueError("registry_credentials.projection.secret_ref.key must match projection.env_name")
         normalized_projection["secret_ref"] = {"name": str(name), "key": key}
     return {
         "connection_type": connection_type,

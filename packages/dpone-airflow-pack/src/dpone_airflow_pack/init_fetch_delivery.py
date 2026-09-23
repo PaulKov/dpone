@@ -134,9 +134,7 @@ def _registry_credentials(
             )
         legacy_connection_id = legacy.get("connection_id")
         expected_env_name = (
-            _airflow_connection_env_name(legacy_connection_id)
-            if isinstance(legacy_connection_id, str)
-            else ""
+            _airflow_connection_env_name(legacy_connection_id) if isinstance(legacy_connection_id, str) else ""
         )
         legacy_secret_ref = legacy.get("secret_ref")
         if isinstance(legacy_secret_ref, Mapping) and legacy_secret_ref.get("key") != expected_env_name:

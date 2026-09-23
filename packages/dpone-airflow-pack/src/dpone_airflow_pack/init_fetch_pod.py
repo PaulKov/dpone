@@ -127,9 +127,7 @@ def compose_init_fetch_operator_kwargs(
     ):
         credential_env_value = raw_env_vars.get(context.registry_credentials.env_name)
         raw_env_vars = {
-            key: value
-            for key, value in raw_env_vars.items()
-            if str(key) != context.registry_credentials.env_name
+            key: value for key, value in raw_env_vars.items() if str(key) != context.registry_credentials.env_name
         }
     env_vars = provider_env(raw_env_vars)
     if credential_env_value is not None and context.registry_credentials is not None:

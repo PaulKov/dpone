@@ -227,8 +227,8 @@ def _optional_registry_credentials(
     if not isinstance(connection_id, str):
         raise ValueError("registry credential connection id is required")
     selected_connection_type = connection_type if isinstance(connection_type, str) else "airflow"
-    selected_projection_mode = projection_mode if isinstance(projection_mode, str) else (
-        "k8s_secret" if secret_name is not None else "env"
+    selected_projection_mode = (
+        projection_mode if isinstance(projection_mode, str) else ("k8s_secret" if secret_name is not None else "env")
     )
     canonical_key = "AIRFLOW_CONN_" + "".join(
         character if character.isalnum() else "_" for character in connection_id.upper()

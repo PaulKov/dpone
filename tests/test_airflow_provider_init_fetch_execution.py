@@ -511,9 +511,7 @@ def test_registry_connection_env_projection_is_init_only() -> None:
     }
     context = init_fetch_context_from_payload(payload)
     pack = _strict_pack()
-    pack["provider_execution"]["kpo_kwargs"]["env_vars"][env_name] = (
-        "{{ conn.artifact_registry_reader.get_uri() }}"
-    )
+    pack["provider_execution"]["kpo_kwargs"]["env_vars"][env_name] = "{{ conn.artifact_registry_reader.get_uri() }}"
 
     kwargs = compose_init_fetch_operator_kwargs(
         pack=pack,
@@ -536,11 +534,7 @@ def test_registry_connection_env_projection_is_init_only() -> None:
 @pytest.mark.parametrize("connection_type", ["airflow", "env", "vault"])
 def test_registry_credentials_use_standard_connection_type_vocabulary(connection_type: str) -> None:
     payload = _v2_payload()
-    env_name = (
-        "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER"
-        if connection_type == "airflow"
-        else "DPONE_REGISTRY_CREDENTIALS"
-    )
+    env_name = "AIRFLOW_CONN_ARTIFACT_REGISTRY_READER" if connection_type == "airflow" else "DPONE_REGISTRY_CREDENTIALS"
     payload["runtime_artifact_delivery"]["registry_credentials"] = {
         "connection_type": connection_type,
         "connection_id": "artifact_registry_reader",
