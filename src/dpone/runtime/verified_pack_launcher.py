@@ -10,7 +10,6 @@ if TYPE_CHECKING:
 
 
 import hashlib
-import os
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -24,7 +23,6 @@ from dpone.contracts.dbt_runtime import (
     validate_dbt_runtime_source_projection,
 )
 from dpone.runtime.dbt_project_bundle import verify_dbt_project_bundle_tree
-from dpone.runtime.deployment_cache_common import DeploymentCacheError, open_regular_file
 from dpone.runtime.init_fetch_contract import (
     InitFetchError,
     cache_relative_path,
@@ -44,6 +42,7 @@ from dpone.runtime.runtime_payload_archive import (
 from dpone.runtime.verified_pack_command_selection import (
     selected_verified_command as _selected_command,
 )
+from dpone.runtime.verified_pack_command_selection import validate_worktree_command
 
 _MAX_READY_BYTES = 64 * 1024
 _MAX_DBT_EXECUTION_PACK_BYTES = 1024 * 1024
@@ -198,10 +197,10 @@ class VerifiedPackLauncher:
             # Pin the verified value for the child instead of inheriting mutable
             # process state again between preparation and execution.
             environment[DBT_WORKSPACE_AUTHORITY_CONNECTION_REF_ENV] = projection.workspace_authority_connection_ref
-        _validate_worktree_command(
+        validate_worktree_command(
             argv,
             root=self._worktree_root,
-            manifest_index=(_runtime_input_index(argv) if plan.execution.kind == "runtime" else 3),
+            execution_kind=plan.execution.kind,
         )
         if argv[:3] == ("dpone", "dbt", "execute-pack") and runtime_environment is not None:
             _validate_dbt_runtime_identity(
@@ -256,42 +255,6 @@ def _dbt_project_bundle(
     if payload is None:
         raise _launcher_error("verified dbt project bundle is missing")
     return payload
-
-
-def _runtime_input_index(argv: tuple[str, ...]) -> int:
-    if argv[:3] == ("dpone", "dbt", "execute-pack"):
-        return 3
-    return 2
-
-
-def _validate_worktree_command(
-    argv: tuple[str, ...],
-    *,
-    root: Path,
-    manifest_index: int,
-) -> None:
-    if len(argv) <= manifest_index:
-        raise _launcher_error("verified workload command is incomplete")
-    raw_manifest = argv[manifest_index]
-    manifest = PurePosixPath(raw_manifest)
-    if (
-        not raw_manifest
-        or "\\" in raw_manifest
-        or manifest.is_absolute()
-        or any(part in {"", ".", ".."} for part in manifest.parts)
-    ):
-        raise _launcher_error("verified workload manifest path is unsafe")
-    try:
-        descriptor = open_regular_file(
-            root.joinpath(*manifest.parts),
-            missing_code="DPONE_RUNTIME_WORKTREE_INCOMPLETE",
-            invalid_code="DPONE_RUNTIME_ARTIFACT_INTEGRITY_FAILED",
-            label="runtime manifest",
-            root=root,
-        )
-    except DeploymentCacheError as exc:
-        raise InitFetchError(exc.code, str(exc)) from exc
-    os.close(descriptor)
 
 
 def _read_artifact(
