@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.83.9 - 2026-09-23
+
 ### Added
 
 - Align artifact-registry credential lookup with the standard
