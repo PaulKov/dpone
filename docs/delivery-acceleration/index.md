@@ -37,6 +37,11 @@ available; production acceptance remains UNVERIFIED.
 
 ## First success without database access
 
+For explicit raw single-query reads on admitted local MergeTree variants, follow
+the [composition how-to](raw-window-composition.md). It preserves the same bounded
+streaming and stage-complete lifecycle; it does not add automatic CLI execution
+or a separate source-capture checkpoint.
+
 From a development checkout with the repository's `uv` environment, inspect the
 existing example and exercise the synthetic composition:
 

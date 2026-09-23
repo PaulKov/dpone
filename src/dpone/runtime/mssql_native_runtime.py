@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
 from dpone.contracts.process_types import ProcessResult
-from dpone.manifest.mssql_native_policy import validate_native_config
+from dpone.manifest.mssql_native_policy import native_source_read_mode, native_transport_policy, validate_native_config
 from dpone.ports.bounded_window import WindowStore
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session
@@ -76,6 +76,10 @@ class NativeMssqlRuntime:
             service, context = binding.service, binding.stage_context
             if context.plan.target_id != self.target_id or context.lease != lease or context.cancelled is not lost:
                 raise WindowContractError("mssql_native.binding_lease_mismatch")
+            if getattr(context.plan, "source_read_mode", None) != native_source_read_mode(load_config):
+                raise WindowContractError("mssql_native.source_policy_mismatch")
+            if getattr(context.plan, "transport", None) != native_transport_policy(load_config):
+                raise WindowContractError("mssql_native.transport_policy_mismatch")
             recovered = service.resume(load_config, context, binding.admission)
             self._check(lease, lost)
             handle = recovered if isinstance(recovered, StagedLoadHandle) else None
@@ -94,13 +98,15 @@ class NativeMssqlRuntime:
             state = journal.publication.state()
             if state is None:
                 raise WindowContractError("mssql_native.publication_receipt_missing")
-            if state["phase"] == "published":
+            if self._is_v4(context):
+                self._complete_v4(load_config, result, context, lease, lost)
+            elif state["phase"] == "published":
                 with self.observations.recorder("runtime").phase("evidence"):
                     self.evidence(load_config, result, context, lease)
                     self._check(lease, lost)
                     journal.publication.evidence_complete()
                 state = journal.publication.state()
-            if state["phase"] == "evidence-complete":
+            if not self._is_v4(context) and state["phase"] == "evidence-complete":
                 with self.observations.recorder("runtime").phase("checkpoint"):
                     self.advance_state(load_config, result, lease)
                     self._check(lease, lost)
@@ -137,6 +143,34 @@ class NativeMssqlRuntime:
                 if primary is None:
                     raise
                 primary.add_note(f"native runtime cleanup failed: {type(error).__name__}")
+
+    @staticmethod
+    def _is_v4(context: Any) -> bool:
+        data = getattr(context.journal_factory(), "data", None)
+        return isinstance(data, dict) and data.get("version") == 4
+
+    def _complete_v4(self, config: Any, result: LoadResult, context: Any, lease: WindowLease, lost: Event) -> None:
+        """Retire exact SqlClient stages before the only checkpoint acknowledgement."""
+        journal = context.journal_factory()
+        state = journal.publication.state()
+        if state is None:
+            raise WindowContractError("mssql_native.publication_receipt_missing")
+        if state["phase"] in {
+            "published",
+            "aborted",
+            "retirement_required",
+            "retiring",
+            "retired",
+            "checkpoint_required",
+        }:
+            if context.settle_parent is None:
+                raise WindowContractError("mssql_native.sqlclient_parent_settlement_required")
+            with self.observations.recorder("runtime").phase("evidence"):
+                self.evidence(config, result, context, lease)
+            self._check(lease, lost)
+            with self.observations.recorder("runtime").phase("checkpoint"):
+                context.settle_parent()
+                self._check(lease, lost)
 
     def _publish(
         self, config: Any, service: Any, handle: StagedLoadHandle, lease: WindowLease, lost: Event

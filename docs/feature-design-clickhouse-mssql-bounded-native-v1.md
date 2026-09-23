@@ -4,7 +4,7 @@
 - Maintainer approval: explicit `APPROVED` in the implementation task, 2026-09-10
 - Owner: dpone maintainers
 - Target release: unassigned
-- Last verified: 2026-09-10
+- Last verified: 2026-09-23
 
 This specification is for framework maintainers and connector authors. It defines
 an opt-in replacement for the complete character spool on bounded ClickHouse to
@@ -355,6 +355,26 @@ and dispersion, RSS and local/server storage high-water marks. Initial acceptanc
 requires zero fidelity failures, zero partial publications, respected resource
 limits and demonstrated worker overlap. Numeric speed claims require those runs;
 no production-ready or acceleration claim follows from mocks.
+
+### Approved P10f target-local verification amendment (2026-09-23)
+
+The maintainer rejected a seven-day path whose mandatory verification returned
+every staged row over TDS and explicitly directed the route to retain industrial
+integrity while removing that reverse transport. The public digest, settlement,
+evidence, recovery and publication contracts remain unchanged.
+
+P10f now computes the existing `mssql-native-sha256-sum-v1` accumulator inside
+SQL Server for the admitted `bigint`, `float(53)`, `nvarchar(max)` and
+`datetime2(6)` profiles. The query returns one fixed-shape aggregate row
+containing row/hash counts and eight unsigned 32-bit word sums. A temporary
+fixed-width hash heap forces one SHA-256 evaluation per row, is capped at the
+expected count plus one, and is dropped inside the settlement transaction. The
+helper performs the carry fold modulo `2**256` and applies the existing final
+digest function. It does not return business rows, add a fast-mode switch,
+weaken verification to `count/min/max`, or change manifest/journal/receipt
+schemas. Exact Python/T-SQL differential vectors and narrow/wide live
+qualification are required before a performance claim; `tempdb` qualification
+must include 32 hash bytes per expected row plus SQL Server heap overhead.
 
 ## Test, documentation and rollout plan
 

@@ -6,7 +6,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from dpone.contracts.mssql_native_chunks import NativeBulkTransportPolicy
 from dpone.manifest.mssql_native_policy import native_limits
+from dpone.ports.mssql_native_route_backend import (
+    NativeActorCapacity,
+    SqlClientNativeRouteBackend,
+    SqlClientNativeRuntimeBinding,
+)
 from dpone.runtime.connectors.mssql_bulk import BcpOptions
 from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
 from dpone.runtime.sinks.mssql_native_composition import compose_native_stage_context
@@ -127,3 +133,107 @@ def test_preparation_preserves_primary_error_when_cleanup_also_fails(tmp_path):
     assert session.closed
     assert any("lock cleanup failed" in note for note in primary.__notes__)
     assert any("session cleanup failed" in note for note in primary.__notes__)
+
+
+def test_sqlclient_capability_and_capacity_fail_before_importer_or_source(tmp_path):
+    plan = SimpleNamespace(
+        run_id="synthetic",
+        transport=NativeBulkTransportPolicy("mssql_sqlclient", "rows", 8 << 30),
+    )
+    common = dict(
+        store=SimpleNamespace(assert_lease=lambda lease: None),
+        plan=plan,
+        lease=object(),
+        wire_contract=build_mssql_bcp_native_contract(schema=[("value", "int")], query="SELECT synthetic"),
+        limits=native_limits(config()),
+        work_dir=tmp_path,
+        target_connector=SimpleNamespace(),
+        importer_connection=lambda: pytest.fail("BCP fallback"),
+        bcp_options_factory=BcpOptions,
+        database="synthetic",
+        schema="dbo",
+        row_source=lambda: pytest.fail("source opened"),
+        journal_factory=lambda: None,
+        cancelled=Event(),
+        required_target_headroom_bytes=1024,
+    )
+    with pytest.raises(ValueError, match="capability_required"):
+        compose_native_stage_context(**common)
+    with pytest.raises(ValueError, match="capacity_insufficient"):
+        compose_native_stage_context(
+            **common,
+            sqlclient_binding=_binding(NativeActorCapacity(8, 2, 2, 1)),
+        )
+
+
+def test_sqlclient_uses_closed_independent_importers_and_v4_parent(tmp_path):
+    plan = SimpleNamespace(
+        run_id="synthetic",
+        transport=NativeBulkTransportPolicy("mssql_sqlclient", "rows", 8 << 30),
+    )
+    context = compose_native_stage_context(
+        store=SimpleNamespace(assert_lease=lambda lease: None),
+        plan=plan,
+        lease=object(),
+        wire_contract=build_mssql_bcp_native_contract(schema=[("value", "int")], query="SELECT synthetic"),
+        limits=native_limits(config()),
+        work_dir=tmp_path,
+        target_connector=SimpleNamespace(),
+        importer_connection=lambda: pytest.fail("BCP fallback"),
+        bcp_options_factory=BcpOptions,
+        database="synthetic",
+        schema="dbo",
+        row_source=lambda: iter(()),
+        journal_factory=lambda: None,
+        cancelled=Event(),
+        required_target_headroom_bytes=1024,
+        sqlclient_binding=_binding(NativeActorCapacity(9, 2, 2, 1)),
+    )
+    assert context.executor.parent_schema_version == 4
+    with context.executor.importer_factory() as importer:
+        assert importer is not None
+
+
+def _binding(capacity):
+    class Importer:
+        import_file = inspect = settle = allocated_bytes = lambda *args: None
+
+    settlement = SimpleNamespace(settle=lambda: object())
+    control = SqlClientNativeRouteBackend(Importer(), settlement, capacity, "a" * 64)
+
+    @contextmanager
+    def open_backend():
+        yield SqlClientNativeRouteBackend(Importer(), settlement, capacity, "a" * 64)
+
+    return SqlClientNativeRuntimeBinding(
+        control,
+        open_backend,
+        lambda receipt: object(),
+        lambda prepared: None,
+        lambda state: object(),
+    )
+
+
+def test_sqlclient_binding_rejects_cross_installation_session():
+    binding = _binding(NativeActorCapacity(9, 2, 2, 1))
+    other = SimpleNamespace(settle=lambda: object())
+
+    @contextmanager
+    def changed():
+        candidate = SqlClientNativeRouteBackend(
+            binding.backend.importer,
+            other,
+            binding.backend.capacity,
+            "b" * 64,
+        )
+        yield candidate
+
+    drifted = SqlClientNativeRuntimeBinding(
+        binding.backend,
+        changed,
+        binding.physical_stage,
+        binding.abort_parent,
+        binding.terminal_result,
+    )
+    with pytest.raises(ValueError, match="binding_changed"):
+        drifted.admit(2)

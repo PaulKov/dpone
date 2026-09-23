@@ -3,10 +3,39 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from decimal import Decimal
 from typing import Any
 
 from dpone.contracts.mssql_type_contract import normalize_mssql_physical_type
+
+
+def normalize_mssql_physical_schema(
+    columns: Iterable[tuple[str, str, bool]],
+) -> tuple[tuple[str, str, bool], ...]:
+    """Normalize ordered physical declarations without changing column identity.
+
+    Names, ordinals and nullability are retained exactly; only type declarations
+    use strict physical-type normalization. Unlike catalog after-image rendering,
+    this retains ``float`` versus ``float(53)``. Callers own any source-specific
+    nullability suffix removal and transport admission policy.
+    """
+
+    return tuple((name, normalize_mssql_physical_type(dtype), nullable) for name, dtype, nullable in columns)
+
+
+def mssql_physical_schema_matches(
+    actual: Iterable[tuple[str, str, bool]],
+    expected: tuple[tuple[str, str, bool], ...],
+) -> bool:
+    """Compare observed declarations with an already normalized ordered schema.
+
+    Normalize every observed column before comparing, so malformed declarations
+    retain their parser errors even after an earlier ordinal mismatch. A valid
+    mismatch is returned to the caller, which owns its operation-specific error.
+    """
+
+    return normalize_mssql_physical_schema(actual) == expected
 
 
 def canonical_catalog_scalar(value: Any) -> str | None:
@@ -136,6 +165,8 @@ __all__ = [
     "canonical_mssql_catalog_type",
     "mssql_catalog_type_is_text",
     "mssql_catalog_type_shape",
+    "mssql_physical_schema_matches",
+    "normalize_mssql_physical_schema",
     "render_mssql_catalog_type",
     "validated_mssql_catalog_type_shape",
 ]

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from dpone.contracts.mssql_native_chunks import NativeChunkLimits
+from dpone.contracts.mssql_native_chunks import NativeBulkTransportPolicy, NativeChunkLimits
 from dpone.contracts.rolling_window import FrozenRollingWindow, RollingWindowSpec
 
 
@@ -25,9 +25,38 @@ def native_requested(config: Any) -> bool:
     wire = value.get("wire", {})
     execution = value.get("execution", {})
     chunking = execution.get("chunking", {}) if isinstance(execution, Mapping) else {}
-    return (isinstance(wire, Mapping) and wire.get("binary_format") == "mssql_native") or (
-        isinstance(chunking, Mapping) and chunking.get("mode") == "bounded_stream"
+    chunks = execution.get("native_chunks", {}) if isinstance(execution, Mapping) else {}
+    return (
+        "source_read" in value
+        or (isinstance(chunks, Mapping) and "transport" in chunks)
+        or (isinstance(wire, Mapping) and wire.get("binary_format") == "mssql_native")
+        or (isinstance(chunking, Mapping) and chunking.get("mode") == "bounded_stream")
     )
+
+
+def native_source_read_mode(config: Any) -> str | None:
+    """Parse explicit raw semantics without changing legacy options or identity."""
+    native = _native(config)
+    if "source_read" not in native:
+        return None
+    value = native["source_read"]
+    if (
+        not isinstance(value, Mapping)
+        or set(value) != {"mode"}
+        or type(value["mode"]) is not str
+        or value["mode"] != "raw_single_query"
+    ):
+        raise ValueError("mssql_native.source_read_invalid")
+    return "raw_single_query"
+
+
+def native_transport_policy(config: Any) -> NativeBulkTransportPolicy | None:
+    """Resolve an explicit transport independently of the integer-only byte limits."""
+    execution = _native(config).get("execution")
+    chunks = execution.get("native_chunks") if isinstance(execution, Mapping) else None
+    if not isinstance(chunks, Mapping) or "transport" not in chunks:
+        return None
+    return NativeBulkTransportPolicy.from_mapping(chunks["transport"])
 
 
 def native_limits(config: Any) -> NativeChunkLimits:
@@ -40,7 +69,7 @@ def native_limits(config: Any) -> NativeChunkLimits:
         raise ValueError("mssql_native.chunking_invalid")
     if chunking.get("mode") != "bounded_stream" or chunking.get("checkpointing", "resumable") != "resumable":
         raise ValueError("mssql_native.chunking_invalid")
-    allowed = set(NativeChunkLimits.__dataclass_fields__) - {"parallelism"}
+    allowed = (set(NativeChunkLimits.__dataclass_fields__) - {"parallelism"}) | {"transport"}
     if not isinstance(chunks, Mapping) or set(chunks) - allowed:
         raise ValueError("mssql_native.native_chunks_invalid")
     if not {"max_total_encoded_bytes", "stage_allocated_bytes_stop_threshold"}.issubset(chunks):
@@ -48,7 +77,9 @@ def native_limits(config: Any) -> NativeChunkLimits:
     for name in ("encoding_parallelism", "import_parallelism"):
         if name in chunks and chunks[name] is None:
             raise ValueError(f"mssql_native.invalid_limit:{name}")
-    return NativeChunkLimits(**dict(chunks), parallelism=chunking.get("parallelism", 1))
+    native_transport_policy(config)
+    values = {name: value for name, value in chunks.items() if name != "transport"}
+    return NativeChunkLimits(**values, parallelism=chunking.get("parallelism", 1))
 
 
 def native_window(config: Any) -> FrozenRollingWindow | None:
@@ -70,7 +101,9 @@ def native_window(config: Any) -> FrozenRollingWindow | None:
 
 def validate_native_config(config: Any) -> None:
     """Reject unsupported routes and source policies before connector row I/O."""
+    native_transport_policy(config)
     value = _native(config)
+    native_source_read_mode(config)
     wire = value.get("wire")
     if (
         not isinstance(wire, Mapping)

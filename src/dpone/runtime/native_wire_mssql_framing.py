@@ -9,10 +9,42 @@ from __future__ import annotations
 import math
 import re
 import struct
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import BinaryIO
 
 from dpone.runtime.native_wire_models import NativeWireColumnLayout
+
+
+class BoundedNativeRowReader:
+    """Wrap a caller-owned stream without owning its lifetime or rewind probes.
+
+    Framing checks the full payload size before allocating, while individual
+    reads debit the row budget and report exactly the bytes consumed. Position
+    probes never produce observations. A new wrapper starts each row's budget.
+    """
+
+    def __init__(self, handle: BinaryIO, limit: int, observer: Callable[[bytes], None] | None) -> None:
+        self._handle, self._remaining, self._observer = handle, limit, observer
+
+    def check_read_size(self, size: int) -> None:
+        """Reject the advertised allocation before framing builds a payload buffer."""
+        if size < 0 or size > self._remaining:
+            raise ValueError("native_wire_row_bytes_exceeded")
+
+    def read(self, size: int) -> bytes:
+        self.check_read_size(size)
+        value = self._handle.read(size)
+        self._remaining -= len(value)
+        if self._observer is not None:
+            self._observer(value)
+        return value
+
+    def tell(self) -> int:
+        return self._handle.tell()
+
+    def seek(self, offset: int, whence: int = 0) -> int:
+        return self._handle.seek(offset, whence)
+
 
 _FIXED_WIDTHS = {
     "bit": 1,
@@ -142,6 +174,8 @@ def _validate_scalar_domain(payload: bytes, field: NativeWireColumnLayout, conte
 
 def read_exact(handle: BinaryIO, length: int, context: str = "format=native_wire.v1") -> bytes:
     """Handle short reads without ever passing a negative/huge count to read()."""
+    if isinstance(handle, BoundedNativeRowReader):
+        handle.check_read_size(length)
     if length < 0:
         raise ValueError(f"native_wire_invalid_length:{context}")
     if length > 65536:

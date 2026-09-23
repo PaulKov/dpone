@@ -1,0 +1,54 @@
+schema_version: 1
+task_id: "DPONE-DDA-SQLCLIENT-FAILED-P10G"
+title: "Implement production failed-attempt P10g retirement"
+goal: "Retire an exact contained SqlClient predecessor without synthetic success authority."
+specification: "docs/feature-specs/mssql-sqlclient-route-activation.md"
+base_commit: "98465594a283b5f93ba966b8f6c2f91b94d749b7"
+integrator: "root"
+
+acceptance_criteria:
+  - "Reservation uses retained or recovered TdsAttempt writer authority."
+  - "DROP intent is durable before SQL and an uncertain DROP is reconciled before any retry."
+  - "Completion proves exact absence, durable RETIRED, closed admission, and released capacity."
+  - "Replay returns the same request-bound receipt without repeating a settled DROP."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "SqlClient failed-attempt settlement capability implementation"
+  migration_required: false
+
+owned_paths:
+  - "src/dpone/app/mssql_sqlclient_failed_retirement_composition.py"
+  - "src/dpone/adapters/mssql_sqlclient_failed_retirement_operator.py"
+  - "src/dpone/adapters/mssql_sqlclient_failed_retirement_effects.py"
+  - "tests/test_mssql_sqlclient_failed_retirement_composition.py"
+  - "docs/agent-task-contracts/mssql-sqlclient-failed-retirement.yml"
+integrator_owned_paths:
+  - "src/dpone/app/mssql_sqlclient_failed_attempt_composition.py"
+  - "docs/feature-specs/mssql-sqlclient-route-activation.md"
+  - "docs/adr/0073-mssql-sqlclient-route-activation.md"
+  - "CHANGELOG.md"
+read_only_paths:
+  - "src/dpone/services/mssql_tds_attempt.py"
+  - "src/dpone/services/mssql_native_chunk_retirement.py"
+  - "src/dpone/adapters/mssql_sqlclient_native_retirement_operator.py"
+  - "src/dpone/contracts/mssql_sqlclient_failed_attempt_settlement.py"
+  - "src/dpone/ports/mssql_sqlclient_failed_attempt_settlement.py"
+forbidden_paths:
+  - "pyproject.toml"
+  - "uv.lock"
+  - "mkdocs.yml"
+  - ".github/workflows/**"
+
+shared_file_owner: "integrator"
+required_checks:
+  focused:
+    - "uv run pytest tests/test_mssql_sqlclient_failed_retirement_composition.py -q"
+    - "uv run ruff check src/dpone/app/mssql_sqlclient_failed_retirement_composition.py src/dpone/adapters/mssql_sqlclient_failed_retirement_operator.py tests/test_mssql_sqlclient_failed_retirement_composition.py"
+  live:
+    - "N/A: no approved live environment in this task contract"
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Another writer owns the same semantic contract."

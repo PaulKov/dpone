@@ -5,11 +5,11 @@ from __future__ import annotations
 import re
 import struct
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from datetime import UTC, date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, cast
 
 from dpone.runtime.native_wire_models import (
     NATIVE_WIRE_SCHEMA_VERSION,
@@ -17,7 +17,13 @@ from dpone.runtime.native_wire_models import (
     SourceNativeWireContract,
     stable_hash,
 )
-from dpone.runtime.native_wire_mssql_framing import fixed_length, native_prefix_width, read_native_payload, time_length
+from dpone.runtime.native_wire_mssql_framing import (
+    BoundedNativeRowReader,
+    fixed_length,
+    native_prefix_width,
+    read_native_payload,
+    time_length,
+)
 from dpone.runtime.support.type_mapping.mssql_clickhouse import MssqlClickHouseTypeMapper, MssqlClickHouseTypePolicy
 
 _SQL_SERVER_EPOCH = date(1900, 1, 1)
@@ -92,6 +98,28 @@ class MssqlBcpNativeDecoder:
                 if not first:
                     return
                 yield self._read_row(handle)
+
+    def iter_stream(
+        self,
+        handle: BinaryIO,
+        *,
+        max_row_bytes: int,
+        on_bytes: Callable[[bytes], None] | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        """Decode a caller-pinned seekable stream with bounds before allocation.
+
+        Observe only consumed framing/payload bytes, including a partial failed
+        row. Natural exhaustion is required for whole-file evidence; neither
+        early iterator close nor matching row count establishes EOF.
+        """
+        if type(max_row_bytes) is not int or max_row_bytes < 1:
+            raise ValueError("native_wire_invalid_row_bound")
+        while True:
+            first = handle.peek(1)[:1] if hasattr(handle, "peek") else _peek_one(handle)
+            if not first:
+                return
+            reader = BoundedNativeRowReader(handle, max_row_bytes, on_bytes)
+            yield self._read_row(cast(BinaryIO, reader))
 
     def _read_row(self, handle: BinaryIO) -> dict[str, Any]:
         row: dict[str, Any] = {}

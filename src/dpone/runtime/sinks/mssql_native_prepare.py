@@ -2,56 +2,18 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field, fields, replace
+from collections.abc import Callable
+from dataclasses import fields, replace
 from typing import Any
 
 from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
 from dpone.runtime.consumed_payload_evidence import ConsumedPayloadEvidence, ConsumedPayloadPartEvidence
-from dpone.runtime.mssql_native_chunks_observations import delivery_session
+from dpone.runtime.sinks.mssql_native_prepare_types import NativeStageContext
+from dpone.runtime.sinks.mssql_native_prepare_types import PreparedResources as _PreparedResources
 from dpone.runtime.sinks.mssql_native_staged_load import NativePreparedStage
 from dpone.runtime.sinks.staging_managers.mssql_staging_support import issue_direct_native_staging_authority
 from dpone.runtime.sinks.strategies.mssql.mssql_native_lineage import MssqlNativeLineageProjection
 from dpone.runtime.sinks.strategies.mssql.mssql_native_staging import MssqlNativeStagingNormalizer
-
-
-@dataclass(frozen=True)
-class NativeStageContext:
-    """Composition-owned source, fenced journal, and independent worker services.
-
-    Recovery supplies a saved completed extraction lifecycle. Its row source is
-    never invoked. Capacity and receipt callbacks must assert current fencing.
-    """
-
-    plan: Any
-    wire_contract: Any
-    executor: Any
-    lease: Any
-    row_source: Callable[[], Iterable[Any]]
-    verify_receipts: Callable[[tuple[Any, ...]], None]
-    cleanup_receipts: Callable[[tuple[Any, ...]], None]
-    capacity_check: Callable[[int], None]
-    journal_factory: Callable[[], Any]
-    preparation_scope: Callable[[], Any]
-    interval: Any = None
-    recover: bool = False
-    completed_lifecycle: Any = None
-    max_row_bytes: int = 1048576
-    cancelled: Any = None
-    observer: Any = field(default=None, kw_only=True)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "observer", delivery_session(self.observer))
-
-
-@dataclass(frozen=True)
-class _PreparedResources:
-    context: NativeStageContext
-    receipts: tuple[Any, ...]
-    verify_digest: str
-    source_schema: tuple[tuple[str, str], ...]
-    object_id: int
-    planned: dict[str, str]
 
 
 class MssqlNativeStagePreparer:
@@ -175,7 +137,20 @@ class MssqlNativeStagePreparer:
             columns = ", ".join(strategy.connector.quote_identifier(name) for name, _dtype in schema)
             # Stage identifiers are verified by the invocation-owned importer
             # before they enter this SQL. UNION ALL retains business duplicates.
-            queries = " UNION ALL ".join(f"SELECT {columns} FROM {receipt.stage_id}" for receipt in receipts)
+            sqlclient = context.plan.transport is not None and context.plan.transport.backend == "mssql_sqlclient"
+            if sqlclient:
+                if context.physical_stage is None:
+                    raise ValueError("mssql_native.sqlclient_physical_stage_required")
+                physical = tuple(context.physical_stage(receipt) for receipt in receipts)
+                queries = " UNION ALL ".join(
+                    f"SELECT {columns} FROM "
+                    f"{strategy.connector.quote_identifier(stage.database_name)}."
+                    f"{strategy.connector.quote_identifier(stage.schema_name)}."
+                    f"{strategy.connector.quote_identifier(stage.table_name)}"
+                    for stage in physical
+                )
+            else:
+                queries = " UNION ALL ".join(f"SELECT {columns} FROM {receipt.stage_id}" for receipt in receipts)
             recorder = context.observer.recorder()
             with recorder.phase("metadata_project", reason="insert_projection_build"):
                 insert_sql = build_prepared_insert(

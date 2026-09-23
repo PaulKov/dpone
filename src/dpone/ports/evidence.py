@@ -12,4 +12,11 @@ class CreateOnlyEvidenceWriterV1(Protocol):
         """Durably create or verify an identical immutable evidence target."""
 
 
-__all__ = ["CreateOnlyEvidenceWriterV1"]
+__all__ = ["CreateOnlyEvidenceWriterV1", "ExactEvidenceReaderV1"]
+
+
+class ExactEvidenceReaderV1(Protocol):
+    """Read one bounded immutable receipt; no creation or repair capability."""
+
+    def read(self, relative_name: str, byte_count: int, payload_sha256: str) -> bytes:
+        """Return exact acknowledged bytes or reject without modifying storage."""

@@ -14,7 +14,14 @@ from typing import TYPE_CHECKING
 
 from dpone.adapters import composition_mssql_check_definitions as reference
 from dpone.adapters import composition_mssql_gate_check_definitions as gate_reference
-from dpone.adapters.composition_mssql_catalog_query import require_exact_catalog_rows as _require
+from dpone.adapters.composition_mssql_catalog_query import (
+    ledger_catalog_projections,
+    require_database_collation,
+    supports_ledger_catalog,
+)
+from dpone.adapters.composition_mssql_catalog_query import (
+    require_exact_catalog_rows as _require,
+)
 from dpone.adapters.composition_mssql_gate_layout import COMPOSITION_GATE_TABLES
 from dpone.adapters.composition_mssql_gate_schema import gate_table_trigger, render_composition_mssql_login_gate
 from dpone.adapters.composition_mssql_layout import (
@@ -26,11 +33,6 @@ from dpone.adapters.composition_mssql_layout import (
     require_control_schema,
 )
 from dpone.adapters.composition_mssql_schema import composition_invariant_trigger_sql, render_composition_mssql_schema
-from dpone.adapters.composition_mssql_server_capabilities import (
-    ledger_catalog_projections,
-    require_database_collation,
-    supports_ledger_catalog,
-)
 from dpone.contracts.composition_identity import CompositionAdmissionError
 from dpone.ports.sql_connection import SqlControlCursor
 

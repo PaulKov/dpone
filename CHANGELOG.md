@@ -2,6 +2,181 @@
 
 ## Unreleased
 
+- Transfer a verified SQLClient attempt to parent retirement through a
+  process-local, one-shot suspension capability. Same-fence continuation is
+  accepted only after both original actors close; duplicate use, process loss,
+  stale ownership and fabricated snapshot-only resume fail closed and require
+  recovery under a newer fence.
+- Make SQLClient permission inventory classification exhaustive: every positive
+  object permission is now bound to an authenticated dpone stage or an explicit
+  exclusion, preventing incomplete CREATE evidence from passing validation.
+- Batch SQLClient catalog classification through fixed `OPENJSON` projections,
+  bounding catalog round trips for large inherited permission sets.
+- Add the production SqlClient native runtime composition, including the
+  product-owned P7-P10f executor and parent publication, retirement, input
+  custody and checkpoint bridges. The runtime now uses one canonical retained
+  input receipt, a pinned verified descriptor, an exact PREPARED-attempt
+  factory and a durable SQLite intent/receipt journal for irreversible input
+  release. Parent settlement now has one production composer, fenced durable
+  per-chunk retirement progress, ordered whole-parent custody release and a
+  checkpoint bridge that re-reads its exact authorization before CAS. Public
+  activation remains gated by current full-route qualification; BCP remains
+  the default.
+- Replace legacy failed-attempt callbacks with one durable SqlClient settlement
+  capability. Retry admission now requires exact contained-attempt authority,
+  DROP reconciliation, stage absence, `RETIRED` lifecycle and closed directory
+  evidence, followed by observed actor-capacity release. Recovery can finish
+  the capacity receipt from the durable terminal prefix after process loss
+  without repeating DROP or reacquiring the retired attempt.
+
+### Fixed
+
+- Retain SqlClient native input with a bounded streaming copy and streaming
+  identity verification. Reject symlinks and non-regular files, publish retained
+  files create-only after file and directory sync, and preserve the existing
+  byte-input API and replay receipts without materializing large route inputs.
+
+- Reject single-NUL `nvarchar(max)` values before canonical native chunk BCP
+  import, where the tested driver turns them into empty text. Validate the
+  complete file identity and row count before affected-chunk target mutation;
+  retain independent post-import typed verification and recovery behavior.
+
+- Keep SQLClient GRANT settlement evidence filenames below common filesystem
+  component limits by naming them with a digest of the complete validated
+  subject. Preserve the phase boundary by recording request authority first at
+  `CREDENTIAL_INTENT`, even when the runner captures it before `REGISTRATION`
+  to prevent re-entry substitution. Retain separate exact references for the
+  GRANT request used by VERIFY projection and the complete GRANT evidence used
+  by restricted-writer settlement and admission. Encode the P9b departure plan
+  under its own schema so GRANT and restricted-helper deployment identities can
+  differ without weakening either identity check.
+
+- Retain attempted and successful unresolved CREATE-launch closure separately,
+  preventing a repeated close after an ambiguous failure while preserving the
+  original containment budget and launch capability.
+
+- Keep a TDS attempt invalidated after same-owner reentry, even when an injected
+  callback catches the rejection. Stop subsequent journal effects and reject a
+  successful return; bounded teardown remains available.
+
+- Reject malformed nested exit identities and evidence receipts in retained TDS
+  CREATE outcomes, including equal-valued boolean, float and enum aliases.
+  Valid outcome construction and existing evidence bytes remain unchanged.
+
+### Added
+
+- Complete the internal SQLClient writer settlement boundary with a separately
+  contained management helper, exact writer-bound input identity, independent
+  remote-session departure, before/after stage identity, typed row-count and
+  multiset reconciliation, helper provenance, durable verification evidence and
+  the ordered `Exited → Verified` transition. Add controlled narrow and
+  100-column Docker coverage against the exact qualified preparation bundle.
+  Public activation remains disabled, and BCP remains the default.
+
+- Add exact SQLClient preparation qualification: two distinct fresh SQL Server
+  controls, frozen source and runtime identities, verified TLS, complete
+  permission projection, independent review and deployment-owned receipt
+  authority. PREPARED revalidates the same authority before effects and before
+  commit. Qualification is limited to the exact admitted build/database tuple;
+  public SQLClient activation remains disabled and BCP remains the default.
+
+- Compose the internal SQLClient PREPARED authorization chain through exact
+  GRANT reservation, hold and settlement, canonical restricted-writer VERIFY,
+  and settlement-created writer authority. Deterministic dependency and
+  credential checks precede GRANT ownership; ambiguous phases retain their
+  original custody. Public activation remains disabled, and BCP remains the
+  default.
+
+- Add the internal one-shot SqlClient grant/result/local-exit boundary. It
+  consumes acknowledged grant intent once, persists exact EOF result and reaped
+  local-exit evidence before lifecycle `Exited`, confirms local resource closure,
+  and returns resource-free locally-exited custody. Ambiguity never resends the
+  grant; public activation remains disabled and BCP remains the default.
+
+- Add the internal pre-grant SqlClient writer boundary: a separately
+  credentialed, process-contained observer binds the announced writer session
+  to its admitted SQL identity, persists ordered observation and grant-intent
+  acknowledgements, and returns opaque grant-ready custody without delivering
+  the grant or starting bulk work. Public activation remains disabled and BCP
+  remains the default.
+
+- Preserve original SqlClient CREATE receipts and snapshots in an immutable
+  operation-local seal, and add explicit source-free authenticated inventory
+  reads with confined file access and retained uncertain actors. Missing
+  historical evidence fails closed; BCP and raw inventory remain unchanged.
+
+- Add an internal bounded SqlClient direct-permission inventory with complete
+  writer/public observations, original locator resolution and retained UNKNOWN
+  ownership. Public writer activation and deployment acceptance remain pending.
+
+- Add internal SqlClient state-domain admission and immutable stage lookup,
+  using original journal evidence and bounded actor ownership. V2 CREATE now
+  requires the attempt's original admitted factory and acknowledges the locator
+  before CREATE. Unknown locator effects retain their actual actor for cleanup.
+  These components do not activate the public writer route.
+
+- Add offline build and admission tools for the optional SqlClient companion,
+  using pinned inputs, locked restore and canonical deployment validation.
+  The public route and BCP default remain unchanged.
+
+- Add an internal SqlClient stage identity and emptiness reader with explicit
+  metadata visibility and RLS rejection. Share strict catalog parsing with CREATE;
+  this observation alone does not authorize preparation or bulk execution.
+
+- Add explicit internal SqlClient v2 CREATE/helper composition with independently
+  configured observer admission, version-bound private credentials and result
+  evidence. Reuse the existing acknowledged lifecycle and retained cleanup; v1
+  and the default BCP route remain unchanged. Bulk writer integration is pending.
+
+- Compose original SqlClient CREATE and departure observation under the fresh
+  attempt owner, with six ordered helper acknowledgments, matching process exit
+  and retained unknown cleanup. Validate original nested CREATE inputs before
+  hashing or effects. This component does not prepare or launch a bulk writer.
+
+- Add the departure-helper evidence actor on the shared bounded pool, with fixed
+  subject binding, one-shot record kinds and preserved prior acknowledgments
+  after failed or late writes.
+
+- Add six bounded canonical departure-helper evidence codecs with strict original
+  value validation and request-bound RESULT records. Add an optional private parent
+  assertion to CREATE supervision, blocking forward effects after lost attempt
+  authority while preserving cleanup. Complete SqlClient route integration remains
+  pending.
+
+- Add a private one-shot sequence for fresh SqlClient CREATE preparation, binding
+  the original reservation, complete owner and both journal revisions. Recovery
+  cannot infer execution permission from an empty journal.
+
+- Retain optional nonsecret provenance from successful TDS CREATE supervision,
+  binding original inputs and acknowledged evidence after local cleanup. Preserve
+  legacy positional outcomes and recheck the operation deadline after final
+  validation. Add separate bounded departure-helper evidence types; the complete
+  SqlClient writer route remains pending integration.
+
+- Add distinct `mssql_sqlclient` transport planning and bounded input-buffer
+  policy. Preserve BCP and `mssql_python` identity records. Execution requires a
+  complete admitted SqlClient runtime binding before source access; Python worker
+  entrypoints cannot accept this backend or silently substitute their SDK.
+  Retain complete result bytes through post-EOF timeout and close failures,
+  with bounded local containment and no implicit resend or retry. Local process
+  observations do not certify remote SQL settlement or enable the route.
+
+- Opt-in raw single-query ClickHouse native reads for explicitly admitted local
+  MergeTree variants. Preserve duplicate rows with query-level `final=0`, bind
+  the policy to version-2 chunk journals, and reject changed-policy recovery.
+  Legacy admission, identity bytes and transaction receipts remain unchanged.
+  Add synthetic composition guidance; live certification remains environment-specific.
+
+### Performance
+
+- Compute the SQLClient P10f native typed multiset inside SQL Server and return
+  one bounded aggregate row instead of streaming every staged business row back
+  through the management connection. Preserve the exact digest, settlement,
+  evidence, recovery and publication contracts.
+
+- Avoid a repeated Python character scan when encoding bounded variable-width
+  native MSSQL text. Preserve native bytes, capacity diagnostics, allocation-free
+  sizing and every independent staging verification and recovery boundary.
 ### Added
 
 - Bind native workload credential mounts to immutable deployment/index/init-fetch

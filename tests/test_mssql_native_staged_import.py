@@ -117,3 +117,56 @@ def test_settlement_refuses_foreign_table_with_same_name(tmp_path):
     value.connector.owner = "another-invocation"
     with pytest.raises(ValueError, match="owner_mismatch"):
         value.settle(plan, "attempt", object())
+
+
+@pytest.mark.parametrize(
+    "schema,rows",
+    [
+        ([("v", "nvarchar(max)")], [("\0",)]),
+        (
+            [("n", "bigint nullable"), ("v", "nvarchar(max) nullable"), ("tail", "int")],
+            [(None, None, 7), (3, "ordinary", 8), (None, "\0", 9)],
+        ),
+    ],
+)
+def test_single_nul_file_rejected_before_any_target_mutation(tmp_path, schema, rows):
+    from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
+    from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
+
+    contract = build_mssql_bcp_native_contract(schema=schema, query="test")
+    encoder = MssqlNativeEncoder(contract, max_row_bytes=1024)
+    effects = []
+
+    class Connector:
+        def qualified_name(self, *args, **kwargs):
+            return "[db].[stage].[owned]"
+
+        def quote_identifier(self, name):
+            return f"[{name}]"
+
+        def begin(self):
+            effects.append("begin")
+            pytest.fail("target transaction started for unrepresentable input")
+
+    def mutation(*args):
+        effects.append("mutation_scope")
+        pytest.fail("mutation scope entered for unrepresentable input")
+
+    value = MssqlNativeChunkImporter(
+        Connector(),
+        database="db",
+        schema="stage",
+        columns=contract.columns,
+        encode_row=encoder.encode_row,
+        assert_lease=lambda lease: None,
+        mutation_scope=mutation,
+        options_factory=BcpOptions,
+    )
+    payload = b"".join(encoder.encode_row(row) for row in rows)
+    path = tmp_path / "nul.native"
+    path.write_bytes(payload)
+    file = EncodedNativeFile(path, 0, len(rows), len(payload), sha256(payload).hexdigest(), "a" * 64)
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    with pytest.raises(ValueError, match="single_nul_not_representable"):
+        value.import_file(plan, file, "attempt", object())
+    assert effects == []

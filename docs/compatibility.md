@@ -28,6 +28,16 @@ the Airflow scheduler.
 
 `dpone` follows a compatibility-first approach for manifests, public imports, CLI commands, and runtime connector contracts.
 
+## MSSQL TDS same-fence continuation compatibility
+
+SQLClient P10f-to-P10g handoff no longer accepts lifecycle and directory
+snapshots as writer authority. In-process integrations implementing the TDS
+directory port must accept the one-shot resume claim supplied by dpone. Durable
+records and their codecs are unchanged. A process restart cannot reconstruct
+this capability; it must observe the records and take them over under a newer
+fence. Existing snapshot-only same-fence resume implementations must migrate
+instead of adapting snapshots into a claim.
+
 ## MSSQL run-state identity compatibility
 
 Run-state table capability and workload policy are separate contracts. Legacy
