@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.83.8 - 2026-09-23
+
+### Fixed
+
+- Re-issue the synchronized package release after completing the required
+  pre-tag evidence sequence. Runtime behavior remains the init-fetch credential
+  projection fix introduced in 0.83.7.
+
 ## 0.83.7 - 2026-09-23
 
 ### Fixed
