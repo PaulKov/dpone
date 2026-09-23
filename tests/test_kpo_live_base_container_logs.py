@@ -538,6 +538,7 @@ def test_provider_cleanup_receives_failed_init_snapshot_after_log_fallback() -> 
     operator.await_init_containers_completion = lambda *args, **kwargs: None
     operator.is_istio_enabled = lambda *args, **kwargs: False
     cleanup_pods: list[object] = []
+    operator.cleanup = lambda *args, **kwargs: cleanup_pods.append(operator.remote_pod)
     operator.post_complete_action = lambda *args, **kwargs: cleanup_pods.append(operator.remote_pod)
 
     with pytest.raises(RuntimeError, match="DPONE_KPO_INIT_CONTAINER_FAILED exit_code=7"):
