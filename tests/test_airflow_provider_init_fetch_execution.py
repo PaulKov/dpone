@@ -244,7 +244,10 @@ def test_real_airflow_indexed_group_keeps_runtime_in_canonical_graph(tmp_path: P
     from datetime import UTC, datetime
 
     from airflow.providers.dpone import DponeTaskGroup
-    from airflow.serialization.serialized_objects import SerializedDAG
+    try:
+        from airflow.serialization.serialized_objects import DagSerialization
+    except ImportError:
+        from airflow.serialization.serialized_objects import SerializedDAG as DagSerialization
 
     try:
         from airflow.sdk import DAG, TaskGroup
@@ -278,7 +281,7 @@ def test_real_airflow_indexed_group_keeps_runtime_in_canonical_graph(tmp_path: P
     assert {task.task_id for task in dag.task_group} == set(dag.task_ids)
     assert runtime.upstream_task_ids == {before.task_id}
     assert runtime.downstream_task_ids == {after.task_id}
-    restored = SerializedDAG.from_dict(SerializedDAG.to_dict(dag))
+    restored = DagSerialization.from_dict(DagSerialization.to_dict(dag))
     assert {task.task_id for task in restored.task_group} == set(dag.task_ids)
     assert restored.get_task(runtime.task_id).upstream_task_ids == {before.task_id}
 
