@@ -37,6 +37,8 @@ owned_paths:
   - src/dpone/adapters/dbt_workspace_mssql_registration_procedures.py
   - src/dpone/adapters/dbt_workspace_mssql_guard_procedures.py
   - src/dpone/adapters/dbt_workspace_mssql_gateway_security.py
+  - src/dpone/adapters/dbt_workspace_mssql_gateway_json.py
+  - src/dpone/adapters/dbt_workspace_mssql_gateway_validation.py
   - src/dpone/adapters/dbt_workspace_mssql_gateway_transaction.py
   - src/dpone/adapters/dbt_workspace_mssql_registration.py
   - src/dpone/adapters/semantic_refresh_mssql_activation.py
@@ -65,6 +67,11 @@ owned_paths:
   - tests/test_dbt_workspace_durable_handover_gaps.py
   - test_artifacts/agent-policy/workspace-handover-task-contract.yml
 integrator_owned_paths:
+  - src/dpone/ports/dbt_workspace_handover_execution.py
+  - src/dpone/services/dbt_workspace_handover_execution.py
+  - tests/test_dbt_workspace_handover_execution.py
+  - docs/workspace-handover-execution.md
+  - docs/agent-task-contracts/workspace-handover-execution.yml
   - src/dpone/readiness/airflow_desired_state_reconcile.py
   - src/dpone/services/airflow_desired_state_reconcile.py
   - src/dpone/adapters/semantic_refresh_mssql_schema_authority.py
@@ -73,6 +80,11 @@ read_only_paths:
   - src/dpone/adapters/semantic_refresh_mssql_schema_workspace.py
   - tests/conftest.py
 forbidden_paths:
+  - src/dpone/ports/dbt_workspace_handover_execution.py
+  - src/dpone/services/dbt_workspace_handover_execution.py
+  - tests/test_dbt_workspace_handover_execution.py
+  - docs/workspace-handover-execution.md
+  - docs/agent-task-contracts/workspace-handover-execution.yml
   - src/dpone/readiness/airflow_desired_state_reconcile.py
   - src/dpone/services/airflow_desired_state_reconcile.py
   - src/dpone/adapters/semantic_refresh_mssql_schema_authority.py
