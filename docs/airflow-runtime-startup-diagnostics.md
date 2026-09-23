@@ -5,6 +5,35 @@ without exposing container credentials. Start from the task's base-container
 log and collect run-volume diagnostics while the containers are still running.
 See [strict delivery](airflow-cache-sync-strict-v2.md) for init-fetch failures.
 
+## Live logs are unavailable before runtime starts
+
+`DPONE_KPO_LOG_STREAM_DEGRADED` means Kubernetes rejected the base-container
+log stream with a retryable response, including the structured HTTP 400
+`PodInitializing` startup response. The task switches to pod-status polling at
+its configured base-container interval. It reads fresh status immediately and
+on every poll; a running workload continues without live logs.
+
+If a one-shot init container terminates unsuccessfully and the pod cannot retry
+it, the task reports `DPONE_KPO_INIT_CONTAINER_FAILED exit_code=7` (synthetic
+example). If the pod is terminal while the base has no termination status, it
+reports `DPONE_KPO_POD_TERMINATED`. Both stop polling immediately and refresh
+the pod status used by cleanup. These dpone diagnostic messages omit pod/container names,
+termination messages, environment values and API response bodies.
+
+Inspect the retained pod's init status and platform diagnostics using your
+normal restricted access. Correct the init configuration or image, then retry
+through Airflow. Increasing execution timeout does not repair a failed init.
+Normal Kubernetes init retries and restartable init sidecars remain supported;
+base exit-code handling, XCom, task retries and pod retention policy still
+belong to the Kubernetes provider.
+
+Upgrade requires the matching updated worker packages; no DAG ID, manifest,
+retry, or timeout changes are required. Maintainers can run the synthetic
+regressions with `uv run pytest tests/test_kpo_fallback_completion.py
+tests/test_kpo_live_base_container_logs.py -q`. Installed-provider lifecycle
+tests require the corresponding Airflow/Kubernetes provider environment; these
+unit tests do not certify live cluster behavior.
+
 ## Service files and publication
 
 Both runtime and separate hooks use `/var/lib/dpone/run` on the provider-owned

@@ -46,10 +46,16 @@ class _PodManager:
         self.calls: list[dict[str, object]] = []
         self.live_log_calls: list[dict[str, object]] = []
 
-    def await_container_completion(self, **kwargs: object) -> None:
+    def read_pod(self, **kwargs: object) -> object:
         self.calls.append(dict(kwargs))
         if self.polling_error is not None:
             raise self.polling_error
+        return SimpleNamespace(
+            status=SimpleNamespace(
+                phase="Running",
+                container_statuses=[SimpleNamespace(name="base", state=SimpleNamespace(terminated=object()))],
+            )
+        )
 
     def read_pod_logs(self, **kwargs: object) -> object | None:
         self.live_log_calls.append(dict(kwargs))
@@ -78,7 +84,7 @@ class _ProviderPodManager(_PodManager):
 
     def read_pod(self, **kwargs: object) -> object:
         self.read_pod_calls.append(dict(kwargs))
-        return kwargs["pod"]
+        return super().read_pod(**kwargs)
 
 
 def _operator(*, get_logs: bool = True, manager: _PodManager | None = None) -> Any:
@@ -167,13 +173,7 @@ def test_transient_log_api_failure_degrades_to_status_polling(
 
     assert result is None
     assert operator.get_logs is False
-    assert operator.pod_manager.calls == [
-        {
-            "pod": pod,
-            "container_name": "base",
-            "polling_time": 2,
-        }
-    ]
+    assert operator.pod_manager.calls == [{"pod": pod}]
     assert operator.log.warnings == [
         f"DPONE_KPO_LOG_STREAM_DEGRADED status={int(status)} action=await_container_completion"
     ]
@@ -202,7 +202,7 @@ def test_pod_initializing_log_race_degrades_to_status_polling() -> None:
     )
 
     assert operator.get_logs is False
-    assert operator.pod_manager.calls == [{"pod": pod, "container_name": "base", "polling_time": 2}]
+    assert operator.pod_manager.calls == [{"pod": pod}]
     assert operator.log.warnings == ["DPONE_KPO_LOG_STREAM_DEGRADED status=400 action=await_container_completion"]
 
 
@@ -357,13 +357,7 @@ def test_pinned_kpo_composes_fallback_with_installed_cncf_provider() -> None:
 
     assert result is None
     assert operator.get_logs is False
-    assert manager.calls == [
-        {
-            "pod": pod,
-            "container_name": "base",
-            "polling_time": getattr(operator, "base_container_status_polling_interval", 1),
-        }
-    ]
+    assert manager.calls == [{"pod": pod}]
     assert len(manager.live_log_calls) == 1
 
 
@@ -431,16 +425,10 @@ def test_provider_10_19_rebinds_log_boundary_after_credential_refresh() -> None:
     assert refresh_events == ["refresh"]
     assert len(first_manager.fetch_calls) == 1
     assert len(first_manager.live_log_calls) == 1
-    assert replacement_manager.read_pod_calls == [{"pod": pod}]
+    assert replacement_manager.read_pod_calls == [{"pod": pod}, {"pod": pod}]
     assert len(replacement_manager.fetch_calls) == 1
     assert len(replacement_manager.live_log_calls) == 1
-    assert replacement_manager.calls == [
-        {
-            "pod": pod,
-            "container_name": "base",
-            "polling_time": getattr(operator, "base_container_status_polling_interval", 1),
-        }
-    ]
+    assert replacement_manager.calls == [{"pod": pod}, {"pod": pod}]
     assert "read_pod_logs" not in vars(first_manager)
     assert "read_pod_logs" not in vars(replacement_manager)
     assert operator._refresh_cached_properties is refresh_cached_properties
@@ -465,9 +453,9 @@ def test_provider_10_19_fallback_preserves_xcom_final_wait_and_cleanup_sequence(
             events.append("live_logs")
             super().fetch_requested_container_logs(**kwargs)
 
-        def await_container_completion(self, **kwargs: object) -> None:
+        def read_pod(self, **kwargs: object) -> object:
             events.append("fallback_base_completed")
-            super().await_container_completion(**kwargs)
+            return super().read_pod(**kwargs)
 
         def await_xcom_sidecar_container_start(self, **kwargs: object) -> None:
             events.append("xcom_sidecar_ready")
@@ -511,3 +499,51 @@ def test_provider_10_19_fallback_preserves_xcom_final_wait_and_cleanup_sequence(
         "final_pod_completed",
         "cleanup",
     ]
+
+
+def test_provider_cleanup_receives_failed_init_snapshot_after_log_fallback() -> None:
+    pytest.importorskip("airflow.providers.cncf.kubernetes.operators.pod")
+    from dpone_airflow_pack.operators import PinnedXComSidecarKubernetesPodOperator
+    from kubernetes.client.exceptions import ApiException
+
+    stale_pod = SimpleNamespace(metadata=SimpleNamespace(name="runtime", namespace="default"))
+    failed_pod = SimpleNamespace(
+        status=SimpleNamespace(
+            phase="Failed",
+            container_statuses=[],
+            init_container_statuses=[
+                SimpleNamespace(name="fetch", state=SimpleNamespace(terminated=SimpleNamespace(exit_code=7)))
+            ],
+        )
+    )
+    error = ApiException(status=400)
+    error.body = (
+        '{"status":"Failure","reason":"BadRequest","code":400,'
+        '"message":"container is waiting to start: PodInitializing"}'
+    )
+
+    class FailedInitManager(_ProviderPodManager):
+        def read_pod(self, **kwargs: object) -> object:
+            return failed_pod
+
+    operator = PinnedXComSidecarKubernetesPodOperator(
+        task_id="failed_init_cleanup", name="failed-init-cleanup", image="example.invalid/runtime:test", get_logs=True
+    )
+    manager = FailedInitManager(live_log_error=error)
+    operator.__dict__["pod_manager"] = manager
+    operator.pod_request_obj = stale_pod
+    operator.pod = stale_pod
+    operator.find_pod = lambda *args, **kwargs: stale_pod
+    operator.await_pod_start = lambda *args, **kwargs: None
+    operator.await_init_containers_completion = lambda *args, **kwargs: None
+    operator.is_istio_enabled = lambda *args, **kwargs: False
+    cleanup_pods: list[object] = []
+    operator.cleanup = lambda *args, **kwargs: cleanup_pods.append(operator.remote_pod)
+    operator.post_complete_action = lambda *args, **kwargs: cleanup_pods.append(operator.remote_pod)
+
+    with pytest.raises(RuntimeError, match="DPONE_KPO_INIT_CONTAINER_FAILED exit_code=7"):
+        operator.execute_sync({"ti": SimpleNamespace(xcom_push=lambda **kwargs: None)})
+
+    assert cleanup_pods == [failed_pod]
+    assert operator.remote_pod is failed_pod
+    assert "read_pod_logs" not in vars(manager)

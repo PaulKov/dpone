@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- Stop Airflow live-log fallback polling promptly when an init container cannot
+  recover or the pod terminates before the base container starts. Cleanup now
+  receives the latest pod status; healthy workloads retain status-only polling.
+
 ## 0.83.9 - 2026-09-23
 
 ### Added
