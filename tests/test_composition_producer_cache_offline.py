@@ -45,7 +45,8 @@ from dpone.services.composition_activation_coordinator import CompositionActivat
 from dpone.services.composition_activation_preparation import CompositionActivationPreparation
 from dpone.services.composition_physical_admission import CompositionPhysicalAdmissionService
 from tests import dbt_compact_wire_v2_helpers as native_helpers
-from tests.test_dbt_airflow_release_e2e import _config_map_ref, _vault_connection, _write_environment
+from tests.test_airflow_credential_projection_delivery import write_native_environment
+from tests.test_dbt_airflow_release_e2e import _config_map_ref, _vault_connection
 from tests.test_release_composition_ordinary import ordinary_root
 
 MAX_SOURCE_BYTES = 1_000_000
@@ -329,7 +330,7 @@ def test_real_producer_to_v3_cache_with_explicit_offline_admission(producer_comp
                 "max_source_bytes": MAX_SOURCE_BYTES,
             }
 
-    _write_environment(tmp_path)
+    projection_authority = write_native_environment(tmp_path)
     environment = tmp_path / "environments/prod/binding-set.yaml"
     bindings = yaml.safe_load(environment.read_bytes())
     bindings["bindings"].update({name: {"connection_ref": name} for name in ("ordinary_reader", "ordinary_writer")})
@@ -351,7 +352,9 @@ def test_real_producer_to_v3_cache_with_explicit_offline_admission(producer_comp
         registry_config_ref=_config_map_ref("registry", "1"),
         trust_policy_ref=_config_map_ref("policy", "2"),
         airflow_bundle_ref="git:" + "d" * 40,
+        desired_state_authority=projection_authority,
     )
+    assert projection.deployment["schema"] == "dpone.deployment-set.v6"
     cache, events = tmp_path / ".dpone-cache", []
     backend = OfflineBackend(events)
     store = OfflineProtectedStore(cache, events)

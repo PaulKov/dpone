@@ -5,8 +5,10 @@ import os
 import shutil
 from contextlib import contextmanager
 from copy import deepcopy
+from dataclasses import replace
 
 import pytest
+from dpone_airflow_pack.credential_projection_contract import canonical_projection_bytes, projection_descriptor
 
 from dpone.app import dbt_publish_composition
 from dpone.app.dbt_promotion_composition import RuntimeDbtProjectBundleOperations
@@ -24,6 +26,7 @@ from dpone.services import dbt_release_source_reader as source_reader_module
 from dpone.services.dbt_release_integrity import DbtReleaseIntegrityService
 from dpone.services.dbt_release_source_reader import DbtReleaseSourceReader
 from tests.airflow_cache_promotion_test_support import write_cache_fixture
+from tests.test_airflow_credential_projection_delivery import write_native_environment
 from tests.test_dbt_airflow_release_e2e import _compiled_release, _config_map_ref, _write_environment
 from tests.test_dbt_workspace_artifact_writer import _case
 
@@ -185,7 +188,7 @@ def projected_workspace(workspace, tmp_path):
     root, tree = workspace
     cache = tmp_path / ".dpone-cache"
     build_dbt_release_materializer().materialize(compiled_root=root, cache_root=cache)
-    return cache, _project_release(tmp_path, tree.release_id)
+    return cache, _project_release(tmp_path, tree.release_id, native=True)
 
 
 def test_stage_cleanup_failure_prevents_cache_publication(workspace, tmp_path, monkeypatch):
@@ -207,8 +210,12 @@ def test_stage_cleanup_failure_prevents_cache_publication(workspace, tmp_path, m
     assert reached_cleanup == [True] and not (tmp_path / ".dpone-cache").exists()
 
 
-def _project_release(tmp_path, release_id):
-    _write_environment(tmp_path)
+def _project_release(tmp_path, release_id, *, native=False):
+    authority = None
+    if native:
+        authority = replace(write_native_environment(tmp_path), artifact_registry_ref="dpone-prod-artifacts")
+    else:
+        _write_environment(tmp_path)
     digest = "sha256:" + "d" * 64
     projection = AirflowDeploymentProjectionService(root=tmp_path).materialize(
         release_id=release_id,
@@ -220,7 +227,10 @@ def _project_release(tmp_path, release_id):
         registry_config_ref=_config_map_ref("registry", "1"),
         trust_policy_ref=_config_map_ref("policy", "2"),
         airflow_bundle_ref="git:" + "d" * 40,
+        desired_state_authority=authority,
     )
+    if native:
+        assert projection.deployment["schema"] == "dpone.deployment-set.v6"
     return projection
 
 
@@ -268,6 +278,12 @@ def test_outer_schema_downgrade_cannot_enable_workspace_activation(projected_wor
     (new_dir / "release-set.json").write_text(json.dumps(release))
     deployment = json.loads((projection.deployment_dir / "deployment.json").read_bytes())
     deployment["release_ref"] = release_id
+    # Keep the independent projection consistent with the forged outer release
+    # so this regression still reaches the original release-schema guard.
+    credentials = json.loads((projection.deployment_dir / "credential-projection.json").read_bytes())
+    credentials["release_id"] = release_id
+    credential_bytes = canonical_projection_bytes(credentials)
+    deployment["credential_projection"] = projection_descriptor(credential_bytes)
     deployment_id = compute_deployment_id(deployment)
     old_deployment_id = deployment["deployment_id"]
     deployment["deployment_id"] = deployment_id
@@ -279,7 +295,10 @@ def test_outer_schema_downgrade_cannot_enable_workspace_activation(projected_wor
     candidate = cache / "deployments/prod" / deployment_id.replace(":", "-", 1)
     shutil.copytree(projection.deployment_dir, candidate)
     (candidate / "deployment.json").write_text(json.dumps(deployment))
-    (candidate / "airflow-index.json").write_text(index_bytes)
+    index = json.loads(index_bytes)
+    index["credential_projection"] = deployment["credential_projection"]
+    (candidate / "airflow-index.json").write_text(json.dumps(index))
+    (candidate / "credential-projection.json").write_bytes(credential_bytes)
     with pytest.raises(DeploymentCacheError) as caught:
         DeploymentCacheMaterializer(cache).promote(candidate, environment="prod")
     assert caught.value.code == "DPONE_RELEASE_SET_INVALID"

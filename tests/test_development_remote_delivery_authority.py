@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import traceback
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
@@ -23,6 +24,7 @@ from dpone.readiness.airflow_artifact_delivery import (
 from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
 from dpone.readiness.airflow_deployment_projection import AirflowDeploymentProjectionService
 from dpone.readiness.airflow_deployment_projection_errors import AirflowDeploymentProjectionError
+from dpone.readiness.airflow_desired_state_authority import AirflowDesiredStateAuthority
 from dpone.runtime.airflow_artifact_delivery import (
     AirflowArtifactDeliveryError,
     AirflowArtifactMaterializer,
@@ -31,6 +33,7 @@ from dpone.runtime.airflow_artifact_delivery import (
 from dpone.runtime.airflow_artifact_delivery_models import MaterializeRequest, PublishRequest
 from dpone.runtime.airflow_artifact_publication import prepare_publication
 from tests.dbt_compact_wire_v2_helpers import IMAGE, SIDECAR, prepare_projects, workspace_service
+from tests.test_airflow_credential_projection_delivery import write_native_environment
 from tests.test_airflow_remote_artifact_delivery import _registry
 from tests.test_dbt_airflow_release_e2e import _config_map_ref, _write_environment
 from tests.test_dbt_compact_wire_v2 import _development_authority
@@ -624,7 +627,7 @@ def _development_projection(
     )
     assert installed.passed, installed.blockers
     release = json.loads(Path(installed.release_dir, "release-set.json").read_bytes())
-    _write_target_environment(tmp_path, target_environment)
+    projection_authority = _write_target_environment(tmp_path, target_environment, ordinary=composed)
     projection = AirflowDeploymentProjectionService(root=tmp_path).materialize(
         release_id=release["release_id"],
         environment=target_environment,
@@ -640,14 +643,16 @@ def _development_projection(
             "key": "authority.json",
         },
         airflow_bundle_ref="git:" + "d" * 40,
+        desired_state_authority=projection_authority,
     )
+    assert projection.deployment["schema"] == "dpone.deployment-set.v6"
     return cache, release["release_id"], projection.deployment["deployment_id"]
 
 
-def _write_target_environment(root: Path, environment: str) -> None:
-    _write_environment(root)
+def _write_target_environment(root: Path, environment: str, *, ordinary: bool) -> AirflowDesiredStateAuthority:
+    authority = write_native_environment(root, ordinary=ordinary)
     if environment == "prod":
-        return
+        return authority
     source = root / "environments" / "prod"
     target = root / "environments" / environment
     shutil.copytree(source, target)
@@ -656,6 +661,7 @@ def _write_target_environment(root: Path, environment: str) -> None:
     registry = root / "platform" / "connection-registries"
     body = (registry / "prod.yaml").read_text(encoding="utf-8").replace("prod", environment)
     (registry / f"{environment}.yaml").write_text(body, encoding="utf-8")
+    return replace(authority, environment=environment)
 
 
 def _admission(

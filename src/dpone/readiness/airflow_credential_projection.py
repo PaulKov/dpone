@@ -19,13 +19,13 @@ from dpone_airflow_pack.credential_projection_contract import (
 )
 from dpone_airflow_pack.pack_identity import verify_pack_fingerprint
 
-from dpone.contracts.configuration_errors import ETLConfigurationError
 from dpone.contracts.dbt_execution_pack import DBT_EXECUTION_PACK_SCHEMA_V2, DbtExecutionPack
 from dpone.contracts.dbt_release_workload_binding import runtime_payload_member
 from dpone.gitops.airflow_connection_projection_closure import required_runtime_connection_refs
 from dpone.manifest.batch_loader import BatchYamlManifestLoader
 from dpone.manifest.bounded_yaml import load_bounded_yaml
 from dpone.manifest.confined_files import read_confined_file
+from dpone.manifest.errors import ManifestConfigurationError
 from dpone.manifest.loader import ManifestLoaderRouter
 from dpone.readiness.airflow_connection_bridge_report import airflow_connection_bridge_report
 from dpone.readiness.airflow_deployment_artifacts import json_bytes
@@ -70,7 +70,7 @@ def native_workload_requirements(packs: Mapping[str, Mapping[str, Any]]) -> dict
             continue
         try:
             requirements[workload_id] = _transfer_requirements(pack, workload_id)
-        except (ValueError, TypeError, KeyError, OSError, InitFetchError, ETLConfigurationError):
+        except (ValueError, TypeError, KeyError, OSError, InitFetchError, ManifestConfigurationError):
             raise CredentialProjectionError("UNSUPPORTED") from None
     return requirements
 
