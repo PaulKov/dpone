@@ -12,6 +12,7 @@ from dpone.adapters.s3_airflow_desired_state import (
     S3AirflowDesiredStateStore,
     parse_s3_desired_state_uri,
 )
+from dpone.contracts.airflow_credential_promotion import CREDENTIAL_PROMOTION_SCHEMA, CredentialPromotionEvidence
 from dpone.runtime.object_storage_access import (
     ObjectStorageConnectionRef,
     ObjectStorageConnectionResolver,
@@ -85,6 +86,7 @@ class PromotionInput:
     expected_dag_ids: tuple[str, ...]
     evidence_sha256: str
     runtime_image_dbt_digest: str | None = None
+    credential_projection: CredentialPromotionEvidence | None = None
 
 
 def load_promotion_input(path: Path) -> PromotionInput:
@@ -100,11 +102,20 @@ def load_promotion_input(path: Path) -> PromotionInput:
         raise ValueError("promotion evidence must be valid UTF-8 JSON") from exc
     if not isinstance(payload, dict):
         raise ValueError("promotion evidence fields do not match the v2 contract")
-    keys = set(payload)
-    if not _PROMOTION_REQUIRED_FIELDS.issubset(keys) or keys - _PROMOTION_FIELDS:
-        raise ValueError("promotion evidence fields do not match the v2 contract")
-    if payload.get("schema_version") != _PROMOTION_SCHEMA:
+    schema = payload.get("schema_version")
+    if schema not in {_PROMOTION_SCHEMA, CREDENTIAL_PROMOTION_SCHEMA}:
         raise ValueError("promotion evidence schema is unsupported")
+    extra_fields = (
+        {"credential_projection", "workspace_authority_connection_ref", "publish_authority_sha256"}
+        if schema == CREDENTIAL_PROMOTION_SCHEMA
+        else set()
+    )
+    keys = set(payload)
+    if not (_PROMOTION_REQUIRED_FIELDS | extra_fields).issubset(keys) or keys - (_PROMOTION_FIELDS | extra_fields):
+        raise ValueError("promotion evidence fields do not match the declared contract")
+    projection = (
+        CredentialPromotionEvidence.from_dict({key: payload[key] for key in extra_fields}) if extra_fields else None
+    )
     blockers = payload.get("blockers")
     dag_ids = payload.get("expected_dag_ids")
     if payload.get("status") != "passed" or blockers != []:
@@ -126,6 +137,7 @@ def load_promotion_input(path: Path) -> PromotionInput:
         runtime_image_dbt_digest=(
             _text(payload, "runtime_image_dbt_digest") if "runtime_image_dbt_digest" in payload else None
         ),
+        credential_projection=projection,
     )
 
 

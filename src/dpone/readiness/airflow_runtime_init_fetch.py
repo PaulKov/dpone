@@ -304,6 +304,7 @@ class AirflowRuntimeInitFetchService:
         ).prepare(
             plan,
             plan_sha256=plan_sha256,
+            runtime_environment=os.environ if environment is None else environment,
             development_authorization=development_authorization,
             development_release_validator=(
                 lambda payload, runtime_plan: require_fetched_development_authority(

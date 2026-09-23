@@ -17,6 +17,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from dpone.contracts.dbt_runtime import (
+    DBT_WORKSPACE_AUTHORITY_CONNECTION_REF_ENV,
     DbtPublishingError,
     dbt_runtime_plan_payload_order,
     validate_dbt_runtime_release_identity,
@@ -29,6 +30,7 @@ from dpone.runtime.init_fetch_contract import (
     cache_relative_path,
     development_runtime_authority_error,
 )
+from dpone.runtime.runtime_credential_projection import verify_runtime_credential_projection
 from dpone.runtime.runtime_init_fetch_ready import (
     RUNTIME_FETCH_READY_NAME,
     parse_ready_manifest,
@@ -76,6 +78,47 @@ class VerifiedPackLauncher:
         deployment_attestation_required: bool | None = None,
         development_authorization: DevelopmentRuntimeAuthorization | None = None,
         development_release_validator: Callable[[bytes, RuntimeInitFetchPlan], None] | None = None,
+        runtime_environment: Mapping[str, str] | None = None,
+    ) -> VerifiedPackCommand:
+        """Return an executable command only after base credential admission."""
+        return self._prepare(
+            plan,
+            plan_sha256=plan_sha256,
+            attestation_required=attestation_required,
+            deployment_attestation_required=deployment_attestation_required,
+            development_authorization=development_authorization,
+            development_release_validator=development_release_validator,
+            runtime_environment={} if runtime_environment is None else runtime_environment,
+        )
+
+    def validate_ready(
+        self,
+        plan: RuntimeInitFetchPlan,
+        *,
+        plan_sha256: str,
+        attestation_required: bool | None = None,
+        deployment_attestation_required: bool | None = None,
+        development_release_validator: Callable[[bytes, RuntimeInitFetchPlan], None] | None = None,
+    ) -> None:
+        """Revalidate init-only ready state without returning executable authority."""
+        self._prepare(
+            plan,
+            plan_sha256=plan_sha256,
+            attestation_required=attestation_required,
+            deployment_attestation_required=deployment_attestation_required,
+            development_release_validator=development_release_validator,
+        )
+
+    def _prepare(
+        self,
+        plan: RuntimeInitFetchPlan,
+        *,
+        plan_sha256: str,
+        attestation_required: bool | None = None,
+        deployment_attestation_required: bool | None = None,
+        development_authorization: DevelopmentRuntimeAuthorization | None = None,
+        development_release_validator: Callable[[bytes, RuntimeInitFetchPlan], None] | None = None,
+        runtime_environment: Mapping[str, str] | None = None,
     ) -> VerifiedPackCommand:
         if plan.development_authority_required and development_release_validator is None:
             raise development_runtime_authority_error()
@@ -119,6 +162,11 @@ class VerifiedPackLauncher:
                 plan,
             )
         pack, _verified_pack_fingerprint = validate_runtime_receipts(plan, payloads)
+        projection = verify_runtime_credential_projection(plan, payloads)
+        if projection is not None and runtime_environment is not None:
+            projection.require_authority(
+                control_ref=runtime_environment.get(DBT_WORKSPACE_AUTHORITY_CONNECTION_REF_ENV, "")
+            )
         archive = runtime_payload_archive(pack)
         if archive.sha256 != ready.runtime_payload_sha256:
             raise _launcher_error("runtime payload differs from the ready manifest")
@@ -146,12 +194,16 @@ class VerifiedPackLauncher:
                 artifact_root=self._artifact_root,
             ).as_posix(),
         }
+        if projection is not None and runtime_environment is not None:
+            # Pin the verified value for the child instead of inheriting mutable
+            # process state again between preparation and execution.
+            environment[DBT_WORKSPACE_AUTHORITY_CONNECTION_REF_ENV] = projection.workspace_authority_connection_ref
         _validate_worktree_command(
             argv,
             root=self._worktree_root,
             manifest_index=(_runtime_input_index(argv) if plan.execution.kind == "runtime" else 3),
         )
-        if argv[:3] == ("dpone", "dbt", "execute-pack"):
+        if argv[:3] == ("dpone", "dbt", "execute-pack") and runtime_environment is not None:
             _validate_dbt_runtime_identity(
                 airflow_pack=pack,
                 execution_pack_path=argv[3],

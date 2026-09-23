@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Added
+
+- Bind native workload credential mounts to immutable deployment/index/init-fetch
+  v6 projection artifacts. Workspace-enabled publication requires neutral,
+  authority-bound promotion evidence; provider and runtime verify exact base-only
+  mount membership. Upgrade all lane readers and the promotion producer together.
+
 ### Fixed
 
 - Stop Airflow live-log fallback polling promptly when an init container cannot
