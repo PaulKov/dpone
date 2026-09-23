@@ -30,6 +30,7 @@ from dpone.readiness.airflow_deployment_projection import (
     AirflowDeploymentProjectionError,
     AirflowDeploymentProjectionService,
 )
+from dpone.runtime.airflow_credential_projection_inventory import credential_projection_publication_file
 from dpone.runtime.airflow_runtime_connection_inventory import runtime_connection_publication_files
 from dpone.runtime.init_fetch_contract import InitFetchError
 from dpone.runtime.runtime_init_fetch_plan_codec import decode_runtime_init_fetch_plan
@@ -37,8 +38,9 @@ from dpone.runtime.runtime_init_fetch_service import RuntimeInitFetchExecutor
 from dpone.runtime.verified_pack_launcher import VerifiedPackLauncher
 from dpone.services.dbt_release_integrity import DbtReleaseIntegrityService
 from tests.dbt_compact_wire_v2_helpers import IMAGE, PROJECTS, SIDECAR, prepare_projects, workspace_service
+from tests.test_airflow_credential_projection_delivery import write_native_environment
 from tests.test_airflow_runtime_init_fetch_cli import RecordingRegistry
-from tests.test_dbt_airflow_release_e2e import _config_map_ref, _write_environment
+from tests.test_dbt_airflow_release_e2e import _config_map_ref
 from tests.test_dbt_versioned_runtime_launcher import _prepared_bundle
 
 
@@ -108,7 +110,7 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
     assert release["schema"] == DEVELOPMENT_RELEASE_SCHEMA
     assert release["promotion"]["profile"] == DEVELOPMENT_COMPOSITION_PROFILE
     assert release["development_authority"] == authority.release_projection()
-    _write_environment(tmp_path)
+    workspace_authority = write_native_environment(tmp_path)
     service = AirflowDeploymentProjectionService(
         root=tmp_path,
         cache_root=tmp_path / "cache",
@@ -142,9 +144,10 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
             "key": "authority.json",
         },
         airflow_bundle_ref="git:" + "d" * 40,
+        desired_state_authority=workspace_authority,
     )
-    assert projection.deployment["schema"] == "dpone.deployment-set.v4"
-    assert projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v4"
+    assert projection.deployment["schema"] == "dpone.deployment-set.v6"
+    assert projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v6"
     expected_source = {
         "mode": "kubernetes_secret_volume",
         "secret_name": "dpone-runtime-authority",
@@ -183,7 +186,7 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
         invalid_dag_policy="skip_and_report",
     )
     assert loaded_report.release_id == projection.airflow_index["release_id"]
-    assert strict_loader_schemas == ["dpone.airflow-deployment-index.v4"]
+    assert strict_loader_schemas == ["dpone.airflow-deployment-index.v6"]
 
     encoded = context.encode_plan(
         workload_id=str(projection.airflow_index["workload_packs"][0]["id"]),
@@ -191,7 +194,7 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
         execution_scope="workload",
         hook_execution="externalized",
     )
-    assert json.loads(encoded.payload)["schema"] == "dpone.airflow-runtime-init-fetch-plan.v4"
+    assert json.loads(encoded.payload)["schema"] == "dpone.airflow-runtime-init-fetch-plan.v6"
 
     raw_authority = b'{"mode":"synthetic"}\n'
     immutable_projection = service.materialize(
@@ -212,14 +215,15 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
             "sha256": "sha256:" + hashlib.sha256(raw_authority).hexdigest(),
         },
         airflow_bundle_ref="git:" + "d" * 40,
+        desired_state_authority=workspace_authority,
     )
-    assert immutable_projection.deployment["schema"] == "dpone.deployment-set.v5"
-    assert immutable_projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v5"
+    assert immutable_projection.deployment["schema"] == "dpone.deployment-set.v6"
+    assert immutable_projection.airflow_index["schema"] == "dpone.airflow-deployment-index.v6"
     immutable_loaded_index = load_airflow_deployment_index(
         immutable_projection.deployment_dir / "airflow-index.json",
         cache_root=tmp_path / "cache",
     )
-    assert immutable_loaded_index.schema == "dpone.airflow-deployment-index.v5"
+    assert immutable_loaded_index.schema == "dpone.airflow-deployment-index.v6"
     assert immutable_loaded_index.delivery_context is not None
     strict_loader_schemas.clear()
     immutable_loaded_report = dag_loader.load_dpone_dags_from_index(
@@ -230,7 +234,7 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
         invalid_dag_policy="skip_and_report",
     )
     assert immutable_loaded_report.release_id == immutable_projection.airflow_index["release_id"]
-    assert strict_loader_schemas == ["dpone.airflow-deployment-index.v5"]
+    assert strict_loader_schemas == ["dpone.airflow-deployment-index.v6"]
     immutable_context = init_fetch_context_from_payload(immutable_projection.airflow_index)
     immutable_plan = immutable_context.encode_plan(
         workload_id=str(immutable_projection.airflow_index["workload_packs"][0]["id"]),
@@ -238,7 +242,7 @@ def test_development_workspace_materializes_with_distinct_authority_and_stable_w
         execution_scope="workload",
         hook_execution="externalized",
     )
-    assert json.loads(immutable_plan.payload)["schema"] == "dpone.airflow-runtime-init-fetch-plan.v5"
+    assert json.loads(immutable_plan.payload)["schema"] == "dpone.airflow-runtime-init-fetch-plan.v6"
 
 
 def verify_delivery(tmp_path, compiled):
@@ -255,7 +259,7 @@ def verify_delivery(tmp_path, compiled):
     for key in preserved:
         assert release[key] == original[key]
     assert release["artifacts"]["runtime_payloads"] == original["artifacts"]["runtime_payloads"]
-    _write_environment(tmp_path)
+    workspace_authority = write_native_environment(tmp_path)
     projection = AirflowDeploymentProjectionService(root=tmp_path).materialize(
         release_id=materialized.release_id,
         environment="prod",
@@ -266,8 +270,13 @@ def verify_delivery(tmp_path, compiled):
         registry_config_ref=_config_map_ref("registry", "1"),
         trust_policy_ref=_config_map_ref("policy", "2"),
         airflow_bundle_ref="git:" + "d" * 40,
+        desired_state_authority=workspace_authority,
     )
-    context = init_fetch_context_from_payload(projection.airflow_index)
+    assert projection.deployment["schema"] == "dpone.deployment-set.v6"
+    context = load_airflow_deployment_index(
+        projection.deployment_dir / "airflow-index.json", cache_root=cache
+    ).delivery_context
+    assert context is not None and context.credential_projection_data is not None
     objects = {
         PurePosixPath(path.relative_to(cache).as_posix()): path.read_bytes()
         for path in cache.rglob("*")
@@ -277,12 +286,22 @@ def verify_delivery(tmp_path, compiled):
         projection.deployment, deployment_dir=projection.deployment_dir, root=cache
     ):
         objects[artifact.key] = artifact.path.read_bytes()
+    artifact = credential_projection_publication_file(
+        projection.deployment, deployment_dir=projection.deployment_dir, root=cache
+    )
+    assert artifact is not None
+    objects[artifact.key] = artifact.path.read_bytes()
     prepared_projects = set()
     for item in projection.airflow_index["workload_packs"]:
         pack = json.loads(objects[PurePosixPath(item["artifact_ref"].removeprefix("cache://"))])
+        operator = runtime_operator_kwargs(pack, strict_provider_execution=True, expected_workload_id=item["id"])
+        runtime_environment = {
+            "DPONE_DBT_WORKSPACE_AUTHORITY_CONNECTION_REF": workspace_authority.workspace_authority_connection_ref
+        }
+        operator["env_vars"] = {**operator.get("env_vars", {}), **runtime_environment}
         kwargs = compose_init_fetch_operator_kwargs(
             pack=pack,
-            kwargs=runtime_operator_kwargs(pack, strict_provider_execution=True, expected_workload_id=item["id"]),
+            kwargs=operator,
             context=context,
             workload_id=item["id"],
             execution_kind="runtime",
@@ -301,7 +320,7 @@ def verify_delivery(tmp_path, compiled):
         )
         executor.execute(plan, plan_sha256=encoded.sha256)
         command = VerifiedPackLauncher(artifact_root=state / "artifacts", worktree_root=state / "worktree").prepare(
-            plan, plan_sha256=encoded.sha256
+            plan, plan_sha256=encoded.sha256, runtime_environment=runtime_environment
         )
         if item["id"].startswith("dbt__"):
             assert command.argv[:3] == ("dpone", "dbt", "execute-pack")
@@ -332,7 +351,7 @@ def verify_delivery(tmp_path, compiled):
             body_path.write_bytes(b"SENSITIVE_SENTINEL")
             with pytest.raises(InitFetchError) as failure:
                 VerifiedPackLauncher(artifact_root=state / "artifacts", worktree_root=state / "worktree").prepare(
-                    plan, plan_sha256=digest
+                    plan, plan_sha256=digest, runtime_environment=runtime_environment
                 )
             assert "SENSITIVE_SENTINEL" not in str(failure.value)
     assert prepared_projects == set(PROJECTS)

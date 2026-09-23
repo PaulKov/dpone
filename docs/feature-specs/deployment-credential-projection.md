@@ -333,6 +333,16 @@ new units are contract/codec, planner, reader and Pod projector. Shared schema
 and DTO edits remain integrator-owned. An ADR is required because the deployment
 becomes explicit owner of credential mount authority.
 
+Build-only source acquisition is separate from the pure metadata join. Native
+execution profiles use their bounded single-member contract. Mixed ordinary
+transfers, flows and batches use the existing bounded multi-file archive reader,
+private temporary staging and pinned runtime-manifest digest. The metadata-only
+manifest loader disables ambient source registries; the canonical runtime
+connection-closure policy covers every compiled process, including active state,
+object-storage and materialization authorities. Disabled/reused state contributes
+no extra ref. No credential is resolved or process executed. Unsafe or incomplete
+sources fail closed; unsupported workloads are never omitted from membership.
+
 Alternatives rejected: per-domain projections duplicate platform state; scanning
 all registry entries mounts unused credentials; alias-to-key guessing loses
 source identity; patching release packs invalidates portable hashes; credential

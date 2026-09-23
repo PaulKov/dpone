@@ -53,6 +53,12 @@ def _v6(source: GitOpsSchemaContract) -> GitOpsSchemaContract:
     schema["properties"]["schema"] = {"const": kind}
     schema["properties"]["credential_projection"] = credential_projection_descriptor_schema()
     schema["properties"]["development_authority_required"] = {"const": True}
+    for field in ("ref", "digest"):
+        schema["properties"][f"runtime_image_dbt_{field}"] = deepcopy(schema["properties"][f"runtime_image_{field}"])
+        other = "digest" if field == "ref" else "ref"
+        schema["allOf"].append(
+            {"if": {"required": [f"runtime_image_dbt_{field}"]}, "then": {"required": [f"runtime_image_dbt_{other}"]}}
+        )
     schema["required"] = [field for field in schema["required"] if field != "mssql_asset_outlet_projection"] + [
         "credential_projection"
     ]

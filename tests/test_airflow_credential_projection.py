@@ -92,6 +92,32 @@ def test_native_source_reader_uses_execution_profile():
     }
 
 
+@pytest.mark.parametrize("flow", [False, True])
+def test_mixed_native_and_ordinary_closure_uses_canonical_processes(tmp_path, flow):
+    from tests.test_release_composition_ordinary import ordinary_root
+
+    root = ordinary_root(tmp_path, flow=flow, second_process=flow, sql_file=not flow)
+    ordinary = json.loads((root / "orders/airflow-pack.json").read_bytes())
+    native, _kwargs, _context = _native_case()
+    refs = native_workload_requirements({native["workload"]["workload_id"]: native, "orders": ordinary})
+    assert refs["orders"] == ("source", "target")
+    assert refs[native["workload"]["workload_id"]] == ("warehouse",)
+
+
+@pytest.mark.parametrize("state", ["disabled", "reuse"])
+def test_mixed_closure_does_not_add_disabled_or_reused_state(tmp_path, state):
+    from tests.test_release_composition_ordinary import ordinary_root
+
+    extra = "state:\n  type: disabled\n  connection_ref: unused\n" if state == "disabled" else "state:\n  reuse: sink\n"
+    root = ordinary_root(tmp_path, extra_manifest=extra)
+    ordinary = json.loads((root / "orders/airflow-pack.json").read_bytes())
+    native, _kwargs, _context = _native_case()
+    assert native_workload_requirements({native["workload"]["workload_id"]: native, "orders": ordinary})["orders"] == (
+        "source",
+        "target",
+    )
+
+
 def test_unused_registry_entry_not_mounted():
     inputs = projection_case()
     inputs["source_registry"]["connections"]["unused"] = deepcopy(

@@ -9,6 +9,7 @@ from typing import Any
 from dpone_airflow_pack.credential_projection_contract import (
     PROJECTION_FILENAME,
     CredentialProjection,
+    CredentialProjectionError,
     require_projection_descriptor,
 )
 
@@ -35,7 +36,10 @@ def verify_credential_projection_files(
     descriptor = require_projection_descriptor(deployment.get("credential_projection"))
 
     def read(name: str, maximum: int) -> bytes:
-        return read_confined_file(root, (deployment_dir / name).relative_to(root).as_posix(), max_bytes=maximum)
+        try:
+            return read_confined_file(root, (deployment_dir / name).relative_to(root).as_posix(), max_bytes=maximum)
+        except (OSError, ValueError):
+            raise CredentialProjectionError("INVALID") from None
 
     return verify_deployment_credential_projection(
         deployment=deployment,

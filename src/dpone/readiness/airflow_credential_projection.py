@@ -1,10 +1,12 @@
-"""Pure environment compiler for native workload credential-file authority."""
+"""Bounded build-plane source acquisition and pure credential metadata compiler."""
 
 from __future__ import annotations
 
 import hashlib
 import json
 from collections.abc import Mapping
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from typing import Any
 
 from dpone_airflow_pack.credential_projection_contract import (
@@ -17,20 +19,28 @@ from dpone_airflow_pack.credential_projection_contract import (
 )
 from dpone_airflow_pack.pack_identity import verify_pack_fingerprint
 
+from dpone.contracts.configuration_errors import ETLConfigurationError
 from dpone.contracts.dbt_execution_pack import DBT_EXECUTION_PACK_SCHEMA_V2, DbtExecutionPack
 from dpone.contracts.dbt_release_workload_binding import runtime_payload_member
-from dpone.contracts.dbt_source_inventory_binding import DbtSourcePlan
-from dpone.manifest.bounded_yaml import load_bounded_yaml
+from dpone.gitops.airflow_connection_projection_closure import required_runtime_connection_refs
+from dpone.manifest.confined_files import read_confined_file
+from dpone.manifest.loader import ManifestLoaderRouter
 from dpone.readiness.airflow_connection_bridge_report import airflow_connection_bridge_report
 from dpone.readiness.airflow_deployment_artifacts import json_bytes
 from dpone.readiness.airflow_deployment_projection_errors import AirflowDeploymentProjectionError
 from dpone.readiness.airflow_desired_state_authority import AirflowDesiredStateAuthority
+from dpone.runtime.init_fetch_contract import InitFetchError
+from dpone.runtime.runtime_payload_archive import (
+    extract_runtime_payload,
+    runtime_payload_archive,
+    verify_runtime_payload_tree,
+)
 
 
 def native_workload_requirements(packs: Mapping[str, Mapping[str, Any]]) -> dict[str, tuple[str, ...]]:
     """Read canonical bounded embedded sources; never guess recursively at refs.
 
-    Only native v2 dbt or its generated transfer manifest enters this lane.
+    Native v2 enables the lane; every mixed ordinary workload then participates.
     Legacy-only releases keep their existing projection and wire unchanged.
     """
     requirements: dict[str, tuple[str, ...]] = {}
@@ -57,21 +67,35 @@ def native_workload_requirements(packs: Mapping[str, Mapping[str, Any]]) -> dict
         if workload_id in requirements:
             continue
         try:
-            raw = DbtSourcePlan.transfer_manifest_bytes(pack, workload_id)
-            manifest = load_bounded_yaml(raw)
-            if not isinstance(manifest, Mapping):
-                raise CredentialProjectionError()
-            refs = set()
-            for field in ("source", "sink", "state"):
-                section = manifest.get(field)
-                if isinstance(section, Mapping) and isinstance(section.get("connection_ref"), str):
-                    refs.add(section["connection_ref"])
-            if not refs:
-                raise CredentialProjectionError()
-            requirements[workload_id] = tuple(sorted(refs))
-        except (ValueError, TypeError, KeyError):
+            requirements[workload_id] = _transfer_requirements(pack, workload_id)
+        except (ValueError, TypeError, KeyError, OSError, InitFetchError, ETLConfigurationError):
             raise CredentialProjectionError("UNSUPPORTED") from None
     return requirements
+
+
+def _transfer_requirements(pack: Mapping[str, Any], workload_id: str) -> tuple[str, ...]:
+    """Read admitted runtime sources using the ordinary multi-file archive contract.
+
+    Build-only staging is private and bounded. Metadata compilation resolves no
+    credentials; ambient source registries are explicitly disabled.
+    """
+    if "runtime_payload_ids" in pack or pack["workload"]["workload_id"] != workload_id:
+        raise CredentialProjectionError("MISMATCH")
+    runtime = pack.get("runtime_manifest")
+    if not isinstance(runtime, Mapping) or runtime.get("kind") not in {"source_manifest", "canonical_manifest"}:
+        raise CredentialProjectionError("UNSUPPORTED")
+    with TemporaryDirectory(prefix="dpone-credential-source-") as temporary:
+        root = Path(temporary) / "source"
+        archive = runtime_payload_archive(pack)
+        extract_runtime_payload(archive, root)
+        verify_runtime_payload_tree(archive, root)
+        payload = read_confined_file(root, runtime["path"], max_bytes=8 * 1024 * 1024)
+        if _sha(payload) != runtime.get("sha256"):
+            raise CredentialProjectionError("MISMATCH")
+        loaded = ManifestLoaderRouter(registry_paths=()).load(root / runtime["path"], metadata_only=True)
+        if not loaded.processes:
+            raise CredentialProjectionError("UNSUPPORTED")
+        return required_runtime_connection_refs(loaded.processes)
 
 
 def build_credential_projection(

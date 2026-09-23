@@ -128,21 +128,12 @@ def test_v6_has_no_development_only_requirement():
     assert init_fetch_context_from_payload(index).development_authority_required is False
 
 
-def build_native_deployment(tmp_path):
-    """Compile a real synthetic two-project native release and exact v6 deployment."""
+def write_native_environment(tmp_path):
+    """Build explicit synthetic target/control registry and protected authority."""
     import yaml
 
-    from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
-    from dpone.readiness.airflow_deployment_projection import AirflowDeploymentProjectionService
-    from tests.dbt_compact_wire_v2_helpers import IMAGE, SIDECAR, prepare_projects, workspace_service
-    from tests.test_dbt_airflow_release_e2e import _config_map_ref, _write_environment
+    from tests.test_dbt_airflow_release_e2e import _write_environment
 
-    source, compiled, cache = tmp_path / "workspace", tmp_path / "compiled", tmp_path / ".dpone-cache"
-    prepare_projects(source)
-    report = workspace_service(tmp_path / "profiles").compile(source, output_dir=compiled)
-    assert report.passed
-    materialized = materialize_compact_pack_release(pack_root=compiled, cache_root=cache, xcom_sidecar_image=SIDECAR)
-    assert materialized.passed, materialized.blockers
     _write_environment(tmp_path)
     binding_path = tmp_path / "environments/prod/binding-set.yaml"
     bindings = yaml.safe_load(binding_path.read_text())
@@ -152,7 +143,23 @@ def build_native_deployment(tmp_path):
     registry = yaml.safe_load(registry_path.read_text())
     registry["connections"]["control_runtime"] = projection_case()["source_registry"]["connections"]["control_runtime"]
     registry_path.write_text(yaml.safe_dump(registry))
-    authority = replace(projection_case()["authority"], artifact_registry_ref="synthetic-artifacts")
+    return replace(projection_case()["authority"], artifact_registry_ref="synthetic-artifacts")
+
+
+def build_native_deployment(tmp_path, *, dbt_image=None):
+    """Compile a real synthetic two-project native release and exact v6 deployment."""
+    from dpone.readiness.airflow_compact_pack_release import materialize_compact_pack_release
+    from dpone.readiness.airflow_deployment_projection import AirflowDeploymentProjectionService
+    from tests.dbt_compact_wire_v2_helpers import IMAGE, SIDECAR, prepare_projects, workspace_service
+    from tests.test_dbt_airflow_release_e2e import _config_map_ref
+
+    source, compiled, cache = tmp_path / "workspace", tmp_path / "compiled", tmp_path / ".dpone-cache"
+    prepare_projects(source)
+    report = workspace_service(tmp_path / "profiles").compile(source, output_dir=compiled)
+    assert report.passed
+    materialized = materialize_compact_pack_release(pack_root=compiled, cache_root=cache, xcom_sidecar_image=SIDECAR)
+    assert materialized.passed, materialized.blockers
+    authority = write_native_environment(tmp_path)
     deployment = AirflowDeploymentProjectionService(root=tmp_path).materialize(
         release_id=materialized.release_id,
         environment="prod",
@@ -164,6 +171,8 @@ def build_native_deployment(tmp_path):
         trust_policy_ref=_config_map_ref("policy", "2"),
         airflow_bundle_ref="git:" + "d" * 40,
         desired_state_authority=authority,
+        runtime_image_dbt_ref=dbt_image,
+        runtime_image_dbt_digest=dbt_image.split("@")[-1] if dbt_image else None,
     )
     return deployment, cache, authority
 
@@ -192,3 +201,48 @@ def test_complete_native_build_validates_sealed_deployment_and_inventory(tmp_pat
         projection.deployment, deployment_dir=projection.deployment_dir, root=cache
     )
     assert "cache://" + published.key.as_posix() == projection.deployment["credential_projection"]["artifact_ref"]
+
+
+def test_native_dbt_image_flavor_matches_v6_schema_and_provider(tmp_path):
+    from dpone_airflow_pack.deployment_index_contract import load_airflow_deployment_index
+
+    from dpone.gitops.schema_validation import GitOpsSchemaValidator
+
+    dbt_image = "example.invalid/runtime-dbt@sha256:" + "e" * 64
+    projection, cache, _authority = build_native_deployment(tmp_path, dbt_image=dbt_image)
+    validator = GitOpsSchemaValidator()
+    for payload in (projection.deployment, projection.airflow_index):
+        assert validator.validate(payload, expected_kind=payload["schema"]) == ()
+        for field in ("runtime_image_dbt_ref", "runtime_image_dbt_digest"):
+            missing = deepcopy(payload)
+            missing.pop(field)
+            assert validator.validate(missing, expected_kind=missing["schema"])
+    context = load_airflow_deployment_index(
+        projection.deployment_dir / "airflow-index.json", cache_root=cache
+    ).delivery_context
+    workload_id = next(row.id for row in context.workload_packs if row.id.startswith("dbt__"))
+    encoded = context.encode_plan(
+        workload_id=workload_id, execution_kind="runtime", execution_scope="workload", hook_execution="externalized"
+    )
+    plan = json.loads(encoded.payload)
+    assert plan["runtime_image"] == {"ref": dbt_image, "digest": dbt_image.split("@")[-1]}
+    assert validator.validate(plan, expected_kind=plan["schema"]) == ()
+
+
+@pytest.mark.parametrize("damage", ["missing", "oversized", "symlink"])
+def test_projection_file_damage_has_closed_cache_error(tmp_path, damage):
+    from dpone.runtime.deployment_cache_common import DeploymentCacheError
+    from dpone.runtime.deployment_cache_projection_validator import DeploymentCacheProjectionValidator
+
+    projection, cache, _authority = build_native_deployment(tmp_path)
+    path = projection.deployment_dir / "credential-projection.json"
+    if damage == "oversized":
+        path.write_bytes(path.read_bytes() + b"SENSITIVE_SENTINEL")
+    else:
+        path.unlink()
+        if damage == "symlink":
+            path.symlink_to(projection.deployment_dir / "binding-set.json")
+    with pytest.raises(DeploymentCacheError) as failure:
+        DeploymentCacheProjectionValidator(cache).validate_details(projection.deployment_dir, environment="prod")
+    assert failure.value.code.startswith("DPONE_RUNTIME_CREDENTIAL_PROJECTION_")
+    assert "SENSITIVE_SENTINEL" not in str(failure.value)
