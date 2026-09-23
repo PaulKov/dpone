@@ -96,6 +96,7 @@ def validate_runtime_receipts(
             "dpone.deployment-set.v3",
             "dpone.deployment-set.v4",
             "dpone.deployment-set.v5",
+            "dpone.deployment-set.v6",
         }
         or deployment_id(deployment) != plan.deployment_id
     ):
@@ -109,6 +110,14 @@ def validate_runtime_receipts(
         runtime_connections=runtime_connections,
     )
     _validate_release_membership(plan, release)
+    from dpone_airflow_pack.credential_projection_contract import CredentialProjectionError
+
+    from dpone.runtime.runtime_credential_projection import verify_runtime_credential_projection
+
+    try:
+        verify_runtime_credential_projection(plan, payloads)
+    except CredentialProjectionError as exc:
+        raise InitFetchError(exc.code, str(exc)) from None
     if verified_pack_fingerprint != plan.workload_pack.pack_fingerprint:
         raise _integrity_error("workload pack fingerprint does not match the pinned plan")
     workload = pack.get("workload")
@@ -140,6 +149,7 @@ def _validate_deployment_mirror(
 ) -> None:
     delivery = deployment.get("runtime_artifact_delivery")
     workloads = deployment.get("workloads")
+    credential_projection = getattr(plan, "credential_projection", None)
     if (
         deployment.get("release_ref") != plan.release_id
         or not plan_matches_declared_runtime_image(plan, deployment)
@@ -155,6 +165,8 @@ def _validate_deployment_mirror(
         or deployment.get("binding_set") != plan.binding_set.to_dict()
         or deployment.get("connection_registry") != plan.connection_registry.to_dict()
         or deployment.get("credential_runtime") != plan.credential_runtime.to_dict()
+        or deployment.get("credential_projection")
+        != (credential_projection.to_dict() if credential_projection is not None else None)
         or not isinstance(workloads, list)
     ):
         raise _integrity_error("deployment-set runtime projection does not match the pinned plan")

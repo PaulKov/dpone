@@ -13,7 +13,9 @@ _INDEX_SCHEMA_V2 = "dpone.airflow-deployment-index.v2"
 _INDEX_SCHEMA_V3 = "dpone.airflow-deployment-index.v3"
 _INDEX_SCHEMA_V4 = "dpone.airflow-deployment-index.v4"
 _INDEX_SCHEMA_V5 = "dpone.airflow-deployment-index.v5"
-_EXECUTABLE_INDEX_SCHEMAS = frozenset({_INDEX_SCHEMA_V2, _INDEX_SCHEMA_V3, _INDEX_SCHEMA_V4, _INDEX_SCHEMA_V5})
+_EXECUTABLE_INDEX_SCHEMAS = frozenset(
+    {_INDEX_SCHEMA_V2, _INDEX_SCHEMA_V3, _INDEX_SCHEMA_V4, _INDEX_SCHEMA_V5, "dpone.airflow-deployment-index.v6"}
+)
 _DELIVERY_MODES = frozenset({"local_preview", "init_fetch", "shared_pvc", "embedded_bundle", "csi_volume", "inline"})
 
 

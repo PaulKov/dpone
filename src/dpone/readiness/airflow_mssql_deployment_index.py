@@ -44,6 +44,7 @@ def build_environment_deployment_documents(
     release_bytes: bytes,
     mssql_outlet_projection: Mapping[str, Any] | None,
     development_authority_required: bool = False,
+    credential_projection: Mapping[str, Any] | None = None,
 ) -> tuple[dict[str, Any], bytes, dict[str, Any]]:
     """Return ``(deployment, deployment_bytes, airflow_index)``.
 
@@ -60,7 +61,9 @@ def build_environment_deployment_documents(
     )
     deployment: dict[str, Any] = {
         "schema": (
-            DEPLOYMENT_SET_SCHEMA_V5
+            "dpone.deployment-set.v6"
+            if credential_projection is not None
+            else DEPLOYMENT_SET_SCHEMA_V5
             if use_v5
             else DEPLOYMENT_SET_SCHEMA_V4
             if development_authority_required
@@ -75,6 +78,7 @@ def build_environment_deployment_documents(
         "binding_set_ref": binding_set_ref,
         "connection_registry_ref": connection_registry_ref,
         "credential_runtime_ref": credential_runtime_ref,
+        **({"credential_projection": dict(credential_projection)} if credential_projection is not None else {}),
         **runtime_connection_descriptors,
         "runtime_image_ref": runtime_image_ref,
         "runtime_image_digest": runtime_image_digest,
@@ -91,7 +95,9 @@ def build_environment_deployment_documents(
     deployment_bytes = json_bytes(deployment)
     airflow_index: dict[str, Any] = {
         "schema": (
-            AIRFLOW_INDEX_SCHEMA_V5
+            "dpone.airflow-deployment-index.v6"
+            if credential_projection is not None
+            else AIRFLOW_INDEX_SCHEMA_V5
             if use_v5
             else AIRFLOW_INDEX_SCHEMA_V4
             if development_authority_required
@@ -101,6 +107,7 @@ def build_environment_deployment_documents(
         "deployment_id": computed_deployment_id,
         "trust_tier": trust_tier,
         "dag_specs": list(dag_specs),
+        **({"credential_projection": dict(credential_projection)} if credential_projection is not None else {}),
         "workload_packs": list(workload_packs),
         **({"runtime_payloads": list(runtime_payloads)} if runtime_payloads else {}),
         "binding_set_ref": binding_set_ref,

@@ -119,6 +119,8 @@ nav:
       - Protected runtime authority: airflow-runtime-authority.md
       - Legacy Airflow pack cache hardening design: feature-design-airflow-legacy-pack-cache-hardening-v07332.md
       - Exact Airflow desired-state delivery: airflow-desired-state.md
+      - Native credential projection: airflow-native-credential-projection.md
+      - Credential-bound promotion: airflow-credential-promotion.md
       - Airflow artifact trust (preview): airflow-artifact-trust.md
       - Airflow artifact attestation operations (preview): airflow-artifact-attestation-operations.md
       - Industrial Airflow self-service architecture: airflow-self-service-architecture.md

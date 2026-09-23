@@ -35,6 +35,7 @@ from dpone.gitops.schema_release_deployment_v3_contracts import (
     deployment_set_v4_contract,
     deployment_set_v5_contract,
 )
+from dpone.gitops.schema_release_deployment_v6_contracts import credential_delivery_v6_contracts
 from dpone.gitops.schema_release_set_promotion import (
     COMPACT_PROMOTION_PROFILE,
     COMPACT_PROMOTION_SCHEMA,
@@ -43,10 +44,13 @@ from dpone.gitops.schema_release_set_promotion import (
 from dpone.gitops.schema_runtime_artifact_delivery import (
     runtime_artifact_delivery_schema,
 )
+from dpone.gitops.schema_runtime_credential_projection import runtime_credential_projection_contract
 
 
 def release_deployment_schema_contracts() -> tuple[GitOpsSchemaContract, ...]:
     return (
+        *credential_delivery_v6_contracts(),
+        runtime_credential_projection_contract(),
         release_set_contract(),
         release_set_v2_contract(),
         development_release_set_contract(),

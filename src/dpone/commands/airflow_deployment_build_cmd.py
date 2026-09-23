@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 
 from dpone.commands.airflow_self_service_output import emit_self_service_result
+from dpone.readiness.airflow_desired_state_authority import AUTHORITY_FILE_ENV, load_airflow_desired_state_authority
 from dpone.readiness.airflow_runtime_authority_input import (
     immutable_runtime_authority_payload_from_file,
 )
@@ -151,6 +153,13 @@ def cmd_airflow_build(args: argparse.Namespace, *, ctx: object, logger: logging.
             file=sys.stderr,
         )
         return 2
+    try:
+        desired_state_authority = load_airflow_desired_state_authority() if os.environ.get(AUTHORITY_FILE_ENV) else None
+    except (OSError, ValueError):
+        print(
+            "DPONE_RUNTIME_CREDENTIAL_PROJECTION_INVALID: protected desired-state authority is invalid", file=sys.stderr
+        )
+        return 2
     result = build_deployment_result(
         root=".",
         release_id=args.release_id,
@@ -178,6 +187,7 @@ def cmd_airflow_build(args: argparse.Namespace, *, ctx: object, logger: logging.
         dev_evidence_worker_queue=args.dev_evidence_worker_queue,
         runtime_authority_ref=runtime_authority_ref,
         registry_credentials=registry_credentials,
+        desired_state_authority=desired_state_authority,
     )
     emit_self_service_result(result, args.format, command="airflow_build")
     if result.exit_code is not None:

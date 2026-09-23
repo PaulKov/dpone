@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from typing import Protocol
+from typing import TYPE_CHECKING, Protocol
+
+if TYPE_CHECKING:
+    from dpone.contracts.airflow_credential_promotion import CredentialPromotionEvidence
 
 
 class DesiredStatePublicationAuthority(Protocol):
@@ -22,6 +25,9 @@ class DesiredStatePublicationAuthority(Protocol):
 
     @property
     def publish_authority_sha256(self) -> str: ...
+
+    @property
+    def workspace_authority_connection_ref(self) -> str | None: ...
 
 
 class DesiredStatePromotionInput(Protocol):
@@ -56,6 +62,9 @@ class DesiredStatePromotionInput(Protocol):
 
     @property
     def evidence_sha256(self) -> str: ...
+
+    @property
+    def credential_projection(self) -> CredentialPromotionEvidence | None: ...
 
 
 __all__ = [

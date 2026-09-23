@@ -3,10 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
 import shlex
 from collections.abc import Mapping
+from pathlib import Path, PurePosixPath
 from typing import Any
 
+from dpone.runtime.deployment_cache_common import DeploymentCacheError, open_regular_file
 from dpone.runtime.init_fetch_contract import InitFetchError
 from dpone.runtime.runtime_init_fetch_plan import (
     RuntimeExecutionSelection,
@@ -20,6 +23,35 @@ from dpone.runtime.verified_pack_hook_policy import (
 
 _WORKLOAD_BOOTSTRAP_KEY = "__workload__"
 _DEFAULT_PROCESS_BOOTSTRAP_KEY = "__default_process__"
+
+
+def validate_worktree_command(argv: tuple[str, ...], *, root: Path, execution_kind: str) -> None:
+    """Require the selected command's manifest to be a confined regular file."""
+    manifest_index = 3
+    if execution_kind == "runtime" and argv[:3] != ("dpone", "dbt", "execute-pack"):
+        manifest_index = 2
+    if len(argv) <= manifest_index:
+        raise _error("verified workload command is incomplete")
+    raw_manifest = argv[manifest_index]
+    manifest = PurePosixPath(raw_manifest)
+    if (
+        not raw_manifest
+        or "\\" in raw_manifest
+        or manifest.is_absolute()
+        or any(part in {"", ".", ".."} for part in manifest.parts)
+    ):
+        raise _error("verified workload manifest path is unsafe")
+    try:
+        descriptor = open_regular_file(
+            root.joinpath(*manifest.parts),
+            missing_code="DPONE_RUNTIME_WORKTREE_INCOMPLETE",
+            invalid_code="DPONE_RUNTIME_ARTIFACT_INTEGRITY_FAILED",
+            label="runtime manifest",
+            root=root,
+        )
+    except DeploymentCacheError as exc:
+        raise InitFetchError(exc.code, str(exc)) from exc
+    os.close(descriptor)
 
 
 def selected_verified_command(
@@ -289,4 +321,4 @@ def _error(message: str) -> InitFetchError:
     return InitFetchError("DPONE_RUNTIME_ARTIFACT_INTEGRITY_FAILED", message)
 
 
-__all__ = ["selected_verified_command"]
+__all__ = ["selected_verified_command", "validate_worktree_command"]

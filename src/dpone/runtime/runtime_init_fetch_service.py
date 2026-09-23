@@ -111,6 +111,7 @@ class RuntimeInitFetchExecutor:
             deployment_attestation_required=self._deployment_attestation_verifier is not None,
             artifact_root=self._artifact_root,
             worktree_root=self._worktree_root,
+            development_release_validator=self._development_release_validator,
         )
         if existing_ready is not None:
             return existing_ready
@@ -257,6 +258,7 @@ def load_existing_runtime_ready(
     deployment_attestation_required: bool = False,
     artifact_root: Path,
     worktree_root: Path,
+    development_release_validator: Callable[[bytes, RuntimeInitFetchPlan], None] | None = None,
 ) -> RuntimeFetchReady | None:
     """Revalidate and reuse one complete ready state without registry access."""
 
@@ -268,11 +270,12 @@ def load_existing_runtime_ready(
     VerifiedPackLauncher(
         artifact_root=artifact_root,
         worktree_root=worktree_root.absolute(),
-    ).prepare(
+    ).validate_ready(
         plan,
         plan_sha256=plan_sha256,
         attestation_required=attestation_required,
         deployment_attestation_required=deployment_attestation_required,
+        development_release_validator=development_release_validator,
     )
     ready_payload = read_bounded_regular_file(
         ready_path,

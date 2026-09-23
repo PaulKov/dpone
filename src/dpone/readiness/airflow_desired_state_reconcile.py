@@ -27,6 +27,7 @@ from dpone.ports.airflow_desired_state import (
 from dpone.readiness.airflow_artifact_trust_material import (
     AirflowArtifactTrustMaterialError,
 )
+from dpone.readiness.airflow_credential_activation import require_activation_credential_authority
 from dpone.readiness.airflow_deployment_attestation_verifier import (
     optional_airflow_deployment_attestation_verifier,
 )
@@ -96,10 +97,12 @@ class DeploymentCacheDesiredDeploymentActivator:
         promoted_by: str,
         workspace_activation: DbtWorkspaceActivationCoordinatorPort | None = None,
         workspace_authority_connection_ref: str | None = None,
+        publish_authority_sha256: str | None = None,
     ) -> None:
         self._cache_root = cache_root
         self._promoted_by = promoted_by
         self._workspace_authority_connection_ref = workspace_authority_connection_ref
+        self._publish_authority_sha256 = publish_authority_sha256
         self._state = DeploymentCacheCurrentState(cache_root)
         self._materializer = DeploymentCacheMaterializer(
             cache_root,
@@ -116,6 +119,13 @@ class DeploymentCacheDesiredDeploymentActivator:
                 resolve_relative_current_symlink(self._cache_root),
                 environment=environment,
             )
+            require_activation_credential_authority(
+                projection.deployment,
+                deployment_dir=resolve_relative_current_symlink(self._cache_root),
+                cache_root=self._cache_root,
+                control_ref=self._workspace_authority_connection_ref,
+                authority_sha256=self._publish_authority_sha256,
+            )
             pointer = read_regular_json_object(
                 self._cache_root / "current-pointer.json",
                 missing_code="DPONE_CURRENT_POINTER_NOT_FOUND",
@@ -124,6 +134,11 @@ class DeploymentCacheDesiredDeploymentActivator:
                 root=self._cache_root,
             )
             release_id = _required_text(pointer, "release_id")
+            if pointer.get("workspace_authority_connection_ref") != self._workspace_authority_connection_ref:
+                raise DeploymentCacheError(
+                    "DPONE_RUNTIME_CREDENTIAL_PROJECTION_MISMATCH",
+                    "current pointer credentials differ from protected workspace authority",
+                )
             if projection.deployment_id != deployment_id or projection.release_id != release_id:
                 raise DeploymentCacheError(
                     "DPONE_DEPLOYMENT_CACHE_RECOVERY_REQUIRED",
@@ -180,6 +195,17 @@ class DeploymentCacheDesiredDeploymentActivator:
                     "DPONE_AIRFLOW_DESIRED_STATE_SUPERSEDED",
                     "desired state changed before local cache activation",
                 )
+            # The materializer has sealed this exact content-addressed snapshot
+            # before invoking precommit; SQL admission has not started yet.
+            sealed_dir = self._cache_root / "activations" / desired.environment / request.deployment_dir_name
+            projection = self._materializer.validate_current_details(sealed_dir, environment=desired.environment)
+            require_activation_credential_authority(
+                projection.deployment,
+                deployment_dir=sealed_dir,
+                cache_root=self._cache_root,
+                control_ref=self._workspace_authority_connection_ref,
+                authority_sha256=self._publish_authority_sha256,
+            )
 
         def commit_activation(current: CurrentDeployment) -> None:
             if post_activation_commit is None:
@@ -197,8 +223,9 @@ class DeploymentCacheDesiredDeploymentActivator:
             )
 
         try:
+            deployment_dir = self._cache_root / "deployments" / desired.environment / request.deployment_dir_name
             current = self._materializer.promote(
-                self._cache_root / "deployments" / desired.environment / request.deployment_dir_name,
+                deployment_dir,
                 environment=desired.environment,
                 promoted_by=self._promoted_by,
                 expected_current_deployment_id=expected_current_deployment_id,
@@ -287,6 +314,7 @@ def reconcile_desired_state(
                             else None
                         ),
                         workspace_authority_connection_ref=authority.workspace_authority_connection_ref,
+                        publish_authority_sha256=authority.publish_authority_sha256,
                     ),
                     success_status_committer=lambda evidence: _commit_success_status(evidence_store, evidence),
                 )

@@ -7,11 +7,13 @@ from collections.abc import Mapping
 from pathlib import Path
 from typing import Any
 
+from dpone_airflow_pack.credential_projection_contract import require_projection_descriptor
 from dpone_airflow_pack.init_fetch_contract import (
     AIRFLOW_INDEX_SCHEMA_V2,
     AIRFLOW_INDEX_SCHEMA_V3,
     AIRFLOW_INDEX_SCHEMA_V4,
     AIRFLOW_INDEX_SCHEMA_V5,
+    AIRFLOW_INDEX_SCHEMA_V6,
     ExactArtifact,
     InitFetchDeliveryContext,
     InitFetchProviderError,
@@ -71,6 +73,7 @@ _INDEX_KEYS_V2 = frozenset(
 _INDEX_KEYS_V3 = _INDEX_KEYS_V2 | frozenset({"mssql_asset_outlet_projection"})
 _INDEX_KEYS_V4 = _INDEX_KEYS_V3 | frozenset({"development_authority_required"})
 _INDEX_KEYS_V5 = _INDEX_KEYS_V4
+_INDEX_KEYS_V6 = _INDEX_KEYS_V5 | {"credential_projection"}
 _OPTIONAL_INDEX_KEYS_V2 = frozenset(
     {
         "runtime_payloads",
@@ -83,9 +86,16 @@ _OPTIONAL_INDEX_KEYS_V2 = frozenset(
 _OPTIONAL_INDEX_KEYS_V3 = _OPTIONAL_INDEX_KEYS_V2
 _OPTIONAL_INDEX_KEYS_V4 = _OPTIONAL_INDEX_KEYS_V3 | frozenset({"mssql_asset_outlet_projection"})
 _OPTIONAL_INDEX_KEYS_V5 = _OPTIONAL_INDEX_KEYS_V4
+_OPTIONAL_INDEX_KEYS_V6 = _OPTIONAL_INDEX_KEYS_V5 | {"development_authority_required"}
 _CONTEXT_DIGEST_DIR_RE = re.compile(r"^sha256-[0-9a-f]{64}$")
 _SUPPORTED_INDEX_SCHEMAS = frozenset(
-    {AIRFLOW_INDEX_SCHEMA_V2, AIRFLOW_INDEX_SCHEMA_V3, AIRFLOW_INDEX_SCHEMA_V4, AIRFLOW_INDEX_SCHEMA_V5}
+    {
+        AIRFLOW_INDEX_SCHEMA_V2,
+        AIRFLOW_INDEX_SCHEMA_V3,
+        AIRFLOW_INDEX_SCHEMA_V4,
+        AIRFLOW_INDEX_SCHEMA_V5,
+        AIRFLOW_INDEX_SCHEMA_V6,
+    }
 )
 
 
@@ -106,12 +116,19 @@ def init_fetch_context_from_payload(
     is_v3 = schema in {AIRFLOW_INDEX_SCHEMA_V3, AIRFLOW_INDEX_SCHEMA_V4, AIRFLOW_INDEX_SCHEMA_V5}
     is_v4 = schema == AIRFLOW_INDEX_SCHEMA_V4
     is_v5 = schema == AIRFLOW_INDEX_SCHEMA_V5
+    is_v6 = schema == AIRFLOW_INDEX_SCHEMA_V6
     exact_mapping(
         payload,
         "airflow deployment index v3" if is_v3 else "airflow deployment index v2",
-        _INDEX_KEYS_V5 if is_v5 else (_INDEX_KEYS_V4 if is_v4 else (_INDEX_KEYS_V3 if is_v3 else _INDEX_KEYS_V2)),
+        _INDEX_KEYS_V6
+        if is_v6
+        else _INDEX_KEYS_V5
+        if is_v5
+        else (_INDEX_KEYS_V4 if is_v4 else (_INDEX_KEYS_V3 if is_v3 else _INDEX_KEYS_V2)),
         optional=(
-            _OPTIONAL_INDEX_KEYS_V5
+            _OPTIONAL_INDEX_KEYS_V6
+            if is_v6
+            else _OPTIONAL_INDEX_KEYS_V5
             if is_v5
             else _OPTIONAL_INDEX_KEYS_V4
             if is_v4
@@ -126,7 +143,13 @@ def init_fetch_context_from_payload(
         raise field_invalid("v4 development authority requires kubernetes_secret_volume", path)
     if is_v5 and not isinstance(delivery.runtime_authority, ImmutableRuntimeAuthoritySource):
         raise field_invalid("v5 development authority requires immutable_payload", path)
-    if not is_v4 and not is_v5 and delivery.runtime_authority is not None:
+    if is_v6:
+        development = payload.get("development_authority_required") is True
+        if development != (delivery.runtime_authority is not None) or (
+            development and delivery.trust_tier != "non_production"
+        ):
+            raise field_invalid("v6 development authority source mismatch", path)
+    if not is_v4 and not is_v5 and not is_v6 and delivery.runtime_authority is not None:
         raise field_invalid("runtime authority is allowed only for development-authorized plans", path)
     release_id = digest(payload.get("release_id"), "release_id", path)
     deployment_id = digest(payload.get("deployment_id"), "deployment_id", path)
@@ -206,9 +229,18 @@ def init_fetch_context_from_payload(
         runtime_image_dbt_digest=dbt_digest,
         mssql_asset_uri_by_ref=mssql_projection,
         development_authority_required=(
-            _literal_true(payload.get("development_authority_required"), path) if (is_v4 or is_v5) else False
+            _literal_true(payload.get("development_authority_required"), path)
+            if (is_v4 or is_v5 or (is_v6 and "development_authority_required" in payload))
+            else False
         ),
         runtime_authority=delivery.runtime_authority,
+        credential_projection=(
+            _artifact(
+                require_projection_descriptor(payload.get("credential_projection")), "credential_projection", path
+            )
+            if is_v6
+            else None
+        ),
     )
     for workload in workloads:
         context.encode_plan(

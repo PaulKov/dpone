@@ -42,6 +42,7 @@ def validate_remote_artifact_headers(
         ("dpone.deployment-set.v3", "dpone.airflow-deployment-index.v3"),
         ("dpone.deployment-set.v4", "dpone.airflow-deployment-index.v4"),
         ("dpone.deployment-set.v5", "dpone.airflow-deployment-index.v5"),
+        ("dpone.deployment-set.v6", "dpone.airflow-deployment-index.v6"),
     }:
         raise AirflowArtifactDeliveryError("DPONE_DEPLOYMENT_SCHEMA_INVALID", "remote deployment schema is invalid")
     if deployment.get("environment") != request.environment:

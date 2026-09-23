@@ -5,11 +5,13 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from dpone.gitops.schema_contract_primitives import GitOpsSchemaContract
 
+
 from dpone.gitops.schema_airflow_init_fetch_execution import (
     bounded_execution_token_schema,
     init_fetch_execution_schema,
 )
 from dpone.gitops.schema_contract_primitives import artifact_registry_ref_schema, documented_contract
+from dpone.gitops.schema_release_deployment_v6_contracts import runtime_init_fetch_plan_v6_contract
 from dpone.gitops.schema_runtime_artifact_delivery import (
     config_map_ref_schema,
     immutable_runtime_authority_source_schema,
@@ -32,6 +34,7 @@ def airflow_runtime_init_fetch_schema_contracts() -> tuple[GitOpsSchemaContract,
         runtime_init_fetch_plan_v3_contract(),
         _runtime_init_fetch_plan_contract(version=4),
         _runtime_init_fetch_plan_contract(version=5),
+        runtime_init_fetch_plan_v6_contract(runtime_init_fetch_plan_v3_contract()),
         runtime_fetch_ready_contract(),
     )
 

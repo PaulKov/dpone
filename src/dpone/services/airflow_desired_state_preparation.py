@@ -85,6 +85,12 @@ class AirflowDesiredStatePreparationService:
     ) -> DesiredStatePublishCandidate:
         if promotion.environment != authority.environment or promotion.registry_scope_id != authority.registry_scope_id:
             raise ValueError("promotion evidence is outside the trusted authority")
+        control_ref = getattr(authority, "workspace_authority_connection_ref", None)
+        projection = getattr(promotion, "credential_projection", None)
+        if control_ref is not None and projection is None:
+            raise ValueError("workspace publication requires credential projection promotion evidence")
+        if projection is not None:
+            projection.require_authority(control_ref=control_ref, authority_sha256=authority.publish_authority_sha256)
         return DesiredStatePublishCandidate(
             environment=authority.environment,
             project=authority.source_project,

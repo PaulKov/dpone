@@ -19,6 +19,7 @@ from dpone.runtime.runtime_init_fetch_plan import (
     RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3,
     RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4,
     RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5,
+    RUNTIME_INIT_FETCH_PLAN_SCHEMA_V6,
     RuntimeArtifactDescriptor,
     RuntimeExecutionSelection,
     RuntimeInitFetchPlan,
@@ -105,6 +106,14 @@ def _plan_from_mapping(raw: Mapping[str, Any]) -> RuntimeInitFetchPlan:
         _require_keys("plan", raw, _ROOT_KEYS_V4)
     elif schema == RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5:
         _require_keys("plan", raw, _ROOT_KEYS_V5)
+    elif schema == RUNTIME_INIT_FETCH_PLAN_SCHEMA_V6:
+        _require_keys(
+            "plan",
+            raw,
+            _ROOT_KEYS_V3
+            | {"credential_projection"}
+            | ({"development_authority_required", "runtime_authority"} & raw.keys()),
+        )
     else:
         raise ValueError("runtime init-fetch plan schema is unsupported")
     runtime_image = _mapping(raw["runtime_image"], "runtime_image", {"ref", "digest"})
@@ -155,6 +164,7 @@ def _plan_from_mapping(raw: Mapping[str, Any]) -> RuntimeInitFetchPlan:
                 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3,
                 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4,
                 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5,
+                RUNTIME_INIT_FETCH_PLAN_SCHEMA_V6,
             },
         ),
         verify=_mapping(raw["verify"], "verify", {"checksums", "attestations"}),
@@ -166,6 +176,7 @@ def _plan_from_mapping(raw: Mapping[str, Any]) -> RuntimeInitFetchPlan:
                     RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3,
                     RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4,
                     RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5,
+                    RUNTIME_INIT_FETCH_PLAN_SCHEMA_V6,
                 },
             )
             if schema
@@ -174,19 +185,25 @@ def _plan_from_mapping(raw: Mapping[str, Any]) -> RuntimeInitFetchPlan:
                 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V3,
                 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4,
                 RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5,
+                RUNTIME_INIT_FETCH_PLAN_SCHEMA_V6,
             }
             else ()
         ),
         development_authority_required=(
             _literal_true(raw["development_authority_required"], "development_authority_required")
             if schema in {RUNTIME_INIT_FETCH_PLAN_SCHEMA_V4, RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5}
+            or (schema == RUNTIME_INIT_FETCH_PLAN_SCHEMA_V6 and "development_authority_required" in raw)
             else False
         ),
         runtime_authority=(
             ImmutableRuntimeAuthorityPayload.from_mapping(raw["runtime_authority"])
             if schema == RUNTIME_INIT_FETCH_PLAN_SCHEMA_V5
+            or (schema == RUNTIME_INIT_FETCH_PLAN_SCHEMA_V6 and "runtime_authority" in raw)
             else None
         ),
+        credential_projection=_artifact(raw["credential_projection"], "credential_projection")
+        if schema == RUNTIME_INIT_FETCH_PLAN_SCHEMA_V6
+        else None,
     )
 
 

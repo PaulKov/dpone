@@ -30,11 +30,8 @@ from dpone.runtime.airflow_artifact_inventory_files import (
 from dpone.runtime.airflow_artifact_inventory_files import (
     marker_last as _marker_last,
 )
-from dpone.runtime.airflow_artifact_inventory_files import (
-    runtime_connection_artifact as _runtime_connection_artifact,
-)
+from dpone.runtime.airflow_credential_projection_inventory import deployment_credential_publication_files
 from dpone.runtime.airflow_runtime_connection_inventory import (
-    runtime_connection_publication_files,
     validate_deployment_auxiliary_files,
 )
 from dpone.runtime.deployment_cache_common import read_regular_json_object
@@ -128,20 +125,13 @@ def build_publish_inventory(
         for name in deployment_names
     ]
     validate_deployment_auxiliary_files(projection.deployment, deployment_dir)
-    if projection.deployment.get("schema") in {
-        "dpone.deployment-set.v2",
-        "dpone.deployment-set.v3",
-        "dpone.deployment-set.v4",
-        "dpone.deployment-set.v5",
-    }:
-        deployment_files.extend(
-            _runtime_connection_artifact(item)
-            for item in runtime_connection_publication_files(
-                projection.deployment,
-                deployment_dir=deployment_dir,
-                root=request.cache_root,
-            )
+    deployment_files.extend(
+        deployment_credential_publication_files(
+            projection.deployment,
+            deployment_dir=deployment_dir,
+            root=request.cache_root,
         )
+    )
     attestation_spec = attestation_publication_spec(
         request,
         release_schema=str(release.get("schema", "dpone.release-set.v1")),
@@ -272,6 +262,8 @@ def deployment_file_names(
     index: Mapping[str, Any] | None = None,
 ) -> tuple[str, ...]:
     names = list(_BASE_DEPLOYMENT_FILES)
+    if deployment.get("schema") == "dpone.deployment-set.v6":
+        names.append("credential-projection.json")
     if deployment.get("binding_set_ref") is not None:
         names.append("binding-set.json")
     if deployment.get("connection_registry_ref") is not None:

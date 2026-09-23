@@ -7,6 +7,7 @@ from copy import deepcopy
 from datetime import timedelta
 from typing import Any
 
+from dpone_airflow_pack.credential_projection_pod import project_credential_pod
 from dpone_airflow_pack.init_fetch_contract import (
     ConfigMapReference,
     InitFetchDeliveryContext,
@@ -33,6 +34,7 @@ from dpone_airflow_pack.init_fetch_pod_contract import (
     TRUST_POLICY_VOLUME,
     WORKTREE_ROOT,
     WORKTREE_VOLUME,
+    runtime_pod_labels,
 )
 from dpone_airflow_pack.init_fetch_pod_guard import (
     reserved_collision,
@@ -46,10 +48,6 @@ from dpone_airflow_pack.init_fetch_secret_env import (
     without_registry_credential,
 )
 from dpone_airflow_pack.provider_execution import (
-    RUNTIME_POD_CONTRACT_KEY,
-    RUNTIME_POD_CONTRACT_VALUE,
-    RUNTIME_POD_MANAGED_BY_KEY,
-    RUNTIME_POD_MANAGED_BY_VALUE,
     WORKLOAD_ID_METADATA_KEY,
     require_provider_execution,
 )
@@ -139,7 +137,7 @@ def compose_init_fetch_operator_kwargs(
     ensure_registry_credential_env_available(context.registry_credentials, env_vars)
 
     clean = {key: deepcopy(value) for key, value in effective_kwargs.items() if key in _PRESERVED_KPO_FIELDS}
-    runtime_labels = _runtime_labels(projection.kpo_kwargs["labels"])
+    runtime_labels = runtime_pod_labels(projection.kpo_kwargs["labels"])
     annotations = {
         PLAN_SHA256_ANNOTATION: encoded.sha256,
         WORKLOAD_ID_METADATA_KEY: workload_id,
@@ -180,20 +178,17 @@ def compose_init_fetch_operator_kwargs(
             ),
         }
     )
+    clean["full_pod_spec"] = project_credential_pod(
+        clean["full_pod_spec"],
+        context=context,
+        workload_id=workload_id,
+        control_ref=env_vars.get("DPONE_DBT_WORKSPACE_AUTHORITY_CONNECTION_REF"),
+        native_empty_projection=pack.get("connection_projection") == {},
+    )
     execution_timeout_seconds = projection.kpo_kwargs.get("execution_timeout_seconds")
     if execution_timeout_seconds is not None:
         clean["execution_timeout"] = timedelta(seconds=execution_timeout_seconds)
     return clean
-
-
-def _runtime_labels(
-    labels: Mapping[str, Any],
-) -> dict[str, Any]:
-    return {
-        **deepcopy(dict(labels)),
-        RUNTIME_POD_MANAGED_BY_KEY: RUNTIME_POD_MANAGED_BY_VALUE,
-        RUNTIME_POD_CONTRACT_KEY: RUNTIME_POD_CONTRACT_VALUE,
-    }
 
 
 def attach_init_fetch_context(operator: Any, context: InitFetchDeliveryContext) -> Any:
