@@ -49,6 +49,15 @@ materialization.
 
 ## Staged load governance
 
+The HTTP connector accepts the native-driver row-batch form
+`execute("INSERT INTO table (columns) VALUES", rows)`. It uses typed insertion,
+not SQL string interpolation: timestamps, `None`, and strings containing `%`
+remain data. This includes load and step audit records, so switching transport
+does not require disabling audit or changing a manifest. Empty batches are
+no-ops; insert failures propagate normally. SQL-bound statements and
+`INSERT ... SELECT` continue through the command API. This compatibility path
+is distinct from the streaming bulk formats described above.
+
 ClickHouse bulk/native routes use a governed staged lifecycle:
 
 ```text

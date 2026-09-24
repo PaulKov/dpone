@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.83.12 - 2026-09-25
+
+### Fixed
+
+- Route native-style ClickHouse `INSERT INTO ... (columns) VALUES` row batches
+  through typed HTTP insertion. Audit records and data rows retain timestamps,
+  NULLs and query identity instead of being interpreted as SQL bind parameters.
+  Existing manifests and native TCP behavior are unchanged.
+
 ## 0.83.11 - 2026-09-24
 
 ### Fixed

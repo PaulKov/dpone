@@ -8,10 +8,17 @@ same local protocol while delegating transport to ``clickhouse-connect``.
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+import re
+from collections.abc import Iterable, Iterator, Mapping
 from typing import Any
 
 _QUERY_PREFIXES = ("SELECT", "WITH", "SHOW", "DESCRIBE", "DESC", "EXPLAIN", "EXISTS")
+_IDENTIFIER = r'(?:[A-Za-z_][A-Za-z_0-9]*|`(?:[^`\\]|\\.|``)+`|"(?:[^"\\]|\\.|"")+")'
+_VALUES_INSERT = re.compile(
+    rf"\s*INSERT\s+INTO\s+(?P<table>{_IDENTIFIER}(?:\s*\.\s*{_IDENTIFIER})?)"
+    rf"\s*\(\s*(?P<columns>{_IDENTIFIER}(?:\s*,\s*{_IDENTIFIER})*)\s*\)\s*VALUES\s*;?\s*",
+    re.IGNORECASE,
+)
 
 
 class ClickHouseHttpClientAdapter:
@@ -36,6 +43,15 @@ class ClickHouseHttpClientAdapter:
             # clickhouse-connect serializes this reserved HTTP parameter
             # separately from SQL SETTINGS, matching X-ClickHouse-Query-Id.
             merged = {**(merged or {}), "query_id": query_id}
+        insert = _VALUES_INSERT.fullmatch(statement)
+        if insert and params is not None and not isinstance(params, Mapping):
+            # Native-driver VALUES takes rows, not SQL bind parameters. Keep
+            # Python types intact so HTTP insertion preserves NULL/date values.
+            columns = [_unquote_identifier(token.group()) for token in re.finditer(_IDENTIFIER, insert["columns"])]
+            rows = list(params)
+            if rows:
+                self.insert_rows(insert["table"], rows, column_names=columns, settings=merged)
+            return []
         if _is_query(statement):
             result = self._client.query(statement, parameters=params, settings=merged)
             rows = list(getattr(result, "result_rows", ()) or ())
@@ -118,6 +134,13 @@ def create_clickhouse_http_client(
 
 def _is_query(statement: str) -> bool:
     return statement.lstrip().upper().startswith(_QUERY_PREFIXES)
+
+
+def _unquote_identifier(identifier: str) -> str:
+    if identifier[0] not in ("`", '"'):
+        return identifier
+    quote = identifier[0]
+    return re.sub(r"\\(.)", r"\1", identifier[1:-1].replace(quote * 2, quote))
 
 
 def _column_types(result: Any) -> list[tuple[str, str]]:
