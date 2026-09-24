@@ -61,10 +61,12 @@ def attach_outcome_and_cleanup(
 
     if inline_required_status is not None or is_mapped:
         return tasks
+    outcome_config = pack.get("outcome_gate")
     outcome = build_outcome(
         pack=pack,
         dag=dag,
         upstream_task_id=upstream_task_id,
+        runtime_task_id=(runtime.task_id if isinstance(outcome_config, Mapping) and outcome_config else None),
         node=node,
         task_group=task_group,
         launch_pin_store=closed_locator,

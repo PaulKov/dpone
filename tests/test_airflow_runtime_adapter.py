@@ -102,6 +102,7 @@ def _install_fake_airflow(monkeypatch: pytest.MonkeyPatch) -> None:
     class DependencyOperator:
         def __init__(self, **kwargs: object) -> None:
             self.kwargs = kwargs
+            self.task_id = kwargs["task_id"]
             self.downstream: list[object] = []
 
         def __rshift__(self, downstream: object) -> object:

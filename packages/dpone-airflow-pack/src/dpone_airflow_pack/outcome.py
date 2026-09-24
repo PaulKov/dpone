@@ -25,11 +25,17 @@ def build_pack_outcome_task(
     pack: Mapping[str, Any],
     dag: Any,
     upstream_task_id: str,
+    runtime_task_id: str | None = None,
     node: Any = None,
     task_group: Any = None,
     launch_pin_store: Mapping[str, str | None] | None = None,
 ) -> Any | None:
-    """Build the optional non-mapped outcome gate from static pack metadata."""
+    """Build a gate with a local name and the materialized runtime XCom identity.
+
+    Airflow qualifies runtime task IDs inside TaskGroups. Keep that identity
+    separate from the local ID used to name the gate, avoiding double prefixes.
+    Direct callers that omit ``runtime_task_id`` retain their existing behavior.
+    """
 
     outcome = pack.get("outcome_gate")
     if not isinstance(outcome, Mapping) or not outcome:
@@ -45,7 +51,7 @@ def build_pack_outcome_task(
         **({"task_group": task_group} if task_group is not None else {}),
         python_callable=evaluate_pack_outcome,
         op_kwargs={
-            "upstream_task_id": upstream_task_id,
+            "upstream_task_id": runtime_task_id if runtime_task_id is not None else upstream_task_id,
             "required_status": str(outcome.get("required_status") or "passed"),
             "expected_run_identity": _expected_run_identity(pack),
             "expected_deployment_identity": _expected_deployment_identity(pack),

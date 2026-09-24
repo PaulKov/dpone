@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- Resolve grouped runtime outcome XComs by the materialized Airflow task ID,
+  including nested TaskGroups, without changing generated gate or cleanup names.
+  No workload authoring changes are required.
+
 ## 0.83.10 - 2026-09-24
 
 ### Added

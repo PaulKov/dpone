@@ -102,6 +102,7 @@ except Exception:  # pragma: no cover - local tests may not have Airflow install
                     "apache-airflow-providers-cncf-kubernetes"
                 )
             self.kwargs = kwargs
+            self.task_id = kwargs.get("task_id", "")
             self.do_xcom_push = bool(kwargs.get("do_xcom_push", False))
             self.env_vars = kwargs.get("env_vars")
             self.full_pod_spec = kwargs.get("full_pod_spec")
