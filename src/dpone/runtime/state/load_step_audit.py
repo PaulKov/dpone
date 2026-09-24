@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
+from dpone.runtime.clickhouse_database_provisioning import ensure_database
 from dpone.runtime.route_runtime_models import LoadStepAuditRecord
 from dpone.runtime.runtime_throughput import enrich_step_details_with_throughput
 from dpone.runtime.state.clickhouse_state_design import ClickHouseStateTableDesign
@@ -113,8 +114,11 @@ class ClickHouseLoadStepAuditStorage:
         if self._table_created:
             return
         self._design.emit_warnings()
-        self.connector.execute_query(
-            f"CREATE DATABASE IF NOT EXISTS {_ch_identifier(self.schema)}{self._design.cluster_clause}"
+        ensure_database(
+            self.connector,
+            database=self.schema,
+            statement=f"CREATE DATABASE IF NOT EXISTS {_ch_identifier(self.schema)}{self._design.cluster_clause}",
+            cluster=self._design.cluster.name if self._design.cluster.on_cluster else None,
         )
         self.connector.execute_query(
             f"""

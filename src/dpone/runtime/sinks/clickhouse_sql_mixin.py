@@ -7,6 +7,7 @@ from decimal import Decimal
 from typing import TYPE_CHECKING, Any
 
 from dpone.ports.partition_clone import PartitionCloneFactory
+from dpone.runtime.clickhouse_database_provisioning import ensure_database
 from dpone.runtime.sinks.clickhouse_operation_tables import ClickHouseOperationTableResolver
 from dpone.runtime.sinks.clickhouse_physical_types import (
     DEFAULT_CLICKHOUSE_PHYSICAL_COLUMN_TYPE_RESOLVER,
@@ -281,7 +282,12 @@ class ClickHouseSqlMixin:
     def _ensure_database(self, load_config: LoadConfig) -> ClickHouseTableDesign:
         design = ClickHouseTableDesign.from_options(getattr(load_config, "options", {}) or {})
         renderer = ClickHouseTableDdlRenderer()
-        self.connector.execute_query(renderer.render_create_database(database=load_config.target_schema, design=design))
+        ensure_database(
+            self.connector,
+            database=load_config.target_schema,
+            statement=renderer.render_create_database(database=load_config.target_schema, design=design),
+            cluster=design.cluster.name if design.cluster.on_cluster else None,
+        )
         return design
 
 

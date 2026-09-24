@@ -499,6 +499,12 @@ reparse and verify the serialized graph shows its workload tasks and dependencie
 before starting a new run. The fix does not repair historical run states or
 require changes to workload manifests.
 
+Outcome gates pull XCom using the runtime operator's fully qualified Airflow
+task ID, including any enclosing TaskGroups. Generated gate and cleanup names
+remain local to their group; authors do not add prefixes to pack metadata or
+maintain a separate task inventory. Upgrading and reparsing corrects this
+wiring for subsequent executions; it does not mark historical failures passed.
+
 Environment deployment promotion uses the separate content-addressed
 release/deployment cache contract. Platform operators should follow the
 [Airflow cache sync and recovery runbook](airflow-cache-sync.md) for pinned

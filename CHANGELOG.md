@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.83.11 - 2026-09-24
+
+### Fixed
+
+- Resolve grouped runtime outcome XComs by the materialized Airflow task ID,
+  including nested TaskGroups, without changing generated gate or cleanup names.
+  No workload authoring changes are required.
+- Permit pre-provisioned ClickHouse sink and audit databases without database
+  creation privileges, only after a denied redundant CREATE is verified against
+  the complete local or cluster catalog. Table and audit permissions stay strict.
+
 ## 0.83.10 - 2026-09-24
 
 ### Added
