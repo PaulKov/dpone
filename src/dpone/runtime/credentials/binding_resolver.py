@@ -12,21 +12,21 @@ from typing import Any, Protocol
 
 from dpone.contracts.credential_resolution import (
     BACKEND_UNAVAILABLE,
-    DAG_RUN_SCOPE_UNSUPPORTED,
     FIELD_MISSING,
-    PINNED_VERSION_UNSUPPORTED,
-    RESOLUTION_SCOPE_DAG_RUN_START,
     SUPPORTED_RESOLUTION_SCOPES,
     SUPPORTED_VERSION_POLICIES,
     VERSION_METADATA_MISSING,
-    VERSION_POLICY_PINNED,
     CredentialResolutionError,
     is_valid_connection_ref,
     is_valid_env_var_name,
+    require_supported_snapshot_policy,
 )
 from dpone.contracts.runtime_connection import ResolvedBindingConnection, ResolvedConnectionDescriptor
 from dpone.kubernetes_names import is_valid_kubernetes_dns_label
-from dpone.runtime.credentials.airflow_uri_registry import credentials_from_airflow_connection_uri
+from dpone.runtime.credentials.airflow_uri_registry import (
+    credentials_from_airflow_connection_uri,
+    resolve_projected_airflow_env,
+)
 from dpone.runtime.credentials.binding_evidence import (
     credential_policy_metadata,
     credential_reference_metadata,
@@ -35,7 +35,6 @@ from dpone.runtime.credentials.binding_evidence import (
     safe_evidence_context,
 )
 from dpone.runtime.credentials.config import CredentialsConfig
-from dpone.runtime.credentials.projected_airflow_env import resolve_projected_airflow_env
 from dpone.vault_references import is_valid_vault_logical_path, is_valid_vault_mount
 
 _PRODUCTION_ENV_NAMES = frozenset({"prod", "production"})
@@ -108,7 +107,7 @@ class BindingCredentialResolver:
         if resolver == "env_var":
             resolved = self._resolve_env(connection=connection, credentials=credentials)
         elif resolver == "airflow_env":
-            _require_supported_snapshot_policy(credentials, resolver=resolver)
+            require_supported_snapshot_policy(credentials, resolver=resolver)
             resolved = resolve_projected_airflow_env(connection=connection, credentials=credentials), None
         elif resolver == "vault_kv":
             resolved = self._resolve_vault(connection=connection, credentials=credentials)
@@ -188,7 +187,7 @@ class BindingCredentialResolver:
         connection: Mapping[str, Any],
         credentials: Mapping[str, Any],
     ) -> tuple[CredentialsConfig, int | None]:
-        _require_supported_snapshot_policy(credentials, resolver="vault_kv")
+        require_supported_snapshot_policy(credentials, resolver="vault_kv")
         mount = str(credentials.get("mount") or "secret")
         path = str(credentials.get("path") or "")
         if not is_valid_vault_mount(mount):
@@ -356,21 +355,6 @@ def _require_mapped_values(values: Mapping[str, Any], *, resolver: str) -> None:
 def _validate_credential_policy(credentials: Mapping[str, Any]) -> None:
     _validate_optional_policy_value(credentials, key="version_policy", allowed=SUPPORTED_VERSION_POLICIES)
     _validate_optional_policy_value(credentials, key="resolution_scope", allowed=SUPPORTED_RESOLUTION_SCOPES)
-
-
-def _require_supported_snapshot_policy(credentials: Mapping[str, Any], *, resolver: str) -> None:
-    if credentials.get("version_policy") == VERSION_POLICY_PINNED:
-        raise CredentialResolutionError(
-            PINNED_VERSION_UNSUPPORTED,
-            "Pinned credential versions are not supported by this runtime resolver; use latest.",
-            resolver=resolver,
-        )
-    if credentials.get("resolution_scope") == RESOLUTION_SCOPE_DAG_RUN_START:
-        raise CredentialResolutionError(
-            DAG_RUN_SCOPE_UNSUPPORTED,
-            "DAG-run credential snapshots are not supported; use workload_start.",
-            resolver=resolver,
-        )
 
 
 def _validate_optional_policy_value(credentials: Mapping[str, Any], *, key: str, allowed: frozenset[str]) -> None:

@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
+from typing import Any
+
 from dpone.contracts.credential_env import is_valid_connection_ref, is_valid_env_var_name
 
 VERSION_POLICY_LATEST = "latest"
@@ -28,7 +31,24 @@ class CredentialResolutionError(ValueError):
         self.resolver = resolver
 
 
+def require_supported_snapshot_policy(credentials: Mapping[str, Any], *, resolver: str) -> None:
+    """Reject guarantees unavailable to current non-snapshot runtime readers."""
+    if credentials.get("version_policy") == VERSION_POLICY_PINNED:
+        raise CredentialResolutionError(
+            PINNED_VERSION_UNSUPPORTED,
+            "Pinned credential versions are not supported by this runtime resolver; use latest.",
+            resolver=resolver,
+        )
+    if credentials.get("resolution_scope") == RESOLUTION_SCOPE_DAG_RUN_START:
+        raise CredentialResolutionError(
+            DAG_RUN_SCOPE_UNSUPPORTED,
+            "DAG-run credential snapshots are not supported; use workload_start.",
+            resolver=resolver,
+        )
+
+
 __all__ = [
+    "require_supported_snapshot_policy",
     "BACKEND_UNAVAILABLE",
     "DAG_RUN_SCOPE_UNSUPPORTED",
     "FIELD_MISSING",
