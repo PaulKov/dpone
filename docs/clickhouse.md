@@ -7,6 +7,22 @@ bounded upserts, and snapshot reconciliation that avoids mutation-heavy
 
 ## Install
 
+### Pre-provisioned databases and restricted accounts
+
+Sink/staging and load-audit databases may be provisioned by an administrator.
+When a redundant `CREATE DATABASE IF NOT EXISTS` returns ClickHouse code 497,
+dpone verifies that the database already exists. Local DDL requires an exact
+positive `EXISTS DATABASE` result; cluster DDL requires database presence on
+every configured replica with unavailable-shard skipping disabled. Catalog
+access therefore remains required for this restricted-account path.
+
+A missing database, incomplete/unreadable catalog, or another DDL error still
+fails the run. Table creation, schema changes and audit writes retain their
+ordinary permission checks. No manifest option, elevated database-creation
+grant or disabled audit is required for an already provisioned database.
+
+### Package
+
 ```bash
 pip install "dpone[clickhouse]"
 ```
