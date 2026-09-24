@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from copy import deepcopy
 from typing import Any
 
+from dpone.airflow_connection_names import airflow_conn_env_name, is_valid_airflow_connection_id
 from dpone.contracts.airflow_deployment import canonical_fingerprint
 from dpone.contracts.credential_security import forbidden_inline_secret_paths
 from dpone.readiness.airflow_connection_bridge_report import airflow_connection_bridge_report
@@ -54,15 +55,20 @@ def runtime_connection_registry_for_init_fetch(
 
     Git/source registries keep ``resolver: airflow_connection`` for offline check
     and bridge intent. Published init-fetch snapshots rewrite those entries to
-    ``kubernetes_secret_volume`` mounts that match the operator bridge projection.
+    the declared operator transport: ``kubernetes_secret_volume`` mounts or
+    explicit ``airflow_env`` URI references. Absent projection retains the
+    existing volume default; unrelated registry entries are preserved.
     """
 
     payload = deepcopy(dict(connection_registry))
+    env_ids = _env_ids_by_registry_ref(projection)
     connections = payload.get("connections")
+    if env_ids is not None:
+        _require_env_registry_entries(connections, env_ids)
     if not isinstance(connections, Mapping) or not connections:
         return payload
-    mounts = _mounts_by_registry_ref(connections, projection=projection)
-    if not mounts:
+    mounts = {} if env_ids is not None else _mounts_by_registry_ref(connections, projection=projection)
+    if not mounts and env_ids is None:
         return payload
     rewritten: dict[str, Any] = {}
     for ref, entry in connections.items():
@@ -72,6 +78,20 @@ def runtime_connection_registry_for_init_fetch(
         credentials = entry.get("credentials")
         if not isinstance(credentials, Mapping) or credentials.get("resolver") != "airflow_connection":
             rewritten[str(ref)] = deepcopy(dict(entry))
+            continue
+        if env_ids is not None:
+            connection_id = env_ids.get(str(ref))
+            if connection_id is None:
+                rewritten[str(ref)] = deepcopy(dict(entry))
+                continue
+            if credentials.get("connection_id") != connection_id:
+                raise ValueError("env projection connection_id differs from source registry")
+            next_entry = deepcopy(dict(entry))
+            next_entry["credentials"] = {"resolver": "airflow_env", "connection_id": connection_id}
+            for key in ("version_policy", "resolution_scope"):
+                if key in credentials:
+                    next_entry["credentials"][key] = credentials[key]
+            rewritten[str(ref)] = next_entry
             continue
         mount = mounts.get(str(ref))
         if mount is None:
@@ -91,6 +111,39 @@ def runtime_connection_registry_for_init_fetch(
         rewritten[str(ref)] = next_entry
     payload["connections"] = rewritten
     return payload
+
+
+def _env_ids_by_registry_ref(projection: Mapping[str, Any] | None) -> dict[str, str] | None:
+    """Index an explicit env projection and reject conflicting identities."""
+    if projection is None or projection.get("mode") != "env":
+        return None
+    entries = projection.get("connections")
+    if not isinstance(entries, list) or not entries:
+        raise ValueError("env projection requires connection entries")
+    refs: dict[str, str] = {}
+    names: dict[str, str] = {}
+    for entry in entries:
+        if not isinstance(entry, Mapping):
+            raise ValueError("env projection connection entry must be an object")
+        ref = entry.get("registry_connection_ref") or entry.get("connection_ref")
+        connection_id = entry.get("connection_id")
+        if not isinstance(ref, str) or not ref or not is_valid_airflow_connection_id(connection_id):
+            raise ValueError("env projection requires registry reference and valid connection_id")
+        connection_id = str(connection_id)
+        env_name = airflow_conn_env_name(connection_id)
+        if refs.get(ref, connection_id) != connection_id or names.get(env_name, connection_id) != connection_id:
+            raise ValueError("env projection contains conflicting connection identities")
+        refs[ref], names[env_name] = connection_id, connection_id
+    return refs
+
+
+def _require_env_registry_entries(connections: object, env_ids: Mapping[str, str]) -> None:
+    """Reject projections that cannot be fulfilled by the source registry."""
+    for ref in env_ids:
+        entry = connections.get(ref) if isinstance(connections, Mapping) else None
+        credentials = entry.get("credentials") if isinstance(entry, Mapping) else None
+        if not isinstance(credentials, Mapping) or credentials.get("resolver") != "airflow_connection":
+            raise ValueError("env projection requires an existing airflow_connection registry entry")
 
 
 def _require_non_secret_snapshot(label: str, payload: Mapping[str, Any]) -> None:

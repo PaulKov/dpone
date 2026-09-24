@@ -12,6 +12,7 @@ from pathlib import Path
 
 import pytest
 from dpone_airflow_pack import build_dpone_gitops_task_group_from_pack
+from dpone_airflow_pack.connection_env_operator import AirflowConnectionEnvKubernetesPodOperator
 from dpone_airflow_pack.connection_secret_lifecycle import (
     ATTEMPT_REF_ANNOTATION,
     CLEANUP_POLICY_LABEL,
@@ -33,6 +34,338 @@ from dpone.gitops.airflow_compact_pack_bootstrap import (
     InlineWorkloadConfigurationError,
     runtime_workload_bootstrap,
 )
+
+
+def _closed_env_projection() -> dict:
+    return {
+        "mode": "env",
+        "payload_format": "airflow_connection_uri",
+        "secret_values": False,
+        "connections": [
+            {"connection_ref": "warehouse", "registry_connection_ref": "warehouse", "connection_id": "warehouse_reader"}
+        ],
+    }
+
+
+@pytest.mark.parametrize("model_pod", [False, True])
+def test_closed_env_operator_resolves_only_at_execute_into_base(monkeypatch, model_pod) -> None:
+    import copy
+
+    reads = []
+    masked = []
+    uri = "postgres://synthetic:sentinel-password@warehouse.example/source?token=sentinel-token"
+
+    class Reader:
+        def read_uri(self, connection_id):
+            reads.append(connection_id)
+            return uri
+
+    pod = {
+        "spec": {
+            "containers": [{"name": "base"}, {"name": "airflow-xcom-sidecar"}],
+            "initContainers": [
+                {
+                    "name": "dpone-runtime-init-fetch",
+                    "env": [
+                        {
+                            "name": "AIRFLOW_CONN_REGISTRY",
+                            "valueFrom": {"secretKeyRef": {"name": "registry", "key": "uri"}},
+                        },
+                    ],
+                }
+            ],
+        }
+    }
+    if model_pod:
+        from dpone_airflow_pack.pack_task_runtime import deserialize_pod_spec
+
+        pod = deserialize_pod_spec(pod)
+        if isinstance(pod, dict):
+            pytest.skip("Kubernetes models unavailable")
+    original = copy.deepcopy(pod)
+    operator = AirflowConnectionEnvKubernetesPodOperator(
+        task_id="runtime",
+        airflow_connection_projection=_closed_env_projection(),
+        airflow_connection_reader=Reader(),
+        connection_secret_masker=masked.append,
+        full_pod_spec=pod,
+    )
+    assert reads == []
+    operator.build_pod_request_obj()
+    assert reads == []
+
+    def execute(self, context):
+        built = self.build_pod_request_obj(context)
+        payload = built if isinstance(built, dict) else built.to_dict()
+        base_env = payload["spec"]["containers"][0]["env"]
+        assert any(item["name"] == "AIRFLOW_CONN_WAREHOUSE_READER" and item["value"] == uri for item in base_env)
+        assert "sentinel-password" not in repr(payload["spec"]["containers"][1:])
+        init = payload["spec"].get("initContainers", payload["spec"].get("init_containers"))
+        assert "sentinel-password" not in repr(init)
+        assert "AIRFLOW_CONN_REGISTRY" in repr(init)
+        assert "sentinel-password" not in repr(self.env_vars)
+        assert "sentinel-password" not in repr(self.full_pod_spec)
+        self.pod_request_obj = built
+        return {"status": "success"}
+
+    monkeypatch.setattr(PinnedXComSidecarKubernetesPodOperator, "execute", execute)
+    assert operator.execute({}) == {"status": "success"}
+    assert reads == ["warehouse_reader"]
+    assert uri in masked and "sentinel-password" in masked and "sentinel-token" in masked
+    assert operator._runtime_connection_env == {}
+    assert "sentinel-password" not in repr(operator.pod_request_obj)
+    assert "sentinel-password" not in repr(original)
+    assert operator.kwargs["log_pod_spec_on_failure"] is False
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"secret_name": "forbidden"},
+        {"secret_values": True},
+        {"database_overrides": {"unrelated": "warehouse"}},
+        {
+            "connections": [
+                {"connection_ref": "one", "registry_connection_ref": "one", "connection_id": "reader.one"},
+                {"connection_ref": "two", "registry_connection_ref": "two", "connection_id": "reader_one"},
+            ]
+        },
+    ],
+)
+def test_closed_env_projection_rejects_unclosed_or_colliding_metadata(change) -> None:
+    from dpone_airflow_pack.init_fetch_connection_bridge import require_closed_init_fetch_connection_bridge
+    from dpone_airflow_pack.init_fetch_contract import InitFetchProviderError
+
+    with pytest.raises(InitFetchProviderError):
+        require_closed_init_fetch_connection_bridge({**_closed_env_projection(), **change})
+
+
+def test_closed_env_projection_selects_native_operator_without_secret_projection() -> None:
+    from dpone_airflow_pack.pack_task_runtime import operator_class, operator_init_kwargs, operator_selection_pack
+
+    pack = {"connection_projection": _closed_env_projection()}
+    assert operator_class(operator_selection_pack(pack, strict=True)) is AirflowConnectionEnvKubernetesPodOperator
+    assert operator_init_kwargs(pack, {})["airflow_connection_projection"] == pack["connection_projection"]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "password",
+        "api_key",
+        "access-token",
+        "privateKey",
+        "service_account_json",
+        "keyfile_dict",
+        "extra__google_cloud_platform__keyfile_dict",
+    ],
+)
+def test_closed_env_projection_rejects_credential_overrides_without_echoing_values(key) -> None:
+    from dpone_airflow_pack.connection_env_projection import require_connection_env_projection
+    from dpone_airflow_pack.init_fetch_contract import InitFetchProviderError
+
+    projection = {**_closed_env_projection(), "query_overrides": {"warehouse_reader": {key: "sentinel-secret"}}}
+    with pytest.raises(InitFetchProviderError) as error:
+        require_connection_env_projection(projection)
+    assert "sentinel-secret" not in str(error.value)
+
+
+def test_closed_env_operator_redacts_resolution_failure_and_clears_values() -> None:
+    class Reader:
+        def read_uri(self, connection_id):
+            raise ValueError("sentinel-secret-error")
+
+    operator = AirflowConnectionEnvKubernetesPodOperator(
+        task_id="runtime",
+        airflow_connection_projection=_closed_env_projection(),
+        airflow_connection_reader=Reader(),
+        connection_secret_masker=lambda value: None,
+    )
+    with pytest.raises(RuntimeError, match="environment resolution failed") as error:
+        operator.execute({})
+    assert "sentinel-secret-error" not in str(error.value)
+    assert error.value.__suppress_context__
+    assert operator._runtime_connection_env == {}
+
+
+@pytest.mark.parametrize("resumed", [False, True])
+@pytest.mark.parametrize("deferred", [False, True])
+def test_closed_env_security_lifecycle_cleans_failure_and_deferral(monkeypatch, resumed, deferred) -> None:
+    import copy
+
+    class Deferred(BaseException):
+        pass
+
+    uri = "postgres://reader:original-sentinel@warehouse.example/source"
+    masked = []
+    reads = []
+
+    class Reader:
+        def read_uri(self, connection_id):
+            reads.append(connection_id)
+            return uri
+
+    pod = {
+        "spec": {
+            "containers": [
+                {
+                    "name": "base",
+                    "env": [
+                        {"name": "AIRFLOW_CONN_WAREHOUSE_READER", "value": uri},
+                    ],
+                }
+            ]
+        }
+    }
+
+    class Hook:
+        def get_pod(self, name, namespace):
+            assert (name, namespace) == ("runtime", "test")
+            return copy.deepcopy(pod)
+
+    monkeypatch.setattr(PinnedXComSidecarKubernetesPodOperator, "hook", property(lambda self: Hook()), raising=False)
+    operator = AirflowConnectionEnvKubernetesPodOperator(
+        task_id="runtime",
+        airflow_connection_projection=_closed_env_projection(),
+        airflow_connection_reader=Reader(),
+        connection_secret_masker=masked.append,
+    )
+    failure = Deferred if deferred else RuntimeError
+
+    def parent_call(self, context, event=None, **kwargs):
+        self.pod = self.hook.get_pod("runtime", "test")
+        assert uri in masked and "original-sentinel" in masked
+        assert self.log_pod_spec_on_failure is False
+        self.pod_request_obj = copy.deepcopy(self.pod)
+        raise failure("synthetic parent failure")
+
+    method = "trigger_reentry" if resumed else "execute"
+    monkeypatch.setattr(PinnedXComSidecarKubernetesPodOperator, method, parent_call)
+    with pytest.raises(failure):
+        if resumed:
+            operator.trigger_reentry({}, {"name": "runtime", "namespace": "test"})
+        else:
+            operator.execute({})
+    assert reads == ([] if resumed else ["warehouse_reader"])
+    assert operator._runtime_connection_env == {}
+    assert operator._active_connection_masker is None
+    assert "original-sentinel" not in repr(operator.pod)
+    assert "original-sentinel" not in repr(operator.pod_request_obj)
+    assert "original-sentinel" in repr(pod)  # The remote response source is unchanged.
+
+
+def test_closed_env_reattach_masks_original_credentials_after_rotation(monkeypatch) -> None:
+    original_uri = "postgres://reader:original-reattach-sentinel@warehouse.example/source"
+    rotated_uri = "postgres://reader:rotated-reattach-sentinel@warehouse.example/source"
+    masked = []
+    selected = {
+        "spec": {
+            "containers": [
+                {
+                    "name": "base",
+                    "env": [
+                        {"name": "AIRFLOW_CONN_WAREHOUSE_READER", "value": original_uri},
+                    ],
+                }
+            ]
+        }
+    }
+
+    class Reader:
+        def read_uri(self, connection_id):
+            return rotated_uri
+
+    def select_existing(self, pod_request_obj, context):
+        assert rotated_uri in masked
+        assert original_uri not in masked
+        return selected
+
+    def consume_selected(self, context):
+        self.pod = self.get_or_create_pod(None, context)
+        assert self.pod is selected
+        assert original_uri in masked
+        assert "original-reattach-sentinel" in masked
+        raise RuntimeError("synthetic reattachment failure")
+
+    monkeypatch.setattr(PinnedXComSidecarKubernetesPodOperator, "get_or_create_pod", select_existing)
+    monkeypatch.setattr(PinnedXComSidecarKubernetesPodOperator, "execute", consume_selected)
+    operator = AirflowConnectionEnvKubernetesPodOperator(
+        task_id="runtime",
+        airflow_connection_projection=_closed_env_projection(),
+        airflow_connection_reader=Reader(),
+        connection_secret_masker=masked.append,
+    )
+    with pytest.raises(RuntimeError, match="synthetic reattachment failure"):
+        operator.execute({})
+    assert operator._runtime_connection_env == {}
+    assert "original-reattach-sentinel" not in repr(operator.pod)
+
+
+def test_closed_env_real_provider_reentry_masks_original_pod_before_failure_logs(monkeypatch) -> None:
+    """Exercise the installed native provider entry point without cluster I/O."""
+    from dpone_airflow_pack.operators import KubernetesPodOperator
+
+    if not KubernetesPodOperator.__module__.startswith("airflow."):
+        pytest.skip("Real Kubernetes provider is not installed")
+    from airflow.exceptions import AirflowException
+    from airflow.sdk.log import redact
+    from dpone_airflow_pack.connection_env_operator import _airflow_mask_secret
+    from kubernetes.client import models as k8s
+
+    original_uri = "postgres://reader:original-pod-sentinel@warehouse.example/source"
+    masked = []
+    native_masker = _airflow_mask_secret()
+
+    def mask_secret(value):
+        native_masker(value)
+        masked.append(value)
+
+    class Reader:
+        def read_uri(self, connection_id):
+            pytest.fail("Reentry must mask the immutable Pod rather than re-resolve rotated credentials")
+
+    pod = k8s.V1Pod(
+        metadata=k8s.V1ObjectMeta(name="runtime", namespace="test"),
+        spec=k8s.V1PodSpec(
+            containers=[
+                k8s.V1Container(
+                    name="base",
+                    env=[
+                        k8s.V1EnvVar(name="AIRFLOW_CONN_WAREHOUSE_READER", value=original_uri),
+                    ],
+                )
+            ]
+        ),
+        status=k8s.V1PodStatus(phase="Failed"),
+    )
+
+    class Hook:
+        def get_pod(self, name, namespace):
+            return pod
+
+    monkeypatch.setattr(KubernetesPodOperator, "hook", property(lambda self: Hook()))
+    monkeypatch.setattr(KubernetesPodOperator, "client", property(lambda self: object()))
+
+    def write_logs(self, pod, **kwargs):
+        assert original_uri in masked and "original-pod-sentinel" in masked
+        assert "original-pod-sentinel" not in redact(repr(pod))
+        assert self.log_pod_spec_on_failure is False
+
+    monkeypatch.setattr(KubernetesPodOperator, "_write_logs", write_logs)
+    monkeypatch.setattr(KubernetesPodOperator, "_clean", lambda self, **kwargs: None)
+    operator = AirflowConnectionEnvKubernetesPodOperator(
+        task_id="runtime",
+        airflow_connection_projection=_closed_env_projection(),
+        airflow_connection_reader=Reader(),
+        connection_secret_masker=mask_secret,
+        deferrable=True,
+    )
+    with pytest.raises(AirflowException, match="synthetic failure"):
+        operator.trigger_reentry(
+            {}, {"name": "runtime", "namespace": "test", "status": "failed", "message": "synthetic failure"}
+        )
+    assert "original-pod-sentinel" not in repr(operator.pod)
+    assert operator._active_connection_masker is None
 
 
 @pytest.fixture(autouse=True)

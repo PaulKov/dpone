@@ -13,6 +13,137 @@ from dpone.readiness.airflow_connection_runtime_registry import (
 from dpone.runtime.credentials.binding_resolver import BindingCredentialResolver
 
 
+def _env_runtime_resolver(environment="production"):
+    source = {
+        "connections": {
+            "warehouse": {
+                "type": "postgres",
+                "connection": {"database": "registry_catalog", "schema": "registry_schema"},
+                "credentials": {
+                    "resolver": "airflow_connection",
+                    "connection_id": "shared_db",
+                    "version_policy": "latest",
+                    "resolution_scope": "workload_start",
+                },
+            }
+        }
+    }
+    projection = {
+        "mode": "env",
+        "connections": [
+            {
+                "connection_ref": "source",
+                "registry_connection_ref": "warehouse",
+                "connection_id": "shared_db",
+            }
+        ],
+    }
+    registry = runtime_connection_registry_for_init_fetch(source, projection=projection)
+    assert registry["connections"]["warehouse"]["credentials"] == {
+        "resolver": "airflow_env",
+        "connection_id": "shared_db",
+        "version_policy": "latest",
+        "resolution_scope": "workload_start",
+    }
+    assert source["connections"]["warehouse"]["credentials"]["resolver"] == "airflow_connection"
+    return BindingCredentialResolver(
+        binding_set={"environment": environment, "bindings": {"source": {"connection_ref": "warehouse"}}},
+        connection_registry=registry,
+    )
+
+
+@pytest.mark.parametrize("environment", ["dev", "prod", "production"])
+def test_env_projection_resolves_uri_with_registry_coordinates(monkeypatch, environment):
+    monkeypatch.setenv("AIRFLOW_CONN_SHARED_DB", "postgresql://runtime:sentinel@db.invalid:5432/old_catalog")
+    resolved = _env_runtime_resolver(environment).resolve("source")
+    assert resolved.credentials.database == "registry_catalog"
+    assert resolved.credentials.schema == "registry_schema"
+    assert resolved.credentials.host == "db.invalid"
+    assert resolved.credentials.password == "sentinel"
+    assert resolved.safe_metadata["resolver"] == "airflow_env"
+    assert resolved.safe_metadata["version_policy"] == "latest"
+    assert resolved.safe_metadata["credential_ref_fingerprint"].startswith("sha256:")
+    assert "sentinel" not in repr(resolved.safe_metadata)
+
+
+@pytest.mark.parametrize("value", [None, "", "sentinel", "postgresql://host:sentinel/db", "sentinel://host"])
+def test_env_projection_fails_closed_without_secret_diagnostics(monkeypatch, value):
+    monkeypatch.delenv("AIRFLOW_CONN_SHARED_DB", raising=False)
+    if value is not None:
+        monkeypatch.setenv("AIRFLOW_CONN_SHARED_DB", value)
+    with pytest.raises(ValueError, match="airflow_env projected connection") as failure:
+        _env_runtime_resolver().resolve("source")
+    assert "sentinel" not in str(failure.value)
+    assert failure.value.__suppress_context__ or value in (None, "")
+
+
+def test_env_projection_rejects_normalized_name_collision():
+    projection = {
+        "mode": "env",
+        "connections": [
+            {"registry_connection_ref": "one", "connection_id": "shared-db"},
+            {"registry_connection_ref": "two", "connection_id": "shared_db"},
+        ],
+    }
+    with pytest.raises(ValueError, match="conflicting connection identities"):
+        runtime_connection_registry_for_init_fetch({"connections": {"one": {}}}, projection=projection)
+
+
+def test_env_resolver_preserves_unsupported_policy_rejection(monkeypatch):
+    resolver = _env_runtime_resolver()
+    resolver._connection_registry["connections"]["warehouse"]["credentials"]["version_policy"] = "pinned"
+    monkeypatch.setenv("AIRFLOW_CONN_SHARED_DB", "postgresql://user:secret@db.invalid/catalog")
+    with pytest.raises(ValueError, match="(?i)pinned"):
+        resolver.resolve("source")
+
+
+@pytest.mark.parametrize("entry", [None, {}, {"credentials": {"resolver": "vault_kv"}}])
+def test_env_projection_rejects_missing_or_incompatible_registry_entry(entry):
+    projection = {
+        "mode": "env",
+        "connections": [
+            {
+                "registry_connection_ref": "warehouse",
+                "connection_id": "shared_db",
+            }
+        ],
+    }
+    registry = {"connections": {"warehouse": entry}} if entry is not None else {}
+    with pytest.raises(ValueError, match="existing airflow_connection"):
+        runtime_connection_registry_for_init_fetch(registry, projection=projection)
+
+
+def test_env_registry_supports_shared_physical_connection_for_distinct_catalogs(monkeypatch):
+    monkeypatch.setenv("AIRFLOW_CONN_SHARED_DB", "postgresql://user:secret@db.invalid/old")
+    source = {
+        "connections": {
+            name: {
+                "connection": {"database": name},
+                "credentials": {
+                    "resolver": "airflow_connection",
+                    "connection_id": "shared_db",
+                },
+            }
+            for name in ("first_catalog", "second_catalog")
+        }
+    }
+    projection = {
+        "mode": "env",
+        "connections": [
+            {"registry_connection_ref": name, "connection_id": "shared_db"} for name in source["connections"]
+        ],
+    }
+    resolver = BindingCredentialResolver(
+        binding_set={
+            "environment": "prod",
+            "bindings": {name: {"connection_ref": name} for name in source["connections"]},
+        },
+        connection_registry=runtime_connection_registry_for_init_fetch(source, projection=projection),
+    )
+    for name in source["connections"]:
+        assert resolver.resolve(name).credentials.database == name
+
+
 def test_runtime_registry_rewrites_airflow_connection_to_secret_volume_mounts(tmp_path) -> None:
     source_registry = {
         "schema": "dpone.connection-registry.v1",

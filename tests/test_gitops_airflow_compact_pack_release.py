@@ -304,10 +304,21 @@ def test_materialize_compact_release_fails_closed_for_invalid_pool(
     assert not cache_root.exists()
 
 
-def test_materialize_compact_pack_release_writes_immutable_release(tmp_path: Path) -> None:
+@pytest.mark.parametrize("transport", ["kubernetes_secret_volume", "env"])
+def test_materialize_compact_pack_release_writes_immutable_release(tmp_path: Path, transport: str) -> None:
     pack_root = tmp_path / "airflow"
     cache_root = tmp_path / "cache"
-    packs = {"orders": _pack()}
+    projection = _projection()
+    if transport == "env":
+        projection = {
+            "mode": "env",
+            "payload_format": "airflow_connection_uri",
+            "secret_values": False,
+            "connections": [
+                {"connection_ref": "warehouse", "registry_connection_ref": "warehouse", "connection_id": "warehouse"}
+            ],
+        }
+    packs = {"orders": _pack(projection=projection)}
     specs = {"DAG__demo__orders__sync": _dag_spec(dag_id="DAG__demo__orders__sync", workload_ids=("orders",))}
     _write_pack_root(pack_root, packs=packs, specs=specs)
 
@@ -326,7 +337,7 @@ def test_materialize_compact_pack_release_writes_immutable_release(tmp_path: Pat
     assert first.release_id.startswith("sha256:")
     assert first.dag_ids == ("DAG__demo__orders__sync",)
     assert first.workload_ids == ("orders",)
-    assert first.connection_projection_mode == "kubernetes_secret_volume"
+    assert first.connection_projection_mode == transport
     release_set = json.loads(Path(first.release_dir, "release-set.json").read_text(encoding="utf-8"))
     assert release_set["release_id"] == first.release_id
     validate_release_set_schema(
@@ -344,6 +355,15 @@ def test_materialize_compact_pack_release_writes_immutable_release(tmp_path: Pat
     release_without_variant.pop("promotion")
     assert compute_release_id(release_without_variant) != first.release_id
     pack_bytes = Path(first.release_dir, "packs/orders.airflow-pack.json").read_bytes()
+    from dpone.readiness.airflow_env_deployment_projection import environment_connection_projection
+
+    runtime_projection = environment_connection_projection({"orders": json.loads(pack_bytes)})
+    if transport == "env":
+        assert runtime_projection["mode"] == "env"
+        assert runtime_projection["connections"][0]["connection_id"] == "warehouse"
+        assert "secret_name" not in runtime_projection
+    else:
+        assert runtime_projection is None
     dag_bytes = Path(first.release_dir, "dags/DAG__demo__orders__sync.dag-spec.json").read_bytes()
     released_dag = json.loads(dag_bytes)
     assert released_dag["operator_overrides"] == {

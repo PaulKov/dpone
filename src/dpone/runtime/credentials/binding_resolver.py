@@ -35,6 +35,7 @@ from dpone.runtime.credentials.binding_evidence import (
     safe_evidence_context,
 )
 from dpone.runtime.credentials.config import CredentialsConfig
+from dpone.runtime.credentials.projected_airflow_env import resolve_projected_airflow_env
 from dpone.vault_references import is_valid_vault_logical_path, is_valid_vault_mount
 
 _PRODUCTION_ENV_NAMES = frozenset({"prod", "production"})
@@ -106,6 +107,9 @@ class BindingCredentialResolver:
         _validate_credential_policy(credentials)
         if resolver == "env_var":
             resolved = self._resolve_env(connection=connection, credentials=credentials)
+        elif resolver == "airflow_env":
+            _require_supported_snapshot_policy(credentials, resolver=resolver)
+            resolved = resolve_projected_airflow_env(connection=connection, credentials=credentials), None
         elif resolver == "vault_kv":
             resolved = self._resolve_vault(connection=connection, credentials=credentials)
         elif resolver == "kubernetes_secret_volume":
@@ -184,7 +188,7 @@ class BindingCredentialResolver:
         connection: Mapping[str, Any],
         credentials: Mapping[str, Any],
     ) -> tuple[CredentialsConfig, int | None]:
-        _require_supported_vault_policy(credentials)
+        _require_supported_snapshot_policy(credentials, resolver="vault_kv")
         mount = str(credentials.get("mount") or "secret")
         path = str(credentials.get("path") or "")
         if not is_valid_vault_mount(mount):
@@ -354,18 +358,18 @@ def _validate_credential_policy(credentials: Mapping[str, Any]) -> None:
     _validate_optional_policy_value(credentials, key="resolution_scope", allowed=SUPPORTED_RESOLUTION_SCOPES)
 
 
-def _require_supported_vault_policy(credentials: Mapping[str, Any]) -> None:
+def _require_supported_snapshot_policy(credentials: Mapping[str, Any], *, resolver: str) -> None:
     if credentials.get("version_policy") == VERSION_POLICY_PINNED:
         raise CredentialResolutionError(
             PINNED_VERSION_UNSUPPORTED,
-            "Pinned Vault data versions are not supported by the runtime client.",
-            resolver="vault_kv",
+            "Pinned credential versions are not supported by this runtime resolver; use latest.",
+            resolver=resolver,
         )
     if credentials.get("resolution_scope") == RESOLUTION_SCOPE_DAG_RUN_START:
         raise CredentialResolutionError(
             DAG_RUN_SCOPE_UNSUPPORTED,
             "DAG-run credential snapshots are not supported; use workload_start.",
-            resolver="vault_kv",
+            resolver=resolver,
         )
 
 

@@ -8,7 +8,7 @@ from typing import Any
 
 from dpone.contracts.credential_resolution import is_valid_connection_ref
 
-_CLOSED_PROJECTION_MODE = "kubernetes_secret_volume"
+_CLOSED_PROJECTION_MODES = frozenset({"kubernetes_secret_volume", "env"})
 _OBJECT_STORAGE_AUTHORITIES = ("runtime_access", "clickhouse_write_access")
 _DISABLED_STATE_TYPES = frozenset({"disabled", "noop", "none", "off"})
 _SCALAR_OVERRIDE_FIELDS = ("scheme_overrides", "database_overrides")
@@ -72,7 +72,7 @@ def close_connection_projection(
     """
 
     closed = deepcopy(dict(projection))
-    if str(closed.get("mode") or "") != _CLOSED_PROJECTION_MODE:
+    if str(closed.get("mode") or "") not in _CLOSED_PROJECTION_MODES:
         return closed
     required = tuple(sorted({_text(item) for item in required_refs if _text(item)}))
     if not required:
@@ -91,7 +91,10 @@ def close_connection_projection(
     _require_physical_ids(selected)
 
     closed["connections"] = [deepcopy(dict(entry)) for entry in selected]
-    closed["connection_ids"] = list(_selected_connection_ids(closed.get("connection_ids"), selected))
+    if closed.get("mode") == "env":
+        closed.pop("connection_ids", None)
+    else:
+        closed["connection_ids"] = list(_selected_connection_ids(closed.get("connection_ids"), selected))
     for field in _SCALAR_OVERRIDE_FIELDS:
         _replace_override_field(
             closed,

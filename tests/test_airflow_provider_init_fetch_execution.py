@@ -44,6 +44,39 @@ IMAGE_REF = f"registry.example/dpone/runtime@{IMAGE_DIGEST}"
 RUNTIME_CONNECTION_CONTEXT_DIR = "sha256-" + "9" * 64
 
 
+def test_strict_env_projection_preserves_native_init_fetch_and_reference_only_metadata() -> None:
+    from dpone_airflow_pack.connection_env_operator import AirflowConnectionEnvKubernetesPodOperator
+    from dpone_airflow_pack.pack_task_runtime import operator_class, operator_init_kwargs, operator_selection_pack
+
+    pack = _strict_pack()
+    pack["connection_projection"] = {
+        "mode": "env",
+        "payload_format": "airflow_connection_uri",
+        "secret_values": False,
+        "connections": [
+            {"connection_ref": "warehouse", "registry_connection_ref": "warehouse", "connection_id": "warehouse_reader"}
+        ],
+    }
+    kwargs = compose_init_fetch_operator_kwargs(
+        pack=pack,
+        kwargs=pack["provider_execution"]["kpo_kwargs"],
+        context=init_fetch_context_from_payload(_v2_payload()),
+        workload_id="orders",
+        execution_kind="runtime",
+        execution_scope="workload",
+        hook_execution="externalized",
+    )
+    init_kwargs = operator_init_kwargs(pack, kwargs, strict_runtime_image_ref=IMAGE_REF)
+    cls = operator_class(operator_selection_pack(pack, strict=True))
+    assert cls is AirflowConnectionEnvKubernetesPodOperator
+    assert init_kwargs["airflow_connection_projection"] == pack["connection_projection"]
+    assert kwargs["cmds"] == ["dpone", "airflow", "runtime-pack-exec"]
+    pod = kwargs["full_pod_spec"]
+    assert pod["spec"]["initContainers"][0]["command"] == ["dpone", "airflow", "runtime-init-fetch"]
+    assert "AIRFLOW_CONN_WAREHOUSE_READER" not in json.dumps(kwargs)
+    assert "secret_name" not in json.dumps(pack["connection_projection"])
+
+
 def _config_map_ref(name: str) -> dict[str, str]:
     return {
         "kind": "kubernetes_config_map",

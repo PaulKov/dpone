@@ -121,9 +121,23 @@ def test_required_runtime_connection_refs_follow_runtime_authority_paths() -> No
     )
 
 
-def test_closure_isolates_disjoint_workload_and_preserves_shared_physical_connection() -> None:
+@pytest.mark.parametrize("transport", ["kubernetes_secret_volume", "env"])
+def test_closure_isolates_disjoint_workload_and_preserves_shared_physical_connection(transport: str) -> None:
+    projection = _projection()
+    projection["mode"] = transport
+    if transport == "env":
+        for key in ("secret_name", "mount_path", "cleanup_policy"):
+            projection.pop(key)
+        projection["connections"] = [
+            {
+                key: value
+                for key, value in entry.items()
+                if key in {"connection_ref", "registry_connection_ref", "connection_id"}
+            }
+            for entry in projection["connections"]
+        ]
     closed = close_connection_projection(
-        _projection(),
+        projection,
         required_refs=("orders_source", "orders_target", "orders_state"),
     )
 
@@ -137,7 +151,13 @@ def test_closure_isolates_disjoint_workload_and_preserves_shared_physical_connec
         "mssql_shared",
         "mssql_shared",
     ]
-    assert closed["connection_ids"] == ["pg_orders", "mssql_shared"]
+    if transport == "env":
+        from dpone_airflow_pack.init_fetch_connection_bridge import require_closed_init_fetch_connection_bridge
+
+        assert require_closed_init_fetch_connection_bridge(closed)["mode"] == "env"
+        assert "connection_ids" not in closed
+    else:
+        assert closed["connection_ids"] == ["pg_orders", "mssql_shared"]
     assert closed["scheme_overrides"] == {
         "pg_orders": "postgresql",
         "mssql_shared": "mssql",

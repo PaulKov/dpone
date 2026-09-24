@@ -126,6 +126,24 @@ def env_var_schema() -> dict[str, Any]:
     )
 
 
+def airflow_env_schema() -> dict[str, Any]:
+    """Runtime-only projected URI reference; no Airflow client or inline values."""
+    return _credential_resolver_schema(
+        {
+            "type": "object",
+            "required": ["resolver", "connection_id"],
+            "additionalProperties": False,
+            "properties": {
+                "resolver": {"const": "airflow_env"},
+                "connection_id": {"$ref": "#/$defs/airflowConnectionId"},
+                "payload_format": {"const": "airflow_connection_uri"},
+                "version_policy": {"const": "latest"},
+                "resolution_scope": {"const": "workload_start"},
+            },
+        }
+    )
+
+
 def _credential_resolver_schema(schema: dict[str, Any]) -> dict[str, Any]:
     schema["not"] = {"anyOf": [{"required": [key]} for key in sorted(FORBIDDEN_SECRET_KEYS)]}
     return schema
@@ -162,6 +180,7 @@ def sha256_schema() -> dict[str, str]:
 
 
 __all__ = [
+    "airflow_env_schema",
     "airflow_connection_schema",
     "env_var_fields_schema",
     "env_var_schema",

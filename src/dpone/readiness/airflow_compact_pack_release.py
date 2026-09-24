@@ -204,10 +204,10 @@ def _materialize(
                 pack_descriptor["runtime_payload_ids"] = list(payload_ids)
             pack_artifacts.append(pack_descriptor)
 
-    if projection_modes != {"kubernetes_secret_volume"}:
+    if len(projection_modes) != 1 or not projection_modes <= {"kubernetes_secret_volume", "env"}:
         raise CompactPackReleaseError(
             "DPONE_COMPACT_PACK_RELEASE_PROJECTION_INVALID",
-            f"all packs must use kubernetes_secret_volume (got {sorted(projection_modes)!r})",
+            f"all packs must use one closed connection transport (got {sorted(projection_modes)!r})",
         )
 
     runtime_files, runtime_artifacts = _materialize_runtime_payloads(
@@ -285,7 +285,7 @@ def _materialize(
         dag_ids=tuple(path.name.removesuffix(".dag-spec.json") for path in dag_paths),
         workload_ids=tuple(ordered_workload_ids),
         pack_fingerprints=pack_fingerprints,
-        connection_projection_mode="kubernetes_secret_volume",
+        connection_projection_mode=next(iter(projection_modes)),
         xcom_sidecar_image=str(xcom_sidecar_image).strip(),
     )
 
