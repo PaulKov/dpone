@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from dpone_airflow_pack.asset_partitions import partition_env_vars_from_pack
+from dpone_airflow_pack.connection_env_operator import AirflowConnectionEnvKubernetesPodOperator
 from dpone_airflow_pack.deployment_identity import (
     AIRFLOW_DEPLOYMENT_IDENTITY_ENV,
     deployment_identity_from_context,
@@ -233,6 +234,8 @@ def copy_policy_value(kwargs: dict[str, Any], execution: Mapping[str, Any], fiel
 
 def operator_class(pack: Mapping[str, Any]) -> type[Any]:
     projection = mapping(pack.get("connection_projection"))
+    if projection.get("mode") == "env":
+        return AirflowConnectionEnvKubernetesPodOperator
     if projection.get("mode") == "unsafe_airflow_env":
         return UnsafeAirflowConnectionEnvKubernetesPodOperator
     if is_airflow_connection_secret_volume_projection(projection):
@@ -294,6 +297,8 @@ def operator_init_kwargs(
                 "unsafe_runtime_scheme_overrides": string_mapping(projection.get("scheme_overrides")),
             }
         )
+    if projection.get("mode") == "env":
+        init_kwargs["airflow_connection_projection"] = dict(projection)
     if is_airflow_connection_secret_volume_projection(projection) and (
         strict_runtime_image_ref is None or is_closed_init_fetch_connection_bridge(projection)
     ):

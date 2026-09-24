@@ -44,7 +44,10 @@ _STRICT_PACK_BYTES = json.dumps(
 ).encode("utf-8")
 
 
-def test_environment_deployment_projection_materializes_digest_refs_and_index(tmp_path: Path) -> None:
+@pytest.mark.parametrize("env_projection", [False, True])
+def test_environment_deployment_projection_materializes_digest_refs_and_index(
+    tmp_path: Path, env_projection: bool
+) -> None:
     jsonschema = pytest.importorskip("jsonschema")
     from dpone.readiness.airflow_deployment_projection import (
         AirflowDeploymentProjectionError,
@@ -54,6 +57,24 @@ def test_environment_deployment_projection_materializes_digest_refs_and_index(tm
     dag_bytes = b'{"dag_id":"orders_daily"}\n'
     pack_fingerprint = _STRICT_PACK_FINGERPRINT
     pack_bytes = _STRICT_PACK_BYTES
+    if env_projection:
+        payload = {
+            **_STRICT_PACK_PAYLOAD,
+            "connection_projection": {
+                "mode": "env",
+                "payload_format": "airflow_connection_uri",
+                "secret_values": False,
+                "connections": [
+                    {
+                        "connection_ref": "mssql_prod",
+                        "registry_connection_ref": "mssql_prod",
+                        "connection_id": "warehouse_reader",
+                    }
+                ],
+            },
+        }
+        pack_fingerprint = compute_pack_fingerprint(payload)
+        pack_bytes = json.dumps({**payload, "pack_fingerprint": pack_fingerprint}, sort_keys=True).encode()
     release = {
         "schema": "dpone.release-set.v1",
         "release_id": "",
@@ -149,6 +170,18 @@ def test_environment_deployment_projection_materializes_digest_refs_and_index(tm
         encoding="utf-8",
     )
 
+    if env_projection:
+        registry_path = registry_dir / "prod.yaml"
+        registry = yaml.safe_load(registry_path.read_text())
+        registry["connections"]["mssql_prod"]["credentials"] = {
+            "resolver": "airflow_connection",
+            "connection_id": "warehouse_reader",
+            "execution_mode": "worker",
+            "version_policy": "latest",
+            "resolution_scope": "workload_start",
+        }
+        registry_path.write_text(yaml.safe_dump(registry))
+
     service = AirflowDeploymentProjectionService(root=tmp_path)
     result = service.materialize(
         release_id=release_id,
@@ -209,6 +242,11 @@ def test_environment_deployment_projection_materializes_digest_refs_and_index(tm
         assert descriptor["sha256"] == "sha256:" + hashlib.sha256(snapshot).hexdigest()
         assert json.loads(snapshot)["environment"] == "prod"
     deployment_bytes = (result.deployment_dir / "deployment.json").read_bytes()
+    if env_projection:
+        runtime_registry = json.loads((result.deployment_dir / "connection-registry.ref").read_bytes())
+        credentials = runtime_registry["connections"]["mssql_prod"]["credentials"]
+        assert credentials["resolver"] == "airflow_env"
+        assert credentials["connection_id"] == "warehouse_reader"
     assert result.airflow_index["deployment"]["sha256"] == "sha256:" + hashlib.sha256(deployment_bytes).hexdigest()
     deployment_schema = json.loads(Path("docs/schemas/gitops/deployment-set-v2.schema.json").read_text())
     index_schema = json.loads(Path("docs/schemas/gitops/airflow-deployment-index-v2.schema.json").read_text())

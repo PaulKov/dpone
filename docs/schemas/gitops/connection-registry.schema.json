@@ -93,6 +93,100 @@
       "pattern": "^[A-Za-z0-9_.-]+$",
       "type": "string"
     },
+    "airflowEnv": {
+      "additionalProperties": false,
+      "not": {
+        "anyOf": [
+          {
+            "required": [
+              "access_key"
+            ]
+          },
+          {
+            "required": [
+              "access_key_id"
+            ]
+          },
+          {
+            "required": [
+              "client_secret"
+            ]
+          },
+          {
+            "required": [
+              "jwt"
+            ]
+          },
+          {
+            "required": [
+              "password"
+            ]
+          },
+          {
+            "required": [
+              "private_key"
+            ]
+          },
+          {
+            "required": [
+              "secret"
+            ]
+          },
+          {
+            "required": [
+              "secret_id"
+            ]
+          },
+          {
+            "required": [
+              "secret_key"
+            ]
+          },
+          {
+            "required": [
+              "session_token"
+            ]
+          },
+          {
+            "required": [
+              "token"
+            ]
+          },
+          {
+            "required": [
+              "vault_path"
+            ]
+          },
+          {
+            "required": [
+              "vault_token"
+            ]
+          }
+        ]
+      },
+      "properties": {
+        "connection_id": {
+          "$ref": "#/$defs/airflowConnectionId"
+        },
+        "payload_format": {
+          "const": "airflow_connection_uri"
+        },
+        "resolution_scope": {
+          "const": "workload_start"
+        },
+        "resolver": {
+          "const": "airflow_env"
+        },
+        "version_policy": {
+          "const": "latest"
+        }
+      },
+      "required": [
+        "resolver",
+        "connection_id"
+      ],
+      "type": "object"
+    },
     "connectionRef": {
       "maxLength": 128,
       "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$",
@@ -1001,6 +1095,9 @@
               },
               {
                 "$ref": "#/$defs/airflowConnection"
+              },
+              {
+                "$ref": "#/$defs/airflowEnv"
               },
               {
                 "$ref": "#/$defs/envVar"

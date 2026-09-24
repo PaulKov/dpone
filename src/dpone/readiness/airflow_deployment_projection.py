@@ -163,10 +163,18 @@ class AirflowDeploymentProjectionService:
             claim_name=dev_evidence_pvc_claim,
             worker_queue=dev_evidence_worker_queue,
         )
+        from dpone.readiness.airflow_env_deployment_projection import environment_connection_projection
+
+        pack_payloads = load_pack_payloads_from_descriptors(
+            inputs.workload_packs,
+            cache_root=self._cache_root,
+            reader=read_confined_file,
+        )
         runtime_connection_snapshots = build_runtime_connection_snapshots(
             binding_set=inputs.binding_set,
             connection_registry=inputs.connection_registry,
             credential_runtime=inputs.credential_runtime,
+            projection=environment_connection_projection(pack_payloads),
         )
         # Authority must fingerprint the published RuntimeConnectionContext
         # payloads (rewritten registry), not the Git/source registry identity.
@@ -175,11 +183,6 @@ class AirflowDeploymentProjectionService:
         )
         runtime_connection_descriptors = build_runtime_connection_descriptors(runtime_connection_snapshots)
         workload_inventory = workload_projection_inventory(inputs.workload_packs)
-        pack_payloads = load_pack_payloads_from_descriptors(
-            inputs.workload_packs,
-            cache_root=self._cache_root,
-            reader=read_confined_file,
-        )
         credential_bytes = compile_native_credential_projection(
             environment=environment,
             release_id=release_id,

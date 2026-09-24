@@ -12,6 +12,7 @@ PRODUCTION_ENV_NAMES = frozenset({"prod", "production"})
 SUPPORTED_CREDENTIAL_RESOLVERS = frozenset(
     {
         "airflow_connection",
+        "airflow_env",
         "env_var",
         "kubernetes_secret_api",
         "kubernetes_secret_volume",

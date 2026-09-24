@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
+from dpone_airflow_pack.connection_env_projection import require_connection_env_projection
 from dpone_airflow_pack.connection_names import (
     require_airflow_conn_env_name,
     require_airflow_connection_id,
@@ -32,6 +33,8 @@ def require_closed_init_fetch_connection_bridge(projection: object) -> Mapping[s
     if not isinstance(projection, Mapping) or not projection:
         raise _bridge_error("strict init-fetch connection_projection must be a non-empty object")
     mode = str(projection.get("mode") or "").strip()
+    if mode == "env":
+        return require_connection_env_projection(projection)
     if mode == "unsafe_airflow_env":
         raise _bridge_error(
             "strict init-fetch rejects unsafe_airflow_env; use kubernetes_secret_volume "

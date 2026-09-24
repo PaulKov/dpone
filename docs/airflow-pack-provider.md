@@ -265,6 +265,46 @@ the matching access provider and logical id. See
 [strict init-fetch operations](airflow-cache-sync-strict-v2.md#prepare-the-runtime-inputs)
 for configuration, rotation, diagnostics, and rollback.
 
+### Workload Connection environment transport
+
+Strict compact packs can explicitly choose runtime environment delivery instead
+of creating temporary Kubernetes Secrets. This is separate from the artifact
+registry credentials above: registry credentials belong only to init-fetch,
+whereas workload Connections belong only to the base container.
+
+```yaml
+connection_projection:
+  mode: env
+  payload_format: airflow_connection_uri
+  secret_values: false
+  connections:
+    - connection_ref: source_events
+      registry_connection_ref: source_events
+      connection_id: source_reader
+```
+
+Platform producers derive workload membership from declared dependencies; an
+analyst does not maintain another connection list. Canonical `AIRFLOW_CONN_*`
+names are derived from physical IDs and collisions fail before execution.
+Existing nonsecret scheme, database and query overrides remain supported.
+Published runtime snapshots use `resolver: airflow_env`, not an in-pod Airflow
+API client; missing/malformed environment values fail before connector I/O.
+Generic development-only `env_var` resolver restrictions do not change.
+
+Connection values are read lazily, masked and attached only to the base Pod
+container. They are not included in serialized DAG configuration, release
+artifacts, init-fetch plans, sidecars or outcome evidence. They **are visible to
+Kubernetes Pod readers and potentially cluster audit logs**. This explicit
+choice is not equivalent to Secret-volume confidentiality. Pod-spec-on-failure
+logging is disabled; applications must not print their environment.
+
+Upgrade CLI, runtime and provider together before selecting `env`; old strict
+readers reject the new mode. One compact release uses one closed transport.
+Existing volume and legacy unsafe modes do not switch automatically. Native
+workspace-authority releases retain their distinct credential-projection
+contract; this option applies to ordinary transfers, including those downstream
+of Cosmos. Pure Cosmos keeps its existing execution-time environment adapter.
+
 New ordinary strict tasks emit `dpone.airflow-runtime-init-fetch-plan.v3`. The plan
 binds an explicit `workload|process` execution scope, the exact process
 selector, and whether hooks execute inside the runtime task (`inline`) or in

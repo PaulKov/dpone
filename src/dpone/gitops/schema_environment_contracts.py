@@ -18,6 +18,7 @@ from dpone.gitops.schema_contract_primitives import (
 )
 from dpone.gitops.schema_credential_contracts import (
     airflow_connection_schema,
+    airflow_env_schema,
     env_var_fields_schema,
     env_var_schema,
     fields_schema,
@@ -94,6 +95,7 @@ def connection_registry_contract() -> GitOpsSchemaContract:
                                 {"$ref": "#/$defs/kubernetesSecretVolume"},
                                 {"$ref": "#/$defs/kubernetesSecretApi"},
                                 {"$ref": "#/$defs/airflowConnection"},
+                                {"$ref": "#/$defs/airflowEnv"},
                                 {"$ref": "#/$defs/envVar"},
                             ]
                         },
@@ -210,6 +212,7 @@ def connection_registry_defs() -> dict[str, Any]:
         "kubernetesSecretVolume": kubernetes_secret_volume_schema(),
         "kubernetesSecretApi": kubernetes_secret_api_schema(),
         "airflowConnection": airflow_connection_schema(),
+        "airflowEnv": airflow_env_schema(),
         "envVar": env_var_schema(),
     }
 

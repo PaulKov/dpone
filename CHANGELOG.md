@@ -2,7 +2,15 @@
 
 ## Unreleased
 
+## 0.83.10 - 2026-09-24
+
 ### Added
+
+- Add explicit `env` Airflow Connection projection for strict compact releases.
+  Connections are resolved at task execution and injected only into the base
+  container; no Kubernetes Secret creation is required. Runtime URI snapshots
+  retain verified registry coordinates. Pod-reader exposure remains an explicit
+  platform tradeoff, and Secret-volume delivery is unchanged.
 
 - Bind native workload credential mounts to immutable deployment/index/init-fetch
   v6 projection artifacts. Workspace-enabled publication requires neutral,

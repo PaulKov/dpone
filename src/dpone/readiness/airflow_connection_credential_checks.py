@@ -55,6 +55,14 @@ def validate_credentials(ref: str, credentials: dict[str, Any], environment: str
         errors.extend(_validate_kubernetes_secret_api(ref, credentials, path))
     if resolver == "airflow_connection":
         errors.extend(_validate_airflow_connection(ref, credentials, path))
+    if resolver == "airflow_env":
+        if not is_valid_airflow_connection_id(str(credentials.get("connection_id") or "")):
+            errors.append(_error("DPONE_AIRFLOW_CONNECTION_ID_INVALID", "invalid projected connection ID", path))
+        if (
+            credentials.get("version_policy", "latest") != "latest"
+            or credentials.get("resolution_scope", "workload_start") != "workload_start"
+        ):
+            errors.append(_error("DPONE_CREDENTIAL_POLICY_UNSUPPORTED", "unsupported env credential policy", path))
     errors.extend(_secret_key_errors(ref, credentials, path))
     return errors
 

@@ -80,6 +80,8 @@ def resolved_at_metadata(resolved_version: int | None, clock: Callable[[], datet
 
 
 def _credential_reference_payload(resolver: str, credentials: Mapping[str, Any]) -> dict[str, Any]:
+    if resolver == "airflow_env":
+        return _safe_subset(credentials, "resolver", "connection_id")
     if resolver == "kubernetes_secret_volume":
         payload = _safe_subset(credentials, "resolver", "secret_name", "mount_path", "fields", "payload_format")
         return payload if payload.get("secret_name") and payload.get("mount_path") else {}
