@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.83.11 - 2026-09-24
+
 ### Fixed
 
 - Resolve grouped runtime outcome XComs by the materialized Airflow task ID,
