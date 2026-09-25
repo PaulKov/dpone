@@ -1,0 +1,117 @@
+schema_version: 1
+task_id: workspace-handover
+title: Recoverable workspace activation handover
+goal: Retire exact predecessor ownership before a successor reserves shared guards.
+specification: docs/feature-design-durable-workspace-handover.md
+base_commit: abb9de012c7e25f6d54fdd54661aadd0b33b47fd
+integrator: parent-integrator
+acceptance_criteria:
+  - Second activation retires its predecessor before acquiring new fencing epochs.
+  - Historical retirement survives catalog observation changes without guard bypass.
+  - Incomplete attempts retain exact ownership and block pointer mutation.
+  - Durable bounded handover intent resumes exact identity after interruption.
+public_contract_impact:
+  level: compatible
+  surfaces: [workspace activation recovery, protected channel witness]
+  migration_required: true
+owned_paths:
+  - src/dpone/contracts/dbt_workspace_lifecycle.py
+  - src/dpone/contracts/dbt_workspace_channel.py
+  - src/dpone/contracts/dbt_workspace_handover.py
+  - src/dpone/contracts/dbt_workspace_registration.py
+  - src/dpone/contracts/dbt_workspace_registration_baseline.py
+  - src/dpone/ports/dbt_workspace_handover.py
+  - src/dpone/services/dbt_workspace_handover.py
+  - src/dpone/services/dbt_workspace_registration.py
+  - src/dpone/ports/dbt_workspace_activation.py
+  - src/dpone/services/dbt_workspace_activation_coordinator.py
+  - src/dpone/adapters/dbt_workspace_mssql_lifecycle.py
+  - src/dpone/adapters/dbt_workspace_mssql_activation_admission.py
+  - src/dpone/adapters/dbt_workspace_mssql_attempt_admission.py
+  - src/dpone/adapters/dbt_workspace_mssql_retirement.py
+  - src/dpone/adapters/dbt_workspace_mssql_handover.py
+  - src/dpone/adapters/dbt_workspace_mssql_handover_schema.py
+  - src/dpone/adapters/dbt_workspace_mssql_channel_procedures.py
+  - src/dpone/adapters/dbt_workspace_mssql_activation_procedures.py
+  - src/dpone/adapters/dbt_workspace_mssql_attempt_procedures.py
+  - src/dpone/adapters/dbt_workspace_mssql_registration_procedures.py
+  - src/dpone/adapters/dbt_workspace_mssql_guard_procedures.py
+  - src/dpone/adapters/dbt_workspace_mssql_gateway_security.py
+  - src/dpone/adapters/dbt_workspace_mssql_gateway_json.py
+  - src/dpone/adapters/dbt_workspace_mssql_gateway_validation.py
+  - src/dpone/adapters/dbt_workspace_mssql_request_validation.py
+  - src/dpone/adapters/dbt_workspace_mssql_gateway_transaction.py
+  - src/dpone/adapters/dbt_workspace_mssql_registration.py
+  - src/dpone/adapters/semantic_refresh_mssql_activation.py
+  - src/dpone/adapters/semantic_refresh_mssql_state.py
+  - src/dpone/adapters/semantic_refresh_mssql_workflow_summary.py
+  - src/dpone/adapters/semantic_refresh_mssql_failure.py
+  - src/dpone/adapters/semantic_refresh_mssql_worker_admission.py
+  - src/dpone/adapters/semantic_refresh_mssql_activation_transaction.py
+  - src/dpone/runtime/deployment_cache_workspace_activation.py
+  - src/dpone/runtime/deployment_cache_materializer.py
+  - tests/test_dbt_workspace_handover_contracts.py
+  - tests/test_dbt_workspace_registration_contracts.py
+  - tests/test_dbt_workspace_handover_state_machine.py
+  - tests/test_dbt_workspace_mssql_handover.py
+  - tests/test_dbt_workspace_mssql_gateway_security.py
+  - tests/test_dbt_workspace_mssql_registration.py
+  - tests/test_dbt_workspace_handover_lock_order.py
+  - tests/test_dbt_workspace_cache_handover.py
+  - tests/test_dbt_workspace_lifecycle.py
+  - tests/test_dbt_workspace_mssql_lifecycle.py
+  - docs/bugfix-workspace-activation-handover.md
+  - docs/feature-design-durable-workspace-handover.md
+  - docs/adr/0072-durable-workspace-handover-witness.md
+  - docs/dbt-workspace-handover-recovery.md
+  - docs/dbt-workspace-handover-migration.md
+  - tests/test_dbt_workspace_durable_handover_gaps.py
+  - test_artifacts/agent-policy/workspace-handover-task-contract.yml
+integrator_owned_paths:
+  - src/dpone/ports/dbt_workspace_handover_execution.py
+  - src/dpone/services/dbt_workspace_handover_execution.py
+  - tests/test_dbt_workspace_handover_execution.py
+  - docs/workspace-handover-execution.md
+  - docs/agent-task-contracts/workspace-handover-execution.yml
+  - src/dpone/readiness/airflow_desired_state_reconcile.py
+  - src/dpone/services/airflow_desired_state_reconcile.py
+  - src/dpone/adapters/semantic_refresh_mssql_schema_authority.py
+read_only_paths:
+  - docs/feature-design-dbt-multi-project-release.md
+  - src/dpone/adapters/semantic_refresh_mssql_schema_workspace.py
+  - tests/conftest.py
+forbidden_paths:
+  - src/dpone/ports/dbt_workspace_handover_execution.py
+  - src/dpone/services/dbt_workspace_handover_execution.py
+  - tests/test_dbt_workspace_handover_execution.py
+  - docs/workspace-handover-execution.md
+  - docs/agent-task-contracts/workspace-handover-execution.yml
+  - src/dpone/readiness/airflow_desired_state_reconcile.py
+  - src/dpone/services/airflow_desired_state_reconcile.py
+  - src/dpone/adapters/semantic_refresh_mssql_schema_authority.py
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+shared_file_owner: parent-integrator
+dependencies:
+  - Feature specification approved for implementation; exact live environment remains unapproved.
+  - Shared schema assembly, factories and native reconcile composition require integrator coordination.
+required_checks:
+  focused: [workspace lifecycle contracts, stateful handover regressions, admission regressions]
+  broad: [ruff, mypy, architecture gates, offline regression, documentation gates]
+  live: [disposable SQL gateway permissions, transaction races, whole cache loss, independent replicas]
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - Live database migration or grant changes require explicit environment approval.
+  - Shared wire or schema assembly edits require integrator coordination.
+  - A required edit falls outside the explicitly assigned paths.
+  - Live verification requires an unapproved environment.

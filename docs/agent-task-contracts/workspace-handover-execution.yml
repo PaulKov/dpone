@@ -1,0 +1,49 @@
+schema_version: 1
+task_id: "DPONE-WORKSPACE-HANDOVER-EXECUTION"
+title: "Execute bounded durable workspace handovers"
+goal: "Progress exact protected claims without cache-derived authority or false convergence."
+specification: "docs/feature-design-durable-workspace-handover.md"
+base_commit: "6da7e5d3739948eaea61d63bfc5a31207208ac25"
+integrator: "root"
+acceptance_criteria:
+  - "Resume pending claims before observing latest publication."
+  - "Use original saved requests and artifact-only local replication."
+  - "Bound transitions and preserve unknown acknowledgement without mutation retry."
+  - "Require fresh remote, protected current and local parity for convergence."
+public_contract_impact:
+  level: compatible
+  surfaces: [Python]
+  migration_required: false
+owned_paths:
+  - docs/agent-task-contracts/workspace-handover-execution.yml
+  - src/dpone/ports/dbt_workspace_handover_execution.py
+  - src/dpone/services/dbt_workspace_handover_execution.py
+  - tests/test_dbt_workspace_handover_execution.py
+  - docs/workspace-handover-execution.md
+integrator_owned_paths: []
+read_only_paths:
+  - docs/feature-design-durable-workspace-handover.md
+  - src/dpone/ports/dbt_workspace_handover.py
+  - src/dpone/services/dbt_workspace_handover.py
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+shared_file_owner: "root"
+dependencies: [durable-workspace-handover]
+required_checks:
+  focused: [tests/test_dbt_workspace_handover_execution.py]
+  broad: [ruff, mypy, import-rules]
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Live registration, migration or DDL is required."
+  - "Another writer owns the same semantic contract."
