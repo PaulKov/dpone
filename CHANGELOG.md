@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.83.13 - 2026-09-26
+
+### Fixed
+
+- Prove an unscannable SQL Server native file from the ClickHouse staging table
+  after the full insert and before publication. The proof is the probed row
+  count and the absence of NULL in contract or fail-fast columns. Fail-fast
+  inserts disable ClickHouse null-as-default, which otherwise stores a column
+  default. Engine reconciliation compares an authored replication clause with
+  `engine_full`.
+
 ## 0.83.12 - 2026-09-25
 
 ### Fixed
