@@ -7,6 +7,7 @@ from dataclasses import replace
 from typing import Any
 
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
+from dpone.runtime.governance.clickhouse_acceptance_metrics import ClickHouseAcceptanceMetricProbe
 from dpone.runtime.governance.ports import (
     StagedLoadHandle,
     StagedLoadPostCommitCleanupError,
@@ -59,12 +60,11 @@ class ClickHouseStagedLoadService:
             if observation is None:
                 staged_rows = self._sink._insert_payload(staging_config, payload)
             else:
-                staged_rows = self._sink._insert_payload(staging_config, observation.payload)
-                observation.require(
-                    self._sink.connector,
+                self._sink._insert_payload(staging_config, observation.payload)
+                staged_rows = observation.require(
+                    ClickHouseAcceptanceMetricProbe(self._sink.connector),
                     database=str(staging_config.target_schema),
                     table=str(staging_config.target_table),
-                    staged_rows=staged_rows,
                 )
             source_byte_budget = enforce_source_byte_budget(
                 payload,

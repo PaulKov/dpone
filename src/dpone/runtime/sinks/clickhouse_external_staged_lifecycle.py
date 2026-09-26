@@ -5,8 +5,10 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+from dpone.runtime.governance.clickhouse_acceptance_metrics import ClickHouseAcceptanceMetricProbe
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.sinks.clickhouse_external_replication_context import ExternalStagedContext
+from dpone.runtime.sinks.clickhouse_loaded_contract import pending_native_observation
 
 
 class ClickHouseExternalStagedLifecycle:
@@ -19,11 +21,25 @@ class ClickHouseExternalStagedLifecycle:
         return bool(callable(predicate) and predicate(load_config))
 
     def stage(self, load_config: Any, payload: Any) -> StagedLoadHandle:
-        context = self._sink._full_refresh_publication.stage_external(load_config, payload)
+        observation = pending_native_observation(load_config, payload)
+        context = self._sink._full_refresh_publication.stage_external(
+            load_config, observation.payload if observation is not None else payload
+        )
+        staged_rows = context.request.artifact.row_count
+        if observation is not None:
+            try:
+                staged_rows = observation.require(
+                    ClickHouseAcceptanceMetricProbe(self._sink.connector),
+                    database=str(load_config.target_schema),
+                    table=str(context.candidate_name),
+                )
+            except BaseException:
+                self._sink._full_refresh_publication.abort_external(context)
+                raise
         return StagedLoadHandle(
             staging_config=replace(load_config, target_table=context.candidate_name),
             payload_schema=tuple(getattr(payload, "schema", ())),
-            staged_rows=context.request.artifact.row_count,
+            staged_rows=staged_rows,
             metadata={"external_publication": context.staged_receipt.to_dict()},
             sink_state=context,
         )

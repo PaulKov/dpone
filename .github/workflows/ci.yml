@@ -898,6 +898,7 @@ jobs:
           test_files=(
             tests/integration/postgres/test_postgres_window_source_integration.py
             tests/integration/clickhouse/test_clickhouse_window_target_integration.py
+            tests/integration/clickhouse/test_clickhouse_loaded_contract_integration.py
             tests/integration/postgres/test_bounded_window_route_integration.py
             tests/test_bounded_window_execution.py tests/test_bounded_window_store.py
             tests/test_bounded_typed_stream.py tests/test_rolling_window_contract.py

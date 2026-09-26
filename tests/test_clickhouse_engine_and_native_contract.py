@@ -168,12 +168,38 @@ def test_staged_load_observes_the_whole_staging_table_once(tmp_path: Path) -> No
     assert payload.artifact.validation_summary.validation_mode == OBSERVED_VALIDATION_MODE
 
 
+def test_insert_return_value_is_not_the_row_proof(tmp_path: Path) -> None:
+    sink = _Sink(inserted=0, table_rows=3, nulls=0)
+
+    handle = ClickHouseStagedLoadService(sink).stage(
+        _load_config("MergeTree", contract=_contract(nullable=False)), _wrapped(tmp_path, rows=3)
+    )
+
+    assert handle.staged_rows == 3
+    assert len(sink.connector.queries) == 1
+
+
+def test_physical_fail_fast_columns_are_null_checked_when_the_contract_allows_null(tmp_path: Path) -> None:
+    sink = _Sink(inserted=1, table_rows=1, nulls=1)
+    config = _load_config("MergeTree", contract=_contract(nullable=True))
+    config.options["physical_design"]["storage"]["clickhouse"]["nullability"] = {
+        "mode": "non_nullable_by_default",
+        "null_handling": "fail_fast",
+        "columns": {"id": {"mode": "non_nullable_by_default"}},
+    }
+
+    with pytest.raises(StagingContractError) as raised:
+        ClickHouseStagedLoadService(sink).stage(config, _wrapped(tmp_path, rows=1))
+
+    assert raised.value.blocker == "not_null_violation:id"
+    assert "isNull" in sink.connector.queries[0]
+
+
 @pytest.mark.parametrize(
     ("inserted", "table_rows", "nulls", "blocker"),
     [
-        (2, 3, 0, "staged_row_count_mismatch"),
-        (3, 2, 0, "row_count_mismatch"),
-        (3, 3, 1, "not_null_violation:id"),
+        (0, 2, 0, "row_count_mismatch"),
+        (99, 3, 1, "not_null_violation:id"),
     ],
 )
 def test_staged_load_rejects_and_drops_a_table_that_breaks_the_contract(

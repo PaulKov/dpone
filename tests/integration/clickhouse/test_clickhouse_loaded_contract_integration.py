@@ -15,6 +15,7 @@ import pytest
 from dpone.readiness.schema_contracts import SchemaContract
 from dpone.runtime.etl.contract_artifacts import ContractValidatedFileArtifact
 from dpone.runtime.file_artifacts import FileExportArtifact
+from dpone.runtime.governance.clickhouse_acceptance_metrics import ClickHouseAcceptanceMetricProbe
 from dpone.runtime.sinks.clickhouse_loaded_contract import (
     NativeContractObservation,
     StagingContractError,
@@ -70,9 +71,11 @@ def _observe(connector, tmp_path, database: str, table: str, *, rows: int, stage
         run_id="run",
         load_id="load",
     )
+    null_columns = tuple(name for name, column in (contract.columns or {}).items() if column.nullable is False)
     observation = NativeContractObservation(
         wrapper=wrapper,
         payload=LoadPayload(artifact=inner, schema=[("id", "bigint"), ("note", "string")]),
         contract=contract,
+        null_columns=null_columns,
     )
-    observation.require(connector, database=database, table=table, staged_rows=staged_rows)
+    observation.require(ClickHouseAcceptanceMetricProbe(connector), database=database, table=table)
