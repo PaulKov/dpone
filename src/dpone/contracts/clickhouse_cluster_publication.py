@@ -94,10 +94,9 @@ class ClusterInventory:
         numbers = [item.replica_num for item in self.replicas]
         if len(hosts) != len(set(hosts)) or len(numbers) != len(set(numbers)):
             raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_INVENTORY_INVALID", "replicas must be unique")
-        if not all(item.internal_replication for item in self.replicas):
-            raise ClusterPublicationError(
-                "DPONE_CLICKHOUSE_CLUSTER_TOPOLOGY_UNSUPPORTED", "internal replication required"
-            )
+        # system.clusters.internal_replication only changes Distributed INSERT.
+        # This publication writes ReplicatedMergeTree and applies DDL with
+        # ON CLUSTER, so the Distributed flag is not a topology requirement.
 
     @property
     def hosts(self) -> tuple[str, ...]:

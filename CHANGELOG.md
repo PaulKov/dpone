@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.83.17 - 2026-09-26
+
+### Fixed
+
+- An MSSQL table source exposes an acceptance metric probe, so a required
+  source/target acceptance check can count the source instead of failing
+  closed with no probe.
+- Cluster publication of a ReplicatedMergeTree no longer requires
+  `system.clusters.internal_replication`. That flag only changes Distributed
+  INSERT, and this path does not use a Distributed table.
+
 ## 0.83.16 - 2026-09-26
 
 ### Fixed

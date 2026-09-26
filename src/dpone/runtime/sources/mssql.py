@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from importlib import import_module
 from typing import TYPE_CHECKING, Any
 
 from dpone.config.load_strategy import LoadStrategy
@@ -42,6 +43,7 @@ class MSSQLSource(AbstractSource):
         self.connector = connector
         self.sink_connector = sink_connector
         self.logger = logger
+        self.acceptance_metric_probe = _default_acceptance_metric_probe(connector)
         self.internal_query_capability = internal_query_capability or InternalQueryCapabilityDecision.not_issued(
             source_dialect="mssql"
         )
@@ -104,3 +106,8 @@ class MSSQLSource(AbstractSource):
         if strategy is self._incremental_extract:
             MSSQLIncrementalExtractStrategy.require_source_route_safe(load_config, self)
         return strategy
+
+
+def _default_acceptance_metric_probe(connector: Any) -> Any:
+    module = import_module("dpone.runtime.governance.mssql_acceptance_metrics")
+    return module.MssqlAcceptanceMetricProbe(connector)

@@ -277,3 +277,17 @@ def test_tampered_mapping_receipt_cannot_authorize_predecessor_drop() -> None:
     assert ddl.cleanup_dispatches == 0
     assert authority.current is not None
     assert authority.current.record.phase.value == "COMMITTED"
+
+
+def test_replicated_publication_accepts_a_cluster_without_distributed_internal_replication() -> None:
+    inventory = ClusterInventory(
+        "dwh",
+        (
+            ClusterReplica("node-1", "127.0.0.1", 9000, 1, 1, False),
+            ClusterReplica("node-2", "127.0.0.2", 9000, 1, 2, False),
+        ),
+    )
+
+    inventory.validate()
+
+    assert inventory.hosts == ("node-1", "node-2")
