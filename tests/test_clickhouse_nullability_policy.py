@@ -54,7 +54,7 @@ def test_clickhouse_null_insert_policy_emits_clickhouse_native_defaulting_settin
     assert policy.insert_select_settings_clause() == " SETTINGS insert_null_as_default=1"
 
 
-def test_clickhouse_null_insert_policy_keeps_fail_fast_without_defaulting_settings() -> None:
+def test_clickhouse_null_insert_policy_disables_server_null_defaults_for_fail_fast() -> None:
     policy = ClickHouseNullInsertPolicy.from_options(
         {
             "physical_design": {
@@ -70,9 +70,14 @@ def test_clickhouse_null_insert_policy_keeps_fail_fast_without_defaulting_settin
         }
     )
 
-    assert policy.merge_format_settings({"max_threads": 4}) == {"max_threads": 4}
-    assert policy.driver_settings() == {}
-    assert policy.insert_select_settings_clause() == ""
+    assert policy.merge_format_settings({"max_threads": 4}) == {
+        "max_threads": 4,
+        "input_format_null_as_default": 0,
+    }
+    assert policy.driver_settings() == {"input_format_null_as_default": False}
+    assert policy.insert_select_settings_clause() == " SETTINGS insert_null_as_default=0"
+    with pytest.raises(ValueError, match="input_format_null_as_default"):
+        policy.merge_format_settings({"input_format_null_as_default": 1})
 
 
 def test_clickhouse_null_insert_policy_rejects_conflicting_direct_settings() -> None:

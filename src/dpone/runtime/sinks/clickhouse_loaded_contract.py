@@ -3,7 +3,10 @@
 A character file is scanned before insert and carries a source receipt. SQL
 Server native bytes cannot be scanned, so they have no receipt. After the whole
 payload is in a staging table, and before publication, that table is the
-contract proof: exported row count and no NULL in contract non-null columns.
+contract proof: exported row count and no NULL in columns the contract or a
+physical fail-fast rule forbids. A non-nullable ClickHouse column cannot store
+NULL once input_format_null_as_default is off, so that insert setting is what
+rejects the value; this query still checks every Nullable column.
 Cell values are not scanned. A sink that cannot read its staging table still
 fails closed on the missing receipt. ClickHouse staged load is the sink that
 implements this read today.

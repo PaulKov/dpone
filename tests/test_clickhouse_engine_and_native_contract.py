@@ -21,7 +21,7 @@ from dpone.runtime.artifact_integrity import CompletedFileWrite
 from dpone.runtime.etl.contract_artifacts import ContractValidatedFileArtifact
 from dpone.runtime.etl.file_contract_validation import FileContractValidationError
 from dpone.runtime.etl.lifecycle import RuntimeLifecycleService
-from dpone.runtime.file_artifacts import FileExportArtifact
+from dpone.runtime.file_artifacts import FileExportArtifact, PartitionedFileExportArtifact
 from dpone.runtime.sinks.clickhouse_loaded_contract import (
     OBSERVED_VALIDATION_MODE,
     StagingContractError,
@@ -177,6 +177,22 @@ def test_insert_return_value_is_not_the_row_proof(tmp_path: Path) -> None:
 
     assert handle.staged_rows == 3
     assert len(sink.connector.queries) == 1
+
+
+def test_partitioned_native_with_a_contract_is_refused_before_insert(tmp_path: Path) -> None:
+    part = _native(tmp_path, rows=1)
+    payload = LoadPayload(
+        artifact=PartitionedFileExportArtifact([part], ("id",)),
+        schema=[("id", "bigint")],
+    )
+
+    with pytest.raises(RuntimeError, match="row-addressable"):
+        RuntimeLifecycleService().prepare_before_schema_evolution(
+            load_config=_load_config("MergeTree", contract=_contract(nullable=False)),
+            payload=payload,
+            run_id="run",
+            load_id="load",
+        )
 
 
 def test_physical_fail_fast_columns_are_null_checked_when_the_contract_allows_null(tmp_path: Path) -> None:

@@ -1,9 +1,10 @@
-"""Live ClickHouse proof for an opted-in native contract.
+"""Live ClickHouse proof for a native file that cannot be scanned.
 
-The fixture is a disposable database on the integration ClickHouse. It checks
-three facts the unit doubles cannot: a non-nullable column rejects NULL at
-insert, a nullable column that violates the contract fails the staging
-observation, and a row-count mismatch fails it too.
+The fixture is a disposable database on the integration ClickHouse. The server
+default stores a column default instead of NULL, so isNull() cannot see it.
+With input_format_null_as_default disabled, the same insert is rejected. A
+nullable column that violates the contract and a row-count mismatch both fail
+the staging observation.
 """
 
 from __future__ import annotations
@@ -31,8 +32,15 @@ def test_loaded_contract_matches_rejects_nulls_and_row_count(clickhouse_connecto
     try:
         connector.execute_query(f"CREATE DATABASE `{database}`")
         connector.execute_query(f"CREATE TABLE `{database}`.strict (id Int64) ENGINE = MergeTree ORDER BY id")
+        connector.execute_query(f"INSERT INTO `{database}`.strict (id) VALUES (NULL)")
+        stored_rows, stored_nulls, stored_zeros = connector.get_records(
+            f"SELECT count(), countIf(isNull(id)), countIf(id = 0) FROM `{database}`.strict"
+        )[0]
+        assert (int(stored_rows), int(stored_nulls), int(stored_zeros)) == (1, 0, 1)
         with pytest.raises(Exception, match="(?i)null"):
-            connector.execute_query(f"INSERT INTO `{database}`.strict (id) VALUES (NULL)")
+            connector.execute_query(
+                f"INSERT INTO `{database}`.strict (id) SETTINGS input_format_null_as_default = 0 VALUES (NULL)"
+            )
 
         connector.execute_query(
             f"CREATE TABLE `{database}`.observed (id Int64, note Nullable(String)) ENGINE = MergeTree ORDER BY id"

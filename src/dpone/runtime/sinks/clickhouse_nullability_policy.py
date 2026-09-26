@@ -120,17 +120,24 @@ class ClickHouseNullInsertPolicy:
             self._reject_false_setting(merged, "input_format_null_as_default")
             merged.setdefault("input_format_null_as_default", 1)
         elif self.options.has_fail_fast_policy():
+            # ClickHouse defaults this to true and stores the column default
+            # instead of NULL. isNull() then cannot see the rejected value.
             self._reject_true_setting(merged, "input_format_null_as_default")
+            merged.setdefault("input_format_null_as_default", 0)
         return merged
 
     def driver_settings(self) -> dict[str, Any]:
         if self.options.has_defaulting_policy():
             return {"input_format_null_as_default": True}
+        if self.options.has_fail_fast_policy():
+            return {"input_format_null_as_default": False}
         return {}
 
     def insert_select_settings_clause(self) -> str:
         if self.options.has_defaulting_policy():
             return " SETTINGS insert_null_as_default=1"
+        if self.options.has_fail_fast_policy():
+            return " SETTINGS insert_null_as_default=0"
         return ""
 
     def validate_rows(self, columns: Sequence[str], rows: Iterable[Sequence[Any]]) -> None:

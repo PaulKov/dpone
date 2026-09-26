@@ -227,9 +227,7 @@ class ClickHouseTableDdlRenderer:
         )
 
 
-_ENGINE_CLAUSE_TAIL = re.compile(
-    r"(?i)\s+\b(?:order\s+by|partition\s+by|primary\s+key|sample\s+by|ttl|settings)\b"
-)
+_ENGINE_CLAUSE_TAIL = re.compile(r"(?i)\s+\b(?:order\s+by|partition\s+by|primary\s+key|sample\s+by|ttl|settings)\b")
 
 
 def clickhouse_engine_identity(value: str | None) -> str | None:
