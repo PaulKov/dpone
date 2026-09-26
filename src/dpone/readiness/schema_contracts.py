@@ -9,9 +9,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from typing import Any, Literal
+from typing import Any, Literal, cast
 
 EnforcementMode = Literal["strict", "coerce", "quarantine", "warn"]
+OpaqueNativeProof = Literal["clickhouse_staging"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +47,7 @@ class ColumnContract:
 class SchemaContract:
     enforcement: EnforcementMode = "strict"
     columns: Mapping[str, ColumnContract] | None = None
+    opaque_native_proof: OpaqueNativeProof | None = None
 
     @classmethod
     def from_config(cls, raw: Mapping[str, Any] | None) -> SchemaContract:
@@ -53,6 +55,9 @@ class SchemaContract:
         enforcement = str(values.get("enforcement", "strict"))
         if enforcement not in {"strict", "coerce", "quarantine", "warn"}:
             raise ValueError("schema_contract.enforcement must be one of: strict, coerce, quarantine, warn")
+        proof = values.get("opaque_native_proof")
+        if proof is not None and proof != "clickhouse_staging":
+            raise ValueError("schema_contract.opaque_native_proof must be clickhouse_staging")
         raw_columns = values.get("columns", {})
         if raw_columns is None:
             raw_columns = {}
@@ -62,17 +67,24 @@ class SchemaContract:
             str(name): ColumnContract.from_config(str(name), _ensure_mapping(config, str(name)))
             for name, config in raw_columns.items()
         }
-        return cls(enforcement=enforcement, columns=columns)  # type: ignore[arg-type]
+        return cls(
+            enforcement=enforcement,  # type: ignore[arg-type]
+            columns=columns,
+            opaque_native_proof=cast(OpaqueNativeProof, proof) if proof is not None else None,
+        )
 
     def column(self, name: str) -> ColumnContract | None:
         values = self.columns or {}
         return values.get(name) or values.get(name.lower())
 
     def to_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "enforcement": self.enforcement,
             "columns": {name: column.to_dict() for name, column in (self.columns or {}).items()},
         }
+        if self.opaque_native_proof is not None:
+            payload["opaque_native_proof"] = self.opaque_native_proof
+        return payload
 
 
 def _ensure_mapping(value: Any, name: str) -> Mapping[str, Any]:

@@ -1,12 +1,13 @@
 """Contract proof for opaque SQL Server native files loaded into ClickHouse staging.
 
 A character wire is scanned before insert and carries a source receipt. Native
-BCP bytes cannot be scanned, so they never get that receipt. The staged
-ClickHouse load is the one place that can still prove the contract: after the
-whole payload is in the staging table, and before validation or publication,
-the table must hold exactly the exported rows and no NULL in columns the
-contract declares non-nullable. Every other path keeps failing closed on the
-missing receipt.
+BCP bytes cannot be scanned, so they never get that receipt. Observation of the
+loaded ClickHouse staging table is opt-in via
+``schema_contract.opaque_native_proof: clickhouse_staging``. Without that
+option every path, including staged ClickHouse, keeps failing closed. With it,
+the staged load checks the whole table once, after every part is inserted and
+before validation or publication: exported row count and no NULL in contract
+non-null columns. It does not scan cell values.
 """
 
 from __future__ import annotations
@@ -17,13 +18,11 @@ from typing import Any
 
 from dpone.readiness.schema_contracts import SchemaContract
 from dpone.runtime.etl.contract_artifacts import ContractValidationSummary
-from dpone.runtime.etl.file_contract_validation import FileContractValidationError
 from dpone.runtime.etl.validated_file_artifact import ContractValidatedFileArtifact
 from dpone.runtime.governance.acceptance_snapshot import AcceptanceMetricRequest, AcceptanceMetricSnapshot
 from dpone.runtime.governance.clickhouse_acceptance_metrics import ClickHouseAcceptanceMetricProbe
 
 _OPAQUE_NATIVE_FORMATS = frozenset({"mssql-bcp-native", "mssql-native"})
-_RECEIPT_REQUIRED = "file_contract_receipt.required"
 OBSERVED_VALIDATION_MODE = "clickhouse_staging_observed"
 
 
@@ -79,18 +78,13 @@ def pending_native_observation(load_config: Any, payload: Any) -> NativeContract
     wrapper = getattr(payload, "artifact", None)
     if not isinstance(wrapper, ContractValidatedFileArtifact):
         return None
+    if not wrapper.lacks_source_contract_receipt():
+        return None
     inner = wrapper.completed_source_authority_artifact
     if _wire_format(inner) not in _OPAQUE_NATIVE_FORMATS:
         return None
-    try:
-        wrapper.validated_file_contract_artifact
-    except FileContractValidationError as error:
-        if error.blocker != _RECEIPT_REQUIRED:
-            raise
-    else:
-        return None
     contract = _schema_contract(load_config)
-    if not contract.columns:
+    if contract.opaque_native_proof != "clickhouse_staging" or not contract.columns:
         return None
     return NativeContractObservation(wrapper=wrapper, payload=payload.rebind(artifact=inner), contract=contract)
 

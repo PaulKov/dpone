@@ -2875,6 +2875,11 @@
                   "default": "strict",
                   "description": "Row-level behavior when values do not match the declared logical contract."
                 },
+                "opaque_native_proof": {
+                  "type": "string",
+                  "enum": ["clickhouse_staging"],
+                  "description": "Opt in to proving an unscannable SQL Server native file from the ClickHouse staging table after the whole payload is loaded. Absent keeps the load fail-closed without a source receipt. The proof checks the exported row count and contract non-null columns; it does not scan cell values."
+                },
                 "columns": {
                   "type": "object",
                   "description": "Column-level logical type hints. Explicit contracts override inference.",
@@ -4865,6 +4870,11 @@
           ],
           "default": "strict",
           "description": "Row-level behavior when values do not match the declared logical contract."
+        },
+        "opaque_native_proof": {
+          "type": "string",
+          "enum": ["clickhouse_staging"],
+          "description": "Opt in to proving an unscannable SQL Server native file from the ClickHouse staging table after the whole payload is loaded. Absent keeps the load fail-closed without a source receipt. The proof checks the exported row count and contract non-null columns; it does not scan cell values."
         },
         "columns": {
           "type": "object",

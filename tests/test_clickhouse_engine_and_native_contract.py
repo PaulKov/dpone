@@ -102,11 +102,73 @@ def test_direct_clickhouse_insert_without_receipt_fails_closed(tmp_path: Path) -
 
 
 def test_only_unreceipted_native_wrappers_owe_an_observation(tmp_path: Path) -> None:
-    config = _load_config("MergeTree", contract=_contract(nullable=True))
+    config = _load_config("MergeTree", contract=_contract(nullable=True, proof=True))
 
     assert pending_native_observation(config, _wrapped(tmp_path, rows=1)) is not None
     assert pending_native_observation(config, LoadPayload(artifact=_native(tmp_path, rows=1), schema=[])) is None
     assert pending_native_observation(config, _wrapped(tmp_path, rows=1, wire="csv")) is None
+
+
+def test_staged_load_without_opt_in_fails_closed(tmp_path: Path) -> None:
+    sink = _Sink(inserted=1, table_rows=1, nulls=0)
+
+    with pytest.raises(FileContractValidationError) as raised:
+        ClickHouseStagedLoadService(sink).stage(
+            _load_config("MergeTree", contract=_contract(nullable=False)), _wrapped(tmp_path, rows=1)
+        )
+
+    assert raised.value.blocker == "file_contract_receipt.required"
+    assert sink.dropped == ["technical.stage"]
+    assert sink.inserted_artifacts == []
+
+
+def test_receipted_character_file_inserts_the_validated_inner_file(tmp_path: Path) -> None:
+    from dpone.runtime.connectors.bulk_text_codec import BulkTextCodec
+    from dpone.runtime.etl.file_contract_validation import validate_mssql_delimited_file_contract
+
+    codec = BulkTextCodec()
+    body = f"1\t{codec.empty_string_marker}\n".encode()
+    path = tmp_path / "payload.bcp"
+    path.write_bytes(body)
+    inner = FileExportArtifact(
+        str(path),
+        ["id", "value"],
+        format="mssql-delimited",
+        bulk_text_codec=codec,
+        rows_exported=1,
+    )
+    contract = SchemaContract.from_config(
+        {
+            "columns": {
+                "id": {"type": "integer", "nullable": False},
+                "value": {"type": "string", "nullable": False},
+            }
+        }
+    )
+    validate_mssql_delimited_file_contract(inner, schema=(("id", "int"), ("value", "nvarchar(max)")), contract=contract)
+    wrapper = ContractValidatedFileArtifact(
+        inner, contract=contract, schema=(("id", "int"), ("value", "nvarchar(max)")), run_id="run", load_id="load"
+    )
+    assert wrapper.lacks_source_contract_receipt() is False
+    seen: list[str] = []
+
+    class _Service(ClickHousePayloadIngestionService):
+        def insert_file(self, load_config: LoadConfig, artifact: FileExportArtifact, schema: object) -> int:
+            del load_config, schema
+            seen.append(artifact.format)
+            return 1
+
+    loaded = _Service(sink=object(), sink_factory=lambda connector: connector).insert_payload(
+        _load_config("MergeTree"), LoadPayload(artifact=wrapper, schema=[("id", "int"), ("value", "nvarchar(max)")])
+    )
+
+    assert loaded == 1
+    assert seen == ["mssql-delimited"]
+
+
+def test_unknown_opaque_native_proof_is_rejected() -> None:
+    with pytest.raises(ValueError, match="opaque_native_proof"):
+        SchemaContract.from_config({"columns": {}, "opaque_native_proof": "skip"})
 
 
 def test_staged_load_observes_the_whole_staging_table_once(tmp_path: Path) -> None:
@@ -114,7 +176,7 @@ def test_staged_load_observes_the_whole_staging_table_once(tmp_path: Path) -> No
     payload = _wrapped(tmp_path, rows=3)
 
     handle = ClickHouseStagedLoadService(sink).stage(
-        _load_config("MergeTree", contract=_contract(nullable=False)), payload
+        _load_config("MergeTree", contract=_contract(nullable=False, proof=True)), payload
     )
 
     assert handle.staged_rows == 3
@@ -139,7 +201,7 @@ def test_staged_load_rejects_and_drops_a_table_that_breaks_the_contract(
 
     with pytest.raises(ClickHouseLoadedContractError) as raised:
         ClickHouseStagedLoadService(sink).stage(
-            _load_config("MergeTree", contract=_contract(nullable=False)), _wrapped(tmp_path, rows=3)
+            _load_config("MergeTree", contract=_contract(nullable=False, proof=True)), _wrapped(tmp_path, rows=3)
         )
 
     assert raised.value.blocker == blocker
@@ -181,7 +243,10 @@ class _Sink:
 
     def _insert_payload(self, staging_config: Any, payload: Any) -> int:
         del staging_config
-        self.inserted_artifacts.append(payload.artifact)
+        artifact = payload.artifact
+        if isinstance(artifact, ContractValidatedFileArtifact):
+            artifact = artifact.validated_file_contract_artifact
+        self.inserted_artifacts.append(artifact)
         return self.inserted
 
     def _drop_table(self, table: str, config: Any) -> None:
@@ -221,8 +286,11 @@ def _wrapped(tmp_path: Path, *, rows: int, wire: str = "mssql-bcp-native") -> Lo
     return LoadPayload(artifact=wrapper, schema=[("id", "bigint")])
 
 
-def _contract(*, nullable: bool) -> SchemaContract:
-    return SchemaContract.from_config({"columns": {"id": {"type": "bigint", "nullable": nullable}}})
+def _contract(*, nullable: bool, proof: bool = False) -> SchemaContract:
+    raw: dict[str, Any] = {"columns": {"id": {"type": "bigint", "nullable": nullable}}}
+    if proof:
+        raw["opaque_native_proof"] = "clickhouse_staging"
+    return SchemaContract.from_config(raw)
 
 
 def _plan_state(engine: str) -> PhysicalTableState:
@@ -247,6 +315,8 @@ def _load_config(engine: str, *, contract: SchemaContract | None = None) -> Load
                 for name, column in (contract.columns or {}).items()
             }
         }
+        if contract.opaque_native_proof is not None:
+            options["schema_contract"]["opaque_native_proof"] = contract.opaque_native_proof
     return LoadConfig(
         source_conn_id="source",
         target_conn_id="target",
