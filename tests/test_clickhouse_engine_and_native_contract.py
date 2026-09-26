@@ -204,6 +204,37 @@ def test_staged_native_observation_still_rejects_an_over_budget_file(tmp_path: P
     assert sink.dropped == ["technical.stage"]
 
 
+def test_enforced_stream_loads_into_the_existing_clickhouse_table() -> None:
+    from dpone.runtime.etl.contract_artifacts import ContractEnforcedStreamingArtifact
+    from dpone.runtime.streaming_rows import StreamingRowsArtifact
+
+    stream = StreamingRowsArtifact(iter([{"id": 1}, {"id": 2}]), batch_size=10)
+    wrapper = ContractEnforcedStreamingArtifact(
+        stream,
+        contract=_contract(nullable=True),
+        run_id="run",
+        load_id="load",
+    )
+    service = ClickHousePayloadIngestionService(object(), sink_factory=lambda connector: None)
+    inserted: list[list[dict[str, int]]] = []
+
+    def insert_rows(load_config: Any, rows: Any, schema: Any) -> int:
+        del load_config, schema
+        batch = list(rows)
+        inserted.append(batch)
+        return len(batch)
+
+    service.insert_rows = insert_rows  # type: ignore[method-assign]
+    total = service.insert_payload(
+        _load_config("MergeTree", contract=_contract(nullable=True)),
+        LoadPayload(artifact=wrapper, schema=[("id", "bigint")]),
+    )
+
+    assert total == 2
+    assert inserted == [[{"id": 1}, {"id": 2}]]
+    assert wrapper.validation_summary.accepted_rows == 2
+
+
 def test_partitioned_native_with_a_contract_is_refused_before_insert(tmp_path: Path) -> None:
     part = _native(tmp_path, rows=1)
     payload = LoadPayload(

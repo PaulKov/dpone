@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import itertools
 from collections import Counter
-from collections.abc import Iterable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import Any
 
 from dpone.runtime.artifact_models import (
@@ -113,60 +113,73 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
     def materialize(
         self, staging_manager: Any, load_config: Any, schema: Sequence[tuple[str, str]]
     ) -> StagingTableArtifact:
+        with owned_staging_handle(staging_manager, load_config, schema) as handle:
+            accepted = self.load_with_row_inserter(lambda rows: staging_manager.insert_rows(handle, rows))
+            handle.row_count = accepted
+            return handle
+
+    def load_with_row_inserter(self, insert_rows: Callable[[Sequence[Mapping[str, Any]]], object]) -> int:
+        """Enforce the stream into an existing table. Does not create one."""
+
         iterator = self._iterator()
         batch_size = int(getattr(self._artifact, "_batch_size", 10000) or 10000)
-        with owned_staging_handle(staging_manager, load_config, schema) as handle:
-            accepted = rejected = quarantined = 0
-            inserted_any = False
-            dlq_record_ids: list[str] = []
-            dlq_reasons: Counter[str] = Counter()
-            dlq_index_ref: str | None = None
-            for chunk in _batched(iterator, batch_size):
-                result = ContractEnforcementService(quarantine=self._quarantine).enforce(
-                    rows=chunk,
-                    contract=self._contract,
-                    run_id=self._run_id,
-                    load_id=self._load_id,
-                    conflict_policy=self._conflict_policy,
-                    row_offset=accepted + rejected + quarantined,
-                    finalize_dlq=False,
-                )
-                if not result.passed:
-                    raise RuntimeError("data contract enforcement failed")
-                if result.target_rows:
-                    staging_manager.insert_rows(handle, result.target_rows)
-                    inserted_any = True
-                accepted += len(result.target_rows)
-                rejected += result.rejected_rows
-                quarantined += result.quarantined_rows
-                dlq_record_ids.extend(result.dlq_record_ids)
-                dlq_reasons.update(result.dlq_reasons)
-                dlq_index_ref = result.dlq_index_ref or dlq_index_ref
-            if not inserted_any:
-                staging_manager.insert_rows(handle, ())
-            handle.row_count = accepted
-            self.validation_summary = ContractValidationSummary(
-                accepted_rows=accepted,
-                rejected_rows=rejected,
-                quarantined_rows=quarantined,
-                validation_mode="row_stream",
+        accepted = rejected = quarantined = 0
+        inserted_any = False
+        dlq_record_ids: list[str] = []
+        dlq_reasons: Counter[str] = Counter()
+        dlq_index_ref: str | None = None
+        for chunk in _batched(iterator, batch_size):
+            result = ContractEnforcementService(quarantine=self._quarantine).enforce(
+                rows=chunk,
+                contract=self._contract,
+                run_id=self._run_id,
+                load_id=self._load_id,
+                conflict_policy=self._conflict_policy,
+                row_offset=accepted + rejected + quarantined,
+                finalize_dlq=False,
             )
-            if dlq_record_ids and self._quarantine is not None:
-                index_ref = self._quarantine.finalize_run(self._run_id).get("index_ref")
-                dlq_index_ref = str(index_ref) if index_ref else None
-            self.enforcement_result = ContractEnforcementResult(
-                passed=rejected == 0,
-                target_rows=[],
-                diagnostics=(),
-                rejected_rows=rejected,
-                quarantined_rows=quarantined,
-                state_commit_allowed=rejected == 0,
-                dlq_record_ids=tuple(dlq_record_ids),
-                dlq_reasons=dict(sorted(dlq_reasons.items())),
-                dlq_index_ref=dlq_index_ref,
-                accepted_row_count=accepted,
-            )
-            return handle
+            if not result.passed:
+                raise RuntimeError("data contract enforcement failed")
+            if result.target_rows:
+                insert_rows(result.target_rows)
+                inserted_any = True
+            accepted += len(result.target_rows)
+            rejected += result.rejected_rows
+            quarantined += result.quarantined_rows
+            dlq_record_ids.extend(result.dlq_record_ids)
+            dlq_reasons.update(result.dlq_reasons)
+            dlq_index_ref = result.dlq_index_ref or dlq_index_ref
+        if not inserted_any:
+            insert_rows(())
+        self.validation_summary = ContractValidationSummary(
+            accepted_rows=accepted,
+            rejected_rows=rejected,
+            quarantined_rows=quarantined,
+            validation_mode="row_stream",
+        )
+        if dlq_record_ids and self._quarantine is not None:
+            index_ref = self._quarantine.finalize_run(self._run_id).get("index_ref")
+            dlq_index_ref = str(index_ref) if index_ref else None
+        self.enforcement_result = ContractEnforcementResult(
+            passed=rejected == 0,
+            target_rows=[],
+            diagnostics=(),
+            rejected_rows=rejected,
+            quarantined_rows=quarantined,
+            state_commit_allowed=rejected == 0,
+            dlq_record_ids=tuple(dlq_record_ids),
+            dlq_reasons=dict(sorted(dlq_reasons.items())),
+            dlq_index_ref=dlq_index_ref,
+            accepted_row_count=accepted,
+        )
+        inner = self._artifact
+        if hasattr(inner, "rows_exported"):
+            inner.rows_exported = accepted
+            inner.row_count = accepted
+        lifecycle = getattr(inner, "extraction_lifecycle", None)
+        if lifecycle is not None:
+            lifecycle.complete()
+        return accepted
 
     def cleanup(self) -> None:
         self.terminate(ArtifactTerminalOutcome.ABORT)

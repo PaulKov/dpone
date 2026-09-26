@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.83.14 - 2026-09-26
+
+### Fixed
+
+- Load a contract-enforced row stream into an existing ClickHouse staging table.
+  The stream no longer asks `ClickHouseSink` to create a second table.
+
 ## 0.83.13 - 2026-09-26
 
 ### Fixed
