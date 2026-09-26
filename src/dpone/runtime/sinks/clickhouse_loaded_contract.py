@@ -1,13 +1,12 @@
-"""Contract proof for opaque SQL Server native files loaded into ClickHouse staging.
+"""Prove an unscannable native file from the staging table that received it.
 
-A character wire is scanned before insert and carries a source receipt. Native
-BCP bytes cannot be scanned, so they never get that receipt. Observation of the
-loaded ClickHouse staging table is opt-in via
-``schema_contract.opaque_native_proof: clickhouse_staging``. Without that
-option every path, including staged ClickHouse, keeps failing closed. With it,
-the staged load checks the whole table once, after every part is inserted and
-before validation or publication: exported row count and no NULL in contract
-non-null columns. It does not scan cell values.
+A character file is scanned before insert and carries a source receipt. SQL
+Server native bytes cannot be scanned, so they have no receipt. After the whole
+payload is in a staging table, and before publication, that table is the
+contract proof: exported row count and no NULL in contract non-null columns.
+Cell values are not scanned. A sink that cannot read its staging table still
+fails closed on the missing receipt. ClickHouse staged load is the sink that
+implements this read today.
 """
 
 from __future__ import annotations
@@ -23,13 +22,13 @@ from dpone.runtime.governance.acceptance_snapshot import AcceptanceMetricRequest
 from dpone.runtime.governance.clickhouse_acceptance_metrics import ClickHouseAcceptanceMetricProbe
 
 _OPAQUE_NATIVE_FORMATS = frozenset({"mssql-bcp-native", "mssql-native"})
-OBSERVED_VALIDATION_MODE = "clickhouse_staging_observed"
+OBSERVED_VALIDATION_MODE = "staging_table"
 
 
-class ClickHouseLoadedContractError(RuntimeError):
+class StagingContractError(RuntimeError):
     """The staging table does not satisfy the source contract."""
 
-    code = "DPONE_CLICKHOUSE_LOADED_CONTRACT_BLOCKED"
+    code = "DPONE_STAGING_CONTRACT_BLOCKED"
 
     def __init__(self, blocker: str) -> None:
         self.blocker = blocker
@@ -49,9 +48,9 @@ class NativeContractObservation:
 
         rows_exported = getattr(self.payload.artifact, "rows_exported", None)
         if type(rows_exported) is not int or rows_exported < 0:
-            raise ClickHouseLoadedContractError("rows_exported_required")
+            raise StagingContractError("rows_exported_required")
         if staged_rows != rows_exported:
-            raise ClickHouseLoadedContractError("staged_row_count_mismatch")
+            raise StagingContractError("staged_row_count_mismatch")
         required = required_columns(self.contract)
         request = AcceptanceMetricRequest(
             side="staged",
@@ -65,7 +64,7 @@ class NativeContractObservation:
         snapshot = ClickHouseAcceptanceMetricProbe(connector).collect(request)
         blocker = loaded_contract_blocker(snapshot, rows_exported=rows_exported, required_columns=required)
         if blocker is not None:
-            raise ClickHouseLoadedContractError(blocker)
+            raise StagingContractError(blocker)
         self.wrapper.validation_summary = ContractValidationSummary(
             accepted_rows=rows_exported,
             validation_mode=OBSERVED_VALIDATION_MODE,
@@ -84,7 +83,7 @@ def pending_native_observation(load_config: Any, payload: Any) -> NativeContract
     if _wire_format(inner) not in _OPAQUE_NATIVE_FORMATS:
         return None
     contract = _schema_contract(load_config)
-    if contract.opaque_native_proof != "clickhouse_staging" or not contract.columns:
+    if not contract.columns:
         return None
     return NativeContractObservation(wrapper=wrapper, payload=payload.rebind(artifact=inner), contract=contract)
 
@@ -120,7 +119,7 @@ def _wire_format(artifact: Any) -> str:
 
 
 __all__ = [
-    "ClickHouseLoadedContractError",
+    "StagingContractError",
     "NativeContractObservation",
     "OBSERVED_VALIDATION_MODE",
     "loaded_contract_blocker",

@@ -16,8 +16,8 @@ from dpone.readiness.schema_contracts import SchemaContract
 from dpone.runtime.etl.contract_artifacts import ContractValidatedFileArtifact
 from dpone.runtime.file_artifacts import FileExportArtifact
 from dpone.runtime.sinks.clickhouse_loaded_contract import (
-    ClickHouseLoadedContractError,
     NativeContractObservation,
+    StagingContractError,
 )
 from dpone.runtime.sinks.load_payload import LoadPayload
 
@@ -40,11 +40,11 @@ def test_loaded_contract_matches_rejects_nulls_and_row_count(clickhouse_connecto
         _observe(connector, tmp_path, database, "observed", rows=2, staged_rows=2, nullable=False)
 
         connector.execute_query(f"INSERT INTO `{database}`.observed (id, note) VALUES (3, NULL)")
-        with pytest.raises(ClickHouseLoadedContractError) as nulls:
+        with pytest.raises(StagingContractError) as nulls:
             _observe(connector, tmp_path, database, "observed", rows=3, staged_rows=3, nullable=False)
         assert nulls.value.blocker == "not_null_violation:note"
 
-        with pytest.raises(ClickHouseLoadedContractError) as mismatch:
+        with pytest.raises(StagingContractError) as mismatch:
             _observe(connector, tmp_path, database, "observed", rows=2, staged_rows=3, nullable=True)
         assert mismatch.value.blocker == "row_count_mismatch"
     finally:
@@ -57,7 +57,6 @@ def _observe(connector, tmp_path, database: str, table: str, *, rows: int, stage
     inner = FileExportArtifact(str(path), ("id", "note"), format="mssql-bcp-native", rows_exported=rows)
     contract = SchemaContract.from_config(
         {
-            "opaque_native_proof": "clickhouse_staging",
             "columns": {
                 "id": {"type": "bigint", "nullable": False},
                 "note": {"type": "string", "nullable": nullable},

@@ -24,7 +24,7 @@ from dpone.runtime.etl.lifecycle import RuntimeLifecycleService
 from dpone.runtime.file_artifacts import FileExportArtifact
 from dpone.runtime.sinks.clickhouse_loaded_contract import (
     OBSERVED_VALIDATION_MODE,
-    ClickHouseLoadedContractError,
+    StagingContractError,
     pending_native_observation,
 )
 from dpone.runtime.sinks.clickhouse_payload_ingestion import ClickHousePayloadIngestionService
@@ -102,24 +102,11 @@ def test_direct_clickhouse_insert_without_receipt_fails_closed(tmp_path: Path) -
 
 
 def test_only_unreceipted_native_wrappers_owe_an_observation(tmp_path: Path) -> None:
-    config = _load_config("MergeTree", contract=_contract(nullable=True, proof=True))
+    config = _load_config("MergeTree", contract=_contract(nullable=True))
 
     assert pending_native_observation(config, _wrapped(tmp_path, rows=1)) is not None
     assert pending_native_observation(config, LoadPayload(artifact=_native(tmp_path, rows=1), schema=[])) is None
     assert pending_native_observation(config, _wrapped(tmp_path, rows=1, wire="csv")) is None
-
-
-def test_staged_load_without_opt_in_fails_closed(tmp_path: Path) -> None:
-    sink = _Sink(inserted=1, table_rows=1, nulls=0)
-
-    with pytest.raises(FileContractValidationError) as raised:
-        ClickHouseStagedLoadService(sink).stage(
-            _load_config("MergeTree", contract=_contract(nullable=False)), _wrapped(tmp_path, rows=1)
-        )
-
-    assert raised.value.blocker == "file_contract_receipt.required"
-    assert sink.dropped == ["technical.stage"]
-    assert sink.inserted_artifacts == []
 
 
 def test_receipted_character_file_inserts_the_validated_inner_file(tmp_path: Path) -> None:
@@ -166,17 +153,12 @@ def test_receipted_character_file_inserts_the_validated_inner_file(tmp_path: Pat
     assert seen == ["mssql-delimited"]
 
 
-def test_unknown_opaque_native_proof_is_rejected() -> None:
-    with pytest.raises(ValueError, match="opaque_native_proof"):
-        SchemaContract.from_config({"columns": {}, "opaque_native_proof": "skip"})
-
-
 def test_staged_load_observes_the_whole_staging_table_once(tmp_path: Path) -> None:
     sink = _Sink(inserted=3, table_rows=3, nulls=0)
     payload = _wrapped(tmp_path, rows=3)
 
     handle = ClickHouseStagedLoadService(sink).stage(
-        _load_config("MergeTree", contract=_contract(nullable=False, proof=True)), payload
+        _load_config("MergeTree", contract=_contract(nullable=False)), payload
     )
 
     assert handle.staged_rows == 3
@@ -199,9 +181,9 @@ def test_staged_load_rejects_and_drops_a_table_that_breaks_the_contract(
 ) -> None:
     sink = _Sink(inserted=inserted, table_rows=table_rows, nulls=nulls)
 
-    with pytest.raises(ClickHouseLoadedContractError) as raised:
+    with pytest.raises(StagingContractError) as raised:
         ClickHouseStagedLoadService(sink).stage(
-            _load_config("MergeTree", contract=_contract(nullable=False, proof=True)), _wrapped(tmp_path, rows=3)
+            _load_config("MergeTree", contract=_contract(nullable=False)), _wrapped(tmp_path, rows=3)
         )
 
     assert raised.value.blocker == blocker
@@ -286,11 +268,8 @@ def _wrapped(tmp_path: Path, *, rows: int, wire: str = "mssql-bcp-native") -> Lo
     return LoadPayload(artifact=wrapper, schema=[("id", "bigint")])
 
 
-def _contract(*, nullable: bool, proof: bool = False) -> SchemaContract:
-    raw: dict[str, Any] = {"columns": {"id": {"type": "bigint", "nullable": nullable}}}
-    if proof:
-        raw["opaque_native_proof"] = "clickhouse_staging"
-    return SchemaContract.from_config(raw)
+def _contract(*, nullable: bool) -> SchemaContract:
+    return SchemaContract.from_config({"columns": {"id": {"type": "bigint", "nullable": nullable}}})
 
 
 def _plan_state(engine: str) -> PhysicalTableState:
@@ -315,8 +294,6 @@ def _load_config(engine: str, *, contract: SchemaContract | None = None) -> Load
                 for name, column in (contract.columns or {}).items()
             }
         }
-        if contract.opaque_native_proof is not None:
-            options["schema_contract"]["opaque_native_proof"] = contract.opaque_native_proof
     return LoadConfig(
         source_conn_id="source",
         target_conn_id="target",
