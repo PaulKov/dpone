@@ -61,7 +61,7 @@ jobs:
       DPONE_PUBLISH_POLICY: ${{ inputs.publish-policy }}
       DPONE_AIRFLOW_BASE_URL: ${{ inputs.airflow-base-url }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
@@ -197,13 +197,13 @@ jobs:
           path: ${{ github.workspace }}/.dpone-ci/dbt
 
       - name: Attest the complete release checksum subject
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: ${{ github.workspace }}/.dpone-ci/dbt/release-a/release-subjects.sha256
 
       - name: Attest the exact runtime release subject
         id: runtime_attestation
-        uses: actions/attest@59d89421af93a897026c735860bf21b6eb4f7b26 # v4.1.0
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-path: ${{ github.workspace }}/.dpone-ci/dbt/release-a/release-set.json
 
