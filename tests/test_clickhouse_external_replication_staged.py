@@ -1,24 +1,14 @@
 from __future__ import annotations
 
-import hashlib
 from dataclasses import replace
-from pathlib import Path
 from types import SimpleNamespace
-
-import pytest
 
 from dpone.config.load_config import LoadConfig
 from dpone.config.load_strategy import LoadStrategy
 from dpone.contracts.clickhouse_external_replication import ExternalArtifactReceipt, ExternalPublicationRequest
-from dpone.readiness.schema_contracts import SchemaContract
-from dpone.runtime.artifact_integrity import CompletedFileWrite
-from dpone.runtime.etl.contract_artifacts import ContractValidatedFileArtifact
-from dpone.runtime.file_artifacts import FileExportArtifact
 from dpone.runtime.sinks.clickhouse_external_replication_context import ExternalStagedContext
 from dpone.runtime.sinks.clickhouse_external_replication_receipt import ExternalReplicationReceipt
-from dpone.runtime.sinks.clickhouse_loaded_contract import StagingContractError
 from dpone.runtime.sinks.clickhouse_staged_load import ClickHouseStagedLoadService
-from dpone.runtime.sinks.load_payload import LoadPayload
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 
 
@@ -32,6 +22,7 @@ class _ExternalRouter:
 
     def stage_external(self, config: object, payload: object) -> ExternalStagedContext:
         self.events.append("stage")
+        self.payload = payload
         return self.context
 
     def validate_external(self, context: ExternalStagedContext) -> object:
@@ -112,69 +103,25 @@ def test_external_abort_uses_exact_context_cleanup() -> None:
     assert router.events == ["stage", "abort"]
 
 
-def test_external_observation_failure_aborts_the_candidate(tmp_path: Path) -> None:
+def test_external_stage_does_not_query_the_local_connector() -> None:
     router = _ExternalRouter()
-    sink = SimpleNamespace(
-        _full_refresh_publication=router,
-        connector=_ProbeConnector(row_count=3, nulls=1),
-    )
+    connector = _ProbeConnector()
+    payload = SimpleNamespace(schema=(("id", "Int64"),))
+    sink = SimpleNamespace(_full_refresh_publication=router, connector=connector)
 
-    with pytest.raises(StagingContractError) as raised:
-        ClickHouseStagedLoadService(sink).stage(_native_config(), _native_payload(tmp_path, rows=3))
+    handle = ClickHouseStagedLoadService(sink).stage(_config(), payload)
 
-    assert raised.value.blocker == "not_null_violation:id"
-    assert router.events == ["stage", "abort"]
-
-
-def test_external_observation_publishes_the_probed_row_count(tmp_path: Path) -> None:
-    router = _ExternalRouter()
-    sink = SimpleNamespace(
-        _full_refresh_publication=router,
-        connector=_ProbeConnector(row_count=3, nulls=0),
-    )
-
-    handle = ClickHouseStagedLoadService(sink).stage(_native_config(), _native_payload(tmp_path, rows=3))
-
-    assert handle.staged_rows == 3
+    assert router.payload is payload
+    assert connector.calls == 0
+    assert handle.staged_rows == 1
     assert router.events == ["stage"]
 
 
 class _ProbeConnector:
-    def __init__(self, *, row_count: int, nulls: int) -> None:
-        self.row_count = row_count
-        self.nulls = nulls
+    def __init__(self) -> None:
+        self.calls = 0
 
     def get_records(self, query: str, as_dict: bool = False) -> list[dict[str, int]]:
         del query, as_dict
-        return [{"row_count": self.row_count, "null__id": self.nulls}]
-
-
-def _native_config() -> LoadConfig:
-    config = _config()
-    config.options["schema_contract"] = {"columns": {"id": {"type": "bigint", "nullable": False}}}
-    return config
-
-
-def _native_payload(tmp_path: Path, *, rows: int) -> LoadPayload:
-    body = b"\x00" * (rows + 1)
-    path = tmp_path / "extract.bcp"
-    path.write_bytes(body)
-    artifact = FileExportArtifact(
-        str(path),
-        ("id",),
-        format="mssql-bcp-native",
-        _completed_write=CompletedFileWrite(
-            sha256=hashlib.sha256(body).hexdigest(),
-            size_bytes=len(body),
-            rows_exported=rows,
-        ),
-    )
-    contract = SchemaContract.from_config({"columns": {"id": {"type": "bigint", "nullable": False}}})
-    wrapper = ContractValidatedFileArtifact(
-        artifact,
-        contract=contract,
-        schema=(("id", "bigint"),),
-        run_id="run",
-        load_id="load",
-    )
-    return LoadPayload(artifact=wrapper, schema=[("id", "bigint")])
+        self.calls += 1
+        return []
