@@ -16,6 +16,11 @@ def live_target_coordinates(load_config: Any) -> tuple[str, str, str]:
     shadow = require_shadow_append_authority(load_config)
     if shadow is not None:
         return shadow.live_database, shadow.live_schema, shadow.live_table
+    # Load config stores an MSSQL schema label as ``database.schema`` while the
+    # target identity registry keys the bare schema.
+    prefix = f"{database}."
+    if database and schema.startswith(prefix) and schema.count(".") == 1:
+        schema = schema[len(prefix) :]
     return database, schema, table
 
 

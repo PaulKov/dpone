@@ -42,27 +42,31 @@ class ClickHouseClusterAuthorityBootstrap:
             "distributed_ddl_task_timeout": 60,
             "log_comment": token,
         }
+        create_error = ""
         try:
             self._connector.connection.execute(
                 sql,
                 settings=settings,
                 query_id=f"dpone-authority-bootstrap-{token[-16:]}",
             )
-        except Exception:
-            pass
+        except Exception as exc:
+            create_error = _bounded(exc)
         entries = self._catalog.find_entries(cluster, token)
-        if len(entries) != 1 or entries[0].state_for(hosts) not in {
-            contracts.QueueState.TERMINAL_SUCCESS,
-            contracts.QueueState.TERMINAL_FAILURE,
-        }:
+        queue_detail = _queue_detail(entries, hosts)
+        if len(entries) != 1 or entries[0].state_for(hosts) is not contracts.QueueState.TERMINAL_SUCCESS:
             raise contracts.ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_BOOTSTRAP_UNKNOWN",
-                "exact terminal bootstrap queue entry is required",
+                _bounded(f"bootstrap ddl did not finish: {queue_detail or create_error or 'no queue entry'}"),
             )
         complete = self._facades(cluster, database)
         if not self._valid_existing(complete, hosts, allow_missing=False):
+            observed = ",".join(sorted({host for host, _ in complete})) or "none"
+            engines = ",".join(sorted({engine[:80] for _, engine in complete})) or "none"
             raise contracts.ClusterPublicationError(
-                "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_BOOTSTRAP_UNKNOWN", "facade is not complete"
+                "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_BOOTSTRAP_UNKNOWN",
+                _bounded(
+                    f"facade is not complete observed={observed} engines={engines} expected={','.join(hosts)}"
+                ),
             )
 
     def _facades(self, cluster: str, database: str) -> tuple[tuple[str, str], ...]:
@@ -84,6 +88,27 @@ class ClickHouseClusterAuthorityBootstrap:
         return len(engines) <= 1 and all(
             engine.startswith("KeeperMap(") and _KEEPER_PATH in engine for engine in engines
         )
+
+
+def _queue_detail(entries: Sequence[Any], hosts: Sequence[str]) -> str:
+    if len(entries) != 1:
+        return f"queue_entries={len(entries)}"
+    entry = entries[0]
+    state = entry.state_for(hosts)
+    texts = []
+    for host in getattr(entry, "hosts", ()):
+        text = str(getattr(host, "exception_text", "") or "").strip()
+        if text:
+            texts.append(text.splitlines()[0][:160])
+    detail = f"state={getattr(state, 'value', state)}"
+    if texts:
+        detail = f"{detail} error={texts[0]}"
+    return detail
+
+
+def _bounded(value: object) -> str:
+    text = " ".join(str(value).split())
+    return text[:300]
 
 
 def _quote(value: str) -> str:

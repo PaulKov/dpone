@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.83.18 - 2026-09-27
+
+### Fixed
+
+- MSSQL target identity looks up the bare schema. A schema label of
+  `database.schema` no longer misses the `dbo.dpone_target_identity` row.
+- A failed ClickHouse publication-authority bootstrap reports the DDL queue
+  error instead of treating a failed `ON CLUSTER` create as success.
+
 ## 0.83.17 - 2026-09-26
 
 ### Fixed
