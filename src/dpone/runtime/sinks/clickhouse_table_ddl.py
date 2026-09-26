@@ -227,6 +227,31 @@ class ClickHouseTableDdlRenderer:
         )
 
 
+_ENGINE_CLAUSE_TAIL = re.compile(
+    r"(?i)\s+\b(?:order\s+by|partition\s+by|primary\s+key|sample\s+by|ttl|settings)\b"
+)
+
+
+def clickhouse_engine_identity(value: str | None) -> str | None:
+    """Comparable ClickHouse engine clause, without ORDER BY or SETTINGS.
+
+    ``system.tables.engine`` is only the family name. ``engine_full`` and an
+    authored ``ReplicatedMergeTree(...)`` expression carry the same clause plus
+    later table options. Reconciliation compares this clause so a replication
+    path is drift and a matching path is not.
+    """
+
+    if value is None:
+        return None
+    text = " ".join(str(value).split())
+    if not text:
+        return None
+    match = _ENGINE_CLAUSE_TAIL.search(text)
+    if match:
+        text = text[: match.start()].rstrip()
+    return text or None
+
+
 def normalize_clickhouse_ttl_expression(value: Any) -> str | None:
     """Normalize a table-level TTL expression for CREATE/recon (no TTL keyword)."""
     if value is None:
@@ -316,5 +341,6 @@ __all__ = [
     "ClickHouseTableDesign",
     "ClickHouseTableDdlRenderer",
     "ClickHouseTableSettingsDialect",
+    "clickhouse_engine_identity",
     "normalize_clickhouse_ttl_expression",
 ]
