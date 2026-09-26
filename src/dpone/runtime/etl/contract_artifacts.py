@@ -8,7 +8,9 @@ they adapt runtime artifact protocols; pure validation stays in
 
 from __future__ import annotations
 
+import hashlib
 import itertools
+import json
 from collections import Counter
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from typing import Any
@@ -125,6 +127,8 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
         batch_size = int(getattr(self._artifact, "_batch_size", 10000) or 10000)
         accepted = rejected = quarantined = 0
         inserted_any = False
+        emitted = hashlib.sha256()
+        emitted_bytes = 0
         dlq_record_ids: list[str] = []
         dlq_reasons: Counter[str] = Counter()
         dlq_index_ref: str | None = None
@@ -143,6 +147,10 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
             if result.target_rows:
                 insert_rows(result.target_rows)
                 inserted_any = True
+                for row in result.target_rows:
+                    blob = json.dumps(row, sort_keys=True, ensure_ascii=False, default=str).encode()
+                    emitted.update(blob)
+                    emitted_bytes += len(blob)
             accepted += len(result.target_rows)
             rejected += result.rejected_rows
             quarantined += result.quarantined_rows
@@ -173,6 +181,15 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
             accepted_row_count=accepted,
         )
         inner = self._artifact
+        inner._events = [
+            {
+                "status": "loaded_to_staging",
+                "chunk_index": 0,
+                "checksum": emitted.hexdigest(),
+                "bytes": emitted_bytes,
+            }
+        ]
+        inner.source_byte_measurement_complete = True
         if hasattr(inner, "rows_exported"):
             inner.rows_exported = accepted
             inner.row_count = accepted

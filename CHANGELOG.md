@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.83.15 - 2026-09-26
+
+### Fixed
+
+- A contract-enforced row stream records the bytes it inserted, so a full
+  refresh source-byte budget can measure it.
+
 ## 0.83.14 - 2026-09-26
 
 ### Fixed

@@ -233,6 +233,15 @@ def test_enforced_stream_loads_into_the_existing_clickhouse_table() -> None:
     assert total == 2
     assert inserted == [[{"id": 1}, {"id": 2}]]
     assert wrapper.validation_summary.accepted_rows == 2
+    from dpone.runtime.sinks.clickhouse_staged_evidence import enforce_source_byte_budget
+
+    evidence = enforce_source_byte_budget(
+        LoadPayload(artifact=wrapper, schema=[("id", "bigint")]),
+        maximum_bytes=10_000_000,
+        full_refresh=True,
+    )
+    assert evidence is not None
+    assert evidence.observed_bytes > 0
 
 
 def test_partitioned_native_with_a_contract_is_refused_before_insert(tmp_path: Path) -> None:
