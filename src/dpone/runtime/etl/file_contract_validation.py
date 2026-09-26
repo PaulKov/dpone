@@ -1,10 +1,10 @@
-"""Source-side validation receipts for immutable transfer files."""
+"""Source-side validation receipts for immutable character-wire files."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-from collections.abc import Mapping, Sequence
+from collections.abc import Sequence
 from dataclasses import dataclass
 from importlib import import_module
 from pathlib import Path
@@ -123,46 +123,6 @@ def project_key_snapshot_schema_contract(
             raise FileContractValidationError(f"key_contract_projection.contract_column_case_mismatch:{key}")
         projected[key] = declared[contract_name]
     return SchemaContract(enforcement=contract.enforcement, columns=projected)
-
-
-_OPAQUE_NATIVE_FORMATS = frozenset({"mssql-bcp-native", "mssql-native"})
-
-
-def opaque_native_file(artifact: Any) -> bool:
-    """True for SQL Server native bytes that cannot be scanned as a character wire."""
-
-    return _wire_format(artifact) in _OPAQUE_NATIVE_FORMATS
-
-
-def _wire_format(artifact: Any) -> str:
-    return str(getattr(artifact, "format", "")).replace("_", "-").lower()
-
-
-def attach_mssql_export_contract(
-    load_config: Any,
-    artifact: Any,
-    schema: Sequence[tuple[str, str]],
-) -> None:
-    """Scan a completed character-wire MSSQL export when a contract exists.
-
-    Opaque native bytes are not scanned here. ClickHouse observes the loaded
-    table instead.
-    """
-
-    options = getattr(load_config, "options", None) or {}
-    raw = options.get("schema_contract") if isinstance(options, Mapping) else None
-    if not isinstance(raw, Mapping) or not raw:
-        return
-    contract = SchemaContract.from_config(dict(raw))
-    if not contract.columns:
-        return
-    if _wire_format(artifact) != "mssql-delimited":
-        return
-    validate_mssql_delimited_file_contract(
-        artifact,
-        schema=tuple((str(name), str(dtype)) for name, dtype in schema),
-        contract=contract,
-    )
 
 
 def validate_mssql_delimited_file_contract(
@@ -350,8 +310,6 @@ __all__ = [
     "FileContractValidationError",
     "FileContractValidationReceipt",
     "project_key_snapshot_schema_contract",
-    "attach_mssql_export_contract",
-    "opaque_native_file",
     "require_file_contract_validation",
     "reissue_file_contract_validation",
     "validate_mssql_delimited_file_contract",

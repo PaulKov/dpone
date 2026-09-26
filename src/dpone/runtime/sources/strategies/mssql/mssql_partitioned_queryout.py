@@ -99,9 +99,6 @@ def build_partitioned_queryout(
                 artifact.bulk_wire_contract = bulk_wire_contract
             if isinstance(rows, int) and not isinstance(rows, bool) and rows >= 0 and artifact.rows_exported is None:
                 artifact.rows_exported = rows
-            from dpone.runtime.etl.file_contract_validation import attach_mssql_export_contract
-
-            attach_mssql_export_contract(load_config, artifact, schema)
             for key, value in context.metadata(bounds).items():
                 setattr(artifact, key, value)
             return artifact

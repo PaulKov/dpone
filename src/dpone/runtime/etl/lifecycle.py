@@ -24,7 +24,6 @@ from dpone.runtime.etl.contract_artifacts import (
     ContractValidatedFileArtifact,
     ContractValidationSummary,
 )
-from dpone.runtime.etl.file_contract_validation import opaque_native_file
 from dpone.runtime.etl.physical_design_lifecycle import RuntimePhysicalDesignService
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.sinks.load_payload import LoadPayload
@@ -75,11 +74,6 @@ class RuntimeLifecycleService:
                     schema=schema,
                 )
             )
-        if self._is_file(payload) and opaque_native_file(payload.artifact):
-            # Native BCP is not a character wire. The loaded ClickHouse table
-            # is observed after insert; a file receipt would claim a scan that
-            # did not happen.
-            return RuntimeLifecycleContext(payload=payload.rebind(schema=schema))
         if self._is_file(payload):
             return RuntimeLifecycleContext(
                 payload=payload.rebind(

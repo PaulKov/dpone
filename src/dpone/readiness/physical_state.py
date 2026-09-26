@@ -7,10 +7,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Protocol
 
 from dpone.readiness.physical_design_models import PhysicalDesignPlan
-from dpone.runtime.sinks.clickhouse_table_ddl import (
-    clickhouse_engine_identity,
-    normalize_clickhouse_ttl_expression,
-)
+from dpone.runtime.sinks.clickhouse_table_ddl import normalize_clickhouse_ttl_expression
 
 TableSettingValue = str | int | float | bool
 
@@ -78,11 +75,7 @@ class PhysicalTableState:
                 )
                 for index, (name, column) in enumerate(plan.columns.items(), start=1)
             },
-            engine=(
-                clickhouse_engine_identity(str(storage.get("engine") or "MergeTree"))
-                if plan.sink_type == "clickhouse"
-                else None
-            ),
+            engine=str(storage.get("engine") or "MergeTree") if plan.sink_type == "clickhouse" else None,
             partition_by=str(storage["partition_by"]) if storage.get("partition_by") else None,
             order_by=tuple(_list_option(storage.get("order_by"))),
             ttl=normalize_clickhouse_ttl_expression(ttl_raw) if plan.sink_type == "clickhouse" else None,
