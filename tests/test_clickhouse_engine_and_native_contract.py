@@ -242,6 +242,9 @@ def test_enforced_stream_loads_into_the_existing_clickhouse_table() -> None:
     )
     assert evidence is not None
     assert evidence.observed_bytes > 0
+    from dpone.runtime.governance.quality_probe_snapshots import source_snapshot
+
+    assert source_snapshot(SimpleNamespace(artifact=wrapper)).row_count == 2
 
 
 def test_partitioned_native_with_a_contract_is_refused_before_insert(tmp_path: Path) -> None:

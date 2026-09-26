@@ -181,6 +181,10 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
             accepted_row_count=accepted,
         )
         inner = self._artifact
+        self.rows_exported = accepted
+        self.row_count = accepted
+        inner.rows_exported = accepted
+        inner.row_count = accepted
         inner._events = [
             {
                 "status": "loaded_to_staging",
@@ -190,9 +194,6 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
             }
         ]
         inner.source_byte_measurement_complete = True
-        if hasattr(inner, "rows_exported"):
-            inner.rows_exported = accepted
-            inner.row_count = accepted
         lifecycle = getattr(inner, "extraction_lifecycle", None)
         if lifecycle is not None:
             lifecycle.complete()

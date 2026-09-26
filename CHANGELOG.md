@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.83.16 - 2026-09-26
+
+### Fixed
+
+- Publish the consumed row count of a contract-enforced stream so the
+  source/target row gate can see it.
+
 ## 0.83.15 - 2026-09-26
 
 ### Fixed
