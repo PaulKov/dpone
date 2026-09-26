@@ -181,6 +181,18 @@ class ContractValidatedFileArtifact(BaseExtractionArtifact):
             raise FileContractValidationError("file_contract_receipt.required")
         return self._artifact
 
+    def lacks_source_contract_receipt(self) -> bool:
+        """True only when no source receipt exists.
+
+        A failed row scan or any other validation error is not this case. Those
+        stay fatal and are not eligible for a later target observation.
+        """
+
+        if self._receipt is not None:
+            return False
+        error = self._validation_error
+        return isinstance(error, FileContractValidationError) and error.blocker == "file_contract_receipt.required"
+
 
 @dataclass(frozen=True, slots=True)
 class FileValidationBinding:

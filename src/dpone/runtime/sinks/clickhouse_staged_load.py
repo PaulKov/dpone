@@ -7,6 +7,7 @@ from dataclasses import replace
 from typing import Any
 
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
+from dpone.runtime.governance.clickhouse_acceptance_metrics import ClickHouseAcceptanceMetricProbe
 from dpone.runtime.governance.ports import (
     StagedLoadHandle,
     StagedLoadPostCommitCleanupError,
@@ -16,6 +17,7 @@ from dpone.runtime.governance.ports import (
 from dpone.runtime.process_io import add_exception_note
 from dpone.runtime.sinks.clickhouse_external_staged_lifecycle import ClickHouseExternalStagedLifecycle
 from dpone.runtime.sinks.clickhouse_full_refresh_staged import finalize_full_refresh, publication_cleanup_plan
+from dpone.runtime.sinks.clickhouse_loaded_contract import pending_native_observation
 from dpone.runtime.sinks.clickhouse_production_finalize import ClickHouseProductionFinalizer
 from dpone.runtime.sinks.clickhouse_staged_cleanup import drop_staging_configs
 from dpone.runtime.sinks.clickhouse_staged_evidence import enforce_source_byte_budget, staged_handle_metadata
@@ -54,7 +56,16 @@ class ClickHouseStagedLoadService:
         staging_config = self._create_staging(load_config, payload)
         finalization_config = decoded_config = None
         try:
-            staged_rows = self._sink._insert_payload(staging_config, payload)
+            observation = pending_native_observation(load_config, payload)
+            if observation is None:
+                staged_rows = self._sink._insert_payload(staging_config, payload)
+            else:
+                self._sink._insert_payload(staging_config, observation.payload)
+                staged_rows = observation.require(
+                    ClickHouseAcceptanceMetricProbe(self._sink.connector),
+                    database=str(staging_config.target_schema),
+                    table=str(staging_config.target_table),
+                )
             source_byte_budget = enforce_source_byte_budget(
                 payload,
                 maximum_bytes=(getattr(load_config, "options", {}) or {}).get(SOURCE_BYTE_BUDGET_OPTION),

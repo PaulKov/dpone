@@ -67,6 +67,9 @@ def _positive_limit(value: object) -> int:
 
 
 def _source_parts(artifact: Any) -> dict[tuple[object, ...], int] | None:
+    lacks_receipt = getattr(artifact, "lacks_source_contract_receipt", None)
+    if callable(lacks_receipt) and lacks_receipt():
+        return _source_parts(artifact.completed_source_authority_artifact)
     validated = getattr(type(artifact), "validated_file_contract_artifact", None)
     if validated is not None:
         return _source_parts(artifact.validated_file_contract_artifact)

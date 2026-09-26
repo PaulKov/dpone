@@ -19,6 +19,9 @@ class ClickHouseExternalStagedLifecycle:
         return bool(callable(predicate) and predicate(load_config))
 
     def stage(self, load_config: Any, payload: Any) -> StagedLoadHandle:
+        # Candidates are created on cluster members and proven by each member's
+        # row hash. The local connector does not see that table. Opaque native
+        # files are not an external seal; they stay on the local staging path.
         context = self._sink._full_refresh_publication.stage_external(load_config, payload)
         return StagedLoadHandle(
             staging_config=replace(load_config, target_table=context.candidate_name),

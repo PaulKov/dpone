@@ -22,6 +22,7 @@ class _ExternalRouter:
 
     def stage_external(self, config: object, payload: object) -> ExternalStagedContext:
         self.events.append("stage")
+        self.payload = payload
         return self.context
 
     def validate_external(self, context: ExternalStagedContext) -> object:
@@ -100,3 +101,27 @@ def test_external_abort_uses_exact_context_cleanup() -> None:
     service.abort(handle)
 
     assert router.events == ["stage", "abort"]
+
+
+def test_external_stage_does_not_query_the_local_connector() -> None:
+    router = _ExternalRouter()
+    connector = _ProbeConnector()
+    payload = SimpleNamespace(schema=(("id", "Int64"),))
+    sink = SimpleNamespace(_full_refresh_publication=router, connector=connector)
+
+    handle = ClickHouseStagedLoadService(sink).stage(_config(), payload)
+
+    assert router.payload is payload
+    assert connector.calls == 0
+    assert handle.staged_rows == 1
+    assert router.events == ["stage"]
+
+
+class _ProbeConnector:
+    def __init__(self) -> None:
+        self.calls = 0
+
+    def get_records(self, query: str, as_dict: bool = False) -> list[dict[str, int]]:
+        del query, as_dict
+        self.calls += 1
+        return []

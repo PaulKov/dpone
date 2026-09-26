@@ -7,6 +7,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 from dpone.runtime.byte_stream_artifacts import ByteStreamArtifact
+from dpone.runtime.etl.validated_file_artifact import ContractValidatedFileArtifact
 from dpone.runtime.file_artifacts import FileExportArtifact, PartitionedFileExportArtifact
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.native_transfer_artifacts import PartitionedTransferPlanArtifact
@@ -43,6 +44,10 @@ class ClickHousePayloadIngestionService:
         self._row_value_coercer = ClickHouseRowValueCoercer()
 
     def insert_payload(self, load_config: LoadConfig, payload: LoadPayload) -> int:
+        if isinstance(payload.artifact, ContractValidatedFileArtifact):
+            # Raises unless the source issued a contract receipt for these bytes.
+            inner = payload.artifact.validated_file_contract_artifact
+            return self.insert_payload(load_config, payload.rebind(artifact=inner))
         if isinstance(payload.artifact, PreparedSourceArtifact):
             return payload.artifact.load_with(
                 lambda artifact: self.insert_payload(

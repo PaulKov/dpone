@@ -17,6 +17,7 @@ from dpone.readiness.physical_reconciliation_diff import (
     table_setting_changes,
 )
 from dpone.readiness.physical_state import PhysicalTableState, TargetPhysicalMigrationDialect
+from dpone.runtime.sinks.clickhouse_table_ddl import clickhouse_engines_equivalent
 
 ChangeDecision = Literal["online_safe", "blocking", "shadow_required", "schema_evolution_owned", "warning"]
 
@@ -115,7 +116,11 @@ class PhysicalDesignDriftDetector:
 
     def detect(self, desired: PhysicalTableState, actual: PhysicalTableState) -> tuple[PhysicalDriftChange, ...]:
         changes: list[PhysicalDriftChange] = []
-        changes.extend(scalar_changes("engine", desired.engine, actual.engine))
+        if not (
+            desired.sink_type == "clickhouse"
+            and clickhouse_engines_equivalent(desired.engine, actual.engine, actual.engine_full)
+        ):
+            changes.extend(scalar_changes("engine", desired.engine, actual.engine))
         changes.extend(scalar_changes("partition_by", desired.partition_by, actual.partition_by))
         changes.extend(key_changes("order_by", desired.order_by, actual.order_by))
         expected_primary_key = desired.primary_key

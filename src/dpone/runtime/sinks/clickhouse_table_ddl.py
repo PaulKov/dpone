@@ -227,6 +227,55 @@ class ClickHouseTableDdlRenderer:
         )
 
 
+_ENGINE_CLAUSE_TAIL = re.compile(r"(?i)\s+\b(?:order\s+by|partition\s+by|primary\s+key|sample\s+by|ttl|settings)\b")
+
+
+def clickhouse_engine_identity(value: str | None) -> str | None:
+    """Engine clause without ORDER BY, PARTITION BY, or SETTINGS."""
+
+    if value is None:
+        return None
+    text = " ".join(str(value).split())
+    if not text:
+        return None
+    match = _ENGINE_CLAUSE_TAIL.search(text)
+    if match:
+        text = text[: match.start()].rstrip()
+    return text or None
+
+
+def clickhouse_engines_equivalent(
+    desired: str | None,
+    actual_engine: str | None,
+    actual_engine_full: str | None = None,
+) -> bool:
+    """Match a bare family name, or a full replication clause, to the live table.
+
+    ``system.tables.engine`` is the family. ``engine_full`` carries arguments.
+    An authored name without arguments accepts that family. An authored
+    ``ReplicatedMergeTree(...)`` expression must match the live clause, so a
+    different replication path stays drift.
+    """
+
+    desired_clause = clickhouse_engine_identity(desired)
+    actual_clause = clickhouse_engine_identity(actual_engine_full) or clickhouse_engine_identity(actual_engine)
+    if not desired_clause:
+        return not actual_clause
+    if "(" not in desired_clause:
+        return _engine_norm(desired_clause) == _engine_norm(_engine_family(actual_clause))
+    return _engine_norm(desired_clause) == _engine_norm(actual_clause)
+
+
+def _engine_family(clause: str | None) -> str | None:
+    if not clause:
+        return None
+    return clause.split("(", 1)[0].strip() or None
+
+
+def _engine_norm(value: str | None) -> str:
+    return "" if value is None else "".join(value.lower().split())
+
+
 def normalize_clickhouse_ttl_expression(value: Any) -> str | None:
     """Normalize a table-level TTL expression for CREATE/recon (no TTL keyword)."""
     if value is None:
@@ -316,5 +365,7 @@ __all__ = [
     "ClickHouseTableDesign",
     "ClickHouseTableDdlRenderer",
     "ClickHouseTableSettingsDialect",
+    "clickhouse_engine_identity",
+    "clickhouse_engines_equivalent",
     "normalize_clickhouse_ttl_expression",
 ]
