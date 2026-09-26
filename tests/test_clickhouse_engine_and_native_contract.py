@@ -11,7 +11,7 @@ from typing import Any
 import pytest
 
 from dpone.config import LoadConfig
-from dpone.config.load_strategy import LoadStrategy
+from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
 from dpone.readiness.physical_design import PhysicalDesignOptions, PhysicalDesignPlanner
 from dpone.readiness.physical_design_models import PhysicalReconciliationOptions
 from dpone.readiness.physical_reconciliation import PhysicalDesignReconciler
@@ -29,6 +29,7 @@ from dpone.runtime.sinks.clickhouse_loaded_contract import (
 )
 from dpone.runtime.sinks.clickhouse_payload_ingestion import ClickHousePayloadIngestionService
 from dpone.runtime.sinks.clickhouse_physical_reconciliation import ClickHousePhysicalMigrationDialect
+from dpone.runtime.sinks.clickhouse_staged_evidence import SourceByteBudgetError
 from dpone.runtime.sinks.clickhouse_staged_load import ClickHouseStagedLoadService
 from dpone.runtime.sinks.clickhouse_table_ddl import clickhouse_engines_equivalent
 from dpone.runtime.sinks.load_payload import LoadPayload
@@ -177,6 +178,30 @@ def test_insert_return_value_is_not_the_row_proof(tmp_path: Path) -> None:
 
     assert handle.staged_rows == 3
     assert len(sink.connector.queries) == 1
+
+
+def test_staged_native_observation_measures_bytes_without_a_file_receipt(tmp_path: Path) -> None:
+    sink = _Sink(inserted=0, table_rows=3, nulls=0)
+    config = _load_config("MergeTree", contract=_contract(nullable=False))
+    config.options[SOURCE_BYTE_BUDGET_OPTION] = 100
+
+    handle = ClickHouseStagedLoadService(sink).stage(config, _wrapped(tmp_path, rows=3))
+
+    assert handle.metadata["source_byte_budget"]["observed_bytes"] == 4
+    assert handle.staged_rows == 3
+    assert sink.dropped == []
+
+
+def test_staged_native_observation_still_rejects_an_over_budget_file(tmp_path: Path) -> None:
+    sink = _Sink(inserted=0, table_rows=3, nulls=0)
+    config = _load_config("MergeTree", contract=_contract(nullable=False))
+    config.options[SOURCE_BYTE_BUDGET_OPTION] = 1
+
+    with pytest.raises(SourceByteBudgetError) as raised:
+        ClickHouseStagedLoadService(sink).stage(config, _wrapped(tmp_path, rows=3))
+
+    assert raised.value.code == "DPONE_SOURCE_BYTE_BUDGET_EXCEEDED"
+    assert sink.dropped == ["technical.stage"]
 
 
 def test_partitioned_native_with_a_contract_is_refused_before_insert(tmp_path: Path) -> None:
