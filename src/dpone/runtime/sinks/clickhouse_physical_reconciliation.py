@@ -8,7 +8,6 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from dpone.readiness.physical_state import PhysicalColumnState, PhysicalTableState, TableSettingValue
-from dpone.runtime.sinks.clickhouse_table_ddl import clickhouse_engine_identity
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
@@ -41,9 +40,7 @@ class ClickHousePhysicalIntrospector:
             sink_type="clickhouse",
             table=_qualified_table(load_config),
             columns=self._columns(load_config),
-            engine=clickhouse_engine_identity(
-                _optional_str(table_row.get("engine_full")) or _optional_str(table_row.get("engine"))
-            ),
+            engine=_optional_str(table_row.get("engine")),
             engine_full=_optional_str(table_row.get("engine_full")),
             partition_by=_optional_str(table_row.get("partition_key")),
             order_by=tuple(_list_option(table_row.get("sorting_key"))),

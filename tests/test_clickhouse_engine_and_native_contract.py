@@ -1,8 +1,8 @@
-"""ClickHouse engine identity and opaque MSSQL native contract admission."""
+"""ClickHouse engine identity and post-load checks for opaque native files."""
 
 from __future__ import annotations
 
-import hashlib
+from dataclasses import replace
 from pathlib import Path
 
 from dpone.config import LoadConfig
@@ -10,178 +10,170 @@ from dpone.readiness.physical_design import PhysicalDesignOptions, PhysicalDesig
 from dpone.readiness.physical_design_models import PhysicalReconciliationOptions
 from dpone.readiness.physical_reconciliation import PhysicalDesignReconciler
 from dpone.readiness.physical_state import PhysicalTableState
-from dpone.readiness.schema_contracts import SchemaContract
-from dpone.runtime.artifact_integrity import CompletedFileWrite
 from dpone.runtime.etl.contract_artifacts import ContractValidatedFileArtifact
-from dpone.runtime.etl.file_contract_validation import (
-    OPAQUE_NATIVE_VALIDATOR_VERSION,
-    FileContractValidationError,
-    admit_mssql_native_file_contract,
-)
+from dpone.runtime.etl.lifecycle import RuntimeLifecycleService
 from dpone.runtime.file_artifacts import FileExportArtifact
-from dpone.runtime.sinks.clickhouse_payload_ingestion import ClickHousePayloadIngestionService
-from dpone.runtime.sinks.clickhouse_physical_reconciliation import ClickHousePhysicalIntrospector
-from dpone.runtime.sinks.clickhouse_table_ddl import clickhouse_engine_identity
+from dpone.runtime.governance.acceptance_snapshot import AcceptanceMetricSnapshot
+from dpone.runtime.sinks.clickhouse_loaded_contract import (
+    ClickHouseLoadedContractError,
+    loaded_contract_blocker,
+    require_loaded_contract,
+)
+from dpone.runtime.sinks.clickhouse_physical_reconciliation import (
+    ClickHousePhysicalIntrospector,
+    ClickHousePhysicalMigrationDialect,
+)
+from dpone.runtime.sinks.clickhouse_table_ddl import clickhouse_engines_equivalent
 from dpone.runtime.sinks.load_payload import LoadPayload
 
 _ENGINE = "ReplicatedMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}')"
 
 
-def test_engine_identity_drops_order_by_and_settings() -> None:
-    full = _ENGINE + " ORDER BY (id, ValidFrom) SETTINGS index_granularity = 8192"
+def test_bare_engine_family_matches_a_parameterized_live_table() -> None:
+    assert clickhouse_engines_equivalent("ReplicatedMergeTree", "ReplicatedMergeTree", _ENGINE + " ORDER BY id")
+    assert clickhouse_engines_equivalent("MergeTree", "MergeTree", None)
 
-    assert clickhouse_engine_identity(full) == _ENGINE
-    assert clickhouse_engine_identity(_ENGINE) == _ENGINE
-    assert clickhouse_engine_identity("MergeTree") == "MergeTree"
-    assert clickhouse_engine_identity(full) != clickhouse_engine_identity(
-        "ReplicatedMergeTree('/clickhouse/tables/{uuid}/other', '{replica}')"
+
+def test_parameterized_engine_must_match_the_live_clause() -> None:
+    full = _ENGINE + " ORDER BY (id) SETTINGS index_granularity = 8192"
+
+    assert clickhouse_engines_equivalent(_ENGINE, "ReplicatedMergeTree", full)
+    assert not clickhouse_engines_equivalent(
+        "ReplicatedMergeTree('/clickhouse/tables/{uuid}/other', '{replica}')",
+        "ReplicatedMergeTree",
+        full,
     )
+    assert not clickhouse_engines_equivalent("MergeTree", "ReplacingMergeTree", None)
 
 
 def test_matching_replication_clause_is_not_engine_drift() -> None:
     desired = _plan_state(_ENGINE)
-    actual = _plan_state(_ENGINE)
-
-    plan = PhysicalDesignReconciler().reconcile(
-        desired=desired,
-        actual=actual,
-        options=PhysicalReconciliationOptions(mode="auto_safe"),
-        dialect=_dialect(),
+    actual = replace(
+        _plan_state("ReplicatedMergeTree"),
+        engine_full=_ENGINE + " ORDER BY (id) SETTINGS index_granularity = 8192",
     )
+
+    plan = _reconcile(desired, actual)
+
+    assert "physical_design.shadow_required:engine" not in plan.blockers
+
+
+def test_bare_family_is_not_false_engine_drift() -> None:
+    desired = _plan_state("ReplicatedMergeTree")
+    actual = replace(desired, engine_full=_ENGINE + " ORDER BY id")
+
+    plan = _reconcile(desired, actual)
 
     assert "physical_design.shadow_required:engine" not in plan.blockers
 
 
 def test_different_replication_path_is_engine_drift() -> None:
     desired = _plan_state(_ENGINE)
-    actual = _plan_state("ReplicatedMergeTree('/clickhouse/tables/{uuid}/other', '{replica}')")
-
-    plan = PhysicalDesignReconciler().reconcile(
-        desired=desired,
-        actual=actual,
-        options=PhysicalReconciliationOptions(mode="auto_safe"),
-        dialect=_dialect(),
+    actual = replace(
+        desired,
+        engine="ReplicatedMergeTree",
+        engine_full="ReplicatedMergeTree('/clickhouse/tables/{uuid}/other', '{replica}') ORDER BY id",
     )
+
+    plan = _reconcile(desired, actual)
 
     assert "physical_design.shadow_required:engine" in plan.blockers
 
 
-def test_introspector_compares_engine_full_clause_not_family_name() -> None:
+def test_introspector_keeps_family_and_full_clause() -> None:
     full = _ENGINE + " ORDER BY id SETTINGS index_granularity = 8192"
 
     class _Connector:
         def get_records(self, query: str):
             if "system.columns" in query:
                 return [("id", "Int64", 1)]
-            assert "system.tables" in query
             return [("ReplicatedMergeTree", full, "", "id", "id", f"ENGINE = {full}")]
 
     actual = ClickHousePhysicalIntrospector(_Connector()).inspect(_load_config(_ENGINE))
 
-    assert actual.engine == _ENGINE
+    assert actual.engine == "ReplicatedMergeTree"
     assert actual.engine_full == full
 
 
-def test_native_export_receipt_admits_opaque_bytes_without_a_row_scan(tmp_path: Path) -> None:
-    payload = b"\x00native-bytes"
-    path = tmp_path / "extract.bcp"
-    path.write_bytes(payload)
-    artifact = FileExportArtifact(
-        str(path),
-        ("id",),
-        format="mssql-bcp-native",
-        _completed_write=CompletedFileWrite(
-            sha256=hashlib.sha256(payload).hexdigest(),
-            size_bytes=len(payload),
-            rows_exported=1,
-        ),
-    )
-    contract = SchemaContract.from_config(
-        {"enforcement": "strict", "columns": {"id": {"type": "bigint", "nullable": True}}}
-    )
+def test_loaded_contract_accepts_matching_rows_and_rejects_nulls() -> None:
+    ok = AcceptanceMetricSnapshot(side="staged", row_count=2, null_counts={"id": 0})
+    assert loaded_contract_blocker(ok, rows_exported=2, required_columns=("id",)) is None
 
-    receipt = admit_mssql_native_file_contract(artifact, schema=(("id", "bigint"),), contract=contract)
+    mismatch = AcceptanceMetricSnapshot(side="staged", row_count=1, null_counts={"id": 0})
+    assert loaded_contract_blocker(mismatch, rows_exported=2, required_columns=("id",)) == "row_count_mismatch"
 
-    assert receipt.validator_version == OPAQUE_NATIVE_VALIDATOR_VERSION
-    assert receipt.rows_validated == 1
-    wrapper = ContractValidatedFileArtifact(
-        artifact,
-        contract=contract,
-        schema=(("id", "bigint"),),
-        run_id="run",
-        load_id="load",
-    )
-    assert wrapper.validated_file_contract_artifact is artifact
+    nulls = AcceptanceMetricSnapshot(side="staged", row_count=2, null_counts={"id": 1})
+    assert loaded_contract_blocker(nulls, rows_exported=2, required_columns=("id",)) == "not_null_violation:id"
 
 
-def test_native_admission_rejects_character_wire(tmp_path: Path) -> None:
-    payload = b"1\n"
-    path = tmp_path / "extract.bcp"
-    path.write_bytes(payload)
-    artifact = FileExportArtifact(
-        str(path),
-        ("id",),
-        format="mssql-delimited",
-        _completed_write=CompletedFileWrite(
-            sha256=hashlib.sha256(payload).hexdigest(),
-            size_bytes=len(payload),
-            rows_exported=1,
-        ),
-    )
-    contract = SchemaContract.from_config({"columns": {"id": {"type": "bigint"}}})
-
-    try:
-        admit_mssql_native_file_contract(artifact, schema=(("id", "bigint"),), contract=contract)
-    except FileContractValidationError as exc:
-        assert exc.blocker == "file_contract_receipt.unsupported_wire"
-    else:
-        raise AssertionError("character wire must not use opaque admission")
-
-
-def test_clickhouse_insert_dispatches_validated_native_file(tmp_path: Path) -> None:
-    payload = b"\x01"
-    path = tmp_path / "extract.bcp"
-    path.write_bytes(payload)
-    artifact = FileExportArtifact(
-        str(path),
-        ("id",),
-        format="mssql-bcp-native",
-        _completed_write=CompletedFileWrite(
-            sha256=hashlib.sha256(payload).hexdigest(),
-            size_bytes=len(payload),
-            rows_exported=1,
-        ),
-    )
-    contract = SchemaContract.from_config({"columns": {"id": {"type": "bigint"}}})
-    admit_mssql_native_file_contract(artifact, schema=(("id", "bigint"),), contract=contract)
-    wrapper = ContractValidatedFileArtifact(
-        artifact,
-        contract=contract,
-        schema=(("id", "bigint"),),
-        run_id="run",
-        load_id="load",
-    )
+def test_require_loaded_contract_queries_the_inserted_table() -> None:
     seen: list[str] = []
 
-    class _Service(ClickHousePayloadIngestionService):
-        def insert_file(self, load_config: LoadConfig, file_artifact: FileExportArtifact, schema: object) -> int:
-            del load_config, schema
-            seen.append(file_artifact.format)
-            return 1
+    class _Connector:
+        def get_records(self, query: str, as_dict: bool = False):
+            del as_dict
+            seen.append(query)
+            return [{"row_count": 2, "null__id": 0}]
 
-    loaded = _Service(sink=object(), sink_factory=lambda connector: connector).insert_payload(
-        _load_config("MergeTree"),
-        LoadPayload(artifact=wrapper, schema=[("id", "bigint")]),
+    require_loaded_contract(
+        _Connector(),
+        database="landing",
+        table="orders",
+        contract=_contract(nullable=False),
+        rows_exported=2,
     )
 
-    assert loaded == 1
-    assert seen == ["mssql-bcp-native"]
+    assert "landing" in seen[0] and "orders" in seen[0] and "isNull" in seen[0]
 
 
-def _dialect():
-    from dpone.runtime.sinks.clickhouse_physical_reconciliation import ClickHousePhysicalMigrationDialect
+def test_require_loaded_contract_fails_closed_without_an_export_count() -> None:
+    try:
+        require_loaded_contract(
+            object(),
+            database="landing",
+            table="orders",
+            contract=_contract(nullable=True),
+            rows_exported=None,
+        )
+    except ClickHouseLoadedContractError as exc:
+        assert exc.blocker == "rows_exported_required"
+    else:
+        raise AssertionError("missing exporter row count must fail closed")
 
-    return ClickHousePhysicalMigrationDialect()
+
+def test_lifecycle_does_not_wrap_opaque_native_files(tmp_path: Path) -> None:
+    path = tmp_path / "extract.bcp"
+    path.write_bytes(b"\x00")
+    native = FileExportArtifact(str(path), ("id",), format="mssql-bcp-native")
+    character = FileExportArtifact(str(path), ("id",), format="csv")
+    service = RuntimeLifecycleService()
+    config = _load_config("MergeTree")
+    config.options["schema_contract"] = {"columns": {"id": {"type": "bigint", "nullable": True}}}
+
+    native_context = service.prepare_before_schema_evolution(
+        load_config=config,
+        payload=LoadPayload(artifact=native, schema=[("id", "bigint")]),
+        run_id="run",
+        load_id="load",
+    )
+    character_context = service.prepare_before_schema_evolution(
+        load_config=config,
+        payload=LoadPayload(artifact=character, schema=[("id", "bigint")]),
+        run_id="run",
+        load_id="load",
+    )
+
+    assert native_context.payload.artifact is native
+    assert isinstance(character_context.payload.artifact, ContractValidatedFileArtifact)
+
+
+def _reconcile(desired: PhysicalTableState, actual: PhysicalTableState):
+    return PhysicalDesignReconciler().reconcile(
+        desired=desired,
+        actual=actual,
+        options=PhysicalReconciliationOptions(mode="auto_safe"),
+        dialect=ClickHousePhysicalMigrationDialect(),
+    )
 
 
 def _plan_state(engine: str) -> PhysicalTableState:
@@ -209,3 +201,9 @@ def _load_config(engine: str) -> LoadConfig:
             },
         },
     )
+
+
+def _contract(*, nullable: bool):
+    from dpone.readiness.schema_contracts import SchemaContract
+
+    return SchemaContract.from_config({"columns": {"id": {"type": "bigint", "nullable": nullable}}})

@@ -6,12 +6,15 @@ import csv
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
+from dpone.readiness.schema_contracts import SchemaContract
 from dpone.runtime.byte_stream_artifacts import ByteStreamArtifact
+from dpone.runtime.etl.file_contract_validation import opaque_native_file
 from dpone.runtime.etl.validated_file_artifact import ContractValidatedFileArtifact
 from dpone.runtime.file_artifacts import FileExportArtifact, PartitionedFileExportArtifact
 from dpone.runtime.in_memory_rows import InMemoryRowsArtifact
 from dpone.runtime.native_transfer_artifacts import PartitionedTransferPlanArtifact
 from dpone.runtime.physical_chunking import PhysicalChunkedFileExportArtifact
+from dpone.runtime.sinks.clickhouse_loaded_contract import require_loaded_contract
 from dpone.runtime.sinks.clickhouse_nullability_policy import ClickHouseNullInsertPolicy
 from dpone.runtime.sinks.clickhouse_payload_support import (
     columnar_direct_push_loader,
@@ -177,7 +180,9 @@ class ClickHousePayloadIngestionService:
                 clickhouse_schema=self._clickhouse_schema(load_config, schema),
                 type_policy=self._type_policy(load_config),
             )
-            return self.insert_byte_stream(load_config, stream_artifact, schema)
+            loaded = self.insert_byte_stream(load_config, stream_artifact, schema)
+            self._observe_native_contract(load_config, artifact)
+            return loaded
         if artifact.format in {"mssql-native", "mssql-bcp-native"}:
             raise ValueError("clickhouse_mssql_native_requires_native_wire_contract")
         if artifact.compressed:
@@ -205,6 +210,26 @@ class ClickHousePayloadIngestionService:
             if batch:
                 total += self.execute_insert(load_config, columns, batch)
         return total
+
+    def _observe_native_contract(self, load_config: LoadConfig, artifact: FileExportArtifact) -> None:
+        """Check the inserted table when native bytes could not be scanned."""
+
+        if not opaque_native_file(artifact):
+            return
+        options = getattr(load_config, "options", None) or {}
+        raw = options.get("schema_contract") if isinstance(options, Mapping) else None
+        if not isinstance(raw, Mapping) or not raw:
+            return
+        contract = SchemaContract.from_config(dict(raw))
+        if not contract.columns:
+            return
+        require_loaded_contract(
+            self._sink.connector,
+            database=str(load_config.target_schema),
+            table=str(load_config.target_table),
+            contract=contract,
+            rows_exported=artifact.rows_exported,
+        )
 
     def insert_byte_stream(
         self,

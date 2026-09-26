@@ -126,53 +126,16 @@ def project_key_snapshot_schema_contract(
 
 
 _OPAQUE_NATIVE_FORMATS = frozenset({"mssql-bcp-native", "mssql-native"})
-OPAQUE_NATIVE_VALIDATOR_VERSION = 3
 
 
-def admit_mssql_native_file_contract(
-    artifact: Any,
-    *,
-    schema: tuple[tuple[str, str], ...],
-    contract: SchemaContract,
-) -> FileContractValidationReceipt:
-    """Bind opaque SQL Server native bytes to a contract without scanning cells.
+def opaque_native_file(artifact: Any) -> bool:
+    """True for SQL Server native bytes that cannot be scanned as a character wire."""
 
-    A character wire is scanned by ``validate_mssql_delimited_file_contract``.
-    Native BCP is not that wire. This receipt proves artifact identity, column
-    alignment, contract identity, and the exporter row count. It does not prove
-    cell values.
-    """
+    return _wire_format(artifact) in _OPAQUE_NATIVE_FORMATS
 
-    wire = str(getattr(artifact, "format", "")).replace("_", "-").lower()
-    if wire not in _OPAQUE_NATIVE_FORMATS:
-        raise FileContractValidationError("file_contract_receipt.unsupported_wire")
-    if bool(getattr(artifact, "compressed", False)):
-        raise FileContractValidationError("file_contract_receipt.compressed_wire_unsupported")
-    integrity = artifact.require_integrity_receipt()
-    frozen_schema = _normalized_schema(schema)
-    names = tuple(name for name, _dtype in frozen_schema)
-    if tuple(str(name) for name in getattr(artifact, "columns", ())) != names:
-        raise FileContractValidationError("file_contract_receipt.schema_alignment")
-    if len({name.casefold() for name in names}) != len(names):
-        raise FileContractValidationError("file_contract_receipt.schema_identity_ambiguous")
-    declared = contract.columns or {}
-    indexes = {name: index for index, name in enumerate(names)}
-    missing = tuple(name for name in declared if name not in indexes)
-    if missing:
-        raise FileContractValidationError(f"file_contract_receipt.contract_column_missing:{missing[0]}")
-    rows = integrity.require_rows_exported()
-    receipt = FileContractValidationReceipt(
-        artifact_sha256=integrity.sha256,
-        artifact_size_bytes=integrity.size_bytes,
-        contract_sha256=_contract_digest(contract),
-        schema_sha256=_schema_digest(frozen_schema),
-        validated_schema=frozen_schema,
-        wire_contract_sha256=artifact.wire_contract().sha256,
-        rows_validated=rows,
-        validator_version=OPAQUE_NATIVE_VALIDATOR_VERSION,
-    )
-    artifact.contract_validation_receipt = receipt
-    return receipt
+
+def _wire_format(artifact: Any) -> str:
+    return str(getattr(artifact, "format", "")).replace("_", "-").lower()
 
 
 def attach_mssql_export_contract(
@@ -180,7 +143,11 @@ def attach_mssql_export_contract(
     artifact: Any,
     schema: Sequence[tuple[str, str]],
 ) -> None:
-    """Issue the receipt for one completed MSSQL export when a contract exists."""
+    """Scan a completed character-wire MSSQL export when a contract exists.
+
+    Opaque native bytes are not scanned here. ClickHouse observes the loaded
+    table instead.
+    """
 
     options = getattr(load_config, "options", None) or {}
     raw = options.get("schema_contract") if isinstance(options, Mapping) else None
@@ -189,13 +156,13 @@ def attach_mssql_export_contract(
     contract = SchemaContract.from_config(dict(raw))
     if not contract.columns:
         return
-    frozen = tuple((str(name), str(dtype)) for name, dtype in schema)
-    wire = str(getattr(artifact, "format", "")).replace("_", "-").lower()
-    if wire == "mssql-delimited":
-        validate_mssql_delimited_file_contract(artifact, schema=frozen, contract=contract)
+    if _wire_format(artifact) != "mssql-delimited":
         return
-    if wire in _OPAQUE_NATIVE_FORMATS:
-        admit_mssql_native_file_contract(artifact, schema=frozen, contract=contract)
+    validate_mssql_delimited_file_contract(
+        artifact,
+        schema=tuple((str(name), str(dtype)) for name, dtype in schema),
+        contract=contract,
+    )
 
 
 def validate_mssql_delimited_file_contract(
@@ -383,9 +350,8 @@ __all__ = [
     "FileContractValidationError",
     "FileContractValidationReceipt",
     "project_key_snapshot_schema_contract",
-    "OPAQUE_NATIVE_VALIDATOR_VERSION",
-    "admit_mssql_native_file_contract",
     "attach_mssql_export_contract",
+    "opaque_native_file",
     "require_file_contract_validation",
     "reissue_file_contract_validation",
     "validate_mssql_delimited_file_contract",
