@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
 from hashlib import sha256
+from threading import Event
 
 import pytest
 from tests.integration.mssql.mssql_target_local_p1_cases import digest_cases
@@ -11,8 +13,11 @@ from tests.integration.mssql.mssql_target_local_p1_support import configured_tar
 from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
 from dpone.adapters.mssql_native_custody import NativeTargetCustody
 from dpone.contracts.bounded_window import WindowContractError
+from dpone.contracts.mssql_native_chunks import NativeChunkLimits, NativeChunkPlan
+from dpone.contracts.mssql_native_verification import NativeVerificationBackend, NativeVerificationIdentityV2
 from dpone.contracts.mssql_native_writer import BCP_STAGE_PROOF, NativeStageWriteGrant
 from dpone.runtime.sinks.mssql_native_bcp_writer import MssqlNativeBcpWriter
+from dpone.runtime.sinks.mssql_native_composition import compose_native_stage_context
 from dpone.runtime.sinks.mssql_native_target_digest import build_target_digest_sql, decode_target_digest_row
 
 pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
@@ -268,3 +273,73 @@ def test_empty_invocation_uses_distinct_custody_release_reason(tmp_path) -> None
 
     assert cleared.state == "clear"
     custody.assert_available_for_v1(lease)
+
+
+def test_empty_executor_completes_without_bcp_or_target_stage(stand, tmp_path) -> None:
+    case = digest_cases()[0]
+    plan = NativeChunkPlan(
+        "synthetic-empty-run",
+        "synthetic-empty-live-target",
+        "synthetic-empty-query",
+        "synthetic-empty-window",
+        "synthetic-empty-schema",
+        case.contract.type_layout_hash,
+    )
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        sha256(b"empty-protocol").hexdigest(),
+        sha256(b"empty-package").hexdigest(),
+        sha256(case.contract.type_layout_hash.encode()).hexdigest(),
+        "mssql-native-sha256-sum-v1",
+        sha256(b"empty-timeout").hexdigest(),
+    )
+    store = SQLiteWindowStore(tmp_path / "empty-live.db", clock=lambda: 1.0)
+    lease = store.acquire(plan.target_id, "empty-live-owner", 60)
+    custody = NativeTargetCustody(store, plan.target_id)
+    custody.claim(lease, identity.invocation_key)
+    importer_opens = 0
+
+    @contextmanager
+    def importer_connection():
+        nonlocal importer_opens
+        importer_opens += 1
+        pytest.fail("empty input must not open an importer or launch BCP")
+        yield
+
+    before = stand.single_record("SELECT COUNT_BIG(*) FROM sys.tables WHERE name LIKE 'dpone[_]native[_]%';")[0]
+    context = compose_native_stage_context(
+        store=store,
+        plan=plan,
+        lease=lease,
+        wire_contract=case.contract,
+        limits=NativeChunkLimits(
+            max_total_encoded_bytes=1 << 20,
+            stage_allocated_bytes_stop_threshold=1 << 30,
+            max_rows=8,
+            max_bytes=1 << 20,
+            max_row_bytes=1 << 16,
+            max_pending=1,
+        ),
+        work_dir=tmp_path / "empty-native-files",
+        target_connector=stand,
+        importer_connection=importer_connection,
+        bcp_options_factory=lambda **_values: pytest.fail("empty input must not configure BCP"),
+        database=stand.database,
+        schema="dbo",
+        row_source=lambda: iter(()),
+        journal_factory=lambda: pytest.fail("target-local empty input must select journal v2"),
+        cancelled=Event(),
+        required_target_headroom_bytes=1,
+        verification_identity=identity,
+    )
+
+    complete = context.executor.stage(plan, iter(()), case.contract, lease)
+
+    after = stand.single_record("SELECT COUNT_BIG(*) FROM sys.tables WHERE name LIKE 'dpone[_]native[_]%';")[0]
+    assert (complete.rows, complete.receipts) == (0, ())
+    assert importer_opens == 0
+    assert before == after
+    assert not tuple((tmp_path / "empty-native-files").rglob("*.native"))
+    assert custody.inspect(lease).state == "held"
