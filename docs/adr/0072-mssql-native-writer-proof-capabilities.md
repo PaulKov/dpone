@@ -54,6 +54,9 @@ proof-capability identifier into invocation identity.
 - Empty target-local invocations claim custody but launch no writer process.
 - A pre-EOF source failure may retire only fully verified exact-owned stages
   after durable non-publication proof. Any unknown attempt keeps custody held.
+- Raw and prepared cleanup require exact object/owner identity, an exclusive
+  table lock, and authoritative post-drop absence visibility before custody can
+  be released. Metadata-filtered absence remains unresolved.
 - Docker certification must exercise real BCP process loss, lock contention,
   late writes, object replacement, lease expiry, multi-chunk execution, and
   stable-custody admission. Mocked lifecycle tests are insufficient evidence.

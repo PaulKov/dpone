@@ -17,11 +17,7 @@ from dpone.runtime.sinks.strategies.mssql.mssql_native_staging import MssqlNativ
 
 @dataclass(frozen=True)
 class NativeStageContext:
-    """Composition-owned source, fenced journal, and independent worker services.
-
-    Recovery supplies a saved completed extraction lifecycle. Its row source is
-    never invoked. Capacity and receipt callbacks must assert current fencing.
-    """
+    """Composition-owned, fenced services for normal and source-free recovery."""
 
     plan: Any
     wire_contract: Any
@@ -40,6 +36,7 @@ class NativeStageContext:
     cancelled: Any = None
     observer: Any = field(default=None, kw_only=True)
     verification_identity: Any = field(default=None, kw_only=True)
+    target_local_timeout_seconds: int = field(default=3600, kw_only=True)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "observer", delivery_session(self.observer))
@@ -348,7 +345,7 @@ class MssqlNativeStagePreparer:
         return self._resources(prepared).context.preparation_scope()
 
     def cleanup(self, prepared: NativePreparedStage) -> None:
-        from dpone.runtime.sinks.mssql_native_prepared_owner import require_prepared_owner
+        from dpone.runtime.sinks.mssql_native_prepared_owner import retire_exact_prepared
 
         resources = self._resources(prepared)
         if resources.context.verification_identity is not None:
@@ -357,12 +354,13 @@ class MssqlNativeStagePreparer:
                 raise ValueError("mssql_native.published_cleanup_publication_required")
         strategy = self._strategy_for(prepared)
         with resources.context.preparation_scope():
-            exists = strategy.connector.get_records("SELECT OBJECT_ID(?)", (strategy._staging_name(prepared.staging),))
-            if exists and exists[0][0] is not None:
-                if exists[0][0] != resources.object_id:
-                    raise ValueError("mssql_native.prepared_object_identity_changed")
-                require_prepared_owner(strategy.connector, resources.planned)
-                prepared.staging.cleanup()
+            retire_exact_prepared(
+                strategy.connector,
+                resources.planned,
+                resources.object_id,
+                prepared.staging.cleanup,
+                timeout_seconds=resources.context.target_local_timeout_seconds,
+            )
         resources.context.cleanup_receipts(resources.receipts)
 
     def _strategy_for(self, prepared: NativePreparedStage) -> Any:

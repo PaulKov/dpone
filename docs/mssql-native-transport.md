@@ -272,10 +272,13 @@ resume preparation without reopening ClickHouse. Custody releases only after
 proved publication plus complete cleanup, verified empty completion, or complete
 authorized non-publication retirement.
 
-After a crash following stage deletion, dpone treats `OBJECT_ID() IS NULL` as
-absence authority only for a `dbo` or `sysadmin` recovery principal that can
-distinguish absence from metadata denial. A least-privilege principal keeps
-custody held for elevated or manual recovery. Unresolved `UNKNOWN` currently
+After a crash following raw or prepared-stage deletion, dpone treats
+`OBJECT_ID() IS NULL` as absence authority only for a `dbo` or `sysadmin`
+recovery principal that can distinguish absence from metadata denial. Prepared
+cleanup also locks and rechecks the exact object ID and ownership property,
+then proves post-drop absence before raw-stage cleanup or custody release. A
+least-privilege principal keeps custody held for elevated or manual recovery.
+Unresolved `UNKNOWN` currently
 requires escalation through the deployment's composed recovery authority; P1
 does not ship the proposed public recovery CLI. Operationally exclude older
 binaries while any v2 custody record remains held.

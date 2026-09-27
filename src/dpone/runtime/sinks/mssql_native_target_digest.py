@@ -81,11 +81,17 @@ def build_target_digest_sql(qualified_stage: str, contract: SourceNativeWireCont
     """
     _validate_expected_rows(expected_rows)
     _validate_stage(qualified_stage)
+    require_target_local_raw_layout(contract)
+    fields = _payload_fields(contract.columns, prepared=False)
+    return _build_sql(qualified_stage, expected_rows, (("row_hash", fields),))
+
+
+def require_target_local_raw_layout(contract: SourceNativeWireContract) -> None:
+    """Reject unsupported target-local layouts before source or writer I/O."""
     validate_mssql_native_contract(contract)
     if len(contract.columns) > 100:
         raise ValueError("mssql_native.target_digest_column_count")
-    fields = _payload_fields(contract.columns, prepared=False)
-    return _build_sql(qualified_stage, expected_rows, (("row_hash", fields),))
+    _payload_fields(contract.columns, prepared=False)
 
 
 def build_prepared_target_digest_sql(
