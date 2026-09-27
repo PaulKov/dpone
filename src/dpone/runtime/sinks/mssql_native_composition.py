@@ -107,6 +107,7 @@ def compose_native_stage_context(
                         connector, stage, timeout_seconds=target_local_timeout_seconds, assert_identity=check
                     ),
                     WindowOutcomeUnknown,
+                    target_local_timeout_seconds,
                 )
             yield MssqlNativeChunkImporter(
                 connector,
@@ -142,9 +143,17 @@ def compose_native_stage_context(
         if custody is None or verification_identity is None:
             return False
         projection = journal.data
-        if projection is None or projection["phase"] != "staging" or not projection["chunks"]:
+        if projection is None:
+            journal.begin()
+            projection = journal.data
+        if projection is None or projection["phase"] != "staging":
             return False
-        if any(events[-1]["event"] != "VERIFIED" for events in projection["events"].values()):
+        if not projection["chunks"] and (projection["events"] or projection["nonces"]):
+            return False
+        if any(
+            events[-1]["event"] not in {"VERIFIED", "FAILED_RETIRABLE", "RETIRED"}
+            for events in projection["events"].values()
+        ):
             return False
 
         def assert_nonpublication() -> None:
@@ -155,6 +164,8 @@ def compose_native_stage_context(
         journal.record_nonpublication(proof, assert_nonpublication=assert_nonpublication)
         for ordinal in sorted(map(int, projection["chunks"])):
             chunk = projection["chunks"][str(ordinal)]
+            if projection["events"][chunk["attempt_id"]][-1]["event"] == "RETIRED":
+                continue
             receipt = NativeChunkReceipt(**chunk["receipt"])
             with importer_factory() as importer:
                 journal.retire_verified(

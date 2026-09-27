@@ -103,9 +103,31 @@ class NativeMssqlRuntime:
             if recovered is None:
                 if claim is not None and claim.recovery_only:
                     raise WindowContractError("mssql_native.pre_eof_reextract_required")
-                with self.source(load_config, binding) as payload:
-                    handle = service.stage(load_config, payload)
-                    result = self._publish(load_config, service, handle, lease, lost)
+                source_entered = False
+                try:
+                    with self.source(load_config, binding) as payload:
+                        source_entered = True
+                        handle = service.stage(load_config, payload)
+                        result = self._publish(load_config, service, handle, lease, lost)
+                except Exception as error:
+                    zero_stage = not source_entered
+                    if source_entered and claim is not None:
+                        try:
+                            projection = context.journal_factory().data
+                            zero_stage = projection is None or (
+                                projection["phase"] == "staging"
+                                and not projection["chunks"]
+                                and not projection["events"]
+                                and not projection["rollback_history"]
+                            )
+                        except Exception as probe:
+                            error.add_note(f"native zero-stage probe failed: {type(probe).__name__}")
+                    if claim is not None and zero_stage and context.executor.on_failed_stage is not None:
+                        try:
+                            context.executor.on_failed_stage(context.journal_factory())
+                        except Exception as cleanup:
+                            error.add_note(f"native nonpublication cleanup failed: {type(cleanup).__name__}")
+                    raise
             elif handle is not None:
                 result = self._publish(load_config, service, handle, lease, lost)
             elif isinstance(recovered, LoadResult):

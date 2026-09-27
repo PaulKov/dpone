@@ -32,26 +32,18 @@ from dpone.contracts.mssql_native_chunks import (
 from dpone.ports.bounded_window import WindowStore
 from dpone.ports.mssql_native_chunks import NativeChunkImporter
 from dpone.runtime.mssql_native_capacity import require_native_spool_capacity
-from dpone.runtime.mssql_native_chunks_files import (
-    NativeRow,
-    discard_native_files,
-    encode_native_frame,
-    verify_native_file,
-)
+from dpone.runtime.mssql_native_chunks_files import NativeRow, encode_native_frame, verify_native_file
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session, frame_observation
 from dpone.runtime.mssql_native_sized_frames import sized_native_frames
+from dpone.runtime.mssql_native_target_local_recovery import NativeReextractRequired, recover_native_chunks
 from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
 from dpone.runtime.native_wire_models import SourceNativeWireContract
-from dpone.runtime.sinks.mssql_native_target_local_import import recover_target_local_staging
 
 if TYPE_CHECKING:
     from dpone.ports.native_delivery_observer import NativeDeliveryObserver
 
 ImporterFactory = Callable[[], AbstractContextManager[NativeChunkImporter]]
-
-
-class NativeReextractRequired(WindowContractError):
-    """Partial staging is settled; restart the complete query with a new invocation."""
+__all__ = ["BoundedNativeChunks", "NativeReextractRequired", "WindowOutcomeUnknown"]
 
 
 def _encode(*args: Any, observed: bool = False) -> tuple[Any, dict[str, Any], dict[str, Any] | None]:
@@ -179,36 +171,7 @@ class BoundedNativeChunks:
         This is a staging-only recovery API. A publication owner must reconcile its
         target transaction receipt before asking to settle any partial extraction.
         """
-        journal = self.journal_factory(plan, lease)
-        journal.bind_limits(self.limits.to_dict())
-        publication = journal.publication.state()
-        if publication is not None and publication["phase"] not in ("preparing", "prepared"):
-            raise WindowOutcomeUnknown("mssql_native.publication_requires_reconciliation")
-        result = journal.completed()
-        if self._target_local and result is None:
-            recover_target_local_staging(
-                journal, plan, lease, self.work_dir, self.importer_factory, self.on_failed_stage
-            )
-            raise NativeReextractRequired("mssql_native.reextract_required")
-        with self.importer_factory() as importer:
-            if result is not None:
-                for receipt in result.receipts:
-                    self.store.assert_lease(lease)
-                    with self.observations.recorder().phase(
-                        "raw_verify", reason="recovery", ordinal=receipt.ordinal, attempt_id=receipt.attempt_id
-                    ):
-                        if importer.inspect(plan, receipt, lease) != receipt:
-                            raise WindowContractError("mssql_native.recovered_stage_changed")
-                self._capacity(importer)
-                return result
-            for attempt_id in journal.attempts():
-                self.store.assert_lease(lease)
-                importer.settle(plan, attempt_id, lease)
-        self.store.assert_lease(lease)
-        discard_native_files(self.work_dir / journal.key.rsplit("/", 1)[-1])
-        if journal.data is not None and journal.data["phase"] == "staging":
-            journal.reextract_required()
-        raise NativeReextractRequired("mssql_native.reextract_required")
+        return recover_native_chunks(self, plan, lease)
 
     def _import(
         self, plan: NativeChunkPlan, file: EncodedNativeFile, attempt: str, lease: WindowLease, cancelled: Event

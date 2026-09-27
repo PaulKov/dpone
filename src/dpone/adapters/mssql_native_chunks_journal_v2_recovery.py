@@ -142,7 +142,8 @@ def record_nonpublication(journal: Any, proof_sha256: str, *, assert_nonpublicat
     if (
         not is_sha256_digest(proof_sha256)
         or data["publication"] is not None
-        or not data["chunks"]
+        or data["complete"] is not None
+        or (not data["chunks"] and (data["events"] or data["nonces"]))
         or any(
             data["events"][chunk["attempt_id"]][-1]["event"] not in {"VERIFIED", "FAILED_RETIRABLE", "RETIRED"}
             for chunk in data["chunks"].values()

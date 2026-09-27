@@ -4,60 +4,31 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable
-from contextlib import AbstractContextManager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from dpone.contracts.bounded_window import WindowOutcomeUnknown
 from dpone.ports.mssql_native_writer import NativeStageWriteGrant
 from dpone.runtime.file_artifacts import FileExportArtifact
-from dpone.runtime.mssql_native_chunks_files import EncodedNativeFile, verify_native_file
-
-
-def recover_target_local_staging(
-    journal: Any,
-    plan: Any,
-    lease: Any,
-    work_dir: Path,
-    importer_factory: Callable[[], AbstractContextManager[Any]],
-    on_failed_stage: Callable[[Any], bool] | None,
-) -> None:
-    """Reobserve durable BCP success without resuming a partial source query."""
-    projection = journal.data
-    if projection is None or projection["phase"] != "staging":
-        raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
-    directory = work_dir / journal.key.rsplit("/", 1)[-1]
-    with importer_factory() as importer:
-        for ordinal in sorted(map(int, projection["chunks"])):
-            chunk = projection["chunks"][str(ordinal)]
-            attempt_id = chunk["attempt_id"]
-            terminal = projection["events"][attempt_id][-1]
-            if terminal["event"] == "VERIFIED" and chunk["phase"] == "verified":
-                continue
-            if (
-                terminal["event"] in {"WRITER_TERMINAL", "UNKNOWN", "VERIFIED"}
-                and terminal["observation"]["writer_outcome"] == "success"
-            ):
-                artifact = chunk["file"]
-                file = EncodedNativeFile(directory / f"{ordinal}.native", **artifact)
-                importer.recover_positive(plan, file, attempt_id, lease)
-                continue
-            if terminal["event"] == "UNKNOWN":
-                journal.retain_bcp_incident(ordinal, attempt_id)
-            raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
-    if on_failed_stage is None or not on_failed_stage(journal):
-        raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
+from dpone.runtime.mssql_native_chunks_files import verify_native_file
+from dpone.runtime.mssql_native_target_local_recovery import retire_exact_owned_stage
 
 
 class NativeTargetLocalAttempt:
     """Bind one sealed attempt to supervised BCP and an exact-stage aggregate."""
 
     def __init__(
-        self, journal: Any, custody: Any, writer: Any, barrier: Callable[..., Any], unknown_error: type[Exception]
+        self,
+        journal: Any,
+        custody: Any,
+        writer: Any,
+        barrier: Callable[..., Any],
+        unknown_error: type[Exception],
+        retirement_timeout_seconds: int = 3600,
     ) -> None:
         self.journal, self.custody, self.writer, self.barrier = journal, custody, writer, barrier
         self.unknown_error = unknown_error
+        self.retirement_timeout_seconds = retirement_timeout_seconds
 
     @staticmethod
     def _observation(
@@ -250,17 +221,6 @@ class NativeTargetLocalAttempt:
             raise ValueError("mssql_native.published_cleanup_publication_required")
         self.drop_exact_owned(importer, plan, receipt, lease)
 
-    @staticmethod
-    def drop_exact_owned(importer: Any, plan: Any, receipt: Any, lease: Any) -> None:
+    def drop_exact_owned(self, importer: Any, plan: Any, receipt: Any, lease: Any) -> None:
         """Perform an exact-owner drop only after the caller's durable authority."""
-        table = importer.table_name(plan, receipt.attempt_id)
-        if receipt.stage_id != importer.qualified(table):
-            raise ValueError("mssql_native.stage_identity_mismatch")
-        object_id = receipt.consumed_part_evidence.get("native_object_id")
-        if type(object_id) is not int or object_id < 1:
-            raise ValueError("mssql_native.stage_identity_mismatch")
-        with importer._mutation_scope(plan, receipt.attempt_id, lease):
-            importer._assert_lease(lease)
-            importer._assert_stage_identity(plan, receipt.attempt_id, table, object_id)
-            importer.connector.execute_query(f"DROP TABLE {receipt.stage_id}")
-            importer._assert_lease(lease)
+        retire_exact_owned_stage(importer, plan, receipt, lease, timeout_seconds=self.retirement_timeout_seconds)

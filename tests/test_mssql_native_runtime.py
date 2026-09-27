@@ -254,3 +254,42 @@ def test_target_local_claims_before_resume_and_releases_after_cleanup(tmp_path):
     assert value.run(cfg, owner="invocation").status == "success"
     assert events.index("custody-claimed") < events.index("resume") < events.index("source")
     assert custody.inspect(value.store.acquire("target", "inspect", 60)).release_reason == "published_cleanup"
+
+
+def test_target_local_source_open_failure_requests_zero_stage_nonpublication(tmp_path):
+    value, events, journal = runtime(tmp_path)
+    cfg = config()
+    cfg.options["native_transfer"]["execution"]["verification_backend"] = "target_local"
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+    )
+    journal.identity = identity
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        bound.stage_context.plan = plan
+        bound.stage_context.executor = SimpleNamespace(
+            on_failed_stage=lambda current: events.append(("nonpublication", current is journal)) or True
+        )
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, identity)
+
+    value.bindings = bindings
+
+    def source(*args):
+        events.append("source-open")
+        raise OSError("source unavailable")
+
+    value.source = source
+    with pytest.raises(OSError, match="source unavailable"):
+        value.run(cfg, owner="invocation")
+    assert events[-2:] == ["source-open", ("nonpublication", True)]
+    assert "stage" not in events
