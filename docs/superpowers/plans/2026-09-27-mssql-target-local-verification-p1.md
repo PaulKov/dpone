@@ -52,6 +52,7 @@
 **Files:**
 - Create: `src/dpone/contracts/mssql_native_verification.py`
 - Create: `src/dpone/adapters/mssql_native_chunks_journal_v2.py`
+- Create: `src/dpone/adapters/mssql_native_chunks_journal_v2_events.py`
 - Create: `tests/test_mssql_native_verification_policy.py`
 - Create: `tests/test_mssql_native_chunks_journal_v2.py`
 
@@ -62,7 +63,7 @@
 - [ ] Write failing policy tests for omission/v1, explicit target-local/v2, invalid values, and fail-closed identity drift.
 - [ ] Write failing journal tests for distinct keys, canonical identity, strict event shape, hash links, invalid transitions, pre-EOF restart rejection, and v1 isolation.
 - [ ] Run both files and record RED.
-- [ ] Implement immutable contracts and v2 journal with the approved closed state machine. Do not edit v1 journal.
+- [ ] Implement immutable contracts and v2 journal with the approved closed state machine. Keep pure event validation/transition logic in the dedicated event module; do not edit v1 journal.
 - [ ] Run focused tests to green and commit in the writer worktree.
 
 ### Task 3: Runtime raw and prepared verification integration
