@@ -6,6 +6,15 @@
 - Target release: phased minor releases after 0.83.23
 - Last verified: 2026-09-27
 
+## Implementation status
+
+| Phase | Status in this change |
+|---|---|
+| P1: supervised BCP plus target-local verification | Implemented; local Docker certification is recorded separately from production qualification |
+| P2: SqlClient writer, .NET companion, and package extra | Not shipped; `mssql_sqlclient` in the writer-state schema is reserved for this later phase |
+| Public recovery CLI and delivery-evidence-v2 sidecar | Not shipped; P1 recovery is supplied by the deployment composition authority |
+| Private seven-day production qualification | Unverified here and never published with corporate identities, data, or measurements |
+
 ## Executive summary
 
 The bounded ClickHouse-to-MSSQL native route already has deterministic source

@@ -79,10 +79,15 @@ integrator_owned_paths:
   - examples/native
   - docs/mssql-native-transport.md
   - docs/source-sink/clickhouse-to-mssql.md
+  - docs/delivery-acceleration/operations.md
+  - docs/delivery-acceleration/certification.md
+  - docs/compatibility.md
+  - docs/reference/manifest-schemas.md
   - docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md
   - src/dpone/schema/dpone.mssql-native-writer-state.v2.schema.json
   - src/dpone/contracts/mssql_native_writer_state_schema.py
   - tests/test_mssql_native_writer_state_schema.py
+  - tests/test_manifest_schema_reference_docs.py
   - docs/adr/0072-mssql-native-writer-proof-capabilities.md
   - docs/adr-index.md
   - test_artifacts/live_certification/mssql-target-local-p1
@@ -109,10 +114,15 @@ forbidden_paths:
   - examples/native
   - docs/mssql-native-transport.md
   - docs/source-sink/clickhouse-to-mssql.md
+  - docs/delivery-acceleration/operations.md
+  - docs/delivery-acceleration/certification.md
+  - docs/compatibility.md
+  - docs/reference/manifest-schemas.md
   - docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md
   - src/dpone/schema/dpone.mssql-native-writer-state.v2.schema.json
   - src/dpone/contracts/mssql_native_writer_state_schema.py
   - tests/test_mssql_native_writer_state_schema.py
+  - tests/test_manifest_schema_reference_docs.py
   - docs/adr/0072-mssql-native-writer-proof-capabilities.md
   - docs/adr-index.md
   - test_artifacts/live_certification/mssql-target-local-p1

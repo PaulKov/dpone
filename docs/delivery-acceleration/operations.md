@@ -87,6 +87,27 @@ Existing manifests, Mapping/tuple consumers, wire files and recovery journals
 require no migration. Preserve the same physical target, invocation and source
 lifecycle identities when resuming an interrupted invocation after upgrade.
 
+## Observe target-local execution
+
+The plan exposes `verification_backend`, `verification_identity_version`, and
+`writer_proof_capability`. A successful target-local plan reports
+`target_local`, `2`, and `bcp-supervised-stage-barrier-v1`; a missing deployment
+composition reports `composition_required` before connector row I/O.
+
+Runtime observations use the phases `encode`, `import_verify`, `raw_verify`,
+`metadata_project`, `prepare_insert`, `prepared_verify`, `quality`, `publish`,
+`evidence`, and `checkpoint`. Worker intervals may overlap, so their durations
+must not be summed into elapsed delivery time. A retained-custody incident is
+reported with its stable invocation and diagnostic code, without paths,
+endpoints, SQL object names, query text, vendor exception text, or data values.
+
+The v2 writer event chain is privileged `WindowStore` recovery authority. Its
+closed format is validated by `dpone.mssql-native-writer-state.v2`; it is not a
+shareable benchmark sidecar. P1 does not implement the feature design's proposed
+delivery-evidence-v2 sidecar or public recovery CLI. Persist shareable
+performance observations separately from the recovery journal and keep
+unresolved custody inside the deployment's composed incident process.
+
 ## Connect optional observations
 
 Use one collector for the application-owned runtime and stage composition within
