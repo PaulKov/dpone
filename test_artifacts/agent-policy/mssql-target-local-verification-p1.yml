@@ -29,6 +29,7 @@ owned_paths:
   - src/dpone/contracts/mssql_native_verification.py
   - src/dpone/adapters/mssql_native_chunks_journal_v2.py
   - src/dpone/adapters/mssql_native_chunks_journal_v2_events.py
+  - src/dpone/adapters/mssql_native_chunks_journal_v2_recovery.py
   - src/dpone/runtime/sinks/mssql_native_import.py
   - src/dpone/runtime/sinks/mssql_native_prepared_digests.py
   - src/dpone/runtime/sinks/mssql_native_prepare.py
@@ -41,6 +42,7 @@ owned_paths:
   - src/dpone/contracts/mssql_native_writer.py
   - src/dpone/ports/mssql_native_writer.py
   - src/dpone/runtime/sinks/mssql_native_bcp_writer.py
+  - src/dpone/runtime/connectors/mssql_bcp_supervised.py
   - src/dpone/contracts/mssql_native_custody.py
   - src/dpone/adapters/mssql_native_custody.py
   - src/dpone/runtime/mssql_native_runtime.py

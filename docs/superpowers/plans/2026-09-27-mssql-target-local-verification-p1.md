@@ -86,9 +86,11 @@ every ambiguous outcome as `UNKNOWN` without automatic retry.
 - Modify: `src/dpone/contracts/mssql_native_verification.py`
 - Modify: `src/dpone/adapters/mssql_native_chunks_journal_v2.py`
 - Modify: `src/dpone/adapters/mssql_native_chunks_journal_v2_events.py`
+- Create: `src/dpone/adapters/mssql_native_chunks_journal_v2_recovery.py`
 - Create: `src/dpone/contracts/mssql_native_writer.py`
 - Create: `src/dpone/ports/mssql_native_writer.py`
 - Create: `src/dpone/runtime/sinks/mssql_native_bcp_writer.py`
+- Create: `src/dpone/runtime/connectors/mssql_bcp_supervised.py`
 - Create: `src/dpone/contracts/mssql_native_custody.py`
 - Create: `src/dpone/adapters/mssql_native_custody.py`
 - Modify: `src/dpone/runtime/mssql_native_runtime.py`
