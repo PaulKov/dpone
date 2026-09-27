@@ -103,6 +103,32 @@ end-to-end source route. Its live binary profile remains **UNVERIFIED**.
 VARCHAR/CHAR are currently rejected by the importer, including when a collation
 is configured.
 
+### Target-local P1 layout matrix
+
+`verification_backend: target_local` deliberately admits a narrower layout
+than the general native BCP transport. The generated
+`TargetLocalLayoutMatrixV1` currently permits at most 100 business columns and
+only these SQL Server wire types; each may be nullable:
+
+| SQL Server wire type | ClickHouse source family | Target-local P1 |
+|---|---|---|
+| `bigint` | signed integer mapped to `Int64` | admitted |
+| `float(53)` | `Float64` | admitted |
+| `nvarchar(max)` | ClickHouse `String` with Unicode text semantics | admitted |
+| `datetime2(6)` | UTC `DateTime64(6)` | admitted |
+
+Decimal, smaller integer widths, UUID, Date/Date32, binary, `varchar`/`char`,
+and other otherwise valid native BCP layouts remain on `python_readback` until
+their target-local SQL digest framing has differential live proof. Readiness
+rejects an unsupported target-local layout before source extraction or writer
+launch. The content-addressed matrix is produced by
+`TARGET_LOCAL_LAYOUT_MATRIX_V1`; its exact-commit certification artifact is
+[`layout-matrix-v1.json`](../test_artifacts/live_certification/mssql-target-local-p1/layout-matrix-v1.json).
+
+Prepared verification additionally admits only the framework-owned suffix
+types `varchar(26)`, `varchar(32)`, `varchar(64)`, `nvarchar(max)`, `int`, and
+`datetime2(7)`. Application columns cannot use that suffix allowance.
+
 Bounded delivery reuses frame sizes, projects canonical metadata in the prepared
 INSERT and computes business/full digests in one iterator. All four raw checks,
 the independent prepared prepublication check and the finalizer target-clock

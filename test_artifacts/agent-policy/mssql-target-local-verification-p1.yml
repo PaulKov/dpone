@@ -27,6 +27,7 @@ public_contract_impact:
 owned_paths:
   - src/dpone/runtime/mssql_native_chunks_files.py
   - src/dpone/runtime/sinks/mssql_native_target_digest.py
+  - src/dpone/runtime/sinks/mssql_native_target_local_layout.py
   - src/dpone/contracts/mssql_native_verification.py
   - src/dpone/contracts/mssql_native_verification_identity.py
   - src/dpone/adapters/mssql_native_chunks_journal_v2.py

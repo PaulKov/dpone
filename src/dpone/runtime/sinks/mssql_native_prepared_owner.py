@@ -96,8 +96,9 @@ def retire_exact_prepared(
     """Drop only the bound prepared object and prove authoritative absence.
 
     SQL Server may return ``NULL`` from ``OBJECT_ID`` when metadata is hidden.
-    Consequently, both an already-absent replay and the post-drop check require
-    an unfiltered metadata principal before cleanup may release custody.
+    Consequently, an already-absent replay requires an unfiltered metadata
+    principal. A caller that first locked and authenticated the exact visible
+    object may prove its own transactional DROP without elevated visibility.
     """
     qualified = connector.qualified_name(planned["schema"], planned["table"], database=planned["database"])
 
@@ -120,9 +121,6 @@ def retire_exact_prepared(
                 drop()
             if read_exact_object_id(connector, qualified) is not None:
                 raise ValueError("mssql_native.prepared_retirement_unproved")
-            require_unfiltered_object_metadata(
-                connector, diagnostic="mssql_native.prepared_absence_visibility_unproved"
-            )
             connector.commit_transaction()
         except BaseException:
             connector.rollback()

@@ -552,8 +552,9 @@ SQL Server version must support `HASHBYTES` over the compiled `varbinary(max)`
 payload and is checked before source I/O. Differential tests are the authority;
 SQL collation, implicit conversion, and row order must not affect the result.
 
-P1 never broadens or guesses the route surface. A generated
-`TargetLocalLayoutMatrixV1` is the intersection of the current planner,
+P1 never broadens or guesses the route surface. The generated
+`TargetLocalLayoutMatrixV1` in
+`dpone.runtime.sinks.mssql_native_target_local_layout` is the intersection of the current planner,
 ClickHouse source, encoder, importer, and live-certified layout registries.
 Current importer exclusions such as `char`/`varchar` without UTF-8 collation
 authority remain excluded. Wire-only `binary`/`varbinary` capability does not
@@ -563,6 +564,8 @@ framework types `varchar(26)`, `varchar(32)`, `varchar(64)`, `nvarchar(max)`,
 `int`, and `datetime2(7)`. Any layout absent from the generated matrix makes
 readiness reject `target_local`; default BCP continues Python readback without
 narrowing. The matrix artifact binds the exact commit and capability digest.
+The sanitized receipt is stored as
+`test_artifacts/live_certification/mssql-target-local-p1/layout-matrix-v1.json`.
 
 ### Pseudocode
 

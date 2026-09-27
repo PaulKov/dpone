@@ -16,10 +16,26 @@ from dpone.runtime.sinks.mssql_native_target_digest import (
     decode_prepared_target_digest_row,
     decode_target_digest_row,
 )
+from dpone.runtime.sinks.mssql_native_target_local_layout import TARGET_LOCAL_LAYOUT_MATRIX_V1
 
 
 def _contract(*columns: tuple[str, str]):
     return build_mssql_bcp_native_contract(schema=columns, query="SELECT 1")
+
+
+def test_target_local_layout_matrix_is_closed_explainable_and_content_addressed() -> None:
+    payload = TARGET_LOCAL_LAYOUT_MATRIX_V1.to_payload()
+
+    assert payload["schema_version"] == 1
+    assert payload["kind"] == "dpone.mssql-target-local-layout-matrix"
+    assert payload["max_business_columns"] == 100
+    assert [item["source_type"] for item in payload["raw_layouts"]] == [
+        "bigint",
+        "float(53)",
+        "nvarchar(max)",
+        "datetime2(6)",
+    ]
+    assert len(payload["capability_digest"]) == 64
 
 
 @pytest.mark.parametrize(

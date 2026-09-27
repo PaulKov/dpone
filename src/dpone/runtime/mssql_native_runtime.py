@@ -82,11 +82,19 @@ class NativeMssqlRuntime:
             service, context = binding.service, binding.stage_context
             if context.plan.target_id != self.target_id or context.lease != lease or context.cancelled is not lost:
                 raise WindowContractError("mssql_native.binding_lease_mismatch")
+            binding_identity = binding.verification_identity
+            context_identity = getattr(context, "verification_identity", None)
+            target_local = verification_backend.value == "target_local"
+            if target_local:
+                if binding_identity is None or context_identity is None or binding_identity != context_identity:
+                    raise WindowContractError("mssql_native.verification_identity_mismatch")
+            elif binding_identity is not None or context_identity is not None:
+                raise WindowContractError("mssql_native.verification_identity_mismatch")
             custody = self.custody_factory(self.store, self.target_id)
             claim = None
             invocation_key: str | None = None
-            if verification_backend.value == "target_local":
-                identity = binding.verification_identity or getattr(context, "verification_identity", None)
+            if target_local:
+                identity = binding_identity
                 journal = context.journal_factory()
                 if (
                     identity is None

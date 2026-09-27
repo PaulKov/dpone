@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any
 
 from dpone.runtime.mssql_native_chunks_files import native_multiset_digest
 from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract, validate_mssql_native_contract
+from dpone.runtime.sinks.mssql_native_target_local_layout import TARGET_LOCAL_LAYOUT_MATRIX_V1
 
 if TYPE_CHECKING:
     from dpone.runtime.native_wire_models import NativeWireColumnLayout, SourceNativeWireContract
@@ -89,8 +90,10 @@ def build_target_digest_sql(qualified_stage: str, contract: SourceNativeWireCont
 def require_target_local_raw_layout(contract: SourceNativeWireContract) -> None:
     """Reject unsupported target-local layouts before source or writer I/O."""
     validate_mssql_native_contract(contract)
-    if len(contract.columns) > 100:
+    if len(contract.columns) > TARGET_LOCAL_LAYOUT_MATRIX_V1.max_business_columns:
         raise ValueError("mssql_native.target_digest_column_count")
+    if any(not TARGET_LOCAL_LAYOUT_MATRIX_V1.admits(column) for column in contract.columns):
+        raise ValueError("mssql_native.target_digest_unsupported_type")
     _payload_fields(contract.columns, prepared=False)
 
 
