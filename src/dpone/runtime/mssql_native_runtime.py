@@ -15,6 +15,7 @@ from threading import Event, Thread
 from time import monotonic
 from typing import TYPE_CHECKING, Any
 
+from dpone.adapters.mssql_native_custody import NativeTargetCustody
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
 from dpone.contracts.process_types import ProcessResult
 from dpone.manifest.mssql_native_policy import native_verification_backend, validate_native_config
@@ -37,6 +38,12 @@ class NativeRuntimeBindings:
     verification_identity: Any = None
 
 
+def _matching_v2_journal(journal: Any, identity: Any) -> bool:
+    """Admit the framework journal by its immutable v2 identity contract."""
+
+    return getattr(journal, "identity", None) == identity
+
+
 class NativeMssqlRuntime:
     """Run one stable invocation through an owned sink's staged lifecycle."""
 
@@ -51,8 +58,8 @@ class NativeMssqlRuntime:
         quality: Callable[[Any, StagedLoadHandle, WindowLease], None],
         evidence: Callable[[Any, LoadResult, Any, WindowLease], None],
         advance_state: Callable[[Any, LoadResult, WindowLease], None],
-        custody_factory: Callable[[WindowStore, str], Any],
-        v2_journal_admission: Callable[[Any, Any], bool],
+        custody_factory: Callable[[WindowStore, str], Any] = NativeTargetCustody,
+        v2_journal_admission: Callable[[Any, Any], bool] = _matching_v2_journal,
         lease_ttl: float = 60.0,
         observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
     ) -> None:

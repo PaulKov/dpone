@@ -21,7 +21,7 @@ from dpone.runtime.sinks.mssql_native_target_digest import build_target_digest_s
 pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql, pytest.mark.integration_clickhouse]
 
 
-def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(tmp_path) -> None:
+def test_clickhouse_rows_use_aggregate_only_publication_and_reject_object_replacement(tmp_path) -> None:
     clickhouse = clickhouse_connector()
     target = mssql_connector()
     suffix = uuid.uuid4().hex[:16]

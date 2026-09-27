@@ -214,6 +214,61 @@ def test_junit_gate_cli_writes_derived_evidence_and_summary(tmp_path: Path) -> N
     assert "2 passed" in summary.read_text(encoding="utf-8")
 
 
+def test_junit_gate_produces_shareable_report_without_host_identity(tmp_path: Path) -> None:
+    raw = _write(
+        tmp_path / "raw.xml",
+        """<?xml version="1.0" encoding="utf-8"?>
+        <testsuites name="pytest tests">
+          <testsuite name="pytest" hostname="private-workstation" timestamp="2026-09-27T20:00:00Z"
+                     tests="1" skipped="0" failures="0" errors="0" time="1.5">
+            <testcase classname="integration.mssql" name="test_route" time="1.5"/>
+          </testsuite>
+        </testsuites>
+        """,
+    )
+    shareable = tmp_path / "shareable.xml"
+
+    result = helper.main(
+        [
+            "--junit",
+            str(raw),
+            "--sanitized-junit-output",
+            str(shareable),
+            "--min-passed",
+            "1",
+        ]
+    )
+
+    body = shareable.read_text(encoding="utf-8")
+    assert result == 0
+    assert "private-workstation" not in body
+    assert "hostname=" not in body
+    assert "timestamp=" not in body
+    assert 'classname="integration.mssql"' in body
+
+
+def test_junit_sanitizer_rejects_logs_and_diagnostic_payloads(tmp_path: Path) -> None:
+    raw = _write(
+        tmp_path / "raw-with-output.xml",
+        """<testsuite tests="1" skipped="0" failures="0" errors="0">
+          <testcase classname="integration.mssql" name="test_route"/>
+          <system-out>private endpoint output</system-out>
+        </testsuite>""",
+    )
+
+    result = helper.main(
+        [
+            "--junit",
+            str(raw),
+            "--sanitized-junit-output",
+            str(tmp_path / "shareable.xml"),
+        ]
+    )
+
+    assert result == 1
+    assert not (tmp_path / "shareable.xml").exists()
+
+
 def test_junit_gate_failure_evidence_cannot_claim_pass(tmp_path: Path) -> None:
     junit = _write(
         tmp_path / "skipped.xml",

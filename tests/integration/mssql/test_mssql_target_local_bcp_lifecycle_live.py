@@ -196,7 +196,7 @@ def test_changed_sealed_file_is_rejected_before_writer_launch(stand, tmp_path) -
     assert launches == 0
 
 
-def test_real_bcp_lock_timeout_is_ambiguous_and_cannot_release_custody(stand, tmp_path) -> None:
+def test_real_bcp_child_timeout_is_reaped_and_cannot_release_custody(stand, tmp_path) -> None:
     case = digest_cases()[0]
     table = stand.unique_table("timeout")
     file = case.sealed_file(tmp_path / "timeout.native")
@@ -221,7 +221,9 @@ def test_real_bcp_lock_timeout_is_ambiguous_and_cannot_release_custody(stand, tm
         with stand.held_table_lock(table):
             outcome = writer.write(grant, rejects_path=tmp_path / "timeout.rejects")
 
-        assert outcome.classification in {"timeout", "custody_lost"}
+        # The supervised timeout path terminates and reaps the child. A lost
+        # process handle would instead classify as custody_lost and fail this cell.
+        assert outcome.classification == "timeout"
         assert outcome.positive_terminal is False
         assert custody.inspect(lease).state == "held"
 

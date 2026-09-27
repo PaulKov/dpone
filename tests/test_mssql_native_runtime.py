@@ -16,7 +16,15 @@ from dpone.runtime.sinks.load_result import LoadResult
 from tests.test_mssql_native_policy import config
 
 
-def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+def runtime(
+    tmp_path,
+    *,
+    recovered=False,
+    evidence_fails=False,
+    quality_fails=False,
+    observer=None,
+    explicit_security_dependencies=True,
+):
     events = []
 
     class Journal(NativeChunkJournalV2):
@@ -97,6 +105,16 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
         if evidence_fails:
             raise ValueError("evidence")
 
+    security_dependencies = (
+        {
+            "custody_factory": NativeTargetCustody,
+            "v2_journal_admission": lambda current, identity: (
+                isinstance(current, NativeChunkJournalV2) and current.identity == identity
+            ),
+        }
+        if explicit_security_dependencies
+        else {}
+    )
     value = NativeMssqlRuntime(
         observer=observer,
         store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
@@ -107,10 +125,7 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
         quality=quality,
         evidence=evidence,
         advance_state=lambda *args: events.append("state"),
-        custody_factory=NativeTargetCustody,
-        v2_journal_admission=lambda current, identity: (
-            isinstance(current, NativeChunkJournalV2) and current.identity == identity
-        ),
+        **security_dependencies,
     )
     return value, events, journal
 
@@ -213,6 +228,18 @@ def test_v1_runtime_blocks_held_v2_custody_before_resume_or_source(tmp_path):
     value.store.release(lease)
     with pytest.raises(Exception, match="custody_held"):
         value.run(config(), owner="new")
+    assert "resume" not in events and "source" not in events
+
+
+def test_legacy_constructor_uses_framework_security_defaults(tmp_path):
+    value, events, _ = runtime(tmp_path, explicit_security_dependencies=False)
+    lease = value.store.acquire("target", "prior", 60)
+    NativeTargetCustody(value.store, "target").claim(lease, "a" * 64)
+    value.store.release(lease)
+
+    with pytest.raises(Exception, match="custody_held"):
+        value.run(config(), owner="legacy-caller")
+
     assert "resume" not in events and "source" not in events
 
 

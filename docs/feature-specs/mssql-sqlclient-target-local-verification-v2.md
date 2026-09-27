@@ -135,6 +135,15 @@ records; rollback selects BCP for a new invocation.
 
 ## Public contract
 
+This section is the approved end-state contract for the phased feature. The
+implementation-status table above is authoritative for the current release.
+P1 ships only the explicit `verification_backend: target_local` selector, BCP
+writer-state v2, deployment-composed recovery, and its documented Python
+composition boundary. References below to `mssql_sqlclient`, the public
+recovery CLI, delivery-evidence-v2 sidecars, companion packages, and their
+generated schemas describe the proposed P2 contract and are not current P1
+interfaces.
+
 ### CLI
 
 The executable admission sequence is:
@@ -161,7 +170,7 @@ mode emits one closed document to stdout. Missing companion
 (`mssql_sqlclient.type_unsupported`), and identity drift
 (`mssql_native.identity_mismatch`) fail before ClickHouse business-row I/O.
 
-Recovery adds `dpone ops mssql-native-recovery` with `inspect`, `reconcile`,
+P2 adds `dpone ops mssql-native-recovery` with `inspect`, `reconcile`,
 `resume`, and `retire` actions. Each requires an opaque invocation ID and
 durable journal root. Live actions additionally require `--yes`, a target
 connection binding, and the expected identity digest. `inspect` is read-only;
@@ -188,7 +197,7 @@ the command exit code is separate, and only `permitted_actions` may execute.
 
 ### Python API
 
-Add one capability-oriented port with immutable request and receipt contracts:
+P2 adds one capability-oriented port with immutable request and receipt contracts:
 
 ```python
 class NativeStageBulkWriter(Protocol):
@@ -209,7 +218,7 @@ It is not a content authority: the existing importer creates
 verification.
 
 Existing public BCP imports and `NativeChunkImporter` behavior remain valid.
-The companion is distributed as the optional `dpone-mssql-sqlclient` wheel and
+In P2, the companion is distributed as the optional `dpone-mssql-sqlclient` wheel and
 selected through the `dpone[mssql-sqlclient]` extra. It contains a
 framework-dependent Linux x64 assembly for .NET 8 LTS. Its closed protocol is
 `dpone.mssql-sqlclient.ipc.v1`; the wheel minor version must match dpone and
@@ -270,7 +279,7 @@ Connection and permission blockers are emitted only by `check --connections` or
 
 ### Artifacts and evidence
 
-Legacy BCP v1 evidence stays byte-identical. Optimized invocations write an
+Legacy BCP v1 evidence stays byte-identical. P2 optimized invocations write an
 atomically replaced UTF-8 `dpone.mssql-native-delivery-evidence.v2` JSON
 sidecar. Its closed schema requires:
 
@@ -319,7 +328,7 @@ unequal content creates a new revision, never overwriting history or v1
 evidence. The producer creates parents with existing artifact permissions,
 writes a same-directory temporary file, fsyncs it, and atomically renames it.
 
-Generated schemas are
+P2 generates the proposed schemas
 `dpone.mssql-native-admission.v2.schema.json`,
 `dpone.mssql-native-recovery.v2.schema.json`, and
 `dpone.mssql-native-delivery-evidence.v2.schema.json`. Admission requires
@@ -1003,7 +1012,11 @@ writers use separate worktrees and task contracts.
 | Docs/UX reviewer | Route docs/runbook/examples review | Public contracts and evidence | Production code | Integrated candidate |
 | Integrator | Shared schemas, registries, ADR/index, changelog, dependency locks | Entire scoped diff | Unrelated dbt/composition work | All reports |
 
-## Approval checklist
+## Implementation readiness checklist
+
+The `APPROVED` status records maintainer approval of this phased design. The
+unchecked items below are implementation/release gates for the remaining
+phases; they do not claim that P1 or P2 has passed final certification.
 
 - [x] User problem and CJM are clear.
 - [ ] Algorithm and failure semantics passed independent review.
@@ -1013,4 +1026,4 @@ writers use separate worktrees and task contracts.
 - [x] Claimed differentiation is measurable.
 - [ ] Tests, evidence, docs, rollout, and rollback passed independent review.
 - [x] Path ownership and integration plan are conflict-safe.
-- [ ] Maintainer changed status to `APPROVED`.
+- [x] Maintainer changed status to `APPROVED`.

@@ -129,6 +129,22 @@ def junit_cases(path: Path) -> tuple[JunitCase, ...]:
     return tuple(cases)
 
 
+def write_shareable_junit(source: Path, destination: Path) -> None:
+    """Write PASS-only JUnit without host, timestamp, path, or diagnostic payloads."""
+
+    tree = ET.parse(source)
+    root = tree.getroot()
+    forbidden_nodes = ("system-out", "system-err", "properties", "failure", "error", "skipped")
+    if any(root.find(f".//{name}") is not None for name in forbidden_nodes):
+        raise ValueError("shareable junit contains diagnostic or non-PASS payloads")
+    for node in root.iter():
+        for attribute in ("hostname", "timestamp", "file", "line"):
+            node.attrib.pop(attribute, None)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    ET.indent(tree, space="  ")
+    tree.write(destination, encoding="utf-8", xml_declaration=True)
+
+
 def _write_evidence(
     path: Path,
     *,
@@ -188,6 +204,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--junit", type=Path, required=True, help="Path to junit XML")
     parser.add_argument(
+        "--sanitized-junit-output",
+        type=Path,
+        help="Write and validate a PASS-only shareable JUnit receipt without environment identities",
+    )
+    parser.add_argument(
         "--min-passed",
         type=int,
         default=1,
@@ -210,14 +231,18 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--profile is required with --evidence-json")
         if not args.commit_sha or re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", args.commit_sha) is None:
             parser.error("--commit-sha must be an exact 40- or 64-character hexadecimal SHA")
+    junit_path = args.junit
     try:
+        if args.sanitized_junit_output is not None:
+            write_shareable_junit(args.junit, args.sanitized_junit_output)
+            junit_path = args.sanitized_junit_output
         ok, message = evaluate_junit(
-            args.junit,
+            junit_path,
             min_passed=args.min_passed,
             max_skipped=args.max_skipped,
         )
-        totals = summarize_junit(args.junit) if args.junit.is_file() else JunitTotals(0, 0, 0, 0, 0)
-        cases = junit_cases(args.junit) if args.junit.is_file() else ()
+        totals = summarize_junit(junit_path) if junit_path.is_file() else JunitTotals(0, 0, 0, 0, 0)
+        cases = junit_cases(junit_path) if junit_path.is_file() else ()
     except (ET.ParseError, OSError, ValueError) as exc:
         ok = False
         message = f"invalid junit evidence: {exc}"
@@ -226,7 +251,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.evidence_json is not None:
         _write_evidence(
             args.evidence_json,
-            junit=args.junit,
+            junit=junit_path,
             profile=args.profile,
             commit_sha=args.commit_sha,
             min_passed=args.min_passed,

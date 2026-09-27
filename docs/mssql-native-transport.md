@@ -183,6 +183,8 @@ produces a different invocation key and cannot resume unfinished work.
 | `quality(config, handle, lease)` | Configured quality gates against prepared staging before publication |
 | `evidence(config, result, context, lease)` | Durable idempotent evidence bound to the exact commit receipt |
 | `advance_state(config, result, lease)` | Fenced idempotent checkpoint CAS after evidence persistence |
+| `custody_factory(store, target_id)` | Optional override for stable target custody; the framework default preserves old constructor calls and blocks v1 while v2 custody is held |
+| `v2_journal_admission(journal, identity)` | Optional stricter deployment admission; the framework default requires the journal's immutable identity to equal the composed v2 identity |
 
 The binding contains a service, `NativeStageContext` and fresh
 `MssqlTransactionAdmission`. Set `context.cancelled` to the supplied event. Restore
