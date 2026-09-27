@@ -1,0 +1,576 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.mssql-native-writer-state.v2.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "else": {
+        "properties": {
+          "previous_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "sequence": {
+            "minimum": 1,
+            "type": "integer"
+          },
+          "stage_binding": {
+            "additionalProperties": false,
+            "properties": {
+              "object_id": {
+                "minimum": 1,
+                "type": "integer"
+              },
+              "owner_binding_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "schema_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "stage_id": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              }
+            },
+            "required": [
+              "object_id",
+              "owner_binding_sha256",
+              "schema_sha256",
+              "stage_id"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "event": {
+            "const": "INTENT"
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "previous_sha256": {
+            "type": "null"
+          },
+          "sequence": {
+            "const": 0
+          },
+          "stage_binding": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "else": {
+        "properties": {
+          "writer_binding": {
+            "additionalProperties": false,
+            "allOf": [
+              {
+                "else": {
+                  "properties": {
+                    "writer_proof_capability": {
+                      "const": "sqlclient-session-applock-v1"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "import_backend": {
+                      "const": "bcp"
+                    }
+                  }
+                },
+                "then": {
+                  "properties": {
+                    "writer_proof_capability": {
+                      "const": "bcp-supervised-stage-barrier-v1"
+                    }
+                  }
+                }
+              }
+            ],
+            "properties": {
+              "capability_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "grant_token_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "import_backend": {
+                "enum": [
+                  "bcp",
+                  "mssql_sqlclient"
+                ]
+              },
+              "package_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "protocol_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "timeout_policy_sha256": {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              },
+              "writer_proof_capability": {
+                "enum": [
+                  "bcp-supervised-stage-barrier-v1",
+                  "sqlclient-session-applock-v1"
+                ]
+              }
+            },
+            "required": [
+              "capability_sha256",
+              "grant_token_sha256",
+              "import_backend",
+              "package_sha256",
+              "protocol_sha256",
+              "timeout_policy_sha256",
+              "writer_proof_capability"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "event": {
+            "enum": [
+              "INTENT",
+              "STAGE_OWNED"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "writer_binding": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "else": {
+        "properties": {
+          "observation": {
+            "additionalProperties": false,
+            "properties": {
+              "count_overflow": {
+                "type": [
+                  "boolean",
+                  "null"
+                ]
+              },
+              "diagnostic_code": {
+                "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+                "type": "string"
+              },
+              "input_rows_consumed": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                ]
+              },
+              "limbs": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "items": {
+                      "pattern": "^(0|[1-9][0-9]*)$",
+                      "type": "string"
+                    },
+                    "maxItems": 8,
+                    "minItems": 8,
+                    "type": "array"
+                  }
+                ]
+              },
+              "quiescence": {
+                "enum": [
+                  "unverified",
+                  "proved",
+                  "failed"
+                ]
+              },
+              "row_count": {
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "minimum": 0,
+                    "type": "integer"
+                  }
+                ]
+              },
+              "writer_outcome": {
+                "enum": [
+                  "cleanup_failed",
+                  "custody_lost",
+                  "failure",
+                  "lost_ack",
+                  "success",
+                  "timeout"
+                ]
+              }
+            },
+            "required": [
+              "count_overflow",
+              "diagnostic_code",
+              "input_rows_consumed",
+              "limbs",
+              "quiescence",
+              "row_count",
+              "writer_outcome"
+            ],
+            "type": "object"
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "event": {
+            "enum": [
+              "INTENT",
+              "STAGE_OWNED",
+              "GRANTED",
+              "WRITING"
+            ]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "observation": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "properties": {
+    "artifact_binding": {
+      "additionalProperties": false,
+      "properties": {
+        "encoded_bytes": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "file_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "ordinal": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "rows": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "typed_digest": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "encoded_bytes",
+        "file_sha256",
+        "ordinal",
+        "rows",
+        "typed_digest"
+      ],
+      "type": "object"
+    },
+    "attempt_id": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "pattern": "^(?:(?:(?:[0-9]{3}[1-9]|[0-9]{2}[1-9][0-9]|[0-9][1-9][0-9]{2}|[1-9][0-9]{3})-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12][0-9]|3[01])|(?:0[469]|11)-(?:0[1-9]|[12][0-9]|30)|02-(?:0[1-9]|1[0-9]|2[0-8])))|(?:(?!(?:0000))(?:[0-9]{2}(?:0[48]|[2468][048]|[13579][26])|(?:[02468][048]|[13579][26])00)-02-29))T(?:[01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?Z$",
+      "type": "string"
+    },
+    "event": {
+      "enum": [
+        "FAILED_RETIRABLE",
+        "GRANTED",
+        "INCIDENT_RETAINED",
+        "INTENT",
+        "PARTIAL_PROVED",
+        "QUIESCENT",
+        "RETIRED",
+        "STAGE_OWNED",
+        "UNKNOWN",
+        "VERIFIED",
+        "WRITER_TERMINAL",
+        "WRITING"
+      ]
+    },
+    "invocation_key": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "kind": {
+      "const": "dpone.mssql-native-writer-state.v2"
+    },
+    "observation": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "count_overflow": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "diagnostic_code": {
+              "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+              "type": "string"
+            },
+            "input_rows_consumed": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              ]
+            },
+            "limbs": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "items": {
+                    "pattern": "^(0|[1-9][0-9]*)$",
+                    "type": "string"
+                  },
+                  "maxItems": 8,
+                  "minItems": 8,
+                  "type": "array"
+                }
+              ]
+            },
+            "quiescence": {
+              "enum": [
+                "unverified",
+                "proved",
+                "failed"
+              ]
+            },
+            "row_count": {
+              "anyOf": [
+                {
+                  "type": "null"
+                },
+                {
+                  "minimum": 0,
+                  "type": "integer"
+                }
+              ]
+            },
+            "writer_outcome": {
+              "enum": [
+                "cleanup_failed",
+                "custody_lost",
+                "failure",
+                "lost_ack",
+                "success",
+                "timeout"
+              ]
+            }
+          },
+          "required": [
+            "count_overflow",
+            "diagnostic_code",
+            "input_rows_consumed",
+            "limbs",
+            "quiescence",
+            "row_count",
+            "writer_outcome"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ordinal": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "previous_sha256": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      ]
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "sequence": {
+      "minimum": 0,
+      "type": "integer"
+    },
+    "stage_binding": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "object_id": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "owner_binding_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "schema_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "stage_id": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "object_id",
+            "owner_binding_sha256",
+            "schema_sha256",
+            "stage_id"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "writer_binding": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "else": {
+                "properties": {
+                  "writer_proof_capability": {
+                    "const": "sqlclient-session-applock-v1"
+                  }
+                }
+              },
+              "if": {
+                "properties": {
+                  "import_backend": {
+                    "const": "bcp"
+                  }
+                }
+              },
+              "then": {
+                "properties": {
+                  "writer_proof_capability": {
+                    "const": "bcp-supervised-stage-barrier-v1"
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "capability_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "grant_token_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "import_backend": {
+              "enum": [
+                "bcp",
+                "mssql_sqlclient"
+              ]
+            },
+            "package_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "protocol_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "timeout_policy_sha256": {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            "writer_proof_capability": {
+              "enum": [
+                "bcp-supervised-stage-barrier-v1",
+                "sqlclient-session-applock-v1"
+              ]
+            }
+          },
+          "required": [
+            "capability_sha256",
+            "grant_token_sha256",
+            "import_backend",
+            "package_sha256",
+            "protocol_sha256",
+            "timeout_policy_sha256",
+            "writer_proof_capability"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "required": [
+    "artifact_binding",
+    "attempt_id",
+    "created_at",
+    "event",
+    "invocation_key",
+    "kind",
+    "observation",
+    "ordinal",
+    "previous_sha256",
+    "schema_version",
+    "sequence",
+    "stage_binding",
+    "writer_binding"
+  ],
+  "title": "dpone MSSQL native writer state v2 event",
+  "type": "object"
+}
