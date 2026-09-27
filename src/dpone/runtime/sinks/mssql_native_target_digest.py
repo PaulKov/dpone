@@ -18,6 +18,7 @@ from dpone.runtime.native_wire_mssql import validate_mssql_native_contract
 
 _WORD_BASE = 1 << 32
 _MAX_EXPECTED_ROWS = (1 << 63) - 2
+_PAYLOAD_CHUNK_WIDTH = 4
 _PREPARED_VARCHAR_TYPES = frozenset({"varchar(26)", "varchar(32)", "varchar(64)"})
 _FRAMEWORK_LAYOUTS: dict[str, tuple[str, bool]] = {
     "__dpone__run_id": ("varchar(26)", False),
@@ -66,8 +67,8 @@ def build_target_digest_sql(qualified_stage: str, contract: SourceNativeWireCont
     validate_mssql_native_contract(contract)
     if len(contract.columns) > 100:
         raise ValueError("mssql_native.target_digest_column_count")
-    payload = _payload_sql(contract.columns, prepared=False)
-    return _build_sql(qualified_stage, expected_rows, (("row_hash", payload),))
+    fields = _payload_fields(contract.columns, prepared=False)
+    return _build_sql(qualified_stage, expected_rows, (("row_hash", fields),))
 
 
 def build_prepared_target_digest_sql(
@@ -109,12 +110,12 @@ def build_prepared_target_digest_sql(
     null_metadata = tuple(
         column.name for column in full_columns[len(business_columns) :] if column.name == "__dpone__meta"
     )
-    business_payload = _payload_sql(business_columns, prepared=False)
-    full_payload = _payload_sql(full_columns, prepared=True, null_sentinels=frozenset(null_metadata))
+    business_fields = _payload_fields(business_columns, prepared=False)
+    full_fields = _payload_fields(full_columns, prepared=True, null_sentinels=frozenset(null_metadata))
     return _build_sql(
         qualified_stage,
         expected_rows,
-        (("business_hash", business_payload), ("full_hash", full_payload)),
+        (("business_hash", business_fields), ("full_hash", full_fields)),
         null_metadata=null_metadata,
     )
 
@@ -122,14 +123,30 @@ def build_prepared_target_digest_sql(
 def _build_sql(
     qualified_stage: str,
     expected_rows: int,
-    hashes: tuple[tuple[str, str], ...],
+    hashes: tuple[tuple[str, tuple[str, ...]], ...],
     *,
     null_metadata: tuple[str, ...] = (),
 ) -> str:
-    selections = ",\n    ".join(f"HASHBYTES('SHA2_256', {payload}) AS {name}" for name, payload in hashes)
+    # Each APPLY owns a shallow expression while the final hash concatenates
+    # only aliases. SQL Server materializes fixed-size hashes, never row payloads.
+    chunks = tuple((name, _payload_chunks(fields)) for name, fields in hashes)
+    selections = [
+        "HASHBYTES('SHA2_256', "
+        + " + ".join(
+            ["CONVERT(varbinary(max), 0x)", *(f"{name}_chunk_{index}.payload" for index in range(len(values)))]
+        )
+        + f") AS {name}"
+        for name, values in chunks
+    ]
     if null_metadata:
         invalid = " OR ".join(f"s.{_quote_column(name)} IS NOT NULL" for name in null_metadata)
-        selections += f",\n    CONVERT(bit, CASE WHEN {invalid} THEN 1 ELSE 0 END) AS invalid_metadata"
+        selections.append(f"CONVERT(bit, CASE WHEN {invalid} THEN 1 ELSE 0 END) AS invalid_metadata")
+    projected = ",\n    ".join(selections)
+    applies = "\n".join(
+        f"CROSS APPLY (VALUES ({chunk})) AS {name}_chunk_{index}(payload)"
+        for name, values in chunks
+        for index, chunk in enumerate(values)
+    )
     guard = (
         "IF EXISTS (SELECT 1 FROM #dpone_target_hashes WHERE invalid_metadata = 1)\n"
         "BEGIN THROW 51000, 'mssql_native.unbounded_metadata_changed', 1; END;\n"
@@ -139,14 +156,15 @@ def _build_sql(
     limbs = ",\n    ".join(
         f"COALESCE(SUM(CONVERT(decimal(38,0), ({_word_sql(index, name)}))), CONVERT(decimal(38,0), 0)) "
         f"AS {name}_limb_{index}"
-        for name, _payload in hashes
+        for name, _fields in hashes
         for index in range(8)
     )
     return (
         "SET NOCOUNT ON;\n"
         "DROP TABLE IF EXISTS #dpone_target_hashes;\n"
-        f"SELECT TOP ({expected_rows + 1}) {selections}\n"
-        f"INTO #dpone_target_hashes FROM {qualified_stage} AS s WITH (TABLOCKX, HOLDLOCK);\n"
+        f"SELECT TOP ({expected_rows + 1}) {projected}\n"
+        f"INTO #dpone_target_hashes FROM {qualified_stage} AS s WITH (TABLOCKX, HOLDLOCK)\n"
+        f"{applies};\n"
         f"{guard}"
         "SELECT COUNT_BIG(*) AS rows, "
         f"CONVERT(bit, CASE WHEN COUNT_BIG(*) > {expected_rows} THEN 1 ELSE 0 END) AS count_overflow,\n    "
@@ -155,18 +173,25 @@ def _build_sql(
     )
 
 
-def _payload_sql(
+def _payload_fields(
     columns: tuple[NativeWireColumnLayout, ...], *, prepared: bool, null_sentinels: frozenset[str] = frozenset()
-) -> str:
+) -> tuple[str, ...]:
     # NULL-only framework values are checked separately in the same bounded
     # scan. Hashing their actual value first would allow unbounded target work.
-    fields = (
+    return tuple(
         "CONVERT(varbinary(max), 0xFFFFFFFFFFFFFFFF)"
         if column.name in null_sentinels
         else _field_sql(column, prepared=prepared)
         for column in columns
     )
-    return " + ".join(["CONVERT(varbinary(max), 0x)", *fields])
+
+
+def _payload_chunks(fields: tuple[str, ...]) -> tuple[str, ...]:
+    """Split canonical bytes without changing their left-to-right order."""
+    return tuple(
+        " + ".join(["CONVERT(varbinary(max), 0x)", *fields[offset : offset + _PAYLOAD_CHUNK_WIDTH]])
+        for offset in range(0, len(fields), _PAYLOAD_CHUNK_WIDTH)
+    )
 
 
 def _base_type(column: NativeWireColumnLayout) -> str:
@@ -257,7 +282,7 @@ def _field_sql(column: NativeWireColumnLayout, *, prepared: bool) -> str:
     elif prepared and dtype == "int" and column.storage_type == "int" and column.fixed_length == 4:
         encoded = _little_endian_sql(f"CONVERT(binary(4), {value})", 4)
     elif dtype == "float(53)" and column.storage_type == "float" and column.fixed_length == 8:
-        encoded = f"CONVERT(varbinary(max), CONVERT(binary(8), {value}))"
+        encoded = _little_endian_sql(f"CONVERT(binary(8), {value})", 8)
     elif dtype == "nvarchar(max)" and column.storage_type == "nvarchar" and column.prefix_width == 8:
         encoded = f"CONVERT(varbinary(max), {value})"
     elif (
