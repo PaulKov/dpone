@@ -15,8 +15,6 @@ from threading import Event, Thread
 from time import monotonic
 from typing import TYPE_CHECKING, Any
 
-from dpone.adapters.mssql_native_chunks_journal_v2 import NativeChunkJournalV2
-from dpone.adapters.mssql_native_custody import NativeTargetCustody
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
 from dpone.contracts.process_types import ProcessResult
 from dpone.manifest.mssql_native_policy import native_verification_backend, validate_native_config
@@ -53,6 +51,8 @@ class NativeMssqlRuntime:
         quality: Callable[[Any, StagedLoadHandle, WindowLease], None],
         evidence: Callable[[Any, LoadResult, Any, WindowLease], None],
         advance_state: Callable[[Any, LoadResult, WindowLease], None],
+        custody_factory: Callable[[WindowStore, str], Any],
+        v2_journal_admission: Callable[[Any, Any], bool],
         lease_ttl: float = 60.0,
         observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
     ) -> None:
@@ -61,6 +61,8 @@ class NativeMssqlRuntime:
         self.store, self.target_id = store, target_id
         self.bindings, self.source, self.preflight = bindings, source, preflight
         self.quality, self.evidence, self.advance_state = quality, evidence, advance_state
+        self.custody_factory = custody_factory
+        self.v2_journal_admission = v2_journal_admission
         self.lease_ttl = lease_ttl
         self.observations = delivery_session(observer)
 
@@ -80,15 +82,15 @@ class NativeMssqlRuntime:
             service, context = binding.service, binding.stage_context
             if context.plan.target_id != self.target_id or context.lease != lease or context.cancelled is not lost:
                 raise WindowContractError("mssql_native.binding_lease_mismatch")
-            custody = NativeTargetCustody(self.store, self.target_id)
+            custody = self.custody_factory(self.store, self.target_id)
             claim = None
             invocation_key: str | None = None
             if verification_backend.value == "target_local":
                 identity = binding.verification_identity or getattr(context, "verification_identity", None)
                 journal = context.journal_factory()
                 if (
-                    not isinstance(journal, NativeChunkJournalV2)
-                    or identity is None
+                    identity is None
+                    or not self.v2_journal_admission(journal, identity)
                     or journal.identity != identity
                     or identity.plan != context.plan
                 ):

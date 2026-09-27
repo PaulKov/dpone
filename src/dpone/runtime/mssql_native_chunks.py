@@ -32,7 +32,12 @@ from dpone.contracts.mssql_native_chunks import (
 from dpone.ports.bounded_window import WindowStore
 from dpone.ports.mssql_native_chunks import NativeChunkImporter
 from dpone.runtime.mssql_native_capacity import require_native_spool_capacity
-from dpone.runtime.mssql_native_chunks_files import NativeRow, encode_native_frame, verify_native_file
+from dpone.runtime.mssql_native_chunks_files import (
+    NativeRow,
+    discard_native_files,
+    encode_native_frame,
+    verify_native_file,
+)
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session, frame_observation
 from dpone.runtime.mssql_native_sized_frames import sized_native_frames
 from dpone.runtime.mssql_native_target_local_recovery import NativeRecoveryFailures, recover_native_chunks
@@ -179,6 +184,8 @@ class BoundedNativeChunks:
             plan,
             lease,
             NativeRecoveryFailures(WindowContractError, WindowOutcomeUnknown, NativeReextractRequired),
+            encoded_file_factory=EncodedNativeFile,
+            discard_files=discard_native_files,
         )
 
     def _import(

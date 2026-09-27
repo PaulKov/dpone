@@ -107,6 +107,10 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
         quality=quality,
         evidence=evidence,
         advance_state=lambda *args: events.append("state"),
+        custody_factory=NativeTargetCustody,
+        v2_journal_admission=lambda current, identity: (
+            isinstance(current, NativeChunkJournalV2) and current.identity == identity
+        ),
     )
     return value, events, journal
 

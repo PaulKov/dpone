@@ -17,6 +17,7 @@ from typing import Any, Concatenate, ParamSpec, TypeVar
 
 from dpone.adapters.mssql_native_chunks_journal_v2_events import (
     adopt_orphan_event,
+    commit_verified_receipt,
     event_key,
     initial_projection,
     requires_dedicated_recovery,
@@ -120,6 +121,8 @@ class NativeChunkJournalV2(BcpRecoveryMixin):
     def opaque_stage_id(self, qualified_stage_id: str) -> str:
         """Return the coordinate-free binding used in v2 writer events."""
         return opaque_native_stage_id(self.identity, qualified_stage_id)
+
+    _commit_verified_receipt = commit_verified_receipt
 
     def _load(self) -> None:
         self.store.assert_lease(self.lease)

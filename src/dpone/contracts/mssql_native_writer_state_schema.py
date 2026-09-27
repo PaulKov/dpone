@@ -7,15 +7,12 @@ from typing import Any
 from dpone.contracts.mssql_native_verification import (
     ARTIFACT_FIELDS,
     EVENT_FIELDS,
+    NATIVE_WRITER_OUTCOMES,
     NEXT_EVENTS,
     OBSERVATION_FIELDS,
     STAGE_FIELDS,
     WRITER_FIELDS,
-)
-from dpone.contracts.mssql_native_writer import (
-    BCP_STAGE_PROOF,
-    SQLCLIENT_SESSION_PROOF,
-    WRITER_OUTCOMES,
+    WRITER_PROOF_CAPABILITIES,
 )
 
 _SHA = {"type": "string", "pattern": "^[0-9a-f]{64}$"}
@@ -65,7 +62,7 @@ def _bindings() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[st
     writer = _closed(
         {
             "import_backend": {"enum": ["bcp", "mssql_sqlclient"]},
-            "writer_proof_capability": {"enum": [BCP_STAGE_PROOF, SQLCLIENT_SESSION_PROOF]},
+            "writer_proof_capability": {"enum": list(WRITER_PROOF_CAPABILITIES)},
             "protocol_sha256": _SHA,
             "package_sha256": _SHA,
             "capability_sha256": _SHA,
@@ -77,13 +74,13 @@ def _bindings() -> tuple[dict[str, Any], dict[str, Any], dict[str, Any], dict[st
     writer["allOf"] = [
         {
             "if": {"properties": {"import_backend": {"const": "bcp"}}},
-            "then": {"properties": {"writer_proof_capability": {"const": BCP_STAGE_PROOF}}},
-            "else": {"properties": {"writer_proof_capability": {"const": SQLCLIENT_SESSION_PROOF}}},
+            "then": {"properties": {"writer_proof_capability": {"const": WRITER_PROOF_CAPABILITIES[0]}}},
+            "else": {"properties": {"writer_proof_capability": {"const": WRITER_PROOF_CAPABILITIES[1]}}},
         }
     ]
     observation = _closed(
         {
-            "writer_outcome": {"enum": sorted(WRITER_OUTCOMES)},
+            "writer_outcome": {"enum": sorted(NATIVE_WRITER_OUTCOMES)},
             "input_rows_consumed": _nullable(_NONNEGATIVE),
             "row_count": _nullable(_NONNEGATIVE),
             "count_overflow": {"type": ["boolean", "null"]},

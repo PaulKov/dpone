@@ -8,8 +8,6 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from dpone.runtime.mssql_native_chunks_files import EncodedNativeFile, discard_native_files
-
 
 @dataclass(frozen=True)
 class NativeRecoveryFailures:
@@ -79,6 +77,7 @@ def recover_target_local_staging(
     work_dir: Path,
     importer_factory: Callable[[], AbstractContextManager[Any]],
     on_failed_stage: Callable[[Any], bool] | None,
+    encoded_file_factory: Callable[..., Any],
     failures: NativeRecoveryFailures,
 ) -> None:
     """Reobserve only positive terminals, then resume authorized retirement."""
@@ -106,7 +105,7 @@ def recover_target_local_staging(
                 and terminal["observation"]["writer_outcome"] == "success"
             ):
                 artifact = chunk["file"]
-                file = EncodedNativeFile(directory / f"{ordinal}.native", **artifact)
+                file = encoded_file_factory(directory / f"{ordinal}.native", **artifact)
                 importer.recover_positive(plan, file, attempt_id, lease)
                 continue
             if terminal["event"] == "UNKNOWN":
@@ -117,7 +116,15 @@ def recover_target_local_staging(
     raise failures.outcome_unknown("mssql_native.target_local_pre_eof_custody_retained")
 
 
-def recover_native_chunks(service: Any, plan: Any, lease: Any, failures: NativeRecoveryFailures) -> Any:
+def recover_native_chunks(
+    service: Any,
+    plan: Any,
+    lease: Any,
+    failures: NativeRecoveryFailures,
+    *,
+    encoded_file_factory: Callable[..., Any],
+    discard_files: Callable[[Path], None],
+) -> Any:
     """Recover a complete stage or settle an incomplete invocation source-free."""
     journal = service.journal_factory(plan, lease)
     journal.bind_limits(service.limits.to_dict())
@@ -127,7 +134,14 @@ def recover_native_chunks(service: Any, plan: Any, lease: Any, failures: NativeR
     result = journal.completed()
     if service._target_local and result is None:
         recover_target_local_staging(
-            journal, plan, lease, service.work_dir, service.importer_factory, service.on_failed_stage, failures
+            journal,
+            plan,
+            lease,
+            service.work_dir,
+            service.importer_factory,
+            service.on_failed_stage,
+            encoded_file_factory,
+            failures,
         )
         raise failures.reextract("mssql_native.reextract_required")
     with service.importer_factory() as importer:
@@ -145,7 +159,7 @@ def recover_native_chunks(service: Any, plan: Any, lease: Any, failures: NativeR
             service.store.assert_lease(lease)
             importer.settle(plan, attempt_id, lease)
     service.store.assert_lease(lease)
-    discard_native_files(service.work_dir / journal.key.rsplit("/", 1)[-1])
+    discard_files(service.work_dir / journal.key.rsplit("/", 1)[-1])
     if journal.data is not None and journal.data["phase"] == "staging":
         journal.reextract_required()
     raise failures.reextract("mssql_native.reextract_required")
