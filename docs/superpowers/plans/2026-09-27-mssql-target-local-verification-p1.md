@@ -75,6 +75,7 @@ every ambiguous outcome as `UNKNOWN` without automatic retry.
 
 **Files:**
 - Modify: `src/dpone/runtime/sinks/mssql_native_import.py`
+- Create: `src/dpone/runtime/sinks/mssql_native_target_local_import.py`
 - Modify: `src/dpone/runtime/sinks/mssql_native_prepared_digests.py`
 - Modify: `src/dpone/runtime/sinks/mssql_native_prepare.py`
 - Modify: `src/dpone/runtime/sinks/mssql_native_composition.py`
@@ -95,6 +96,7 @@ every ambiguous outcome as `UNKNOWN` without automatic retry.
 - Create: `src/dpone/adapters/mssql_native_custody.py`
 - Modify: `src/dpone/runtime/mssql_native_runtime.py`
 - Modify: `tests/test_mssql_native_staged_import.py`
+- Create: `tests/test_mssql_native_target_local_import.py`
 - Modify: `tests/test_mssql_native_integrity_readbacks.py`
 - Modify: `tests/test_mssql_native_composition.py`
 - Modify: `tests/test_mssql_native_chunks_execution.py`

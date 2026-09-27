@@ -31,6 +31,7 @@ owned_paths:
   - src/dpone/adapters/mssql_native_chunks_journal_v2_events.py
   - src/dpone/adapters/mssql_native_chunks_journal_v2_recovery.py
   - src/dpone/runtime/sinks/mssql_native_import.py
+  - src/dpone/runtime/sinks/mssql_native_target_local_import.py
   - src/dpone/runtime/sinks/mssql_native_prepared_digests.py
   - src/dpone/runtime/sinks/mssql_native_prepare.py
   - src/dpone/runtime/sinks/mssql_native_composition.py
@@ -50,6 +51,7 @@ owned_paths:
   - tests/test_mssql_native_verification_policy.py
   - tests/test_mssql_native_chunks_journal_v2.py
   - tests/test_mssql_native_staged_import.py
+  - tests/test_mssql_native_target_local_import.py
   - tests/test_mssql_native_integrity_readbacks.py
   - tests/test_mssql_native_composition.py
   - tests/test_mssql_native_chunks_execution.py
@@ -116,6 +118,7 @@ required_checks:
   focused:
     - "uv run pytest tests/test_mssql_native_target_digest.py tests/test_mssql_native_verification_policy.py tests/test_mssql_native_chunks_journal_v2.py -q"
     - "uv run pytest tests/test_mssql_native_staged_import.py tests/test_mssql_native_integrity_readbacks.py tests/test_mssql_native_composition.py tests/test_mssql_native_chunks_execution.py -q"
+    - "uv run pytest tests/test_mssql_native_target_local_import.py -q"
     - "uv run pytest tests/test_mssql_bcp_process.py tests/test_mssql_native_bcp_writer.py tests/test_mssql_native_guard.py tests/test_mssql_native_custody.py tests/test_mssql_native_runtime.py -q"
     - "uv run pytest tests/test_mssql_native_writer_state_schema.py tests/test_mssql_native_policy.py tests/test_mssql_native_staged_planning.py -q"
   broad:
