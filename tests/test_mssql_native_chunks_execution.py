@@ -276,6 +276,7 @@ def test_target_local_recovery_observes_positive_terminal_then_requires_reextrac
             "phase": "staging",
             "chunks": {"0": {"attempt_id": attempt_id, "file": artifact, "phase": "staging"}},
             "events": {attempt_id: [{"event": last_event, "observation": {"writer_outcome": "success"}}]},
+            "rollback_history": [],
         }
         publication = type("Publication", (), {"state": lambda self: None})()
 

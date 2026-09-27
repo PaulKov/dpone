@@ -446,6 +446,17 @@ def test_nonpublication_proof_is_idempotent_and_cannot_be_changed(tmp_path):
     assert NativeChunkJournalV2(store, lease, _identity(plan)).data == journal.data
 
 
+def test_zero_stage_source_failure_persists_nonpublication_without_attempt(tmp_path):
+    store, lease, plan, journal = _journal(tmp_path)
+    journal.begin()
+    journal.record_nonpublication("4" * 64, assert_nonpublication=lambda: None)
+    reopened = NativeChunkJournalV2(store, lease, _identity(plan))
+    assert reopened.data["chunks"] == reopened.data["events"] == reopened.data["nonces"] == {}
+    assert reopened.data["rollback_history"] == [{"kind": "pre_eof_nonpublication", "proof_sha256": "4" * 64}]
+    with pytest.raises(WindowContractError, match="reextract_required"):
+        reopened.attempt(0, 0, _file(tmp_path))
+
+
 def test_nonpublication_proof_freezes_new_attempts_and_writer_events(tmp_path):
     _, _, _, journal = _journal(tmp_path)
     attempt_id = _verified_chain(journal, tmp_path)

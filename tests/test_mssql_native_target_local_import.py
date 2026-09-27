@@ -141,9 +141,27 @@ def test_published_cleanup_requires_durable_authority_and_exact_stage_identity()
             calls.append("identity")
 
         class Connector:
+            object_id = 11
+            bounded_query_timeout = staticmethod(lambda seconds: nullcontext())
+
             @staticmethod
-            def execute_query(sql):
+            def begin():
+                pass
+
+            @staticmethod
+            def commit_transaction():
+                pass
+
+            @staticmethod
+            def rollback():
+                pass
+
+            def get_records(self, sql, params=None):
+                return [(self.object_id,)] if sql == "SELECT OBJECT_ID(?)" else []
+
+            def execute_query(self, sql):
                 calls.append("drop")
+                self.object_id = None
 
         connector = Connector()
 
@@ -156,7 +174,71 @@ def test_published_cleanup_requires_durable_authority_and_exact_stage_identity()
     assert calls == ["lease", "identity", "drop", "lease"]
     calls.clear()
     attempt.drop_exact_owned(Importer(), None, receipt, None)
-    assert calls == ["lease", "identity", "drop", "lease"]
+    assert calls == ["lease", "lease"]
+
+
+def test_published_partial_cleanup_replays_each_exact_stage_without_second_drop():
+    receipts = tuple(
+        SimpleNamespace(
+            attempt_id=attempt * 64,
+            stage_id=f"[db].[dbo].[{attempt}]",
+            consumed_part_evidence={"native_object_id": object_id},
+        )
+        for attempt, object_id in (("a", 11), ("b", 12))
+    )
+    objects = {"[db].[dbo].[a]": 11, "[db].[dbo].[b]": 12}
+    drops = []
+
+    class Connector:
+        bounded_query_timeout = staticmethod(lambda seconds: nullcontext())
+
+        @staticmethod
+        def begin():
+            pass
+
+        @staticmethod
+        def commit_transaction():
+            pass
+
+        @staticmethod
+        def rollback():
+            pass
+
+        @staticmethod
+        def get_records(sql, params=None):
+            return [(objects[params[0]],)] if sql == "SELECT OBJECT_ID(?)" else []
+
+        @staticmethod
+        def execute_query(sql):
+            name = sql.removeprefix("DROP TABLE ")
+            drops.append(name)
+            objects[name] = None
+
+    class Importer:
+        connector = Connector()
+        _mutation_scope = staticmethod(lambda *args: nullcontext())
+        _assert_lease = staticmethod(lambda lease: None)
+        _assert_stage_identity = staticmethod(lambda *args: None)
+
+        @staticmethod
+        def table_name(plan, attempt_id):
+            return attempt_id[0]
+
+        @staticmethod
+        def qualified(table):
+            return f"[db].[dbo].[{table}]"
+
+    class Journal:
+        publication = SimpleNamespace(state=lambda: {"phase": "succeeded"})
+        completed = staticmethod(lambda: SimpleNamespace(receipts=receipts))
+
+    attempt = NativeTargetLocalAttempt(Journal(), None, None, None, WindowOutcomeUnknown)
+    importer = Importer()
+    attempt.settle_published(importer, None, receipts[0], None)
+    assert drops == [receipts[0].stage_id]
+    for receipt in receipts:
+        attempt.settle_published(importer, None, receipt, None)
+    assert drops == [receipt.stage_id for receipt in receipts]
 
 
 def test_positive_terminal_recovery_reobserves_without_writer_launch(tmp_path):

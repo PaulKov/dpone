@@ -136,7 +136,10 @@ def test_preparation_preserves_primary_error_when_cleanup_also_fails(tmp_path):
     assert any("session cleanup failed" in note for note in primary.__notes__)
 
 
-def test_target_local_composition_selects_shared_v2_journal_and_supervised_importer(tmp_path, monkeypatch):
+@pytest.mark.parametrize("crash_boundary", [None, "before_drop", "after_drop", "after_retired", "zero_stage"])
+def test_target_local_composition_selects_shared_v2_journal_and_supervised_importer(
+    tmp_path, monkeypatch, crash_boundary
+):
     store = SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1.0)
     lease = store.acquire("target", "owner", 60)
     wire = build_mssql_bcp_native_contract(schema=[("value", "bigint")], query="SELECT synthetic")
@@ -183,16 +186,47 @@ def test_target_local_composition_selects_shared_v2_journal_and_supervised_impor
 
     NativeTargetCustody(store, "target").claim(lease, identity.invocation_key)
     journal = context.journal_factory()
+    if crash_boundary == "zero_stage":
+        journal.begin()
+        assert context.executor.on_failed_stage(journal)
+        assert journal.data["chunks"] == journal.data["events"] == journal.data["nonces"] == {}
+        assert journal.data["rollback_history"][0]["kind"] == "pre_eof_nonpublication"
+        assert NativeTargetCustody(store, "target").inspect(lease).release_reason == "nonpublication_all_stages_retired"
+        return
     attempt_id = _verified_chain(journal, tmp_path)
     journal.verified(NativeChunkReceipt(0, attempt_id, "[schema].[table]", 1, 2, "e" * 64, "f" * 64))
     observed = []
-    monkeypatch.setattr(
-        MssqlNativeChunkImporter,
-        "drop_exact_owned",
-        lambda self, plan, receipt, lease: observed.append(journal.data["events"][attempt_id][-1]["event"]),
-    )
+
+    def drop(self, plan, receipt, lease):
+        if crash_boundary == "before_drop" and not observed:
+            observed.append("before_drop")
+            raise RuntimeError("crash before drop")
+        observed.append(journal.data["events"][attempt_id][-1]["event"])
+        if crash_boundary == "after_drop" and len(observed) == 1:
+            raise RuntimeError("crash after drop")
+
+    monkeypatch.setattr(MssqlNativeChunkImporter, "drop_exact_owned", drop)
+    if crash_boundary == "after_retired":
+        real_release = NativeTargetCustody.release
+        calls = []
+
+        def release(self, *args, **kwargs):
+            calls.append(1)
+            if len(calls) == 1:
+                raise RuntimeError("crash after retired")
+            return real_release(self, *args, **kwargs)
+
+        monkeypatch.setattr(NativeTargetCustody, "release", release)
+    if crash_boundary is not None:
+        with pytest.raises(RuntimeError, match="crash (before|after)"):
+            context.executor.on_failed_stage(journal)
     context.executor.on_failed_stage(journal)
-    assert observed == ["FAILED_RETIRABLE"]
+    expected = ["FAILED_RETIRABLE"]
+    if crash_boundary == "before_drop":
+        expected.insert(0, "before_drop")
+    if crash_boundary == "after_drop":
+        expected.append("FAILED_RETIRABLE")
+    assert observed == expected
     assert journal.data["events"][attempt_id][-1]["event"] == "RETIRED"
     custody = NativeTargetCustody(store, "target").inspect(lease)
     assert custody.state == "clear" and custody.release_reason == "nonpublication_all_stages_retired"
