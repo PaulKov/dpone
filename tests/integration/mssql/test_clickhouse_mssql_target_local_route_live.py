@@ -156,6 +156,19 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
         )
         assert aggregate.rows == len(rows)
         assert aggregate.typed_digest == receipt.typed_digest
+
+        target.execute_query(f"UPDATE {receipt.stage_id} SET [text_value]=N'drifted' WHERE [row_key]=1")
+        with pytest.raises(ValueError, match="typed_digest_mismatch"):
+            context.verify_receipts(complete.receipts)
+
+        target.execute_query(f"DROP TABLE {receipt.stage_id}")
+        target.execute_query(
+            f"CREATE TABLE {receipt.stage_id} ("
+            "[row_key] bigint NOT NULL,[ratio] real NULL,[text_value] nvarchar(max) NULL,"
+            "[happened_at] datetime2(6) NULL)"
+        )
+        with pytest.raises(ValueError, match="stage_identity_mismatch|prepared_owner"):
+            context.verify_receipts(complete.receipts)
     finally:
         for stage in stages:
             target.execute_query(f"DROP TABLE IF EXISTS {stage}")
