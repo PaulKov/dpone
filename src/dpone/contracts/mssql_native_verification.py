@@ -18,6 +18,7 @@ from typing import Any, TypedDict
 
 from dpone.contracts.bounded_window import WindowContractError
 from dpone.contracts.mssql_native_chunks import NativeChunkPlan, NativeChunkReceipt
+from dpone.contracts.mssql_native_writer import BCP_STAGE_PROOF, SQLCLIENT_SESSION_PROOF
 from dpone.contracts.strict_json import canonical_json_bytes
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
@@ -64,6 +65,7 @@ class NativeVerificationIdentityV2:
     capability_layout_sha256: str
     digest_algorithm_id: str
     timeout_policy_sha256: str
+    writer_proof_capability: str = BCP_STAGE_PROOF
 
     def __post_init__(self) -> None:
         if not isinstance(self.plan, NativeChunkPlan) or any(
@@ -71,6 +73,11 @@ class NativeVerificationIdentityV2:
         ):
             raise ValueError("mssql_native.invalid_v2_identity")
         if type(self.import_backend) is not str or self.import_backend not in {"bcp", "mssql_sqlclient"}:
+            raise ValueError("mssql_native.invalid_v2_identity")
+        if (self.import_backend, self.writer_proof_capability) not in {
+            ("bcp", BCP_STAGE_PROOF),
+            ("mssql_sqlclient", SQLCLIENT_SESSION_PROOF),
+        }:
             raise ValueError("mssql_native.invalid_v2_identity")
         if self.verification_backend is not NativeVerificationBackend.TARGET_LOCAL:
             raise ValueError("mssql_native.invalid_v2_identity")
@@ -92,6 +99,7 @@ class NativeVerificationIdentityV2:
             **asdict(self.plan),
             "import_backend": self.import_backend,
             "verification_backend": self.verification_backend.value,
+            "writer_proof_capability": self.writer_proof_capability,
             "companion_protocol_sha256": self.companion_protocol_sha256,
             "companion_package_sha256": self.companion_package_sha256,
             "capability_layout_sha256": self.capability_layout_sha256,
@@ -128,10 +136,11 @@ STAGE_FIELDS = frozenset({"stage_id", "owner_binding_sha256", "object_id", "sche
 WRITER_FIELDS = frozenset(
     {
         "import_backend",
+        "writer_proof_capability",
         "protocol_sha256",
         "package_sha256",
         "capability_sha256",
-        "session_token_sha256",
+        "grant_token_sha256",
         "timeout_policy_sha256",
     }
 )
@@ -153,7 +162,7 @@ NEXT_EVENTS: dict[str, frozenset[str]] = {
     "WRITING": frozenset({"WRITER_TERMINAL", "UNKNOWN"}),
     "WRITER_TERMINAL": frozenset({"QUIESCENT", "UNKNOWN"}),
     "QUIESCENT": frozenset({"VERIFIED", "UNKNOWN"}),
-    "VERIFIED": frozenset(),
+    "VERIFIED": frozenset({"FAILED_RETIRABLE"}),
     "UNKNOWN": frozenset({"QUIESCENT", "PARTIAL_PROVED", "INCIDENT_RETAINED"}),
     "PARTIAL_PROVED": frozenset({"FAILED_RETIRABLE"}),
     "FAILED_RETIRABLE": frozenset({"RETIRED"}),
@@ -246,7 +255,10 @@ def validate_native_writer_event(
         not isinstance(writer, dict)
         or set(writer) != WRITER_FIELDS
         or writer["import_backend"] != identity.import_backend
-        or not all(is_sha256_digest(writer[name]) for name in WRITER_FIELDS - {"import_backend"})
+        or writer["writer_proof_capability"] != identity.writer_proof_capability
+        or not all(
+            is_sha256_digest(writer[name]) for name in WRITER_FIELDS - {"import_backend", "writer_proof_capability"}
+        )
         or (
             writer["protocol_sha256"] != identity.companion_protocol_sha256
             or writer["package_sha256"] != identity.companion_package_sha256
@@ -268,6 +280,21 @@ def validate_native_writer_event(
         raise ValueError("observation")
     if event["event"] in {"QUIESCENT", "PARTIAL_PROVED"} and observation["quiescence"] != "proved":
         raise ValueError("quiescence proof")
+    if identity.writer_proof_capability == BCP_STAGE_PROOF:
+        if event["event"] == "PARTIAL_PROVED":
+            raise ValueError("bcp partial proof forbidden")
+        if (
+            event["event"] == "WRITER_TERMINAL"
+            and observation["writer_outcome"] == "success"
+            and (observation["input_rows_consumed"] != artifact["rows"])
+        ):
+            raise ValueError("bcp vendor count")
+        if (
+            event["event"] == "UNKNOWN"
+            and observation["writer_outcome"] == "success"
+            and (previous is None or previous["event"] != "WRITER_TERMINAL")
+        ):
+            raise ValueError("bcp success authority missing")
     if event["event"] == "VERIFIED" and (
         observation["quiescence"] != "proved"
         or observation["row_count"] != artifact["rows"]

@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import secrets
 from collections.abc import Callable
-from dataclasses import asdict
+from contextlib import AbstractContextManager
 from datetime import UTC, datetime
 from functools import wraps
 from threading import RLock
@@ -18,9 +18,26 @@ from typing import Any, Concatenate, ParamSpec, TypeVar
 
 from dpone.adapters.mssql_native_chunks_journal_v2_events import (
     adopt_orphan_event,
+    commit_verified_receipt,
     event_key,
     initial_projection,
+    requires_dedicated_recovery,
     validate_projection,
+)
+from dpone.adapters.mssql_native_chunks_journal_v2_events import (
+    observe_bcp_recovery as _observe_bcp_recovery,
+)
+from dpone.adapters.mssql_native_chunks_journal_v2_events import (
+    record_nonpublication as _record_nonpublication,
+)
+from dpone.adapters.mssql_native_chunks_journal_v2_events import (
+    recover_bcp_verified as _recover_bcp_verified,
+)
+from dpone.adapters.mssql_native_chunks_journal_v2_events import (
+    retain_bcp_incident as _retain_bcp_incident,
+)
+from dpone.adapters.mssql_native_chunks_journal_v2_events import (
+    retire_verified as _retire_verified,
 )
 from dpone.adapters.mssql_native_publication_journal import NativePublicationJournal, validate_publication_state
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
@@ -36,12 +53,10 @@ from dpone.contracts.mssql_native_verification import (
     canonical_sha256,
     is_nonnegative_int,
     is_sha256_digest,
-    matches_native_receipt,
     native_completion_digests,
     opaque_native_stage_id,
     ordered_native_receipts,
     validate_native_writer_event,
-    validated_native_receipt,
 )
 from dpone.contracts.strict_json import StrictJsonError, canonical_json_bytes, strict_json_object
 from dpone.ports.bounded_window import WindowStore
@@ -226,6 +241,8 @@ class NativeChunkJournalV2:
         if chunk is None or chunk["attempt_id"] != attempt_id or event not in NEXT_EVENTS:
             raise WindowContractError("mssql_native.invalid_journal_event")
         prior = data["events"][attempt_id][-1]
+        if requires_dedicated_recovery(self.identity.import_backend, prior["event"], event):
+            raise WindowContractError("mssql_native.dedicated_recovery_required")
         stage = prior["stage_binding"] if stage_binding is None else stage_binding
         writer = prior["writer_binding"] if writer_binding is None else writer_binding
         observed = prior["observation"] if observation is None else observation
@@ -239,6 +256,45 @@ class NativeChunkJournalV2:
             return json.loads(json.dumps(prior))
         return self._append(data, ordinal, attempt_id, event, chunk["file"], stage, writer, observed, created_at)
 
+    @_serialized
+    def observe_bcp_recovery(
+        self,
+        ordinal: int,
+        attempt_id: str,
+        *,
+        barrier: Callable[[], AbstractContextManager[Any]],
+        observe: Callable[[], dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Observe an already authorized BCP attempt under a supplied exact-stage barrier."""
+        return _observe_bcp_recovery(self, ordinal, attempt_id, barrier=barrier, observe=observe)
+
+    @_serialized
+    def recover_bcp_verified(
+        self,
+        ordinal: int,
+        attempt_id: str,
+        *,
+        barrier: Callable[[], AbstractContextManager[Any]],
+        observe: Callable[[], tuple[dict[str, Any], NativeChunkReceipt]],
+    ) -> NativeChunkReceipt:
+        """Commit a recovered receipt while the supplied exact-stage barrier is held."""
+        return _recover_bcp_verified(self, ordinal, attempt_id, barrier=barrier, observe=observe)
+
+    @_serialized
+    def retain_bcp_incident(self, ordinal: int, attempt_id: str) -> dict[str, Any]:
+        """Retain an ambiguous BCP attempt without authorizing stage classification."""
+        return _retain_bcp_incident(self, ordinal, attempt_id)
+
+    @_serialized
+    def record_nonpublication(self, proof_sha256: str, *, assert_nonpublication: Callable[[], None]) -> None:
+        """Persist an invocation-level exclusion proof before verified retirement."""
+        _record_nonpublication(self, proof_sha256, assert_nonpublication=assert_nonpublication)
+
+    @_serialized
+    def retire_verified(self, ordinal: int, attempt_id: str, *, drop_exact_owned: Callable[[], None]) -> None:
+        """Retire a writer-proved stage only after exact-owner drop."""
+        _retire_verified(self, ordinal, attempt_id, drop_exact_owned=drop_exact_owned)
+
     def _append(
         self,
         data: dict[str, Any],
@@ -250,6 +306,8 @@ class NativeChunkJournalV2:
         writer: dict[str, Any] | None,
         observation: dict[str, Any] | None,
         created_at: str | None = None,
+        *,
+        allow_recovery: bool = False,
     ) -> dict[str, Any]:
         events = data["events"].setdefault(attempt_id, [])
         previous = events[-1] if events else None
@@ -269,7 +327,7 @@ class NativeChunkJournalV2:
             created_at=created_at or datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         )
         orphan = self.store.load(self._event_key(entry))
-        if self._recovery_only and orphan is None:
+        if self._recovery_only and orphan is None and not allow_recovery:
             raise WindowContractError("mssql_native.pre_eof_reextract_required")
         adopt_orphan_event(entry, None if orphan is None else orphan.payload, explicit_timestamp=created_at is not None)
         try:
@@ -283,16 +341,10 @@ class NativeChunkJournalV2:
     @_serialized
     def verified(self, receipt: NativeChunkReceipt) -> None:
         """Commit the existing receipt only after a real terminal VERIFIED event."""
-        data = self._staging()
-        validated_native_receipt(asdict(receipt))
-        chunk = data["chunks"].get(str(receipt.ordinal))
-        if chunk is None or chunk["attempt_id"] != receipt.attempt_id or chunk["phase"] != "staging":
-            raise WindowContractError("mssql_native.receipt_attempt_mismatch")
-        event = data["events"][receipt.attempt_id][-1]
-        if event["event"] != "VERIFIED" or not matches_native_receipt(self.identity, receipt, event):
-            raise WindowContractError("mssql_native.receipt_event_mismatch")
-        chunk.update(phase="verified", receipt=asdict(receipt))
-        self._save(data)
+        self._commit_verified_receipt(receipt, allow_recovery=False)
+
+    def _commit_verified_receipt(self, receipt: NativeChunkReceipt, *, allow_recovery: bool) -> None:
+        commit_verified_receipt(self, receipt, allow_recovery=allow_recovery)
 
     def _staging(self, *, allow_recovery: bool = False) -> dict[str, Any]:
         if self._data is None or self._data["phase"] != "staging":
@@ -313,6 +365,8 @@ class NativeChunkJournalV2:
         data = self._staging()
         if source_eof is not True:
             raise WindowContractError("mssql_native.source_EOF_required")
+        if any(events[-1]["event"] != "VERIFIED" for events in data["events"].values()):
+            raise WindowContractError("mssql_native.unverified_attempts")
         receipts = ordered_native_receipts(data["chunks"])
         metadata = {} if completion_metadata is None else completion_metadata
         complete = native_completion_digests(receipts, metadata)
