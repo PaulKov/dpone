@@ -9,7 +9,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from dpone.manifest.mssql_native_policy import native_limits
+from dpone.manifest.mssql_native_policy import native_limits, native_verification_backend
 
 
 def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
@@ -28,6 +28,8 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
         and isinstance(chunking, Mapping)
         and chunking.get("mode") == "bounded_stream"
     ):
+        return
+    if not isinstance(execution, Mapping):
         return
     limits = native_limits(config)
     authored: dict[str, Any] = {
@@ -53,6 +55,15 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
             "quality_evidence_state_callbacks",
         ],
     }
+    if "verification_backend" in execution:
+        verifier = native_verification_backend(config)
+        authored["verification_backend"] = verifier.value
+        authored["verification_identity_version"] = verifier.identity_version
+        if verifier.value == "target_local":
+            authored["writer_proof_capability"] = "bcp-supervised-stage-barrier-v1"
+            authored["required_dependencies"].extend(
+                ["stable_target_custody", "supervised_bcp_writer", "target_local_digest"]
+            )
     if "encoding_parallelism" in authored["limits"]:
         authored["stage_concurrency"] = {
             "encoding_parallelism": limits.effective_encoding_parallelism,

@@ -6,6 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from dpone.contracts.mssql_native_chunks import NativeChunkLimits
+from dpone.contracts.mssql_native_verification import NativeVerificationBackend
 from dpone.contracts.rolling_window import FrozenRollingWindow, RollingWindowSpec
 
 
@@ -51,6 +52,19 @@ def native_limits(config: Any) -> NativeChunkLimits:
     return NativeChunkLimits(**dict(chunks), parallelism=chunking.get("parallelism", 1))
 
 
+def native_verification_backend(config: Any) -> NativeVerificationBackend:
+    """Resolve the closed verifier selector without materializing an authored default."""
+    execution = _native(config).get("execution")
+    if not isinstance(execution, Mapping):
+        raise ValueError("mssql_native.execution_required")
+    if "verification_backend" not in execution:
+        return NativeVerificationBackend.PYTHON_READBACK
+    value = execution["verification_backend"]
+    if value is None:
+        raise ValueError("mssql_native.invalid_verification_backend")
+    return NativeVerificationBackend.parse(value)
+
+
 def native_window(config: Any) -> FrozenRollingWindow | None:
     """Freeze authored scope against the supplied execution interval, never wall time."""
     strategy = getattr(config.load_strategy, "value", config.load_strategy)
@@ -82,6 +96,7 @@ def validate_native_config(config: Any) -> None:
     if options.get("source_type") != "clickhouse" or options.get("sink_type") != "mssql":
         raise ValueError("mssql_native.route_unsupported")
     native_limits(config)
+    native_verification_backend(config)
     native_window(config)
     unsupported = (
         "query",
