@@ -14,8 +14,7 @@ _COLUMNS = (
     "dispatch_epoch UInt64, payload String, payload_sha256 FixedString(64), version UInt64"
 )
 _ENGINE = (
-    "ENGINE=ReplicatedReplacingMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}', version) "
-    "ORDER BY target_key"
+    "ENGINE=ReplicatedReplacingMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}', version) ORDER BY target_key"
 )
 
 
@@ -66,14 +65,14 @@ class ClickHouseClusterAuthorityBootstrap:
             engines = ",".join(sorted({engine[:80] for _, engine in complete})) or "none"
             raise contracts.ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_BOOTSTRAP_UNKNOWN",
-                _bounded(
-                    f"facade is not complete observed={observed} engines={engines} expected={','.join(hosts)}"
-                ),
+                _bounded(f"facade is not complete observed={observed} engines={engines} expected={','.join(hosts)}"),
             )
 
     def _replace_invalid(self, cluster: str, database: str, hosts: Sequence[str]) -> None:
         token = f"dpone-v1-bootstrap-drop-{secrets.token_hex(16)}"
-        sql = f"DROP TABLE IF EXISTS {_qualified(database, contracts.AUTHORITY_TABLE)} ON CLUSTER {_quote(cluster)} SYNC"
+        sql = (
+            f"DROP TABLE IF EXISTS {_qualified(database, contracts.AUTHORITY_TABLE)} ON CLUSTER {_quote(cluster)} SYNC"
+        )
         drop_error = self._execute_ddl(sql, token)
         entries = self._catalog.find_entries(cluster, token)
         if len(entries) != 1 or entries[0].state_for(hosts) is not contracts.QueueState.TERMINAL_SUCCESS:

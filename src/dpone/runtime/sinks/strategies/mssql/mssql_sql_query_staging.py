@@ -30,9 +30,7 @@ def stage_sql_query_artifact(
         inserted = int(
             staging_manager.insert_streaming_rows(
                 handle,
-                _flatten_batches(
-                    source.get_records_streaming(artifact.sql, batch_size=batch_size, as_dict=True)
-                ),
+                _flatten_batches(source.get_records_streaming(artifact.sql, batch_size=batch_size, as_dict=True)),
             )
             or 0
         )

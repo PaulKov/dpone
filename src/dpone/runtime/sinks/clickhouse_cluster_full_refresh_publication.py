@@ -3,8 +3,7 @@
 from __future__ import annotations
 
 import secrets
-import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import asdict, replace
 from typing import Any
 
@@ -19,6 +18,7 @@ from dpone.ports.clickhouse_cluster_publication import (
 from dpone.ports.clickhouse_cluster_publication import (
     require_verified_mutation as _require_verified,
 )
+from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import require_candidate_rows
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
 from dpone.runtime.sinks.clickhouse_full_refresh_contract import (
     publication_invocation_id,
@@ -26,9 +26,6 @@ from dpone.runtime.sinks.clickhouse_full_refresh_contract import (
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import REPLAY_OPTION, SCHEDULER_IDENTITY_OPTION
 from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
-
-_CANDIDATE_ROW_WAIT_SECONDS = 300
-_CANDIDATE_ROW_POLL_SECONDS = 2
 
 AggregatePublicationState = contracts.AggregatePublicationState
 AuthorityMutationStatus = contracts.AuthorityMutationStatus
@@ -65,34 +62,6 @@ class ClickHouseClusterFullRefreshPublicationService:
     def is_enabled(load_config: Any) -> bool:
         return ClickHouseTableDesign.from_options(getattr(load_config, "options", {}) or {}).cluster.on_cluster
 
-    def _require_replicated_candidate_rows(
-        self,
-        cluster: str,
-        database: str,
-        candidate: str,
-        hosts: Sequence[str],
-        staged_rows: int,
-    ) -> None:
-        """Wait until every replica count() matches the staged load.
-
-        ``system.tables.total_rows`` is an estimate and lags part replication.
-        Publication admits the candidate only from an exact per-replica count.
-        """
-
-        deadline = time.monotonic() + _CANDIDATE_ROW_WAIT_SECONDS
-        observed: dict[str, int] = {}
-        while True:
-            observed = self._catalog.candidate_counts(cluster, database, candidate)
-            if set(observed) == set(hosts) and all(observed.get(host) == staged_rows for host in hosts):
-                return
-            if time.monotonic() >= deadline:
-                detail = ",".join(f"{host}={observed.get(host, 'missing')}" for host in hosts)
-                raise ClusterPublicationError(
-                    "DPONE_CLICKHOUSE_CLUSTER_CANDIDATE_NOT_READY",
-                    f"row count differs by replica observed={detail} expected={staged_rows}",
-                )
-            time.sleep(_CANDIDATE_ROW_POLL_SECONDS)
-
     def publish(self, load_config: Any, candidate_config: Any, *, staged_rows: int) -> ClusterFullRefreshReceipt:
         cluster = _cluster(load_config)
         database, target = str(load_config.target_schema), str(load_config.target_table)
@@ -109,8 +78,14 @@ class ClickHouseClusterFullRefreshPublicationService:
         predecessor = _optional_one_identity(facts, "target")
         if predecessor == desired:
             raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_GENERATION_INVALID", "generations must differ")
-        self._require_replicated_candidate_rows(
-            cluster, database, candidate, inventory.hosts, staged_rows
+        require_candidate_rows(
+            ClusterPublicationError,
+            self._catalog.candidate_counts,
+            cluster,
+            database,
+            candidate,
+            inventory.hosts,
+            staged_rows,
         )
         operation_id = _operation_id(load_config)
         target_key = digest_payload({"cluster": cluster, "database": database, "target": target})
@@ -147,7 +122,7 @@ class ClickHouseClusterFullRefreshPublicationService:
             record = replace(record, dispatch_epoch=current.record.dispatch_epoch + 1)
             current = _require_verified(authority.compare_and_swap(current, record), permit=False)
         else:
-            self._require_same_operation(current.record, record)
+            _require_same_operation(current.record, record)
             record = current.record
             if record.phase is not AuthorityPhase.PREPARED:
                 _require_inventory(record, inventory)
@@ -239,7 +214,7 @@ class ClickHouseClusterFullRefreshPublicationService:
                 raise ClusterPublicationError(
                     "DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNSAFE", "authority is not ready for completion"
                 )
-            self._complete(authority, current)
+            _complete(authority, current)
             return
         facts = self._catalog.generations(
             resolved.cluster, record.database, record.target, record.candidate, inventory.hosts
@@ -372,34 +347,31 @@ class ClickHouseClusterFullRefreshPublicationService:
                 "generation changed before publication dispatch",
             )
 
-    @staticmethod
-    def _require_same_operation(current: AuthorityRecord, proposed: AuthorityRecord) -> None:
-        if current.operation_id != proposed.operation_id or current.plan_digest != proposed.plan_digest:
-            raise ClusterPublicationError(
-                "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target"
-            )
-
-    @staticmethod
-    def _complete(authority: ClusterPublicationAuthorityPort, current: VersionedAuthorityRecord) -> None:
-        if current.record.phase is AuthorityPhase.COMPLETED:
-            return
-        completed = replace(current.record, phase=AuthorityPhase.COMPLETED)
-        _require_verified(authority.compare_and_swap(current, completed), permit=False)
-
 
 def _operation_id(load_config: Any) -> str:
     options = getattr(load_config, "options", {}) or {}
-    stable = str(options.get(SCHEDULER_IDENTITY_OPTION) or "")
-    if not stable:
-        stable = publication_invocation_id(scheduler_run_id="direct", process_id=str(load_config.target_table))
+    stable = str(options.get(SCHEDULER_IDENTITY_OPTION) or "") or publication_invocation_id(
+        scheduler_run_id="direct", process_id=str(load_config.target_table)
+    )
     return digest_payload({"stable": stable, "database": load_config.target_schema, "target": load_config.target_table})
 
 
 def _cluster(load_config: Any) -> str:
-    name = ClickHouseTableDesign.from_options(getattr(load_config, "options", {}) or {}).cluster.name
-    if not name:
+    if not (name := ClickHouseTableDesign.from_options(getattr(load_config, "options", {}) or {}).cluster.name):
         raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_TOPOLOGY_UNSUPPORTED", "cluster name is missing")
     return name
+
+
+def _require_same_operation(current: AuthorityRecord, proposed: AuthorityRecord) -> None:
+    if current.operation_id != proposed.operation_id or current.plan_digest != proposed.plan_digest:
+        raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target")
+
+
+def _complete(authority: ClusterPublicationAuthorityPort, current: VersionedAuthorityRecord) -> None:
+    if current.record.phase is AuthorityPhase.COMPLETED:
+        return
+    completed = replace(current.record, phase=AuthorityPhase.COMPLETED)
+    _require_verified(authority.compare_and_swap(current, completed), permit=False)
 
 
 def _correlation_token(operation_id: str, action: str, epoch: int) -> str:

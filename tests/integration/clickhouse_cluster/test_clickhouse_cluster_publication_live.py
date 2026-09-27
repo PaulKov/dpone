@@ -40,13 +40,12 @@ def test_keeper_cas_and_distributed_ddl_correlation() -> None:
         "('target','operation','fence','PREPARED',0,'{}','" + "0" * 64 + "',1)",
         query_id="publication-authority-create",
     )
-    before = int(
-        _execute("SELECT version FROM publication_acceptance.authority FINAL WHERE target_key='target'")[0][0]
-    )
+    before = int(_execute("SELECT version FROM publication_acceptance.authority FINAL WHERE target_key='target'")[0][0])
     _execute(
         "INSERT INTO publication_acceptance.authority "
         "SELECT 'target','operation','fence','DISPATCHING',1,'{}','"
-        + "0" * 64
+        + "0"
+        * 64
         + f"', version + 1 FROM publication_acceptance.authority FINAL "
         f"WHERE target_key='target' AND version={before}",
         query_id="publication-authority-cas",
