@@ -90,3 +90,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0070: Non-secret runtime-authority payloads use a closed immutable v5 wire (Accepted)](adr/0070-immutable-runtime-authority-payload.md)
 
 - [ADR 0071: Deployment-owned credential projection (Accepted)](adr/0071-deployment-owned-credential-projection.md)
+
+- [ADR 0072: MSSQL native writers expose explicit proof capabilities (Accepted)](adr/0072-mssql-native-writer-proof-capabilities.md)
