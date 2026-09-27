@@ -376,6 +376,7 @@ candidate checkout in an integration environment that provides ODBC Driver 18,
 
 ```bash
 docker compose -f docker/docker-compose.integration.yml up -d --wait clickhouse mssql
+docker compose -f docker/docker-compose.integration.yml run --rm mssql-init
 export DPONE_RUN_INTEGRATION=1
 export DPONE_IT_DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
 uv run pytest \
