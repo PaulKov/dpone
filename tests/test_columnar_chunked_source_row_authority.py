@@ -35,6 +35,7 @@ def test_columnar_chunked_windows_publish_slice_export_evidence() -> None:
             "transport": "columnar_object_storage_window",
             "uri_prefix": "s3://dpone-stage/msql/run-1/window-000001/",
             "bytes": 0,
+            "sha256": "a" * 64,
         },
         {
             "partition_index": 0,
@@ -43,6 +44,7 @@ def test_columnar_chunked_windows_publish_slice_export_evidence() -> None:
             "transport": "columnar_object_storage_window",
             "uri_prefix": "s3://dpone-stage/msql/run-1/window-000002/",
             "bytes": 0,
+            "sha256": "b" * 64,
         },
     ]
 

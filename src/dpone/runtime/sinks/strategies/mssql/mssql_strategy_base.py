@@ -26,8 +26,10 @@ from dpone.runtime.sinks.strategies.mssql.mssql_partition_fallback import (
     MssqlPartitionFallbackPlan,
     plan_mssql_partition_fallback,
 )
+from dpone.runtime.sinks.strategies.mssql.mssql_sql_query_staging import stage_sql_query_artifact
 from dpone.runtime.sinks.strategies.mssql.mssql_staging_consumer import MssqlStagingConsumer
 from dpone.runtime.sinks.strategies.mssql.mssql_staging_sql_mixin import MSSQLStagingSqlMixin
+from dpone.runtime.sql_query_artifact import SqlQueryArtifact
 from dpone.runtime.support.mssql_native_projection import (
     project_mssql_schema_evolution_columns,
     resolve_native_column_types,
@@ -86,6 +88,13 @@ class MSSQLStrategyBase(MSSQLStagingSqlMixin, MSSQLObjectNamingMixin, SinkStrate
             fallback_schema=payload.schema,
         )
         materialization_config = replace(load_config, options=options)
+        if isinstance(payload.artifact, SqlQueryArtifact):
+            return stage_sql_query_artifact(
+                self.staging_manager,
+                materialization_config,
+                payload.artifact,
+                staging_schema or payload.schema,
+            )
         return payload.artifact.materialize(
             self.staging_manager,
             materialization_config,

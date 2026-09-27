@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+## 0.83.24 - 2026-09-27
+
+### Fixed
+
+- Object-storage windows report a digest and byte size, so a full refresh
+  can enforce its source byte budget after the objects are staged.
+- SQL Server stages a ClickHouse SQL query through the source stream and one
+  BCP import, instead of trying to execute that query locally.
+
 ## 0.83.23 - 2026-09-27
 
 ### Fixed

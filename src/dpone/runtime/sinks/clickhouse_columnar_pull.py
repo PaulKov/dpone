@@ -90,6 +90,9 @@ class ClickHouseColumnarPullLoader:
                 clickhouse_pull_seconds=pull_seconds,
                 window_cleanup_seconds=cleanup_seconds,
             )
+        mark_complete = getattr(artifact, "mark_source_byte_measurement_complete", None)
+        if callable(mark_complete):
+            mark_complete()
         return self._count_rows(load_config) if loaded_any else 0
 
     def render_insert_sql(

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -104,6 +105,7 @@ class ObjectStorageColumnarChunkedArtifact(BaseExtractionArtifact):
         self.cleanup_policy = cleanup_policy
         self.window_metrics: list[dict[str, object]] = []
         self.slice_evidence: list[dict[str, object]] = []
+        self.source_byte_measurement_complete = False
 
     def iter_windows(self) -> Any:
         iterator = getattr(self.provider, "iter_object_storage_windows", None)
@@ -113,18 +115,31 @@ class ObjectStorageColumnarChunkedArtifact(BaseExtractionArtifact):
             self._publish_window_export_evidence(window, window_index=window_index)
             yield window
 
+    def mark_source_byte_measurement_complete(self) -> None:
+        """Admit the byte budget only after every emitted window has a digest."""
+
+        if any(not _window_byte_identity(item) for item in self.slice_evidence):
+            return
+        self.source_byte_measurement_complete = True
+
     def _publish_window_export_evidence(self, window: object, *, window_index: int) -> None:
         rows_exported = canonical_non_negative_int(getattr(window, "row_count", None))
         if rows_exported is None:
             return
+        digest = _window_digest(window)
+        evidence = {
+            "transport": "columnar_object_storage_window",
+            "uri_prefix": str(getattr(window, "uri_prefix", "")),
+            "bytes": int(getattr(window, "size_bytes", 0) or 0),
+        }
+        if digest is not None:
+            evidence["sha256"] = digest
         append_export_slice_evidence(
             self.slice_evidence,
             partition_index=0,
             slice_index=window_index,
             rows_exported=rows_exported,
-            transport="columnar_object_storage_window",
-            uri_prefix=str(getattr(window, "uri_prefix", "")),
-            bytes=int(getattr(window, "size_bytes", 0) or 0),
+            **evidence,
         )
 
     def record_window_metric(self, metric: Mapping[str, object]) -> None:
@@ -164,6 +179,28 @@ class ObjectStorageColumnarChunkedArtifact(BaseExtractionArtifact):
 
     def cleanup(self) -> None:
         return
+
+
+def _window_digest(window: object) -> str | None:
+    chunks = tuple(getattr(window, "chunks", ()) or ())
+    digests = tuple(str(getattr(chunk, "sha256", "") or "") for chunk in chunks)
+    if not digests or any(not digest for digest in digests):
+        return None
+    if len(digests) == 1:
+        return digests[0]
+    return hashlib.sha256("\n".join(digests).encode()).hexdigest()
+
+
+def _window_byte_identity(item: dict[str, object]) -> bool:
+    raw_bytes = item.get("bytes")
+    digest = item.get("sha256")
+    return (
+        not isinstance(raw_bytes, bool)
+        and isinstance(raw_bytes, int)
+        and raw_bytes >= 0
+        and isinstance(digest, str)
+        and bool(digest)
+    )
 
 
 def _unsafe_cleanup_prefix(prefix: Any) -> bool:

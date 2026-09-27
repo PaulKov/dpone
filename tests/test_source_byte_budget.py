@@ -11,6 +11,12 @@ from dpone.config.load_strategy import MAX_SOURCE_BYTE_BUDGET, SOURCE_BYTE_BUDGE
 from dpone.contracts.source_byte_budget_admission import source_byte_budget_rejection
 from dpone.dag.errors import DagConfigurationError
 from dpone.dag.load_config_builder import LoadConfigBuilder
+from dpone.runtime.columnar_fast_path_models import ObjectStorageChunk
+from dpone.runtime.columnar_object_storage_windows import (
+    ObjectStorageChunkWindow,
+    ObjectStorageColumnarChunkedArtifact,
+)
+from dpone.runtime.object_storage_access_models import ObjectStorageReadContract
 from dpone.runtime.sinks.clickhouse_staged_evidence import SourceByteBudgetError, enforce_source_byte_budget
 
 
@@ -89,6 +95,48 @@ def test_conflicting_replay_identity_fails_closed() -> None:
 
     with pytest.raises(SourceByteBudgetError, match="DPONE_SOURCE_BYTE_BUDGET_UNMEASURABLE"):
         _enforce(_config(18), SimpleNamespace(artifact=artifact))
+
+
+def test_completed_columnar_windows_are_measurable() -> None:
+    artifact = ObjectStorageColumnarChunkedArtifact(
+        provider=_WindowProvider(),
+        request=object(),
+        columns=("id",),
+        schema_hash="schema",
+    )
+    with pytest.raises(SourceByteBudgetError, match="DPONE_SOURCE_BYTE_BUDGET_UNMEASURABLE"):
+        _enforce(_config(20), SimpleNamespace(artifact=artifact))
+
+    list(artifact.iter_windows())
+    artifact.mark_source_byte_measurement_complete()
+    evidence = _enforce(_config(20), SimpleNamespace(artifact=artifact))
+
+    assert evidence is not None
+    assert evidence.observed_bytes == 15
+    assert evidence.unique_parts == 1
+
+
+class _WindowProvider:
+    def iter_object_storage_windows(self, request: object):
+        del request
+        contract = ObjectStorageReadContract(mode="named_collection", named_collection="stage")
+        yield ObjectStorageChunkWindow(
+            uri_prefix="s3://bucket/run/window/",
+            columns=("id",),
+            chunks=(
+                ObjectStorageChunk(
+                    uri="s3://bucket/run/window/chunk.parquet",
+                    index=0,
+                    row_count=2,
+                    size_bytes=15,
+                    sha256="c" * 64,
+                    schema_hash="schema",
+                ),
+            ),
+            read_contract=contract,
+            schema_hash="schema",
+            estimated_rows=2,
+        )
 
 
 def test_empty_lazy_plan_requires_explicit_completion() -> None:
