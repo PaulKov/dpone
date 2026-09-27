@@ -27,6 +27,7 @@ public_contract_impact:
 owned_paths:
   - src/dpone/runtime/sinks/mssql_native_target_digest.py
   - src/dpone/contracts/mssql_native_verification.py
+  - src/dpone/runtime/mssql_native_verification_identity.py
   - src/dpone/adapters/mssql_native_chunks_journal_v2.py
   - src/dpone/adapters/mssql_native_chunks_journal_v2_events.py
   - src/dpone/adapters/mssql_native_chunks_journal_v2_recovery.py
@@ -52,6 +53,7 @@ owned_paths:
   - src/dpone/runtime/mssql_native_runtime.py
   - tests/test_mssql_native_target_digest.py
   - tests/test_mssql_native_verification_policy.py
+  - tests/test_mssql_native_verification_identity_builder.py
   - tests/test_mssql_native_chunks_journal_v2.py
   - tests/test_mssql_native_staged_import.py
   - tests/test_consumed_payload_evidence.py
