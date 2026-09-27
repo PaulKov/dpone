@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.84.0 - 2026-09-28
+
 ### Added
 
 - MSSQL bounded native delivery accepts the opt-in
