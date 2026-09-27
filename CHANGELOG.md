@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.83.22 - 2026-09-27
+
+### Fixed
+
+- MSSQL target shape checks read the bare schema. A `database.schema` label
+  was queried as a schema name, so an existing table looked columnless.
+
 ## 0.83.21 - 2026-09-27
 
 ### Fixed

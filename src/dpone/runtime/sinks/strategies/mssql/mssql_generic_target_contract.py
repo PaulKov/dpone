@@ -116,7 +116,7 @@ class MssqlGenericTargetContract:
             self._connector.execute_query(statement)
 
     def _metadata(self, load_config: Any) -> dict[str, dict[str, Any]]:
-        database = getattr(load_config, "target_database", None)
+        database, schema, table = _catalog_coordinates(load_config)
         prefix = f"{self._connector.quote_identifier(database)}." if database else ""
         rows = self._connector.get_records(
             "SELECT c.name AS column_name, ty.name AS type_name, c.max_length, c.precision, c.scale, "
@@ -126,7 +126,7 @@ class MssqlGenericTargetContract:
             f"INNER JOIN {prefix}sys.tables AS t ON t.object_id = c.object_id "
             f"INNER JOIN {prefix}sys.schemas AS s ON s.schema_id = t.schema_id "
             "WHERE s.name = ? AND t.name = ?",
-            (load_config.target_schema, load_config.target_table),
+            (schema, table),
             as_dict=True,
         )
         output: dict[str, dict[str, Any]] = {}
@@ -141,7 +141,7 @@ class MssqlGenericTargetContract:
         return output
 
     def _validate_unique_authority(self, load_config: Any, expected: MssqlUniqueAuthorityContract) -> None:
-        database = getattr(load_config, "target_database", None)
+        database, schema, table = _catalog_coordinates(load_config)
         prefix = f"{self._connector.quote_identifier(database)}." if database else ""
         rows = self._connector.get_records(
             "SELECT i.index_id, i.name AS index_name, i.type_desc, i.is_primary_key, "
@@ -164,7 +164,7 @@ class MssqlGenericTargetContract:
             "WHERE p.object_id = i.object_id AND p.index_id = i.index_id) AS part "
             "WHERE s.name = ? AND t.name = ? AND i.is_unique = 1 "
             "AND ic.key_ordinal > 0 ORDER BY i.index_id, ic.key_ordinal",
-            (load_config.target_schema, load_config.target_table),
+            (schema, table),
             as_dict=True,
         )
         if any(unique_authority_matches(index, expected) for index in unique_authorities(rows)):
@@ -204,6 +204,12 @@ class MssqlGenericTargetContract:
         )
         if rows:
             _raise("key_sql_equivalence_collision")
+
+
+def _catalog_coordinates(load_config: Any) -> tuple[str, str, str]:
+    from dpone.runtime.etl.mssql_transaction_request import live_target_coordinates
+
+    return live_target_coordinates(load_config)
 
 
 _raise = raise_projection_error
