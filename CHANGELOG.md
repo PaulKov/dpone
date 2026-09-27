@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.83.19 - 2026-09-27
+
+### Fixed
+
+- MSSQL physical planning uses the same bare schema as target identity, so an
+  existing table is not reported as a different relation.
+
 ## 0.83.18 - 2026-09-27
 
 ### Fixed

@@ -216,12 +216,12 @@ def _apply_authorized_changes(
 
 
 def _table_name(load_config: Any) -> str:
-    database = str(getattr(load_config, "target_database", "") or "").strip()
-    schema = str(load_config.target_schema)
-    table = str(load_config.target_table)
+    from dpone.runtime.etl.mssql_transaction_request import live_target_coordinates
+
+    database, schema, table = live_target_coordinates(load_config)
     if not database:
         raise RuntimeError("mssql_transaction.target_database_required")
-    return f"[{database.replace(']', ']]')}].[{schema.replace(']', ']]')}].[{table.replace(']', ']]')}]"
+    return ".".join(f"[{part.replace(']', ']]')}]" for part in (database, schema, table))
 
 
 __all__ = ["MssqlPhysicalPreplan", "plan_existing_mssql_physical_design"]

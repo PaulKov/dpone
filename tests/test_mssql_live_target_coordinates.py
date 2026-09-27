@@ -2,7 +2,9 @@
 
 from types import SimpleNamespace
 
+from dpone.runtime.etl.mssql_physical_preplan import _table_name
 from dpone.runtime.etl.mssql_transaction_request import live_target_coordinates
+from dpone.runtime.sinks.mssql_physical_introspection import _qualified_table
 
 
 def test_live_target_coordinates_peel_the_database_prefix_from_the_schema_label():
@@ -14,3 +16,5 @@ def test_live_target_coordinates_peel_the_database_prefix_from_the_schema_label(
     )
 
     assert live_target_coordinates(load_config) == ("DWH_Dev", "ch", "marketing__wau_for_da")
+    assert _table_name(load_config) == "[DWH_Dev].[ch].[marketing__wau_for_da]"
+    assert _table_name(load_config) == _qualified_table(load_config)
