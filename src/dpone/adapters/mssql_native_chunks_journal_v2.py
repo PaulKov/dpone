@@ -221,7 +221,7 @@ class NativeChunkJournalV2:
         created_at: str | None = None,
     ) -> dict[str, Any]:
         """Append one closed event under CAS; omitted bindings inherit prior proof."""
-        data = self._staging()
+        data = self._staging(allow_recovery=True)
         chunk = data["chunks"].get(str(ordinal))
         if chunk is None or chunk["attempt_id"] != attempt_id or event not in NEXT_EVENTS:
             raise WindowContractError("mssql_native.invalid_journal_event")
@@ -234,6 +234,8 @@ class NativeChunkJournalV2:
             and (stage, writer, observed) == (prior["stage_binding"], prior["writer_binding"], prior["observation"])
             and (created_at is None or created_at == prior["created_at"])
         ):
+            if self._recovery_only:
+                raise WindowContractError("mssql_native.pre_eof_reextract_required")
             return json.loads(json.dumps(prior))
         return self._append(data, ordinal, attempt_id, event, chunk["file"], stage, writer, observed, created_at)
 
@@ -267,6 +269,8 @@ class NativeChunkJournalV2:
             created_at=created_at or datetime.now(UTC).isoformat().replace("+00:00", "Z"),
         )
         orphan = self.store.load(self._event_key(entry))
+        if self._recovery_only and orphan is None:
+            raise WindowContractError("mssql_native.pre_eof_reextract_required")
         adopt_orphan_event(entry, None if orphan is None else orphan.payload, explicit_timestamp=created_at is not None)
         try:
             validate_native_writer_event(self.identity, entry, previous, len(events), attempt_id)
