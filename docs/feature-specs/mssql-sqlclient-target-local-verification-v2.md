@@ -412,7 +412,8 @@ digests, counts, and bytes; no credentials or coordinates. Allowed events are
   backend, proof-capability ID, protocol/package/capability SHA-256 values,
   grant-token SHA-256, and timeout-policy SHA-256;
 - `observation` is `null` through `WRITING`. Later events require writer outcome
-  (`success`, `failure`, `timeout`, `lost_ack`, or `custody_lost`), nullable non-negative input
+  (`success`, `failure`, `timeout`, `lost_ack`, `cleanup_failed`, or
+  `custody_lost`), nullable non-negative input
   rows consumed, nullable count/sentinel, nullable overflow flag, either `null`
   or exactly eight non-negative decimal limb strings, quiescence (`unverified`,
   `proved`, or `failed`), and a namespaced diagnostic code.
