@@ -4,15 +4,20 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from dpone.contracts.bounded_window import WindowContractError, WindowOutcomeUnknown
 from dpone.runtime.mssql_native_chunks_files import EncodedNativeFile, discard_native_files
 
 
-class NativeReextractRequired(WindowContractError):
-    """Partial staging is settled; a new invocation must re-extract the source."""
+@dataclass(frozen=True)
+class NativeRecoveryFailures:
+    """Preserve the executor's public failure types across recovery helpers."""
+
+    contract: type[Exception]
+    outcome_unknown: type[Exception]
+    reextract: type[Exception]
 
 
 def retire_exact_owned_stage(importer: Any, plan: Any, receipt: Any, lease: Any, *, timeout_seconds: int) -> None:
@@ -65,17 +70,18 @@ def recover_target_local_staging(
     work_dir: Path,
     importer_factory: Callable[[], AbstractContextManager[Any]],
     on_failed_stage: Callable[[Any], bool] | None,
+    failures: NativeRecoveryFailures,
 ) -> None:
     """Reobserve only positive terminals, then resume authorized retirement."""
     projection = journal.data
     if projection is None or projection["phase"] != "staging":
-        raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
+        raise failures.outcome_unknown("mssql_native.target_local_pre_eof_custody_retained")
     if not projection["chunks"] or any(
         item.get("kind") == "pre_eof_nonpublication" for item in projection["rollback_history"]
     ):
         if on_failed_stage is not None and on_failed_stage(journal):
             return
-        raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
+        raise failures.outcome_unknown("mssql_native.target_local_pre_eof_custody_retained")
     directory = work_dir / journal.key.rsplit("/", 1)[-1]
     with importer_factory() as importer:
         for ordinal in sorted(map(int, projection["chunks"])):
@@ -96,25 +102,25 @@ def recover_target_local_staging(
                 continue
             if terminal["event"] == "UNKNOWN":
                 journal.retain_bcp_incident(ordinal, attempt_id)
-            raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
+            raise failures.outcome_unknown("mssql_native.target_local_pre_eof_custody_retained")
     if on_failed_stage is not None and on_failed_stage(journal):
         return
-    raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
+    raise failures.outcome_unknown("mssql_native.target_local_pre_eof_custody_retained")
 
 
-def recover_native_chunks(service: Any, plan: Any, lease: Any) -> Any:
+def recover_native_chunks(service: Any, plan: Any, lease: Any, failures: NativeRecoveryFailures) -> Any:
     """Recover a complete stage or settle an incomplete invocation source-free."""
     journal = service.journal_factory(plan, lease)
     journal.bind_limits(service.limits.to_dict())
     publication = journal.publication.state()
     if publication is not None and publication["phase"] not in ("preparing", "prepared"):
-        raise WindowOutcomeUnknown("mssql_native.publication_requires_reconciliation")
+        raise failures.outcome_unknown("mssql_native.publication_requires_reconciliation")
     result = journal.completed()
     if service._target_local and result is None:
         recover_target_local_staging(
-            journal, plan, lease, service.work_dir, service.importer_factory, service.on_failed_stage
+            journal, plan, lease, service.work_dir, service.importer_factory, service.on_failed_stage, failures
         )
-        raise NativeReextractRequired("mssql_native.reextract_required")
+        raise failures.reextract("mssql_native.reextract_required")
     with service.importer_factory() as importer:
         if result is not None:
             for receipt in result.receipts:
@@ -123,7 +129,7 @@ def recover_native_chunks(service: Any, plan: Any, lease: Any) -> Any:
                     "raw_verify", reason="recovery", ordinal=receipt.ordinal, attempt_id=receipt.attempt_id
                 ):
                     if importer.inspect(plan, receipt, lease) != receipt:
-                        raise WindowContractError("mssql_native.recovered_stage_changed")
+                        raise failures.contract("mssql_native.recovered_stage_changed")
             service._capacity(importer)
             return result
         for attempt_id in journal.attempts():
@@ -133,4 +139,4 @@ def recover_native_chunks(service: Any, plan: Any, lease: Any) -> Any:
     discard_native_files(service.work_dir / journal.key.rsplit("/", 1)[-1])
     if journal.data is not None and journal.data["phase"] == "staging":
         journal.reextract_required()
-    raise NativeReextractRequired("mssql_native.reextract_required")
+    raise failures.reextract("mssql_native.reextract_required")

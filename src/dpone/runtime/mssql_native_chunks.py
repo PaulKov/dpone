@@ -35,7 +35,7 @@ from dpone.runtime.mssql_native_capacity import require_native_spool_capacity
 from dpone.runtime.mssql_native_chunks_files import NativeRow, encode_native_frame, verify_native_file
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session, frame_observation
 from dpone.runtime.mssql_native_sized_frames import sized_native_frames
-from dpone.runtime.mssql_native_target_local_recovery import NativeReextractRequired, recover_native_chunks
+from dpone.runtime.mssql_native_target_local_recovery import NativeRecoveryFailures, recover_native_chunks
 from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
 from dpone.runtime.native_wire_models import SourceNativeWireContract
 
@@ -44,6 +44,10 @@ if TYPE_CHECKING:
 
 ImporterFactory = Callable[[], AbstractContextManager[NativeChunkImporter]]
 __all__ = ["BoundedNativeChunks", "NativeReextractRequired", "WindowOutcomeUnknown"]
+
+
+class NativeReextractRequired(WindowContractError):
+    """Partial staging is settled; restart the complete query with a new invocation."""
 
 
 def _encode(*args: Any, observed: bool = False) -> tuple[Any, dict[str, Any], dict[str, Any] | None]:
@@ -171,7 +175,12 @@ class BoundedNativeChunks:
         This is a staging-only recovery API. A publication owner must reconcile its
         target transaction receipt before asking to settle any partial extraction.
         """
-        return recover_native_chunks(self, plan, lease)
+        return recover_native_chunks(
+            self,
+            plan,
+            lease,
+            NativeRecoveryFailures(WindowContractError, WindowOutcomeUnknown, NativeReextractRequired),
+        )
 
     def _import(
         self, plan: NativeChunkPlan, file: EncodedNativeFile, attempt: str, lease: WindowLease, cancelled: Event
