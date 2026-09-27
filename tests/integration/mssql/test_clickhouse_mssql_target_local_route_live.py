@@ -169,6 +169,10 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
         )
         with pytest.raises(ValueError, match="stage_identity_mismatch|prepared_owner"):
             context.verify_receipts(complete.receipts)
+
+        target.execute_query(f"DROP TABLE {receipt.stage_id}")
+        with context.executor.importer_factory() as importer:
+            importer.drop_exact_owned(plan, receipt, lease)
     finally:
         for stage in stages:
             target.execute_query(f"DROP TABLE IF EXISTS {stage}")
