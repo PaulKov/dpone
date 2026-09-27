@@ -10,11 +10,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.runtime.mssql_native_chunks_files import native_multiset_digest
-from dpone.runtime.native_wire_models import NativeWireColumnLayout, SourceNativeWireContract
-from dpone.runtime.native_wire_mssql import validate_mssql_native_contract
+from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract, validate_mssql_native_contract
+
+if TYPE_CHECKING:
+    from dpone.runtime.native_wire_models import NativeWireColumnLayout, SourceNativeWireContract
 
 _WORD_BASE = 1 << 32
 _MAX_EXPECTED_ROWS = (1 << 63) - 2
@@ -52,6 +54,21 @@ class PreparedTargetDigests:
 
     business: TargetDigest
     full: TargetDigest
+
+
+def full_prepared_contract(stage: Any) -> SourceNativeWireContract:
+    """Build the exact prepared layout consumed by both digest implementations."""
+    return build_mssql_bcp_native_contract(
+        schema=tuple(
+            (
+                name,
+                stage.column_types[name] + (" nullable" if stage.target_column_nullability.get(name, True) else ""),
+            )
+            for name in stage.columns
+        ),
+        query="prepared-native-stage",
+        target_format="mssql_native",
+    )
 
 
 def build_target_digest_sql(qualified_stage: str, contract: SourceNativeWireContract, expected_rows: int) -> str:

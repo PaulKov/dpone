@@ -21,6 +21,7 @@ from dpone.contracts.mssql_native_chunks import NativeChunkPlan, NativeChunkRece
 from dpone.contracts.mssql_native_writer import (
     BCP_STAGE_PROOF,
     SQLCLIENT_SESSION_PROOF,
+    WRITER_OUTCOMES,
     is_nonnegative_int,
     valid_native_writer_observation,
     validate_bcp_writer_event,
@@ -28,6 +29,8 @@ from dpone.contracts.mssql_native_writer import (
 from dpone.contracts.strict_json import canonical_json_bytes
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
+WRITER_PROOF_CAPABILITIES = (BCP_STAGE_PROOF, SQLCLIENT_SESSION_PROOF)
+NATIVE_WRITER_OUTCOMES = WRITER_OUTCOMES
 
 
 class NativeVerificationBackend(StrEnum):

@@ -13,6 +13,7 @@ from dpone.runtime.native_wire_models import SourceNativeWireContract
 from dpone.runtime.sinks.mssql_native_target_digest import (
     build_prepared_target_digest_sql,
     decode_prepared_target_digest_row,
+    full_prepared_contract,
 )
 from dpone.runtime.sinks.mssql_native_verification import verification_allowance
 
@@ -43,23 +44,6 @@ def digest_prepared_target(
     if observed.business.rows != expected_rows or observed.full.rows != expected_rows:
         raise ValueError("mssql_native.prepared_count_mismatch")
     return PreparedDigests(observed.business.typed_digest, observed.full.typed_digest, expected_rows)
-
-
-def full_prepared_contract(stage: Any) -> SourceNativeWireContract:
-    """Build the exact physical prepared layout used by both verification modes."""
-    from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
-
-    return build_mssql_bcp_native_contract(
-        schema=tuple(
-            (
-                name,
-                stage.column_types[name] + (" nullable" if stage.target_column_nullability.get(name, True) else ""),
-            )
-            for name in stage.columns
-        ),
-        query="prepared-native-stage",
-        target_format="mssql_native",
-    )
 
 
 def digest_stage_projection(strategy: Any, stage: Any, context: Any, *, all_columns: bool) -> str:

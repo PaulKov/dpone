@@ -6,7 +6,6 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from typing import Any
 
-from dpone.adapters.mssql_native_chunks_journal_v2_events import commit_verified_receipt
 from dpone.contracts.bounded_window import WindowContractError
 from dpone.contracts.mssql_native_chunks import NativeChunkReceipt
 from dpone.contracts.mssql_native_verification import is_sha256_digest, matches_native_receipt
@@ -204,9 +203,6 @@ class BcpRecoveryMixin:
     """Serialize recovery methods against the journal's durable projection."""
 
     _lock: Any
-
-    def _commit_verified_receipt(self, receipt: NativeChunkReceipt, *, allow_recovery: bool) -> None:
-        commit_verified_receipt(self, receipt, allow_recovery=allow_recovery)
 
     @staticmethod
     def _assert_no_nonpublication(data: dict[str, Any]) -> None:

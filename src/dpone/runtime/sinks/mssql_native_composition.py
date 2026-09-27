@@ -15,7 +15,7 @@ from dpone.adapters.mssql_native_guard import native_exact_stage_barrier, native
 from dpone.ports.mssql_native_chunks import NativeChunkReceipt
 from dpone.runtime.mssql_native_capacity import require_native_spool_capacity
 from dpone.runtime.mssql_native_chunks import BoundedNativeChunks, WindowOutcomeUnknown
-from dpone.runtime.mssql_native_chunks_files import discard_native_files
+from dpone.runtime.mssql_native_chunks_files import discard_native_files, verify_native_file
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
 
@@ -107,6 +107,7 @@ def compose_native_stage_context(
                         connector, stage, timeout_seconds=target_local_timeout_seconds, assert_identity=check
                     ),
                     WindowOutcomeUnknown,
+                    verify_native_file,
                     target_local_timeout_seconds,
                 )
             yield MssqlNativeChunkImporter(

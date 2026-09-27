@@ -10,7 +10,6 @@ from typing import Any
 
 from dpone.ports.mssql_native_writer import NativeStageWriteGrant
 from dpone.runtime.file_artifacts import FileExportArtifact
-from dpone.runtime.mssql_native_chunks_files import verify_native_file
 from dpone.runtime.mssql_native_target_local_recovery import retire_exact_owned_stage
 
 
@@ -24,10 +23,12 @@ class NativeTargetLocalAttempt:
         writer: Any,
         barrier: Callable[..., Any],
         unknown_error: type[Exception],
+        verify_file: Callable[[Any], None],
         retirement_timeout_seconds: int = 3600,
     ) -> None:
         self.journal, self.custody, self.writer, self.barrier = journal, custody, writer, barrier
         self.unknown_error = unknown_error
+        self.verify_file = verify_file
         self.retirement_timeout_seconds = retirement_timeout_seconds
 
     @staticmethod
@@ -170,7 +171,7 @@ class NativeTargetLocalAttempt:
     def recover_positive(self, importer: Any, plan: Any, file: Any, attempt_id: str, lease: Any) -> Any:
         """Observe a durable positive terminal under a fresh barrier; never relaunch."""
         importer._assert_lease(lease)
-        verify_native_file(file)
+        self.verify_file(file)
         events = self.journal.data["events"][attempt_id]
         object_id = events[-1]["stage_binding"]["object_id"]
         table = importer.table_name(plan, attempt_id)

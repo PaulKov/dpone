@@ -85,7 +85,7 @@ def test_positive_attempt_records_boundary_order_and_one_aggregate(tmp_path: Pat
         assert_identity()
         return nullcontext()
 
-    attempt = NativeTargetLocalAttempt(journal, custody, Writer(), barrier, WindowOutcomeUnknown)
+    attempt = NativeTargetLocalAttempt(journal, custody, Writer(), barrier, WindowOutcomeUnknown, lambda _file: None)
     if barrier_fails:
         with pytest.raises(TimeoutError, match="barrier"):
             attempt.import_file(Importer(), plan, file, attempt_id, lease, SimpleNamespace())
@@ -169,7 +169,7 @@ def test_published_cleanup_requires_durable_authority_and_exact_stage_identity()
 
         connector = Connector()
 
-    attempt = NativeTargetLocalAttempt(Journal(), None, None, None, WindowOutcomeUnknown)
+    attempt = NativeTargetLocalAttempt(Journal(), None, None, None, WindowOutcomeUnknown, lambda _file: None)
     with pytest.raises(ValueError, match="publication_required"):
         attempt.settle_published(Importer(), None, receipt, None)
     assert "drop" not in calls
@@ -240,7 +240,7 @@ def test_published_partial_cleanup_replays_each_exact_stage_without_second_drop(
         publication = SimpleNamespace(state=lambda: {"phase": "succeeded"})
         completed = staticmethod(lambda: SimpleNamespace(receipts=receipts))
 
-    attempt = NativeTargetLocalAttempt(Journal(), None, None, None, WindowOutcomeUnknown)
+    attempt = NativeTargetLocalAttempt(Journal(), None, None, None, WindowOutcomeUnknown, lambda _file: None)
     importer = Importer()
     attempt.settle_published(importer, None, receipts[0], None)
     assert drops == [receipts[0].stage_id]
@@ -336,7 +336,7 @@ def test_positive_terminal_recovery_reobserves_without_writer_launch(tmp_path):
         assert_identity()
         return nullcontext()
 
-    recovery = NativeTargetLocalAttempt(journal, None, NoWriter(), barrier, WindowOutcomeUnknown)
+    recovery = NativeTargetLocalAttempt(journal, None, NoWriter(), barrier, WindowOutcomeUnknown, lambda _file: None)
     receipt = recovery.recover_positive(Importer(), plan, file, attempt_id, lease)
     assert receipt.attempt_id == attempt_id
     assert journal.data["events"][attempt_id][-1]["event"] == "VERIFIED"
