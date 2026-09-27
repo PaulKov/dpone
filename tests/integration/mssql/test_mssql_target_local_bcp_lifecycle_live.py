@@ -137,6 +137,31 @@ def test_real_bcp_cleanup_failure_retains_ambiguity_after_rows_arrive(stand, tmp
         stand.drop_table(table)
 
 
+def test_real_bcp_vendor_count_mismatch_cannot_create_authority(stand, tmp_path) -> None:
+    case = digest_cases()[0]
+    table = stand.unique_table("count")
+    file = case.sealed_file(tmp_path / "count.native")
+    grant = NativeStageWriteGrant(
+        "attempt-count",
+        stand.qualified(table),
+        file.path,
+        file.rows + 1,
+        file.encoded_bytes,
+        file.file_sha256,
+        sha256(b"count-grant").hexdigest(),
+        BCP_STAGE_PROOF,
+    )
+    try:
+        stand.create_empty_table(table, case)
+        writer = MssqlNativeBcpWriter(lambda current, path: stand.launch_bcp(current, path))
+
+        with pytest.raises(ValueError, match="vendor_count_mismatch"):
+            writer.write(grant, rejects_path=tmp_path / "count.rejects")
+        assert stand.table_rows(table) == file.rows
+    finally:
+        stand.drop_table(table)
+
+
 def test_changed_sealed_file_is_rejected_before_writer_launch(stand, tmp_path) -> None:
     case = digest_cases()[0]
     file = case.sealed_file(tmp_path / "changed.native")
