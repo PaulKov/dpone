@@ -157,7 +157,11 @@ def test_published_cleanup_requires_durable_authority_and_exact_stage_identity()
                 pass
 
             def get_records(self, sql, params=None):
-                return [(self.object_id,)] if sql == "SELECT OBJECT_ID(?)" else []
+                if sql == "SELECT OBJECT_ID(?)":
+                    return [(self.object_id,)]
+                if sql == "SELECT USER_NAME(), IS_SRVROLEMEMBER('sysadmin')":
+                    return [("dbo", 0)]
+                return []
 
             def execute_query(self, sql):
                 calls.append("drop")
@@ -206,7 +210,11 @@ def test_published_partial_cleanup_replays_each_exact_stage_without_second_drop(
 
         @staticmethod
         def get_records(sql, params=None):
-            return [(objects[params[0]],)] if sql == "SELECT OBJECT_ID(?)" else []
+            if sql == "SELECT OBJECT_ID(?)":
+                return [(objects[params[0]],)]
+            if sql == "SELECT USER_NAME(), IS_SRVROLEMEMBER('sysadmin')":
+                return [("dbo", 0)]
+            return []
 
         @staticmethod
         def execute_query(sql):

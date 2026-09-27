@@ -9,8 +9,9 @@ from dpone.runtime.mssql_native_target_local_recovery import retire_exact_owned_
 
 
 class _Connector:
-    def __init__(self, object_id=11):
+    def __init__(self, object_id=11, *, user="dbo"):
         self.object_id = object_id
+        self.user = user
         self.calls = []
 
     @contextmanager
@@ -24,6 +25,8 @@ class _Connector:
     def get_records(self, query, params=None):
         if query == "SELECT OBJECT_ID(?)":
             return [(self.object_id,)]
+        if query == "SELECT USER_NAME(), IS_SRVROLEMEMBER('sysadmin')":
+            return [(self.user, 0)]
         if "TABLOCKX, HOLDLOCK" in query:
             self.calls.append("table-lock")
             return []
@@ -83,6 +86,14 @@ def test_exact_retirement_replays_after_drop_before_durable_event():
     retire_exact_owned_stage(importer, None, _receipt(), None, timeout_seconds=3)
     assert connector.calls[-2:] == ["begin", "commit"]
     assert connector.calls.count("drop") == 1
+
+
+def test_null_object_id_without_metadata_authority_cannot_release_custody():
+    connector = _Connector(None, user="limited")
+    with pytest.raises(ValueError, match="absence_visibility_unproved"):
+        retire_exact_owned_stage(_Importer(connector), None, _receipt(), None, timeout_seconds=3)
+    assert "rollback" in connector.calls and "commit" not in connector.calls
+    assert "drop" not in connector.calls
 
 
 @pytest.mark.parametrize("object_id,drift", [(12, None), (11, "owner"), (11, "schema")])
