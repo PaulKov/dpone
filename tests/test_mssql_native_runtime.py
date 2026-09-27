@@ -6,16 +6,36 @@ from types import SimpleNamespace
 import pytest
 
 from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
+from dpone.adapters.mssql_native_chunks_journal_v2 import NativeChunkJournalV2
+from dpone.adapters.mssql_native_custody import NativeTargetCustody
+from dpone.contracts.mssql_native_chunks import NativeChunkPlan
+from dpone.contracts.mssql_native_verification import NativeVerificationBackend, NativeVerificationIdentityV2
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.mssql_native_runtime import NativeMssqlRuntime, NativeRuntimeBindings
 from dpone.runtime.sinks.load_result import LoadResult
 from tests.test_mssql_native_policy import config
 
 
-def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
+def runtime(
+    tmp_path,
+    *,
+    recovered=False,
+    evidence_fails=False,
+    quality_fails=False,
+    observer=None,
+    explicit_security_dependencies=True,
+):
     events = []
 
-    class Journal:
+    class Journal(NativeChunkJournalV2):
+        # This interaction fake keeps publication callbacks observable while
+        # satisfying the runtime's concrete v2 journal admission check.
+        identity = None
+        data = None
+
+        def __init__(self):
+            pass
+
         @property
         def publication(self):
             return self
@@ -32,6 +52,9 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
         def succeeded(self):
             self.phase = "succeeded"
             events.append("state-marker")
+
+        def completed(self):
+            return SimpleNamespace(rows=2)
 
     journal = Journal()
     handle = StagedLoadHandle(None, (), 2)
@@ -82,6 +105,16 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
         if evidence_fails:
             raise ValueError("evidence")
 
+    security_dependencies = (
+        {
+            "custody_factory": NativeTargetCustody,
+            "v2_journal_admission": lambda current, identity: (
+                isinstance(current, NativeChunkJournalV2) and current.identity == identity
+            ),
+        }
+        if explicit_security_dependencies
+        else {}
+    )
     value = NativeMssqlRuntime(
         observer=observer,
         store=SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1),
@@ -92,6 +125,7 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
         quality=quality,
         evidence=evidence,
         advance_state=lambda *args: events.append("state"),
+        **security_dependencies,
     )
     return value, events, journal
 
@@ -185,3 +219,185 @@ def test_runtime_observations_identify_the_executing_thread(tmp_path):
         worker = pool.submit(execute).result()
     assert worker != get_ident()
     assert {item["worker_id"] for item in observer.snapshot()["observations"]} == {f"runtime:{worker}"}
+
+
+def test_v1_runtime_blocks_held_v2_custody_before_resume_or_source(tmp_path):
+    value, events, _ = runtime(tmp_path)
+    lease = value.store.acquire("target", "prior", 60)
+    NativeTargetCustody(value.store, "target").claim(lease, "a" * 64)
+    value.store.release(lease)
+    with pytest.raises(Exception, match="custody_held"):
+        value.run(config(), owner="new")
+    assert "resume" not in events and "source" not in events
+
+
+def test_legacy_constructor_uses_framework_security_defaults(tmp_path):
+    value, events, _ = runtime(tmp_path, explicit_security_dependencies=False)
+    lease = value.store.acquire("target", "prior", 60)
+    NativeTargetCustody(value.store, "target").claim(lease, "a" * 64)
+    value.store.release(lease)
+
+    with pytest.raises(Exception, match="custody_held"):
+        value.run(config(), owner="legacy-caller")
+
+    assert "resume" not in events and "source" not in events
+
+
+@pytest.mark.parametrize("identity_location", ["binding", "context"])
+def test_v1_rejects_v2_identity_before_resume_or_source(tmp_path, identity_location):
+    value, events, _ = runtime(tmp_path)
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        identity = object()
+        if identity_location == "context":
+            bound.stage_context.verification_identity = identity
+            return bound
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, identity)
+
+    value.bindings = bindings
+    with pytest.raises(Exception, match="verification_identity_mismatch"):
+        value.run(config(), owner="new")
+    assert "resume" not in events and "source" not in events
+
+
+def test_target_local_requires_equal_binding_and_context_identity_before_resume(tmp_path):
+    value, events, _ = runtime(tmp_path)
+    cfg = config()
+    cfg.options["native_transfer"]["execution"]["verification_backend"] = "target_local"
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        bound.stage_context.verification_identity = object()
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, object())
+
+    value.bindings = bindings
+    with pytest.raises(Exception, match="verification_identity_mismatch"):
+        value.run(cfg, owner="new")
+    assert "resume" not in events and "source" not in events
+
+
+def test_target_local_claims_before_resume_and_releases_after_cleanup(tmp_path):
+    value, events, journal = runtime(tmp_path)
+    cfg = config()
+    cfg.options["native_transfer"]["execution"]["verification_backend"] = "target_local"
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+    )
+    journal.identity = identity
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        bound.stage_context.plan = plan
+        bound.stage_context.verification_identity = identity
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, identity)
+
+    value.bindings = bindings
+    original_resume = value.bindings
+    custody = NativeTargetCustody(value.store, "target")
+
+    def asserting_bindings(*args):
+        bound = original_resume(*args)
+        original = bound.service.resume
+
+        def resume(*resume_args):
+            assert custody.inspect(bound.stage_context.lease).holder_invocation_key == identity.invocation_key
+            events.append("custody-claimed")
+            return original(*resume_args)
+
+        bound.service.resume = resume
+        return bound
+
+    value.bindings = asserting_bindings
+    assert value.run(cfg, owner="invocation").status == "success"
+    assert events.index("custody-claimed") < events.index("resume") < events.index("source")
+    assert custody.inspect(value.store.acquire("target", "inspect", 60)).release_reason == "published_cleanup"
+
+
+def test_target_local_source_open_failure_requests_zero_stage_nonpublication(tmp_path):
+    value, events, journal = runtime(tmp_path)
+    cfg = config()
+    cfg.options["native_transfer"]["execution"]["verification_backend"] = "target_local"
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+    )
+    journal.identity = identity
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        bound.stage_context.plan = plan
+        bound.stage_context.verification_identity = identity
+        bound.stage_context.executor = SimpleNamespace(
+            on_failed_stage=lambda current: events.append(("nonpublication", current is journal)) or True
+        )
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, identity)
+
+    value.bindings = bindings
+
+    def source(*args):
+        events.append("source-open")
+        raise OSError("source unavailable")
+
+    value.source = source
+    with pytest.raises(OSError, match="source unavailable"):
+        value.run(cfg, owner="invocation")
+    assert events[-2:] == ["source-open", ("nonpublication", True)]
+    assert "stage" not in events
+
+
+def test_recovery_only_claim_without_journal_closes_zero_stage_before_reextract(tmp_path):
+    value, events, journal = runtime(tmp_path)
+    cfg = config()
+    cfg.options["native_transfer"]["execution"]["verification_backend"] = "target_local"
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+    )
+    journal.identity = identity
+    prior = value.store.acquire("target", "crashed", 60)
+    NativeTargetCustody(value.store, "target").claim(prior, identity.invocation_key)
+    value.store.release(prior)
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        bound.stage_context.plan = plan
+        bound.stage_context.verification_identity = identity
+        bound.stage_context.executor = SimpleNamespace(
+            on_failed_stage=lambda current: events.append(("nonpublication", current is journal)) or True
+        )
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, identity)
+
+    value.bindings = bindings
+    value.source = lambda *args: pytest.fail("recovery-only claim must not open source")
+    with pytest.raises(Exception, match="pre_eof_reextract_required"):
+        value.run(cfg, owner="recovery")
+    assert events[-1] == ("nonpublication", True)
+    assert "source" not in events

@@ -1,0 +1,179 @@
+schema_version: 1
+task_id: "DPONE-MSSQL-TARGET-LOCAL-P1"
+title: "MSSQL target-local native verification"
+goal: "Remove business-row readback from the explicitly selected target-local BCP verification path without changing released BCP v1 behavior."
+specification: "docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md"
+base_commit: "9566575b63df8c3eebde7f935cd2e470c69a0531"
+integrator: "root"
+
+acceptance_criteria:
+  - "Omitted verification_backend preserves BCP plus Python readback and journal v1."
+  - "Explicit target_local returns only aggregate count/digest data from SQL Server."
+  - "Raw and prepared digests reproduce mssql-native-sha256-sum-v1 for the admitted matrix."
+  - "Count overflow, identity drift, schema drift, and digest mismatch fail closed."
+  - "BCP target-local success requires acknowledged and reaped supervised process custody plus a transaction-held exact-stage barrier; ambiguous outcomes remain UNKNOWN and forbid automatic retry, drop, preparation, and publication."
+  - "A stable invocation-owned target-custody CAS authority is claimed before target-local source I/O, survives lease expiry, covers every chunk including empty input, and blocks new v2 and rollback v1 invocations until matching publication cleanup or proved non-publication and full stage retirement."
+  - "Docker narrow and wide100 differential certification passes on the exact candidate commit."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - manifest_schema
+    - plan_json
+    - native_journal_identity
+    - route_documentation
+  migration_required: false
+
+owned_paths:
+  - src/dpone/runtime/mssql_native_chunks_files.py
+  - src/dpone/runtime/sinks/mssql_native_target_digest.py
+  - src/dpone/runtime/sinks/mssql_native_target_local_layout.py
+  - src/dpone/contracts/mssql_native_verification.py
+  - src/dpone/contracts/mssql_native_verification_identity.py
+  - src/dpone/adapters/mssql_native_chunks_journal_v2.py
+  - src/dpone/adapters/mssql_native_chunks_journal_v2_events.py
+  - src/dpone/adapters/mssql_native_chunks_journal_v2_recovery.py
+  - src/dpone/runtime/sinks/mssql_native_import.py
+  - src/dpone/runtime/sinks/mssql_native_target_local_import.py
+  - src/dpone/runtime/mssql_native_target_local_recovery.py
+  - src/dpone/runtime/sinks/mssql_native_prepared_digests.py
+  - src/dpone/runtime/sinks/mssql_native_prepare.py
+  - src/dpone/runtime/sinks/mssql_native_prepared_owner.py
+  - src/dpone/runtime/sinks/mssql_native_object_authority.py
+  - src/dpone/runtime/consumed_payload_evidence.py
+  - src/dpone/runtime/sinks/staging_managers/mssql_staging_evidence.py
+  - src/dpone/runtime/sinks/mssql_native_composition.py
+  - src/dpone/runtime/mssql_native_chunks.py
+  - src/dpone/runtime/connectors/mssql_bulk.py
+  - src/dpone/runtime/connectors/mssql_bcp_process.py
+  - src/dpone/runtime/connectors/mssql.py
+  - src/dpone/adapters/mssql_native_guard.py
+  - src/dpone/contracts/mssql_native_writer.py
+  - src/dpone/ports/mssql_native_writer.py
+  - src/dpone/runtime/sinks/mssql_native_bcp_writer.py
+  - src/dpone/runtime/connectors/mssql_bcp_supervised.py
+  - src/dpone/contracts/mssql_native_custody.py
+  - src/dpone/adapters/mssql_native_custody.py
+  - src/dpone/runtime/mssql_native_runtime.py
+  - tests/test_mssql_native_target_digest.py
+  - tests/test_mssql_native_verification_policy.py
+  - tests/test_mssql_native_verification_identity_builder.py
+  - tests/test_mssql_native_chunks_journal_v2.py
+  - tests/test_mssql_native_staged_import.py
+  - tests/test_consumed_payload_evidence.py
+  - tests/test_mssql_native_staged_prepare.py
+  - tests/test_mssql_native_prepared_owner_cleanup.py
+  - tests/test_mssql_native_target_local_import.py
+  - tests/test_mssql_native_target_local_recovery.py
+  - tests/test_mssql_native_integrity_readbacks.py
+  - tests/test_mssql_native_composition.py
+  - tests/test_mssql_native_chunks_execution.py
+  - tests/test_mssql_bcp_process.py
+  - tests/test_mssql_native_bcp_writer.py
+  - tests/test_mssql_native_guard.py
+  - tests/test_mssql_native_custody.py
+  - tests/test_mssql_native_runtime.py
+  - tests/integration/mssql
+  - tests/fixtures
+
+integrator_owned_paths:
+  - src/dpone/manifest/mssql_native_policy.py
+  - src/dpone/readiness/mssql_native_planning.py
+  - src/dpone/schema/etl-config.schema.json
+  - src/dpone/schema/etl-batch-manifest.schema.json
+  - examples/native
+  - docs/mssql-native-transport.md
+  - docs/source-sink/clickhouse-to-mssql.md
+  - docs/delivery-acceleration/operations.md
+  - docs/delivery-acceleration/certification.md
+  - docs/compatibility.md
+  - docs/reference/manifest-schemas.md
+  - docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md
+  - src/dpone/schema/dpone.mssql-native-writer-state.v2.schema.json
+  - src/dpone/contracts/mssql_native_writer_state_schema.py
+  - tests/test_mssql_native_writer_state_schema.py
+  - tests/test_manifest_schema_reference_docs.py
+  - docs/adr/0072-mssql-native-writer-proof-capabilities.md
+  - docs/adr-index.md
+  - test_artifacts/live_certification/mssql-target-local-p1
+  - CHANGELOG.md
+
+read_only_paths:
+  - src/dpone/contracts/mssql_native_chunks.py
+  - src/dpone/adapters/mssql_native_chunks_journal.py
+  - src/dpone/runtime/mssql_native_encoder.py
+  - src/dpone/runtime/mssql_native_encoder_values.py
+  - src/dpone/runtime/native_wire_mssql.py
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - tests/conftest.py
+  - src/dpone/manifest/mssql_native_policy.py
+  - src/dpone/readiness/mssql_native_planning.py
+  - src/dpone/schema/etl-config.schema.json
+  - src/dpone/schema/etl-batch-manifest.schema.json
+  - examples/native
+  - docs/mssql-native-transport.md
+  - docs/source-sink/clickhouse-to-mssql.md
+  - docs/delivery-acceleration/operations.md
+  - docs/delivery-acceleration/certification.md
+  - docs/compatibility.md
+  - docs/reference/manifest-schemas.md
+  - docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md
+  - src/dpone/schema/dpone.mssql-native-writer-state.v2.schema.json
+  - src/dpone/contracts/mssql_native_writer_state_schema.py
+  - tests/test_mssql_native_writer_state_schema.py
+  - tests/test_manifest_schema_reference_docs.py
+  - docs/adr/0072-mssql-native-writer-proof-capabilities.md
+  - docs/adr-index.md
+  - test_artifacts/live_certification/mssql-target-local-p1
+
+shared_file_owner: "root"
+
+dependencies:
+  - "SQL Server 2019+ Docker image for live differential certification"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_mssql_native_target_digest.py tests/test_mssql_native_verification_policy.py tests/test_mssql_native_chunks_journal_v2.py -q"
+    - "uv run pytest tests/test_mssql_native_staged_import.py tests/test_mssql_native_integrity_readbacks.py tests/test_mssql_native_composition.py tests/test_mssql_native_chunks_execution.py -q"
+    - "uv run pytest tests/test_mssql_native_target_local_import.py -q"
+    - "uv run pytest tests/test_mssql_bcp_process.py tests/test_mssql_native_bcp_writer.py tests/test_mssql_native_guard.py tests/test_mssql_native_custody.py tests/test_mssql_native_runtime.py -q"
+    - "uv run pytest tests/test_mssql_native_writer_state_schema.py tests/test_mssql_native_policy.py tests/test_mssql_native_staged_planning.py -q"
+  broad:
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+    - "uv run dpone docs check-docs"
+    - "uv run mkdocs build --strict"
+  live:
+    - "local Docker SQL Server target-local narrow and wide100 differential matrix"
+    - "local Docker SQL Server real BCP custody and stage-barrier recovery matrix with zero skips"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

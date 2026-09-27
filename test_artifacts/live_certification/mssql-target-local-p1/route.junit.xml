@@ -1,0 +1,11 @@
+<?xml version='1.0' encoding='utf-8'?>
+<testsuites name="pytest tests">
+  <testsuite name="pytest" errors="0" failures="0" skipped="0" tests="6" time="4.833">
+    <testcase classname="tests.integration.mssql.test_clickhouse_mssql_target_local_route_live" name="test_clickhouse_rows_use_aggregate_only_publication_and_reject_object_replacement" time="1.744" />
+    <testcase classname="tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live" name="test_late_target_write_blocks_exact_stage_barrier_and_is_rejected" time="1.294" />
+    <testcase classname="tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live" name="test_controller_restart_recovers_verified_bcp_chunks_without_writer_or_source" time="0.392" />
+    <testcase classname="tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live" name="test_real_bcp_two_chunk_invocation_obeys_import_concurrency[1-1]" time="0.385" />
+    <testcase classname="tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live" name="test_real_bcp_two_chunk_invocation_obeys_import_concurrency[2-2]" time="0.349" />
+    <testcase classname="tests.integration.mssql.test_clickhouse_mssql_target_local_runtime_live" name="test_clickhouse_mssql_target_local_runtime_orders_publication_and_cleanup" time="0.449" />
+  </testsuite>
+</testsuites>

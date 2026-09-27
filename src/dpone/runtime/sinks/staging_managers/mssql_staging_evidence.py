@@ -88,6 +88,17 @@ class MssqlStagingEvidenceAuthority:
         evidence = raw.consumed_payload_evidence
         if not isinstance(evidence, ConsumedPayloadEvidence):
             raise ArtifactIntegrityError("mssql_native_projection.consumed_payload_evidence_required")
+        if not evidence.parts:
+            if (
+                evidence != ConsumedPayloadEvidence.empty()
+                or type(native.row_count) is not int
+                or native.row_count != 0
+            ):
+                raise ArtifactIntegrityError("mssql_native_projection.empty_row_count_mismatch")
+            native.consumed_payload_evidence = ConsumedPayloadEvidence.verified_empty(
+                canonical_native_contract_sha256(columns, source_wire_contract_sha256s=(), allow_empty_source=True)
+            )
+            return
         verified = evidence.require_complete(native=False)
         native.consumed_payload_evidence = verified.with_native_rows(
             native.row_count,

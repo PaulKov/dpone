@@ -19,7 +19,7 @@ def test_generated_reference_contains_every_public_schema() -> None:
 
     assert MANIFEST_SCHEMA_REF_START in rendered
     assert MANIFEST_SCHEMA_REF_END in rendered
-    assert "Registered schemas: **18**." in rendered
+    assert "Registered schemas: **19**." in rendered
     for name in (
         "capability-discovery.schema.json",
         "etl-batch-manifest.schema.json",
@@ -39,6 +39,7 @@ def test_generated_reference_contains_every_public_schema() -> None:
         "extension-check-receipt.schema.json",
         "extension-conformance-request.schema.json",
         "extension-conformance.schema.json",
+        "dpone.mssql-native-writer-state.v2.schema.json",
     ):
         assert name in rendered
     assert "`dpone.test.v1`" in rendered

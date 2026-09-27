@@ -1,0 +1,64 @@
+{
+  "capability_digest": "36512cb336093a7b93cc9a74c5a832cf632b4847a96f4ff9fdb5cbba88f7aa4d",
+  "kind": "dpone.mssql-target-local-layout-matrix",
+  "max_business_columns": 100,
+  "prepared_framework_types": [
+    "datetime2(7)",
+    "int",
+    "nvarchar(max)",
+    "varchar(26)",
+    "varchar(32)",
+    "varchar(64)"
+  ],
+  "raw_layouts": [
+    {
+      "encoding": null,
+      "fixed_length": 8,
+      "precision": null,
+      "prefix_widths": [
+        0,
+        1
+      ],
+      "scale": null,
+      "source_type": "bigint",
+      "storage_type": "bigint"
+    },
+    {
+      "encoding": null,
+      "fixed_length": 8,
+      "precision": 53,
+      "prefix_widths": [
+        0,
+        1
+      ],
+      "scale": null,
+      "source_type": "float(53)",
+      "storage_type": "float"
+    },
+    {
+      "encoding": "utf-16le",
+      "fixed_length": null,
+      "precision": null,
+      "prefix_widths": [
+        8
+      ],
+      "scale": null,
+      "source_type": "nvarchar(max)",
+      "storage_type": "nvarchar"
+    },
+    {
+      "encoding": null,
+      "fixed_length": 8,
+      "precision": null,
+      "prefix_widths": [
+        0,
+        1
+      ],
+      "scale": 7,
+      "source_type": "datetime2(6)",
+      "storage_type": "datetime2"
+    }
+  ],
+  "schema_version": 1,
+  "source_commit": "821bb79cf26a03c32c2b4b1eb2af92871c756134"
+}

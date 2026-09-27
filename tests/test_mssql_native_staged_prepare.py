@@ -20,8 +20,23 @@ from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
 from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
 from dpone.runtime.sinks.mssql_native_prepare import MssqlNativeStagePreparer, NativeStageContext
 from dpone.runtime.sinks.staging_managers.mssql import MSSQLStagingManager
+from dpone.runtime.sinks.staging_managers.mssql_staging_evidence import MssqlStagingEvidenceAuthority
 from dpone.runtime.sinks.strategies.mssql.mssql_concrete_load_strategies import MSSQLFullRefreshStrategy
 from tests.test_mssql_native_staged_recovery import prepared_fixture
+
+
+def test_native_finalize_accepts_only_physically_verified_zero_part_projection():
+    authority = MssqlStagingEvidenceAuthority(SimpleNamespace())
+    raw = SimpleNamespace(consumed_payload_evidence=ConsumedPayloadEvidence.empty())
+    native = SimpleNamespace(row_count=1, consumed_payload_evidence=None)
+    columns = ({"wire_name": "n", "target_name": "n", "target_type": "int", "nullable": False, "collation": None},)
+    with pytest.raises(Exception, match="empty|row_count"):
+        authority.finalize_native(raw, native, columns=columns)
+    assert native.consumed_payload_evidence is None
+    native.row_count = 0
+    authority.finalize_native(raw, native, columns=columns)
+    assert native.consumed_payload_evidence.require_complete().actual_native_rows == 0
+    assert native.consumed_payload_evidence.parts == ()
 
 
 class MemoryConnector:
@@ -93,6 +108,8 @@ class MemoryConnector:
         return 0
 
     def get_records(self, sql, params=(), **kwargs):
+        if "#dpone_target_hashes" in sql:
+            return [(0, 0, *([0] * 16))]
         if "extended_properties" in sql:
             return [(self.properties[params[0]],)]
         if "OBJECT_ID" in sql:
@@ -105,6 +122,94 @@ class MemoryConnector:
         self.typed_readbacks.append(sql)
         names = re.findall(r"\[([^\]]+)\]", sql.split(" FROM ", 1)[0])
         return iter({name: row[name] for name in names} for row in self.tables[sql.split(" FROM ", 1)[1]])
+
+
+def test_target_local_empty_prepare_has_no_raw_attempt_and_verified_empty_evidence():
+    base = prepared_fixture()
+    connector = MemoryConnector()
+    connector.tables.clear()
+    strategy = MSSQLFullRefreshStrategy(connector, SimpleNamespace(), MSSQLStagingManager(connector))
+    config = LoadConfig(
+        "source",
+        "target",
+        "default",
+        "events",
+        "dbo",
+        "target",
+        target_database="db",
+        staging_database="db",
+        staging_schema="stage",
+        options={"__dpone_load_identity": {"run_id": "run", "load_id": "load"}, "lineage": False},
+    )
+    wire = build_mssql_bcp_native_contract(schema=(("n", "bigint"),), query="test", target_format="mssql_native")
+
+    class Journal:
+        @property
+        def publication(self):
+            return self
+
+        @staticmethod
+        def completed():
+            return SimpleNamespace(receipts=(), rows=0)
+
+        def preparation_started(self, binding):
+            self.planned = binding["planned_stage"]
+
+        def prepared(self, binding):
+            self.snapshot = binding
+
+        def state(self):
+            return {"phase": "prepared"}
+
+    journal = Journal()
+    context = NativeStageContext(
+        NativeChunkPlan("run", "target", "query", "window", "schema", "wire"),
+        wire,
+        SimpleNamespace(stage=lambda *args, **kwargs: SimpleNamespace(receipts=(), rows=0)),
+        object(),
+        lambda: iter(()),
+        lambda receipts: None,
+        lambda receipts: None,
+        lambda extra: None,
+        lambda: journal,
+        nullcontext,
+        verification_identity=object(),
+    )
+    payload = SimpleNamespace(
+        schema=(("n", "bigint"),),
+        relation_schema=None,
+        relation_metadata=None,
+        relation_dialect=None,
+        target_projection=None,
+        mssql_transaction_admission=base.admission,
+        mssql_target_mutation_plan=base.mutation_plan,
+        require_completed_extraction=lambda: base.source_lifecycle,
+    )
+    preparer = MssqlNativeStagePreparer(
+        SimpleNamespace(connector=connector, _strategy_map={LoadStrategy.FULL_REFRESH: strategy}),
+        lambda *args: context,
+    )
+    prepared = preparer.stage(config, payload)
+    assert prepared.staging.row_count == 0
+    assert prepared.staging.consumed_payload_evidence.require_complete().parts == ()
+    assert not any(sql.startswith("INSERT INTO ") for sql in connector.statements)
+    assert connector.typed_readbacks == []
+    preparer.reverify(prepared)
+    from dpone.runtime.sinks.mssql_native_recovery import restore_prepared
+
+    restored = restore_prepared(
+        json.loads(json.dumps(journal.snapshot)),
+        admission=base.admission,
+        staging_manager=strategy.staging_manager,
+        interval=None,
+        resources=prepared.resources,
+    )
+    preparer.reverify(restored)
+    assert restored.staging.consumed_payload_evidence == prepared.staging.consumed_payload_evidence
+    stage_name = strategy._staging_name(prepared.staging)
+    with pytest.raises(ValueError, match="publication_required"):
+        preparer.cleanup(prepared)
+    assert stage_name in connector.tables
 
 
 @pytest.mark.parametrize("counts", [(2, 1), (0,), (1, 1, 1)])

@@ -10,6 +10,11 @@ from typing import Any
 from dpone.runtime.mssql_native_chunks_files import native_multiset_digest
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
 from dpone.runtime.native_wire_models import SourceNativeWireContract
+from dpone.runtime.sinks.mssql_native_target_digest import (
+    build_prepared_target_digest_sql,
+    decode_prepared_target_digest_row,
+    full_prepared_contract,
+)
 from dpone.runtime.sinks.mssql_native_verification import verification_allowance
 
 
@@ -20,6 +25,52 @@ class PreparedDigests:
     business_digest: str
     full_digest: str
     rows: int
+
+
+def digest_prepared_target(
+    read_aggregate: Callable[[str], list[Any]],
+    *,
+    qualified_stage: str,
+    business_contract: SourceNativeWireContract,
+    full_contract: SourceNativeWireContract,
+    expected_rows: int,
+) -> PreparedDigests:
+    """Return business and full digests from one bounded 18-field SQL aggregate."""
+    sql = build_prepared_target_digest_sql(qualified_stage, business_contract, full_contract, expected_rows)
+    rows = read_aggregate(sql)
+    if len(rows) != 1:
+        raise ValueError("mssql_native.prepared_target_digest_shape")
+    observed = decode_prepared_target_digest_row(rows[0], expected_rows=expected_rows)
+    if observed.business.rows != expected_rows or observed.full.rows != expected_rows:
+        raise ValueError("mssql_native.prepared_count_mismatch")
+    return PreparedDigests(observed.business.typed_digest, observed.full.typed_digest, expected_rows)
+
+
+def digest_stage_projection(strategy: Any, stage: Any, context: Any, *, all_columns: bool) -> str:
+    """Select aggregate-only v2 or unchanged v1 prepared readback per context."""
+    full_contract = full_prepared_contract(stage)
+    if getattr(context, "verification_identity", None) is not None:
+        digests = digest_prepared_target(
+            strategy.connector.get_records,
+            qualified_stage=strategy._staging_name(stage),
+            business_contract=context.wire_contract,
+            full_contract=full_contract,
+            expected_rows=stage.row_count,
+        )
+        return digests.full_digest if all_columns else digests.business_digest
+    contract = full_contract if all_columns else context.wire_contract
+
+    def read_rows() -> Iterator[Mapping[str, Any]]:
+        columns = ", ".join(strategy.connector.quote_identifier(column.name) for column in contract.columns)
+        return strategy.connector.get_records_iterator(f"SELECT {columns} FROM {strategy._staging_name(stage)}")
+
+    return digest_prepared_projection(
+        read_rows,
+        contract=contract,
+        business_contract=context.wire_contract,
+        max_row_bytes=context.max_row_bytes,
+        expected_rows=stage.row_count,
+    )
 
 
 def digest_prepared_projection(

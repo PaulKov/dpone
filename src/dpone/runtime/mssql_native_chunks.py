@@ -40,6 +40,7 @@ from dpone.runtime.mssql_native_chunks_files import (
 )
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session, frame_observation
 from dpone.runtime.mssql_native_sized_frames import sized_native_frames
+from dpone.runtime.mssql_native_target_local_recovery import NativeRecoveryFailures, recover_native_chunks
 from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
 from dpone.runtime.native_wire_models import SourceNativeWireContract
 
@@ -96,11 +97,16 @@ class BoundedNativeChunks:
         limits: NativeChunkLimits,
         lease_ttl: float = 60.0,
         observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
+        journal_factory: Callable[[NativeChunkPlan, WindowLease], Any] | None = None,
+        on_failed_stage: Callable[[Any], bool] | None = None,
     ) -> None:
         if lease_ttl <= 0:
             raise ValueError("mssql_native.invalid_lease_ttl")
         self.store, self.importer_factory, self.work_dir = store, importer_factory, work_dir
         self.limits, self.lease_ttl = limits, lease_ttl
+        self.journal_factory = journal_factory or (lambda plan, lease: NativeChunkJournal(self.store, lease, plan))
+        self._target_local = journal_factory is not None
+        self.on_failed_stage = on_failed_stage
         self.observations = delivery_session(observer)
 
     def _check(self, lease: WindowLease, cancelled: Event) -> None:
@@ -143,7 +149,7 @@ class BoundedNativeChunks:
         try:
             if plan.wire_fingerprint != contract.type_layout_hash:
                 raise WindowContractError("mssql_native.wire_identity_changed")
-            journal = NativeChunkJournal(self.store, lease, plan)
+            journal = self.journal_factory(plan, lease)
             if journal.data is not None:
                 return self.recover(plan, lease)
             self._check(lease, cancel)
@@ -173,31 +179,14 @@ class BoundedNativeChunks:
         This is a staging-only recovery API. A publication owner must reconcile its
         target transaction receipt before asking to settle any partial extraction.
         """
-        journal = NativeChunkJournal(self.store, lease, plan)
-        journal.bind_limits(self.limits.to_dict())
-        publication = journal.publication.state()
-        if publication is not None and publication["phase"] not in ("preparing", "prepared"):
-            raise WindowOutcomeUnknown("mssql_native.publication_requires_reconciliation")
-        result = journal.completed()
-        with self.importer_factory() as importer:
-            if result is not None:
-                for receipt in result.receipts:
-                    self.store.assert_lease(lease)
-                    with self.observations.recorder().phase(
-                        "raw_verify", reason="recovery", ordinal=receipt.ordinal, attempt_id=receipt.attempt_id
-                    ):
-                        if importer.inspect(plan, receipt, lease) != receipt:
-                            raise WindowContractError("mssql_native.recovered_stage_changed")
-                self._capacity(importer)
-                return result
-            for attempt_id in journal.attempts():
-                self.store.assert_lease(lease)
-                importer.settle(plan, attempt_id, lease)
-        self.store.assert_lease(lease)
-        discard_native_files(self.work_dir / journal.key.rsplit("/", 1)[-1])
-        if journal.data is not None and journal.data["phase"] == "staging":
-            journal.reextract_required()
-        raise NativeReextractRequired("mssql_native.reextract_required")
+        return recover_native_chunks(
+            self,
+            plan,
+            lease,
+            NativeRecoveryFailures(WindowContractError, WindowOutcomeUnknown, NativeReextractRequired),
+            encoded_file_factory=EncodedNativeFile,
+            discard_files=discard_native_files,
+        )
 
     def _import(
         self, plan: NativeChunkPlan, file: EncodedNativeFile, attempt: str, lease: WindowLease, cancelled: Event
@@ -272,6 +261,9 @@ class BoundedNativeChunks:
                             eof = True
                             break
                         frame, size = sized_frame.rows, sized_frame.encoded_bytes
+                        if self._target_local and not frame:
+                            eof = True
+                            break
                         # Reserve one additional stage for UNION ALL preparation.
                         if ordinal + 2 > limits.max_staging_tables:
                             raise WindowContractError("mssql_native.staging_object_limit_exceeded")
@@ -303,6 +295,8 @@ class BoundedNativeChunks:
                             if isinstance(value, Exception):
                                 raise value
                         except WindowTransientError:
+                            if self._target_local:
+                                raise
                             if work.file is None or work.attempt == 2:
                                 raise
                             with self.importer_factory() as importer:
@@ -359,6 +353,11 @@ class BoundedNativeChunks:
                     journal.record_observations(tuple(observations))
                 except BaseException as cleanup:
                     self._cleanup_error(primary, cleanup)
+                if self._target_local and self.on_failed_stage is not None:
+                    try:
+                        self.on_failed_stage(journal)
+                    except BaseException as cleanup:
+                        self._cleanup_error(primary, cleanup)
                 raise
             finally:
                 cleanup_primary = sys.exc_info()[1]

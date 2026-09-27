@@ -8,12 +8,43 @@ from __future__ import annotations
 
 import hashlib
 import sys
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from typing import Any
 
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
+from dpone.contracts.mssql_native_writer import is_qualified_native_stage
 from dpone.ports.bounded_window import WindowStore
+
+
+@contextmanager
+def native_exact_stage_barrier(
+    connector: Any,
+    qualified_stage: str,
+    *,
+    timeout_seconds: int,
+    assert_identity: Callable[[], None],
+) -> Iterator[None]:
+    """Hold one bounded SQL transaction across stage identity and content checks.
+
+    Only a positively supervised writer may call this barrier. The caller
+    verifies count and digest while the exclusive table lock remains held.
+    """
+    if not is_qualified_native_stage(qualified_stage):
+        raise ValueError("mssql_native.invalid_stage_identity")
+    if type(timeout_seconds) is not int or timeout_seconds < 1:
+        raise ValueError("mssql_native.invalid_barrier_timeout")
+    with connector.bounded_query_timeout(timeout_seconds):
+        connector.begin()
+        try:
+            connector.get_records(f"SELECT TOP (1) 1 FROM {qualified_stage} WITH (TABLOCKX, HOLDLOCK)")
+            assert_identity()
+            yield
+            assert_identity()
+            connector.commit_transaction()
+        except BaseException:
+            connector.rollback()
+            raise
 
 
 @contextmanager

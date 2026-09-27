@@ -1,5 +1,20 @@
 # Compatibility
 
+## MSSQL target-local verification v2
+
+Omitting `native_transfer.execution.verification_backend`, or setting it to
+`python_readback`, preserves the existing BCP plus Python-readback path and its
+v1 journal bytes. Setting it to `target_local` starts a distinct v2 invocation
+with supervised BCP, aggregate-only SQL verification, and stable target custody.
+v1 records are never rewritten or interpreted as v2.
+
+Do not change the verification backend inside unfinished work. A rollback to v1
+requires the v2 publication state to be terminal and reconciled, all owned stages
+to be cleaned or authoritatively retired, and target custody to be cleared. A
+held v2 custody record blocks both new v2 work and older v1 runtimes before
+source or writer I/O; operators must exclude older binaries until reconciliation
+completes.
+
 ## Native BCP safety corrections in 0.74.35
 
 Upgrade core and the optional accelerator together. Native provider revision 2

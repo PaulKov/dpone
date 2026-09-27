@@ -107,6 +107,11 @@ class ConsumedPayloadEvidence:
     def empty(cls) -> ConsumedPayloadEvidence:
         return cls()
 
+    @classmethod
+    def verified_empty(cls, native_contract_sha256: str) -> ConsumedPayloadEvidence:
+        """Bind a physically verified zero-row native projection without file parts."""
+        return cls((), 0, native_contract_sha256)
+
     @property
     def declared_rows(self) -> int:
         return sum(part.declared_rows for part in self.parts)
@@ -195,7 +200,8 @@ class ConsumedPayloadEvidence:
 
     def require_complete(self, *, native: bool = True) -> ConsumedPayloadEvidence:
         if not self.parts:
-            _raise("consumed_payload.parts_required")
+            if self.actual_native_rows != 0 or self.native_contract_sha256 is None:
+                _raise("consumed_payload.parts_required")
         if native and (self.actual_native_rows is None or self.native_contract_sha256 is None):
             _raise("consumed_payload.native_receipt_required")
         _require_sha256(self.manifest_sha256)
@@ -236,11 +242,12 @@ def canonical_native_contract_sha256(
     columns: Sequence[Mapping[str, object]],
     *,
     source_wire_contract_sha256s: Sequence[str],
+    allow_empty_source: bool = False,
 ) -> str:
     """Hash native conversion semantics, physical shape and codec identities."""
 
     wire_hashes = tuple(str(value) for value in source_wire_contract_sha256s)
-    if not wire_hashes or any(not _SHA256.fullmatch(value) for value in wire_hashes):
+    if (not wire_hashes and not allow_empty_source) or any(not _SHA256.fullmatch(value) for value in wire_hashes):
         _raise("consumed_payload.native_wire_contract_invalid")
     normalized = [
         {

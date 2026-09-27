@@ -4,7 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 
-from dpone.manifest.mssql_native_policy import native_limits, native_requested, native_window, validate_native_config
+from dpone.manifest.mssql_native_policy import (
+    native_limits,
+    native_requested,
+    native_verification_backend,
+    native_window,
+    validate_native_config,
+)
 from dpone.runtime.etl.payload_loader_staged_load import supports_staged_load
 
 
@@ -36,6 +42,22 @@ def test_strict_limits_and_legacy_admission():
     assert native_window(value) is None
     validate_native_config(value)
     assert not native_requested(SimpleNamespace(options={}))
+
+
+def test_verification_backend_is_closed_and_omission_preserves_v1() -> None:
+    value = config()
+    assert native_verification_backend(value).value == "python_readback"
+    validate_native_config(value)
+
+    execution = value.options["native_transfer"]["execution"]
+    execution["verification_backend"] = "target_local"
+    assert native_verification_backend(value).value == "target_local"
+    validate_native_config(value)
+
+    for invalid in ("unknown", None):
+        execution["verification_backend"] = invalid
+        with pytest.raises(ValueError, match="verification_backend"):
+            validate_native_config(value)
 
 
 @pytest.mark.parametrize(
@@ -127,6 +149,8 @@ def test_public_schema_native_limits_and_wire(name):
         assert not list(validator.iter_errors(native[field]))
     invalid = dict(native["execution"], native_chunks={"max_total_encoded_bytes": True})
     assert list(validator.iter_errors(invalid))
+    assert not list(validator.iter_errors({**native["execution"], "verification_backend": "target_local"}))
+    assert list(validator.iter_errors({**native["execution"], "verification_backend": "unknown"}))
 
 
 def test_native_window_policy_never_derives_scope_from_staging():

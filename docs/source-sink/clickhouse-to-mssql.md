@@ -26,6 +26,14 @@ Docker correctness and controlled-recovery fixtures; it does not certify this
 guide's character-spool path or production performance. See the native guide
 for the exact source, profiles and remaining governance limitations.
 
+Bounded native delivery keeps BCP plus Python business-row readback when
+`verification_backend` is omitted. Set it explicitly to `target_local` to use
+supervised BCP and aggregate-only SQL Server verification under identity/journal
+v2. The optimized path never falls back to v1 within an invocation. Start with
+the [target-local example](../../examples/native/clickhouse-to-mssql-target-local.yaml),
+then follow the native guide for composition, custody, permissions, recovery,
+and current certification status.
+
 ## When to use this path
 
 Use this path when ClickHouse is the system of record or ingestion boundary and

@@ -8,6 +8,7 @@ from dpone.commands.plan_cmd import _render_md, _render_text
 from dpone.readiness.managed import ExecutionPlanService
 
 SAMPLE = Path("examples/native/clickhouse-to-mssql-native.yaml")
+TARGET_LOCAL_SAMPLE = Path("examples/native/clickhouse-to-mssql-target-local.yaml")
 
 
 def test_native_example_plan_is_bounded_and_requires_composition() -> None:
@@ -28,6 +29,33 @@ def test_native_example_plan_is_bounded_and_requires_composition() -> None:
     assert plan["type_matrix"]["ready"] is False
     assert plan["physical_design"]["ddl"] == []
     assert plan["strategy_intelligence"]["decision"]["native_transfer_plan"]["export_method"] == "one_clickhouse_query"
+    assert "verification_backend" not in native
+    assert "verification_identity_version" not in native
+
+
+def test_target_local_example_projects_explicit_v2_proof() -> None:
+    plan = ExecutionPlanService().plan_manifest(TARGET_LOCAL_SAMPLE)
+    native = plan["mssql_native"]
+    assert native["verification_backend"] == "target_local"
+    assert native["verification_identity_version"] == 2
+    assert native["writer_proof_capability"] == "bcp-supervised-stage-barrier-v1"
+    assert "stable_target_custody" in native["required_dependencies"]
+    assert plan["bulk_path"] == "clickhouse_bounded_mssql_native_bcp"
+
+
+def test_explicit_python_readback_projects_v1_without_target_local_requirements(tmp_path: Path) -> None:
+    import yaml
+
+    raw = yaml.safe_load(SAMPLE.read_text())
+    execution = raw["defaults"]["source"]["options"]["native_transfer"]["execution"]
+    execution["verification_backend"] = "python_readback"
+    path = tmp_path / "python-readback.yaml"
+    path.write_text(yaml.safe_dump(raw))
+    native = ExecutionPlanService().plan_manifest(path)["mssql_native"]
+    assert native["verification_backend"] == "python_readback"
+    assert native["verification_identity_version"] == 1
+    assert "writer_proof_capability" not in native
+    assert "stable_target_custody" not in native["required_dependencies"]
 
 
 @pytest.mark.parametrize("render", [_render_md, _render_text])

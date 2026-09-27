@@ -11,6 +11,7 @@ from typing import Any, Protocol
 
 from dpone.runtime.connectors.bulk_text_codec import DEFAULT_EMPTY_STRING_MARKER
 from dpone.runtime.connectors.mssql_bcp_dsn import BcpDsnOptions
+from dpone.runtime.connectors.mssql_bcp_supervised import BcpSupervisedResult, observe_bcp_process
 from dpone.runtime.process_io import (
     DEFAULT_PROCESS_ABORT_TIMEOUT_SECONDS,
     ProcessOutputDrainer,
@@ -140,6 +141,11 @@ class BcpProcess:
     output_drainer: ProcessOutputDrainer | None = None
     cleanup_callback: Callable[[], None] | None = None
     redact_output: Callable[[str], str] = str
+    _cleanup_failed: bool = False
+
+    def wait_supervised(self) -> BcpSupervisedResult:
+        """Observe one launched child without converting ambiguous outcomes to success."""
+        return observe_bcp_process(self)
 
     def wait(self) -> BcpResult:
         timeout_error: BcpTimeoutError | None = None
@@ -227,7 +233,11 @@ class BcpProcess:
         if callback is None:
             return
         self.cleanup_callback = None
-        callback()
+        try:
+            callback()
+        except BaseException:
+            self._cleanup_failed = True
+            raise
 
     terminate = abort
 

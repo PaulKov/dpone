@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 import dpone.runtime.connectors.mssql_bulk as mssql_bulk_module
+from dpone.runtime.connectors.mssql_bcp_process import BcpSupervisedResult
 from dpone.runtime.connectors.mssql_bulk import (
     BcpCredentials,
     BcpDsnOptions,
@@ -24,6 +25,128 @@ from dpone.runtime.process_io import (
     add_exception_note,
     iter_fifo_bytes,
 )
+
+
+def test_supervised_wait_requires_acknowledgement_and_reap() -> None:
+    class Process:
+        returncode = 0
+
+        def communicate(self, **kwargs):
+            return "2 rows copied.", ""
+
+        def poll(self):
+            return self.returncode
+
+    handle = BcpProcess(Process(), ("bcp",), ("bcp",))  # type: ignore[arg-type]
+    outcome = handle.wait_supervised()
+    assert (outcome.classification, outcome.acknowledged, outcome.reaped, outcome.rows_copied) == (
+        "success",
+        True,
+        True,
+        2,
+    )
+
+
+def test_supervised_wait_never_promotes_lost_ack_or_cleanup_failure() -> None:
+    class Process:
+        returncode = 0
+
+        def communicate(self, **kwargs):
+            raise OSError("ack lost")
+
+        def poll(self):
+            return self.returncode
+
+        def terminate(self):
+            pass
+
+        def wait(self, **kwargs):
+            return self.returncode
+
+    lost = BcpProcess(Process(), ("bcp",), ("bcp",))  # type: ignore[arg-type]
+    assert lost.wait_supervised().classification == "lost_ack"
+
+    class SuccessfulProcess(Process):
+        def communicate(self, **kwargs):
+            return "2 rows copied.", ""
+
+    failed_cleanup = BcpProcess(
+        SuccessfulProcess(), ("bcp",), ("bcp",), cleanup_callback=lambda: (_ for _ in ()).throw(OSError())
+    )  # type: ignore[arg-type]
+    assert failed_cleanup.wait_supervised().classification == "cleanup_failed"
+
+
+def test_supervised_import_uses_one_process_with_original_import_command(monkeypatch, tmp_path: Path) -> None:
+    calls = []
+
+    class Process:
+        returncode = 0
+        stdin = None
+
+        def communicate(self, **kwargs):
+            return "2 rows copied.", ""
+
+        def poll(self):
+            return self.returncode
+
+    def popen(command, **kwargs):
+        calls.append(tuple(command))
+        return Process()
+
+    monkeypatch.setattr(mssql_bulk_module.subprocess, "Popen", popen)
+    runner = BcpRunner(
+        BcpCredentials(host="sql.example.com", port=1433, database="dwh", trusted_connection=True),
+        BcpOptions(file_format="native", timeout_seconds=30),
+    )
+    source = tmp_path / "sealed.native"
+    source.write_bytes(b"sealed")
+    result = runner.import_file_process("[dwh].[stage].[owned]", str(source)).wait_supervised()
+    assert (result.classification, result.rows_copied) == ("success", 2)
+    assert len(calls) == 1
+    assert calls[0][2] == "in"
+
+
+@pytest.mark.parametrize(
+    "error,returncode,classification",
+    [
+        (RuntimeError("exit 1"), 1, "failure"),
+        (BcpTimeoutError(redacted_command=("bcp",), timeout_seconds=1), 1, "timeout"),
+        (OSError("ack lost"), 0, "lost_ack"),
+        (OSError("child missing"), None, "custody_lost"),
+    ],
+)
+def test_supervised_wait_classifies_process_failure_without_success_promotion(error, returncode, classification):
+    class Process:
+        def poll(self):
+            return returncode
+
+    handle = BcpProcess(Process(), ("bcp",), ("bcp",))  # type: ignore[arg-type]
+    handle.wait = lambda: (_ for _ in ()).throw(error)  # type: ignore[method-assign]
+    result = handle.wait_supervised()
+    assert result.classification == classification
+    assert result.acknowledged is False
+
+
+def test_supervised_wait_without_count_is_not_acknowledged() -> None:
+    class Process:
+        returncode = 0
+
+        def communicate(self, **kwargs):
+            return "completed", ""
+
+        def poll(self):
+            return self.returncode
+
+    outcome = BcpProcess(Process(), ("bcp",), ("bcp",)).wait_supervised()  # type: ignore[arg-type]
+    assert outcome.classification == "lost_ack"
+    assert outcome.acknowledged is False
+
+
+def test_supervised_result_rejects_false_acknowledgement() -> None:
+    with pytest.raises(ValueError, match="writer_outcome"):
+        BcpSupervisedResult("failure", True, True, 2)
+    with pytest.raises(ValueError, match="writer_outcome"):
+        BcpSupervisedResult("success", True, False, 2)
 
 
 def test_add_exception_note_uses_runtime_capability() -> None:

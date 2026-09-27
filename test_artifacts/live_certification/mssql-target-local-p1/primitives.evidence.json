@@ -1,0 +1,89 @@
+{
+  "cases": [
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_digest_live::test_fixture_descriptor_is_bound_to_generated_schema[narrow]",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_digest_live::test_fixture_descriptor_is_bound_to_generated_schema[wide100]",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_digest_live::test_wide_compiler_materializes_only_fixed_hash_state",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_digest_live::test_python_and_sql_target_digest_are_identical[narrow]",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_digest_live::test_python_and_sql_target_digest_are_identical[wide100]",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_digest_live::test_digest_rejects_count_overflow_and_detects_value_mutation",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_digest_live::test_digest_is_stable_across_repeated_barrier_observations",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_positive_terminal_precedes_target_authority",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_lost_ack_is_ambiguous_even_when_rows_arrived",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_failure_never_becomes_positive_terminal",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_cleanup_failure_retains_ambiguity_after_rows_arrive",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_vendor_count_mismatch_cannot_create_authority",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_changed_sealed_file_is_rejected_before_writer_launch",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_child_timeout_is_reaped_and_cannot_release_custody",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_stable_custody_blocks_v1_and_overlap_after_lease_expiry",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_empty_invocation_uses_distinct_custody_release_reason",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_empty_executor_completes_without_bcp_or_target_stage",
+      "status": "passed"
+    }
+  ],
+  "commit_sha": "821bb79cf26a03c32c2b4b1eb2af92871c756134",
+  "gate": {
+    "max_skipped": 0,
+    "min_passed": 17
+  },
+  "junit": "test_artifacts/live_certification/mssql-target-local-p1/primitives.junit.xml",
+  "message": "junit gate ok (tests=17 passed=17 skipped=0 failures=0 errors=0)",
+  "profile": "mssql-target-local-p1-primitives",
+  "schema_version": 1,
+  "status": "PASS",
+  "totals": {
+    "errors": 0,
+    "failures": 0,
+    "passed": 17,
+    "skipped": 0,
+    "tests": 17
+  }
+}

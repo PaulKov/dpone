@@ -105,11 +105,13 @@ class BcpRunner:
         stdin = self._stdin_password()
         lease = self._issue_connection_dsn()
         redact = process_input.redact if process_input is not None else str
+        timeout_seconds = self.options.timeout_seconds
+        assert timeout_seconds is not None
         return start_bcp_process(
             command,
             redacted_command=tuple(redact(value) for value in self.redact_command(command)),
             stdin_text=stdin,
-            timeout_seconds=int(self.options.timeout_seconds),
+            timeout_seconds=timeout_seconds,
             environment=lease.environment if lease is not None else None,
             cleanup_callback=lease.close if lease is not None else None,
             progress_callback=progress_callback,
@@ -128,6 +130,17 @@ class BcpRunner:
             command,
             process_input=process_input,
         )
+
+    def import_file_process(self, qualified_table: str, input_path: str) -> BcpProcess:
+        """Launch one supervised native import while retaining its child handle."""
+        if self._run is not None:
+            raise ValueError("mssql_native.supervised_process_required")
+        process_input = BcpProcessInput.resolve(input_path, self.options.input_file_authority)
+        command = [self.options.bcp_path, qualified_table, "in", process_input.path, self._file_format_flag()]
+        command += self._connection_options(
+            include_database=not bcp_qualified_table_includes_database(qualified_table)
+        ) + self._format_options(include_table_lock=True, include_keep_nulls=True)
+        return self._start_process(command, process_input=process_input, drain_output=False)
 
     def import_format_file(self, qualified_table: str, input_path: str, format_path: str) -> BcpResult:
         """Bulk-import an explicit length-prefixed host format.
@@ -231,11 +244,13 @@ class BcpRunner:
         process_options = process_input.subprocess_options() if process_input is not None else {}
         redact = process_input.redact if process_input is not None else str
         assert self._run is not None
+        timeout_seconds = self.options.timeout_seconds
+        assert timeout_seconds is not None
         return run_injected_bcp_command(
             command,
             redacted_command=tuple(redact(value) for value in self.redact_command(command)),
             stdin_text=stdin,
-            timeout_seconds=int(self.options.timeout_seconds),
+            timeout_seconds=timeout_seconds,
             environment=lease.environment if lease is not None else None,
             cleanup_callback=lease.close if lease is not None else None,
             run=self._run,

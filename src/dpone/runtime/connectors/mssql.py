@@ -9,6 +9,7 @@ from typing import Any
 from dpone.contracts.mssql_object_name import MSSQLObjectName
 from dpone.contracts.mssql_type_contract import MssqlCatalogColumn
 from dpone.runtime.connectors.base import AbstractConnector
+from dpone.runtime.connectors.mssql_bcp_supervised import SupervisedBcpImport
 from dpone.runtime.connectors.mssql_bulk import BcpCredentials, BcpDsnOptions, BcpOptions, BcpRunner
 from dpone.runtime.connectors.mssql_datetimeoffset import (
     SQL_SS_TIMESTAMPOFFSET as _SQL_SS_TIMESTAMPOFFSET,
@@ -37,10 +38,10 @@ _SQL_RENDERER_DELEGATES = {
     "qualified_name": "qualified_name",
     "build_max_query": "build_max_query",
 }
-_BULK_OPERATION_DELEGATES = frozenset({"bcp_import", "bcp_import_format", "bcp_queryout"})
+_BULK_OPERATION_DELEGATES = frozenset({"bcp_import", "bcp_import_process", "bcp_import_format", "bcp_queryout"})
 
 
-class _MssqlConnectorBulkOperations:
+class _MssqlConnectorBulkOperations(SupervisedBcpImport):
     """Connector-facing facade over injectable native BCP runners."""
 
     def __init__(

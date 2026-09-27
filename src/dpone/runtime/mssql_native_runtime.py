@@ -15,9 +15,10 @@ from threading import Event, Thread
 from time import monotonic
 from typing import TYPE_CHECKING, Any
 
+from dpone.adapters.mssql_native_custody import NativeTargetCustody
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
 from dpone.contracts.process_types import ProcessResult
-from dpone.manifest.mssql_native_policy import validate_native_config
+from dpone.manifest.mssql_native_policy import native_verification_backend, validate_native_config
 from dpone.ports.bounded_window import WindowStore
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session
@@ -34,6 +35,13 @@ class NativeRuntimeBindings:
     service: Any
     stage_context: Any
     admission: Any
+    verification_identity: Any = None
+
+
+def _matching_v2_journal(journal: Any, identity: Any) -> bool:
+    """Admit the framework journal by its immutable v2 identity contract."""
+
+    return getattr(journal, "identity", None) == identity
 
 
 class NativeMssqlRuntime:
@@ -50,6 +58,8 @@ class NativeMssqlRuntime:
         quality: Callable[[Any, StagedLoadHandle, WindowLease], None],
         evidence: Callable[[Any, LoadResult, Any, WindowLease], None],
         advance_state: Callable[[Any, LoadResult, WindowLease], None],
+        custody_factory: Callable[[WindowStore, str], Any] = NativeTargetCustody,
+        v2_journal_admission: Callable[[Any, Any], bool] = _matching_v2_journal,
         lease_ttl: float = 60.0,
         observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
     ) -> None:
@@ -58,12 +68,15 @@ class NativeMssqlRuntime:
         self.store, self.target_id = store, target_id
         self.bindings, self.source, self.preflight = bindings, source, preflight
         self.quality, self.evidence, self.advance_state = quality, evidence, advance_state
+        self.custody_factory = custody_factory
+        self.v2_journal_admission = v2_journal_admission
         self.lease_ttl = lease_ttl
         self.observations = delivery_session(observer)
 
     def run(self, load_config: Any, *, owner: str) -> ProcessResult:
         """Resume target receipts before any source factory; never replay unknown commit."""
         validate_native_config(load_config)
+        verification_backend = native_verification_backend(load_config)
         self.preflight(load_config)
         started = monotonic()
         lease = self.store.acquire(self.target_id, owner, self.lease_ttl)
@@ -76,13 +89,65 @@ class NativeMssqlRuntime:
             service, context = binding.service, binding.stage_context
             if context.plan.target_id != self.target_id or context.lease != lease or context.cancelled is not lost:
                 raise WindowContractError("mssql_native.binding_lease_mismatch")
+            binding_identity = binding.verification_identity
+            context_identity = getattr(context, "verification_identity", None)
+            target_local = verification_backend.value == "target_local"
+            if target_local:
+                if binding_identity is None or context_identity is None or binding_identity != context_identity:
+                    raise WindowContractError("mssql_native.verification_identity_mismatch")
+            elif binding_identity is not None or context_identity is not None:
+                raise WindowContractError("mssql_native.verification_identity_mismatch")
+            custody = self.custody_factory(self.store, self.target_id)
+            claim = None
+            invocation_key: str | None = None
+            if target_local:
+                identity = binding_identity
+                journal = context.journal_factory()
+                if (
+                    identity is None
+                    or not self.v2_journal_admission(journal, identity)
+                    or journal.identity != identity
+                    or identity.plan != context.plan
+                ):
+                    raise WindowContractError("mssql_native.invalid_v2_identity")
+                invocation_key = identity.invocation_key
+                claim = custody.claim(lease, invocation_key)
+            else:
+                custody.assert_available_for_v1(lease)
             recovered = service.resume(load_config, context, binding.admission)
             self._check(lease, lost)
             handle = recovered if isinstance(recovered, StagedLoadHandle) else None
             if recovered is None:
-                with self.source(load_config, binding) as payload:
-                    handle = service.stage(load_config, payload)
-                    result = self._publish(load_config, service, handle, lease, lost)
+                if claim is not None and claim.recovery_only:
+                    journal = context.journal_factory()
+                    if journal.data is None and context.executor.on_failed_stage is not None:
+                        context.executor.on_failed_stage(journal)
+                    raise WindowContractError("mssql_native.pre_eof_reextract_required")
+                source_entered = False
+                try:
+                    with self.source(load_config, binding) as payload:
+                        source_entered = True
+                        handle = service.stage(load_config, payload)
+                        result = self._publish(load_config, service, handle, lease, lost)
+                except Exception as error:
+                    zero_stage = not source_entered
+                    if source_entered and claim is not None:
+                        try:
+                            projection = context.journal_factory().data
+                            zero_stage = projection is None or (
+                                projection["phase"] == "staging"
+                                and not projection["chunks"]
+                                and not projection["events"]
+                                and not projection["rollback_history"]
+                            )
+                        except Exception as probe:
+                            error.add_note(f"native zero-stage probe failed: {type(probe).__name__}")
+                    if claim is not None and zero_stage and context.executor.on_failed_stage is not None:
+                        try:
+                            context.executor.on_failed_stage(context.journal_factory())
+                        except Exception as cleanup:
+                            error.add_note(f"native nonpublication cleanup failed: {type(cleanup).__name__}")
+                    raise
             elif handle is not None:
                 result = self._publish(load_config, service, handle, lease, lost)
             elif isinstance(recovered, LoadResult):
@@ -111,6 +176,19 @@ class NativeMssqlRuntime:
                 service.cleanup(handle)
             else:
                 service.cleanup_recovered(load_config, context, binding.admission)
+            if claim is not None:
+                if invocation_key is None:
+                    raise WindowContractError("mssql_native.invalid_v2_identity")
+                completed = journal.completed()
+                reason = (
+                    "empty_completion_cleanup" if completed is not None and completed.rows == 0 else "published_cleanup"
+                )
+
+                def assert_release_authority() -> None:
+                    if completed is None or journal.publication.state()["phase"] != "succeeded":
+                        raise WindowContractError("mssql_native.custody_release_unproved")
+
+                custody.release(lease, invocation_key, reason, assert_release_authority=assert_release_authority)
             return ProcessResult(
                 status="success",
                 inserted_rows=result.inserted_rows,

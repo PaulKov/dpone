@@ -1,0 +1,22 @@
+{
+  "kind": "dpone.synthetic-certification-environment",
+  "runtime": {
+    "image_sha256": "sha256:f0fe4557afd43d93e5d66c1a5d707bee6f06880c864d6bc23e0e64b0283097c1",
+    "odbc_driver": "ODBC Driver 18 for SQL Server",
+    "platform": "linux-arm64",
+    "pyodbc_version": "5.3.0",
+    "python_version": "3.12.14"
+  },
+  "schema_version": 1,
+  "services": {
+    "clickhouse": {
+      "image_sha256": "sha256:1ffa82edee000a42c09313bd9f1293d94c570aee74babc1b3ca9983a35fa597b",
+      "version": "24.8.14.39"
+    },
+    "mssql": {
+      "image_sha256": "sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89",
+      "version": "16.0.4265.3"
+    }
+  },
+  "source_commit": "821bb79cf26a03c32c2b4b1eb2af92871c756134"
+}

@@ -17,11 +17,7 @@ from dpone.runtime.sinks.strategies.mssql.mssql_native_staging import MssqlNativ
 
 @dataclass(frozen=True)
 class NativeStageContext:
-    """Composition-owned source, fenced journal, and independent worker services.
-
-    Recovery supplies a saved completed extraction lifecycle. Its row source is
-    never invoked. Capacity and receipt callbacks must assert current fencing.
-    """
+    """Composition-owned, fenced services for normal and source-free recovery."""
 
     plan: Any
     wire_contract: Any
@@ -39,6 +35,8 @@ class NativeStageContext:
     max_row_bytes: int = 1048576
     cancelled: Any = None
     observer: Any = field(default=None, kw_only=True)
+    verification_identity: Any = field(default=None, kw_only=True)
+    target_local_timeout_seconds: int = field(default=3600, kw_only=True)
 
     def __post_init__(self) -> None:
         object.__setattr__(self, "observer", delivery_session(self.observer))
@@ -105,8 +103,12 @@ class MssqlNativeStagePreparer:
             )
             lifecycle = payload.require_completed_extraction()
         receipts = tuple(complete.receipts)
-        if not receipts or tuple(receipt.ordinal for receipt in receipts) != tuple(range(len(receipts))):
+        if tuple(receipt.ordinal for receipt in receipts) != tuple(range(len(receipts))):
             raise ValueError("mssql_native.receipt_coverage_invalid")
+        if not receipts:
+            durable = context.journal_factory().completed() if context.verification_identity is not None else None
+            if durable is None or durable.rows != 0 or durable.receipts != () or complete.rows != 0:
+                raise ValueError("mssql_native.receipt_coverage_invalid")
         with context.observer.recorder().phase("raw_verify", reason="preparation"):
             context.verify_receipts(receipts)
         context.capacity_check(0)
@@ -175,23 +177,24 @@ class MssqlNativeStagePreparer:
             columns = ", ".join(strategy.connector.quote_identifier(name) for name, _dtype in schema)
             # Stage identifiers are verified by the invocation-owned importer
             # before they enter this SQL. UNION ALL retains business duplicates.
-            queries = " UNION ALL ".join(f"SELECT {columns} FROM {receipt.stage_id}" for receipt in receipts)
             recorder = context.observer.recorder()
-            with recorder.phase("metadata_project", reason="insert_projection_build"):
-                insert_sql = build_prepared_insert(
-                    target_sql=strategy._staging_name(stage),
-                    source_sql=queries,
-                    business_schema=tuple(
-                        (name, resolved.types[name])
-                        for name in resolved.ordered_target_names
-                        if not name.casefold().startswith("__dpone__")
-                    ),
-                    resolved=resolved,
-                    lineage=lineage,
-                    quote_identifier=strategy.connector.quote_identifier,
-                )
-            with recorder.phase("prepare_insert", rows=complete.rows):
-                strategy.connector.execute_query(insert_sql)
+            if receipts:
+                queries = " UNION ALL ".join(f"SELECT {columns} FROM {receipt.stage_id}" for receipt in receipts)
+                with recorder.phase("metadata_project", reason="insert_projection_build"):
+                    insert_sql = build_prepared_insert(
+                        target_sql=strategy._staging_name(stage),
+                        source_sql=queries,
+                        business_schema=tuple(
+                            (name, resolved.types[name])
+                            for name in resolved.ordered_target_names
+                            if not name.casefold().startswith("__dpone__")
+                        ),
+                        resolved=resolved,
+                        lineage=lineage,
+                        quote_identifier=strategy.connector.quote_identifier,
+                    )
+                with recorder.phase("prepare_insert", rows=complete.rows):
+                    strategy.connector.execute_query(insert_sql)
             stage.row_count = sum(receipt.rows for receipt in receipts)
             if stage.row_count != complete.rows:
                 raise ValueError("mssql_native.complete_row_count_mismatch")
@@ -202,21 +205,36 @@ class MssqlNativeStagePreparer:
                 )
                 for receipt in receipts
             )
-            stage.consumed_payload_evidence = ConsumedPayloadEvidence(parts).require_complete(native=False)
+            stage.consumed_payload_evidence = (
+                ConsumedPayloadEvidence(parts).require_complete(native=False)
+                if receipts
+                else ConsumedPayloadEvidence.empty()
+            )
             normalizer._validate_direct_native(config, stage, schema, resolved)
             normalizer._complete_direct_native(config, stage, resolved, lineage)
-            from dpone.runtime.sinks.mssql_native_prepared_digests import digest_prepared_rows
+            from dpone.runtime.sinks.mssql_native_prepared_digests import digest_prepared_rows, digest_prepared_target
 
             full_contract = self._full_contract(stage)
             columns = ", ".join(strategy.connector.quote_identifier(column.name) for column in full_contract.columns)
             with recorder.phase("prepared_verify", reason="preparation", rows=stage.row_count):
-                digests = digest_prepared_rows(
-                    strategy.connector.get_records_iterator(f"SELECT {columns} FROM {strategy._staging_name(stage)}"),
-                    business_contract=context.wire_contract,
-                    full_contract=full_contract,
-                    max_row_bytes=context.max_row_bytes,
-                    expected_rows=stage.row_count,
-                )
+                if context.verification_identity is not None:
+                    digests = digest_prepared_target(
+                        strategy.connector.get_records,
+                        qualified_stage=strategy._staging_name(stage),
+                        business_contract=context.wire_contract,
+                        full_contract=full_contract,
+                        expected_rows=stage.row_count,
+                    )
+                else:
+                    digests = digest_prepared_rows(
+                        strategy.connector.get_records_iterator(
+                            f"SELECT {columns} FROM {strategy._staging_name(stage)}"
+                        ),
+                        business_contract=context.wire_contract,
+                        full_contract=full_contract,
+                        max_row_bytes=context.max_row_bytes,
+                        expected_rows=stage.row_count,
+                    )
                 from dpone.runtime.mssql_native_chunks_files import native_multiset_digest
 
                 expected_sum = sum(int(receipt.consumed_part_evidence["native_typed_sum"]) for receipt in receipts) % (
@@ -327,17 +345,22 @@ class MssqlNativeStagePreparer:
         return self._resources(prepared).context.preparation_scope()
 
     def cleanup(self, prepared: NativePreparedStage) -> None:
-        from dpone.runtime.sinks.mssql_native_prepared_owner import require_prepared_owner
+        from dpone.runtime.sinks.mssql_native_prepared_owner import retire_exact_prepared
 
         resources = self._resources(prepared)
+        if resources.context.verification_identity is not None:
+            state = resources.context.journal_factory().publication.state()
+            if state is None or state["phase"] != "succeeded":
+                raise ValueError("mssql_native.published_cleanup_publication_required")
         strategy = self._strategy_for(prepared)
         with resources.context.preparation_scope():
-            exists = strategy.connector.get_records("SELECT OBJECT_ID(?)", (strategy._staging_name(prepared.staging),))
-            if exists and exists[0][0] is not None:
-                if exists[0][0] != resources.object_id:
-                    raise ValueError("mssql_native.prepared_object_identity_changed")
-                require_prepared_owner(strategy.connector, resources.planned)
-                prepared.staging.cleanup()
+            retire_exact_prepared(
+                strategy.connector,
+                resources.planned,
+                resources.object_id,
+                prepared.staging.cleanup,
+                timeout_seconds=resources.context.target_local_timeout_seconds,
+            )
         resources.context.cleanup_receipts(resources.receipts)
 
     def _strategy_for(self, prepared: NativePreparedStage) -> Any:
@@ -354,34 +377,12 @@ class MssqlNativeStagePreparer:
 
     @staticmethod
     def _full_contract(stage: Any) -> Any:
-        from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
+        from dpone.runtime.sinks.mssql_native_prepared_digests import full_prepared_contract
 
-        return build_mssql_bcp_native_contract(
-            schema=tuple(
-                (
-                    name,
-                    stage.column_types[name] + (" nullable" if stage.target_column_nullability.get(name, True) else ""),
-                )
-                for name in stage.columns
-            ),
-            query="prepared-native-stage",
-            target_format="mssql_native",
-        )
+        return full_prepared_contract(stage)
 
     @staticmethod
     def _stage_digest(strategy: Any, stage: Any, context: NativeStageContext, *, all_columns: bool = False) -> str:
-        from dpone.runtime.sinks.mssql_native_prepared_digests import digest_prepared_projection
+        from dpone.runtime.sinks.mssql_native_prepared_digests import digest_stage_projection
 
-        contract = MssqlNativeStagePreparer._full_contract(stage) if all_columns else context.wire_contract
-
-        def read_rows() -> Any:
-            columns = ", ".join(strategy.connector.quote_identifier(column.name) for column in contract.columns)
-            return strategy.connector.get_records_iterator(f"SELECT {columns} FROM {strategy._staging_name(stage)}")
-
-        return digest_prepared_projection(
-            read_rows,
-            contract=contract,
-            business_contract=context.wire_contract,
-            max_row_bytes=context.max_row_bytes,
-            expected_rows=stage.row_count,
-        )
+        return digest_stage_projection(strategy, stage, context, all_columns=all_columns)
