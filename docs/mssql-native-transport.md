@@ -25,7 +25,6 @@ The optimized selector belongs under `native_transfer.execution`:
 ```yaml
 native_transfer:
   execution:
-    mode: bounded_mssql_native
     verification_backend: target_local
 ```
 
@@ -138,8 +137,8 @@ context = compose_native_stage_context(
 )
 bindings = NativeRuntimeBindings(
     service=service,
-    context=context,
-    transaction_admission=transaction_admission,
+    stage_context=context,
+    admission=transaction_admission,
     verification_identity=verification_identity,
 )
 ```
