@@ -3,7 +3,7 @@ task_id: "DPONE-MSSQL-TARGET-LOCAL-P1"
 title: "MSSQL target-local native verification"
 goal: "Remove business-row readback from the explicitly selected target-local BCP verification path without changing released BCP v1 behavior."
 specification: "docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md"
-base_commit: "54905bce7f93c768e9ff7cc95d6b7067a513cab8"
+base_commit: "9566575b63df8c3eebde7f935cd2e470c69a0531"
 integrator: "root"
 
 acceptance_criteria:
@@ -11,6 +11,8 @@ acceptance_criteria:
   - "Explicit target_local returns only aggregate count/digest data from SQL Server."
   - "Raw and prepared digests reproduce mssql-native-sha256-sum-v1 for the admitted matrix."
   - "Count overflow, identity drift, schema drift, and digest mismatch fail closed."
+  - "BCP target-local success requires acknowledged and reaped supervised process custody plus a transaction-held exact-stage barrier; ambiguous outcomes remain UNKNOWN and forbid automatic retry, drop, preparation, and publication."
+  - "A stable invocation-owned target-custody CAS authority is claimed before target-local source I/O, survives lease expiry, covers every chunk including empty input, and blocks new v2 and rollback v1 invocations until matching publication cleanup or proved non-publication and full stage retirement."
   - "Docker narrow and wide100 differential certification passes on the exact candidate commit."
 
 public_contract_impact:
@@ -32,6 +34,16 @@ owned_paths:
   - src/dpone/runtime/sinks/mssql_native_prepare.py
   - src/dpone/runtime/sinks/mssql_native_composition.py
   - src/dpone/runtime/mssql_native_chunks.py
+  - src/dpone/runtime/connectors/mssql_bulk.py
+  - src/dpone/runtime/connectors/mssql_bcp_process.py
+  - src/dpone/runtime/connectors/mssql.py
+  - src/dpone/adapters/mssql_native_guard.py
+  - src/dpone/contracts/mssql_native_writer.py
+  - src/dpone/ports/mssql_native_writer.py
+  - src/dpone/runtime/sinks/mssql_native_bcp_writer.py
+  - src/dpone/contracts/mssql_native_custody.py
+  - src/dpone/adapters/mssql_native_custody.py
+  - src/dpone/runtime/mssql_native_runtime.py
   - tests/test_mssql_native_target_digest.py
   - tests/test_mssql_native_verification_policy.py
   - tests/test_mssql_native_chunks_journal_v2.py
@@ -39,6 +51,11 @@ owned_paths:
   - tests/test_mssql_native_integrity_readbacks.py
   - tests/test_mssql_native_composition.py
   - tests/test_mssql_native_chunks_execution.py
+  - tests/test_mssql_bcp_process.py
+  - tests/test_mssql_native_bcp_writer.py
+  - tests/test_mssql_native_guard.py
+  - tests/test_mssql_native_custody.py
+  - tests/test_mssql_native_runtime.py
   - tests/integration/mssql
   - tests/fixtures
 
@@ -51,6 +68,12 @@ integrator_owned_paths:
   - docs/mssql-native-transport.md
   - docs/source-sink/clickhouse-to-mssql.md
   - docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md
+  - src/dpone/schema/dpone.mssql-native-writer-state.v2.schema.json
+  - src/dpone/contracts/mssql_native_writer_state_schema.py
+  - tests/test_mssql_native_writer_state_schema.py
+  - docs/adr/0072-mssql-native-writer-proof-capabilities.md
+  - docs/adr-index.md
+  - test_artifacts/live_certification/mssql-target-local-p1
   - CHANGELOG.md
 
 read_only_paths:
@@ -75,6 +98,12 @@ forbidden_paths:
   - docs/mssql-native-transport.md
   - docs/source-sink/clickhouse-to-mssql.md
   - docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md
+  - src/dpone/schema/dpone.mssql-native-writer-state.v2.schema.json
+  - src/dpone/contracts/mssql_native_writer_state_schema.py
+  - tests/test_mssql_native_writer_state_schema.py
+  - docs/adr/0072-mssql-native-writer-proof-capabilities.md
+  - docs/adr-index.md
+  - test_artifacts/live_certification/mssql-target-local-p1
 
 shared_file_owner: "root"
 
@@ -85,6 +114,8 @@ required_checks:
   focused:
     - "uv run pytest tests/test_mssql_native_target_digest.py tests/test_mssql_native_verification_policy.py tests/test_mssql_native_chunks_journal_v2.py -q"
     - "uv run pytest tests/test_mssql_native_staged_import.py tests/test_mssql_native_integrity_readbacks.py tests/test_mssql_native_composition.py tests/test_mssql_native_chunks_execution.py -q"
+    - "uv run pytest tests/test_mssql_bcp_process.py tests/test_mssql_native_bcp_writer.py tests/test_mssql_native_guard.py tests/test_mssql_native_custody.py tests/test_mssql_native_runtime.py -q"
+    - "uv run pytest tests/test_mssql_native_writer_state_schema.py tests/test_mssql_native_policy.py tests/test_mssql_native_staged_planning.py -q"
   broad:
     - "uv run ruff check ."
     - "uv run ruff format --check ."
@@ -96,6 +127,7 @@ required_checks:
     - "uv run mkdocs build --strict"
   live:
     - "local Docker SQL Server target-local narrow and wide100 differential matrix"
+    - "local Docker SQL Server real BCP custody and stage-barrier recovery matrix with zero skips"
 
 required_outputs:
   - implementation

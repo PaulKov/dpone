@@ -10,6 +10,12 @@
 
 **Spec:** `docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md`
 
+**Approval gate:** Task 3 is paused until the P1 BCP proof amendment is
+approved. The BCP CLI cannot satisfy the original same-session application-lock
+claim; P1 uses supervised process custody plus a transaction-held stage barrier
+for positively acknowledged success and retains every ambiguous outcome as
+`UNKNOWN` without automatic retry.
+
 ## Global Constraints
 
 - Base implementation on the current `origin/master`; preserve all changes after 0.83.23 when rebasing.
@@ -74,18 +80,71 @@
 - Modify: `src/dpone/runtime/sinks/mssql_native_prepare.py`
 - Modify: `src/dpone/runtime/sinks/mssql_native_composition.py`
 - Modify: `src/dpone/runtime/mssql_native_chunks.py`
+- Modify: `src/dpone/runtime/connectors/mssql_bulk.py`
+- Modify: `src/dpone/runtime/connectors/mssql_bcp_process.py`
+- Modify: `src/dpone/runtime/connectors/mssql.py`
+- Modify: `src/dpone/adapters/mssql_native_guard.py`
+- Modify: `src/dpone/contracts/mssql_native_verification.py`
+- Modify: `src/dpone/adapters/mssql_native_chunks_journal_v2.py`
+- Modify: `src/dpone/adapters/mssql_native_chunks_journal_v2_events.py`
+- Create: `src/dpone/contracts/mssql_native_writer.py`
+- Create: `src/dpone/ports/mssql_native_writer.py`
+- Create: `src/dpone/runtime/sinks/mssql_native_bcp_writer.py`
+- Create: `src/dpone/contracts/mssql_native_custody.py`
+- Create: `src/dpone/adapters/mssql_native_custody.py`
+- Modify: `src/dpone/runtime/mssql_native_runtime.py`
 - Modify: `tests/test_mssql_native_staged_import.py`
 - Modify: `tests/test_mssql_native_integrity_readbacks.py`
 - Modify: `tests/test_mssql_native_composition.py`
 - Modify: `tests/test_mssql_native_chunks_execution.py`
+- Modify: `tests/test_mssql_bcp_process.py`
+- Create: `tests/test_mssql_native_bcp_writer.py`
+- Create: `tests/test_mssql_native_guard.py`
+- Create: `tests/test_mssql_native_custody.py`
+- Modify: `tests/test_mssql_native_runtime.py`
 
 **Interfaces:**
 - Consumes: Task 1 digest kernel and Task 2 backend identity/journal.
 - Produces: opt-in aggregate-only raw/import/inspect/preparation/reverify behavior; default Python readback remains unchanged.
+- Produces: an explicit BCP proof capability. Positive success requires a
+  supervised, acknowledged and reaped child plus an exact-stage transaction
+  barrier. Ambiguity is durable `UNKNOWN` and blocks retry/drop/publication.
 
 - [ ] Add failing tests proving zero business-row iterators for target-local raw and prepared verification, aggregate mismatch rejection, repeated prepublication verification, and unchanged default reads.
 - [ ] Run the named focused tests and record RED.
-- [ ] Inject verification policy at composition, select journal v2 for target-local, and route raw/prepared checks through the kernel without changing receipt/publication ordering.
+- [ ] Add failing lifecycle tests for crash before/after launch, failed reaping,
+  lost acknowledgement, custody loss, stage-barrier timeout, object replacement,
+  empty input, and `UNKNOWN` blocking retry/drop/publication.
+- [ ] Cover the closed BCP action matrix: acknowledged/reaped success may cross
+  the barrier only after vendor count, empty rejects, sealed-file identity, and
+  exactly-one-launch checks; explicit failure, timeout, failed reap, lost ACK,
+  late writer, barrier timeout, object replacement, and restart from every
+  durable pre-terminal boundary must forbid receipt, retry, drop, preparation,
+  publication, and overlapping invocation. Empty input launches no process.
+- [ ] Prove the stable target-custody CAS key blocks a new v2 invocation and a
+  rollback v1 invocation after controller crash and lease expiry. Only matching
+  source-free recovery may inspect it; release requires durable publication and
+  cleanup or non-publication plus complete stage retirement.
+- [ ] Prove custody is invocation-owned: it is claimed before target-local v2
+  source I/O, shared by sequential and parallel chunk attempts, and held by an
+  empty invocation until its successful no-op completion and cleanup.
+- [ ] Test sequential and parallel two-chunk invocations: same-invocation
+  custody admits distinct attempts only when each launch has its own journal
+  grant; a prior unresolved attempt prevents a replacement launch.
+- [ ] Add the closed observation-only recovery path: BCP durable positive
+  terminal plus a later exact-stage barrier may append `QUIESCENT`; missing ACK,
+  failed reap, uncertain launch, and custody loss may only become
+  `INCIDENT_RETAINED` and can never be reconstructed from stage contents.
+- [ ] Prove pre-EOF source failure can retire every fully `VERIFIED` exact-owned
+  stage only after durable invocation-level nonpublication proof; one
+  `UNKNOWN` attempt blocks all custody release and overlapping invocation.
+- [ ] Prove one SQL transaction holds the exact-stage lock across both identity
+  checks and the aggregate digest; rollback and timeout create no authority.
+- [ ] Add a narrow writer grant/outcome port and supervised BCP adapter while
+  preserving the existing `bcp_import` API and v1 behavior.
+- [ ] Inject verification policy at composition, select journal v2 for
+  target-local, append events only at proved boundaries, and route raw/prepared
+  checks through the kernel without changing receipt/publication ordering.
 - [ ] Run focused tests to green, including the existing BCP lifecycle tests.
 - [ ] Commit the integrated runtime task.
 
@@ -101,6 +160,11 @@
 - Modify: `docs/mssql-native-transport.md`
 - Modify: `docs/source-sink/clickhouse-to-mssql.md`
 - Modify: relevant focused manifest/planning/docs tests
+- Create: `src/dpone/schema/dpone.mssql-native-writer-state.v2.schema.json`
+- Create: `src/dpone/contracts/mssql_native_writer_state_schema.py`
+- Create: `tests/test_mssql_native_writer_state_schema.py`
+- Create: `docs/adr/0072-mssql-native-writer-proof-capabilities.md`
+- Modify: `docs/adr-index.md`
 
 **Interfaces:**
 - Consumes: Task 2 selector/identity and Task 3 runtime behavior.
@@ -108,7 +172,9 @@
 
 - [ ] Add failing schema/policy/planning/example tests for omission, explicit selection, invalid values, and v2 projection.
 - [ ] Run focused tests and record RED.
-- [ ] Implement the two generated schemas, readiness projection, examples, and focused self-service docs. Keep existing example behavior unchanged.
+- [ ] Implement both public manifest schemas and the mandatory closed writer-state
+  schema producer plus checked-in output, readiness projection, examples, ADR/index, and
+  focused self-service docs. Keep existing example behavior unchanged.
 - [ ] Run schema, docs, and compatibility tests to green.
 - [ ] Commit the public-contract task.
 
@@ -117,6 +183,8 @@
 **Files:**
 - Create or modify focused files under `tests/integration/mssql/` for target-local parity.
 - Create versioned generic fixture descriptors under `tests/fixtures/`.
+- Create exact-commit generic evidence under
+  `test_artifacts/live_certification/mssql-target-local-p1/`.
 - Modify: `docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md` only after evidence exists.
 - Modify: `CHANGELOG.md` at integration time.
 
@@ -125,6 +193,16 @@
 - Produces: narrow and wide100 parity evidence on local Docker SQL Server; no private data.
 
 - [ ] Add live tests for all admitted raw/prepared layouts, NULL/empty/Unicode/NUL/boundaries/duplicates, count overflow, mutation rejection, and repeated digest stability.
+- [ ] Add real BCP plus Docker SQL Server lifecycle tests for acknowledged and
+  reaped success, competing stage-lock timeout, late write while the barrier
+  waits, child kill/custody loss retention, object replacement, and empty input
+  without a writer. Require zero skips and an exact-commit recovery receipt.
+- [ ] Prove controller crash, lease expiry, and subsequent v2 and v1 admission
+  remain blocked by stable target custody; prove observation-only recovery only
+  for a previously durable positive terminal event.
+- [ ] Run real sequential and parallel two-chunk BCP cases under one invocation
+  custody record and prove no second launch is admitted for an unresolved
+  attempt.
 - [ ] Run the live tests against disposable local Docker SQL Server and record exact commit/environment-bound generic evidence.
 - [ ] Run `uv run python tools/agent_policy/select_checks.py --base-ref origin/master`, all selected checks, and the normal broad Python/docs gates.
 - [ ] Obtain fresh-context correctness, compatibility, data-loss, recovery, docs, and evidence review; fix and re-review all blockers.

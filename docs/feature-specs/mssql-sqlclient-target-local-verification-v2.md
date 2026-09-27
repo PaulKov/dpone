@@ -1,6 +1,6 @@
 # Feature design: MSSQL target-local verification and SqlClient bulk transport v2
 
-- Status: APPROVED
+- Status: RESEARCHED — P1 BCP proof amendment approval required
 - Owner: dpone maintainers
 - Issue: TBD
 - Target release: phased minor releases after 0.83.23
@@ -31,6 +31,25 @@ less, zero business rows returned during mandatory target verification, and one
 atomic publication boundary. Production qualification is private and does not
 publish endpoint, object, query, credential, row sample, or customer workload
 details.
+
+### P1 BCP proof amendment
+
+The original design required the actual bulk-writer SQL session to acquire a
+nonce-derived application lock. The released BCP CLI opens its own SQL session
+and provides no supported import-session SQL preamble, so the importer cannot
+make that claim truthfully. P1 therefore uses a narrower, fail-closed proof for
+BCP: one supervised child remains under grant custody; only positively
+acknowledged success from a reaped child can enter a transaction-held
+`TABLOCKX, HOLDLOCK` stage barrier and target-local verification. Timeout,
+cleanup failure, lost acknowledgement, controller loss, or any uncertain child
+or server outcome enters `UNKNOWN`. It never authorizes automatic retry, stage
+drop, preparation, or publication.
+
+The SqlClient phase retains the stronger same-session nonce-lock contract. The
+two proof capabilities have distinct identity bindings and must never be
+interpreted as equivalent. This amendment trades automatic recovery after an
+ambiguous BCP outcome for a truthful, safe optimized success path; it does not
+weaken data correctness or publication authority.
 
 ## Personas and customer journey
 
@@ -63,6 +82,8 @@ records; rollback selects BCP for a new invocation.
   `SqlBulkCopy` with streaming input, explicit column mappings, null
   preservation, bounded memory, and one operation deadline.
 - BCP as the unchanged default and compatibility path.
+- An opt-in BCP plus target-local P1 path whose positive proof is supervised
+  child completion followed by a transaction-held exact-stage barrier.
 - Backend-aware durable identity v2 for explicit SqlClient invocations.
 - Fail-closed recovery for process failure, timeout, cancellation, lost ACK,
   partial write, target mutation, and unknown commit outcome.
@@ -149,7 +170,7 @@ the command exit code is separate, and only `permitted_actions` may execute.
 
 | Diagnostic code / state | Required operator action | Success observation | Escalation |
 |---|---|---|---|
-| `mssql_native.writer_ack_lost` / `UNKNOWN` | `dpone ops mssql-native-recovery reconcile ID --journal-root ROOT --identity-sha256 SHA --connection-id TARGET --connection-type env --yes --format json` | Quiescent exact stage becomes verified or proved partial | Retain custody when lock/session proof is unavailable |
+| `mssql_native.writer_ack_lost` / `UNKNOWN` | Inspect the exact attempt; P1 BCP provides no automatic reconcile-to-write authority after custody loss | Read-only incident record; no retry, drop, preparation, or overlap | Retain custody as `INCIDENT_RETAINED`; SqlClient may use live reconcile only when its same-session lock proof is available |
 | `mssql_native.partial_stage_proved` / `FAILED_RETIRABLE` | `dpone ops mssql-native-recovery retire ID --journal-root ROOT --identity-sha256 SHA --connection-id TARGET --connection-type env --yes --format json` | Exact owned stage removed; new attempt permitted if publication exclusion also holds | Stop on any identity drift |
 | `mssql_native.verified_eof_recoverable` / `VERIFIED` | `dpone ops mssql-native-recovery resume ID --journal-root ROOT --identity-sha256 SHA --connection-id TARGET --connection-type env --yes --format json` | Preparation/publication continues without source read | Stop if receipt chain is not contiguous |
 | `mssql_native.pre_eof_reextract_required` / `FAILED_RETIRABLE` | Retire with the complete command above, then run the full authored interval | New source query and invocation | Never resume the vanished stream |
@@ -314,12 +335,13 @@ against these schemas.
   v1 record cannot resume v2, and either selector change requires a new
   invocation.
 - No automatic migration rewrites durable records.
-- Operators can roll back by starting a new BCP invocation. An in-flight
-  SqlClient invocation must first reach a proved terminal or recoverable state.
+- Operators can roll back by starting a new BCP invocation only when stable
+  target custody is clear. Any in-flight v2 invocation must first reach a
+  proved terminal or recoverable state that authorizes custody release.
 
 Journal v2 uses key prefix `mssql-native-chunks-v2/`. Its canonical identity
 contains the six unchanged v1 `NativeChunkPlan` fields plus `import_backend`,
-`verification_backend`, companion protocol and package digests,
+`verification_backend`, `writer_proof_capability`, companion protocol and package digests,
 capability-layout digest, digest algorithm ID, and timeout-policy digest. The
 monotonic deadline is process-local and never serialized. Journal v1 decodes
 only as BCP plus Python readback. Existing `NativeChunkReceipt` and prepared
@@ -328,8 +350,47 @@ snapshot shapes remain unchanged.
 The invocation key is lowercase SHA-256 of RFC 8785 canonical JSON for that
 identity. Each attempt begins by persisting a 256-bit random nonce; `attempt_id`
 is SHA-256 of canonical `[invocation_key, ordinal, nonce]`. The writer grant
-contains a fresh 256-bit session token; only its digest is durable, and its
-application-lock resource is derived from that digest.
+contains a fresh 256-bit token and a closed proof-capability identifier; only
+the token digest is durable. For SqlClient, the application-lock resource is
+derived from that digest. For BCP P1, the digest binds one supervised launch
+and must not be described as a SQL-session token.
+The closed initial proof-capability values are
+`bcp-supervised-stage-barrier-v1` and `sqlclient-session-applock-v1`.
+The only admitted pairs are BCP plus the former and SqlClient plus the latter;
+every other pair fails before source I/O. The capability string is an explicit
+field in the canonical invocation-identity JSON and therefore changes its
+SHA-256 key.
+
+Journal identity alone cannot prevent a new backend or invocation from ignoring
+unresolved custody. A second durable CAS authority uses the stable key
+`mssql-native-target-custody-v1/{sha256(target_id)}` in the existing
+`WindowStore`; the key excludes run, window, backend, and verifier identity.
+Every native runtime, including default v1, checks this authority after target
+lease acquisition and before source or writer I/O. A v2 invocation claims it
+with its invocation digest before any v2 durable side effect or source I/O;
+all of its chunk attempts share that invocation-owned custody. A crash between
+claim and the first launch remains conservatively held. It is released only
+after the matching invocation has durable publication success and cleanup, or after durable
+non-publication proof plus retirement of every owned stage. Lease expiry never
+clears it. A matching source-free recovery may inspect or complete already
+authorized work but cannot grant a second launch. Current binaries enforce this
+guard; older binaries do not understand the key and must be operationally
+excluded from targets with any v2 custody record.
+The authority payload is closed JSON with `schema_version=1`,
+`kind="dpone.mssql-native-target-custody"`, `target_id_sha256`, monotonically
+increasing positive `epoch`, `state` (`clear` or `held`), nullable
+`holder_invocation_key`, nullable positive `holder_lease_fence`, and a closed
+nullable `release_reason`. In `held`, holder and fence are required and
+`release_reason` is null. In `clear`, holder and fence are null and
+`release_reason` is one of `published_cleanup`,
+`nonpublication_all_stages_retired`, or `empty_completion_cleanup`.
+`clear -> held` increments `epoch`; `held -> clear` preserves it. Both use `WindowStore.save`
+CAS under the current target lease. A held record may be read by matching
+recovery but cannot be overwritten by lease replacement, backend change, or a
+new run ID. A changed lease fence makes the matching invocation recovery-only:
+it may inspect, verify already durable positive terminal authority, retire
+proved stages, or finish source-free publication, but it cannot create a new
+attempt or writer grant. No deletion or TTL-based release exists.
 
 Writer state is an append-only chain below
 `mssql-native-chunks-v2/{invocation_key}/{ordinal:020d}/{attempt_id}/`.
@@ -348,10 +409,10 @@ digests, counts, and bytes; no credentials or coordinates. Allowed events are
 - `stage_binding` is `null` for `INTENT` and thereafter requires opaque stage
   ID, owner-binding SHA-256, positive SQL object ID, and schema SHA-256;
 - `writer_binding` is `null` before `GRANTED` and thereafter requires import
-  backend, protocol/package/capability SHA-256 values, session-token SHA-256,
-  and timeout-policy SHA-256;
+  backend, proof-capability ID, protocol/package/capability SHA-256 values,
+  grant-token SHA-256, and timeout-policy SHA-256;
 - `observation` is `null` through `WRITING`. Later events require writer outcome
-  (`success`, `failure`, `timeout`, or `lost_ack`), nullable non-negative input
+  (`success`, `failure`, `timeout`, `lost_ack`, or `custody_lost`), nullable non-negative input
   rows consumed, nullable count/sentinel, nullable overflow flag, either `null`
   or exactly eight non-negative decimal limb strings, quiescence (`unverified`,
   `proved`, or `failed`), and a namespaced diagnostic code.
@@ -372,8 +433,21 @@ WRITER_TERMINAL -> QUIESCENT -> VERIFIED`. Any state after `GRANTED` may enter
 non-publication proof. Only `FAILED_RETIRABLE` may enter `RETIRED`.
 `INCIDENT_RETAINED` has no ordinary destructive transition. Receipt creation
 requires terminal `VERIFIED` plus matching artifact and stage bindings.
+For `bcp-supervised-stage-barrier-v1`, `UNKNOWN -> QUIESCENT` is allowed only
+when the durable chain already contains positive acknowledged-and-reaped
+`WRITER_TERMINAL(success)` and the new observation-only recovery acquires the
+exact-stage barrier. BCP lost ACK, failed reap, uncertain launch, or custody
+loss may append only `INCIDENT_RETAINED`; current stage contents cannot replace
+missing writer authority. BCP never enters `PARTIAL_PROVED`. Recovery-only
+journal access exposes this closed observation operation but still forbids a
+new attempt, grant, launch, source resume, EOF promotion, or publication.
+If the source fails before EOF after one or more BCP chunks reached `VERIFIED`,
+an invocation-level durable proof that no preparation/publication intent exists
+may move those verified stages to `FAILED_RETIRABLE` and then `RETIRED` by exact
+owner identity. This retirement path applies only to fully writer-proved
+`VERIFIED` stages; any `UNKNOWN` attempt keeps target custody held.
 
-Compatibility is fail-closed. New dpone plus a missing/old companion blocks
+Compatibility is fail-closed. SqlClient plus a missing/old companion blocks
 before extraction. Old dpone rejects unknown manifest fields and cannot decode
 the v2 keyspace. Protocol mismatch blocks. Unfinished v2 state cannot be
 downgraded. No overlapping rollback invocation may start until the prior v2
@@ -381,7 +455,9 @@ publication state is proved non-publishing, published, terminal-retirable, or
 reconciled to another proved terminal state. `INCIDENT_RETAINED` never
 authorizes overlap. Retained raw stages may coexist
 only after non-publication is proved and remain excluded from new identity.
-P1 verifier rollback then starts a new `python_readback` invocation. P2 writer
+P1 verifier rollback starts a new `python_readback` invocation only after the
+old attempt has proved non-publication and reached an allowed terminal state;
+an unresolved BCP `UNKNOWN` never authorizes overlap. P2 writer
 rollback then starts a new BCP invocation. Older binaries preserve but never
 interpret v2 records.
 
@@ -399,6 +475,9 @@ interpret v2 records.
    process-local invocation deadline. After process restart, automatic retry is
    forbidden. Reconciliation runs under a new bounded recovery deadline; any
    further write requires operator authorization and a new attempt identity.
+   After acquiring the target lease, check stable target custody. A target-local
+   v2 invocation CAS-claims it before source I/O; a matching source-free
+   recovery reuses it, while every different v1/v2 invocation stops.
 4. Reuse the current single ClickHouse query and bounded encoder pipeline.
    Each immutable native file is fsynced and sealed with file SHA, row count,
    encoded byte count, and typed multiset digest.
@@ -408,15 +487,27 @@ interpret v2 records.
    SqlClient, stream native rows through a bounded `DbDataReader` into
    `SqlBulkCopy` with explicit mappings, `KeepNulls`, approved table locking,
    no triggers, and timeout derived from the remaining operation deadline.
-7. The companion acquires a session-owned exclusive application lock derived
-   from the opaque writer/session token before bulk copy and holds it until the
-   connection is disposed. After completion or ambiguous termination, reap the
-   worker and prove SQL Server quiescence. A verification transaction acquires
-   that same exclusive application lock and `TABLOCKX, HOLDLOCK` on the exact
-   stage. Acquiring both proves the writer session is gone and all rollback or
-   stage locks have drained without requiring server-wide DMV permission.
-   Lock timeout, rollback still in progress, or an unobservable request yields
-   `UNKNOWN`; digest, drop, preparation, and retry are forbidden.
+   Before persisting `GRANTED`, reassert that stable target custody still names
+   the same invocation. Any drift stops before writer I/O.
+7. Apply the selected closed proof capability.
+   - For P1 BCP, persist `GRANTED`, then persist `WRITING` before exactly one
+     supervised launch may occur. Retain the child handle under that grant.
+     `WRITER_TERMINAL(success)` requires acknowledged BCP success, positive
+     child reaping, exact vendor count, empty reject output, and unchanged
+     sealed-file identity. Timeout, cleanup failure, lost acknowledgement,
+     controller/custody loss, or ambiguous launch yields `UNKNOWN`; digest,
+     drop, preparation, automatic retry, and overlapping invocation are
+     forbidden. After positive success, a verification transaction acquires
+     `TABLOCKX, HOLDLOCK` on the exact owned stage, repeats object/owner/schema
+     identity, and performs verification while the barrier is held. This is a
+     successful-process-plus-stage-barrier proof, not a writer-session lock.
+   - For SqlClient, the companion acquires a session-owned exclusive
+     application lock derived from the opaque grant token before bulk copy and
+     holds it until connection disposal. The verification transaction acquires
+     that same lock and the exact-stage barrier. Acquiring both proves the
+     writer session is gone and rollback/stage locks have drained.
+   Any barrier timeout, rollback still in progress, or unavailable proof yields
+   `UNKNOWN` and retains custody.
 8. While holding that barrier, verify current object ID, owner binding, schema,
    row count, and target-local typed digest, then repeat the identity check
    before releasing it. Scan at most `expected_rows + 1`: the aggregate reports
@@ -467,24 +558,45 @@ narrowing. The matrix artifact binds the exact commit and capability digest.
 
 ```text
 plan = admit_and_freeze(config, backend_capability)
-assert journal_identity_is_compatible(plan)
+if not journal_identity_is_compatible(plan):
+    stop_before_source_with_identity_mismatch()
+claim_or_resume_invocation_target_custody_before_source(plan)
 
 for sealed_file in bounded_encode(single_source_query(plan)):
     intent = journal.begin_attempt(plan, sealed_file.identity)
     stage = create_owned_raw_stage(intent)
     grant = revalidate_and_grant(stage, sealed_file, plan)
+    assert_invocation_target_custody_before_granted(grant)
     deadline = attempt_deadline(plan.timeout_policy, invocation_deadline)
-    outcome = writer(plan.backend).write(grant, deadline=deadline)
+    outcome = writer(plan.backend).write_once_under_custody(grant, deadline)
 
-    reap_worker()
-    barrier = prove_server_quiescence(stage, grant.writer_session_token)
+    if grant.proof_capability == "bcp-supervised-stage-barrier-v1":
+        if not outcome.acknowledged_success_and_reaped:
+            append(UNKNOWN)
+            stop_and_retain_without_retry_drop_prepare_publish_or_overlap()
+        if (
+            outcome.vendor_rows != sealed_file.rows
+            or not outcome.reject_output_is_empty
+            or not sealed_file.identity_is_unchanged()
+        ):
+            append(UNKNOWN)
+            stop_and_retain_without_retry_drop_prepare_publish_or_overlap()
+        barrier = acquire_exact_stage_transaction_barrier(stage)
+    else:
+        barrier = acquire_sqlclient_session_and_stage_barrier(
+            stage, grant.grant_token
+        )
     if not barrier.proved:
         preserve_custody_and_fail_unknown_outcome()
     observation = observe_exact_stage_under_barrier(stage)
     if observation.count_digest_schema == sealed_file.authority:
         receipt = create_native_chunk_receipt(observation, sealed_file)
         journal.commit_receipt(receipt)
-    elif observation.proves_partial_or_empty and outcome.is_terminal:
+    elif (
+        grant.proof_capability == "sqlclient-session-applock-v1"
+        and observation.proves_partial_or_empty
+        and outcome.is_terminal
+    ):
         append(PARTIAL_PROVED)
         prove_nonpublication()
         append(FAILED_RETIRABLE)
@@ -499,11 +611,18 @@ prepared = prepare_existing_union(stage_complete)
 business_digest, full_digest = target_local_prepared_digests(prepared)
 expected_total = sum(receipt.consumed_part_evidence.native_typed_sum) mod 2^256
 expected_digest = native_multiset_digest(stage_complete.rows, expected_total)
-assert business_digest == expected_digest
+if business_digest != expected_digest:
+    stop_and_retain_without_publication("mssql_native.prepared_digest_mismatch")
 reverify_full_digest_at_publication_boundary(full_digest)
 publication_receipt = publish_once_atomically(prepared)
 persist_evidence_then_checkpoint_then_retire(publication_receipt)
 ```
+
+Every `stop_*` and `preserve_*_unknown_outcome` operation above is
+non-returning. It durably records the closed diagnostic before raising; no
+barrier, digest, receipt, retry, drop, preparation, publication, or overlapping
+invocation follows it. These are runtime validations, never Python `assert`
+statements.
 
 ### State machine
 
@@ -513,16 +632,19 @@ stateDiagram-v2
     Planned --> IntentPersisted
     IntentPersisted --> StageOwned
     StageOwned --> WriterRunning
-    WriterRunning --> Quiescing: success, failure, timeout, or lost ACK
-    Quiescing --> Observing: worker reaped and SQL quiescence proved
-    Quiescing --> Unknown: quiescence cannot be proved
+    WriterRunning --> Quiescing: acknowledged success or SqlClient reconciliation
+    WriterRunning --> Unknown: BCP failure, timeout, lost ACK, failed reap, or custody loss
+    Quiescing --> Observing: selected proof-capability barrier acquired
+    Quiescing --> Unknown: barrier cannot be proved
     Observing --> Verified: exact identity/count/schema and matching digest
-    Observing --> PartialProved: proved partial or empty under barrier
+    Observing --> PartialProved: SqlClient proved partial under its lock barrier
     Observing --> Unknown: outcome cannot be proved
+    Verified --> FailedRetirable: pre-EOF source failure plus durable nonpublication proof
     PartialProved --> FailedRetirable: durable non-publication proof
     FailedRetirable --> Retired: exact-owner drop completed
     Retired --> IntentPersisted: new attempt within original deadline
-    Unknown --> Observing: operator reconcile proves quiescence
+    Unknown --> Observing: SqlClient lock proof or BCP durable positive terminal plus stage barrier
+    Unknown --> IncidentRetained: BCP custody lost or proof unavailable
     Unknown --> IncidentRetained: identity drift, unavailable quiescence, or unresolved publication
     Verified --> Prepared: verified EOF and contiguous receipts
     Prepared --> Published: independent digest reverify and atomic commit
@@ -534,15 +656,26 @@ stateDiagram-v2
 
 ### Edge cases
 
-- Empty input produces a verified zero-row authority and follows existing
-  empty-window strategy semantics; no writer process is required.
+- Empty input still holds invocation-level target custody but produces no sealed
+  chunk and therefore no writer attempt or fabricated writer event. EOF closes
+  under the existing verified zero-row authority and empty-window strategy;
+  successful no-op completion and cleanup release custody.
 - NULL and empty values remain distinct. Unicode, embedded NUL, binary,
   decimals, floats, and temporal boundaries require SQL/Python byte parity.
 - Duplicates contribute independently to the multiset sum; row order is
   irrelevant.
-- A timeout or cancellation does not create a fresh phase budget. The worker
-  must be reaped and server quiescence proved before stage classification.
-- A lost ACK is reconciled from the exact stage. Blind replay is prohibited.
+- A timeout or cancellation does not create a fresh phase budget. BCP timeout,
+  failed reap, lost ACK, controller loss, or uncertain launch remains
+  `UNKNOWN`/`INCIDENT_RETAINED`; it cannot enter stage classification.
+- SqlClient may reconcile a lost ACK from the exact stage only through its
+  same-session lock proof. Blind replay is prohibited for every backend.
+- A crash after durable `GRANTED` or `WRITING` but before a positive terminal
+  event is an uncertain BCP launch. Restart may inspect and retain it but must
+  not launch a second child or append success authority.
+- A barrier failure after durable acknowledged-and-reaped BCP success may be
+  retried as observation-only recovery. It may append `QUIESCENT` only after the
+  exact-stage barrier succeeds; no writer launch or partial-stage retirement is
+  permitted.
 - Schema, owner, computed definition, object ID, or digest drift blocks
   publication.
 - Unsupported types or missing capability fail before ClickHouse row I/O.
