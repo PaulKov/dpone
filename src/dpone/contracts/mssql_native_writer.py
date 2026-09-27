@@ -12,6 +12,7 @@ _BRACKETED_PART = r"\[(?:[^\]\x00-\x1f]|\]\])+\]"
 _QUALIFIED_STAGE = re.compile(rf"{_BRACKETED_PART}(?:\.{_BRACKETED_PART}){{1,2}}\Z")
 BCP_STAGE_PROOF = "bcp-supervised-stage-barrier-v1"
 SQLCLIENT_SESSION_PROOF = "sqlclient-session-applock-v1"
+WRITER_OUTCOMES = frozenset({"success", "failure", "timeout", "lost_ack", "cleanup_failed", "custody_lost"})
 
 
 def is_qualified_native_stage(value: object) -> bool:
@@ -62,8 +63,7 @@ class NativeStageWriteOutcome:
             not self.attempt_id
             or type(self.positive_terminal) is not bool
             or (self.rows_consumed is not None and (type(self.rows_consumed) is not int or self.rows_consumed < 0))
-            or self.classification
-            not in {"success", "failure", "timeout", "lost_ack", "cleanup_failed", "custody_lost"}
+            or self.classification not in WRITER_OUTCOMES
             or (self.classification == "success") != self.positive_terminal
             or (self.positive_terminal and self.rows_consumed is None)
         ):
@@ -77,7 +77,7 @@ def is_nonnegative_int(value: object) -> bool:
 def valid_native_writer_observation(value: dict[str, Any]) -> bool:
     limbs = value["limbs"]
     return (
-        value["writer_outcome"] in {"success", "failure", "timeout", "lost_ack"}
+        value["writer_outcome"] in WRITER_OUTCOMES
         and (value["input_rows_consumed"] is None or is_nonnegative_int(value["input_rows_consumed"]))
         and (value["row_count"] is None or is_nonnegative_int(value["row_count"]))
         and (value["count_overflow"] is None or type(value["count_overflow"]) is bool)
@@ -91,3 +91,29 @@ def valid_native_writer_observation(value: dict[str, Any]) -> bool:
         and isinstance(value["diagnostic_code"], str)
         and re.fullmatch(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*", value["diagnostic_code"]) is not None
     )
+
+
+def validate_bcp_writer_event(event: dict[str, Any], previous: dict[str, Any] | None, expected_rows: int) -> None:
+    """Require positive terminal authority before BCP stage verification."""
+    name, observation = event["event"], event["observation"]
+    if name == "PARTIAL_PROVED":
+        raise ValueError("bcp partial proof forbidden")
+    if name in {"QUIESCENT", "VERIFIED"} and observation["writer_outcome"] != "success":
+        raise ValueError("bcp terminal success required")
+    if (
+        name == "QUIESCENT"
+        and previous is not None
+        and previous["event"] == "WRITER_TERMINAL"
+        and previous["observation"]["writer_outcome"] != "success"
+    ):
+        raise ValueError("bcp terminal success required")
+    if name == "WRITER_TERMINAL" and observation["writer_outcome"] == "success":
+        if observation["input_rows_consumed"] != expected_rows:
+            raise ValueError("bcp vendor count")
+    if name == "UNKNOWN" and observation["writer_outcome"] == "success":
+        if (
+            previous is None
+            or previous["event"] != "WRITER_TERMINAL"
+            or previous["observation"]["writer_outcome"] != "success"
+        ):
+            raise ValueError("bcp success authority missing")

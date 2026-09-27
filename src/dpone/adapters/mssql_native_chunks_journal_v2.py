@@ -17,7 +17,6 @@ from typing import Any, Concatenate, ParamSpec, TypeVar
 
 from dpone.adapters.mssql_native_chunks_journal_v2_events import (
     adopt_orphan_event,
-    commit_verified_receipt,
     event_key,
     initial_projection,
     requires_dedicated_recovery,
@@ -222,6 +221,7 @@ class NativeChunkJournalV2(BcpRecoveryMixin):
     ) -> dict[str, Any]:
         """Append one closed event under CAS; omitted bindings inherit prior proof."""
         data = self._staging(allow_recovery=True)
+        self._assert_no_nonpublication(data)
         chunk = data["chunks"].get(str(ordinal))
         if chunk is None or chunk["attempt_id"] != attempt_id or event not in NEXT_EVENTS:
             raise WindowContractError("mssql_native.invalid_journal_event")
@@ -289,14 +289,13 @@ class NativeChunkJournalV2(BcpRecoveryMixin):
         """Commit the existing receipt only after a real terminal VERIFIED event."""
         self._commit_verified_receipt(receipt, allow_recovery=False)
 
-    def _commit_verified_receipt(self, receipt: NativeChunkReceipt, *, allow_recovery: bool) -> None:
-        commit_verified_receipt(self, receipt, allow_recovery=allow_recovery)
-
     def _staging(self, *, allow_recovery: bool = False) -> dict[str, Any]:
         if self._data is None or self._data["phase"] != "staging":
             raise WindowContractError("mssql_native.not_staging")
         if self._recovery_only and not allow_recovery:
             raise WindowContractError("mssql_native.pre_eof_reextract_required")
+        if not allow_recovery:
+            self._assert_no_nonpublication(self._data)
         return json.loads(json.dumps(self._data))
 
     @_serialized

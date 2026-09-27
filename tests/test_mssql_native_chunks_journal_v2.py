@@ -324,6 +324,30 @@ def test_verified_pre_eof_retirement_requires_durable_nonpublication_and_exact_d
         reopened.complete(source_eof=True)
 
 
+def test_nonpublication_proof_is_idempotent_and_cannot_be_changed(tmp_path):
+    store, lease, plan, journal = _journal(tmp_path)
+    attempt_id = _verified_chain(journal, tmp_path)
+    journal.verified(NativeChunkReceipt(0, attempt_id, "[schema].[table]", 1, 2, "e" * 64, "f" * 64))
+    journal.record_nonpublication("4" * 64, assert_nonpublication=lambda: None)
+    revision = journal.revision
+    journal.record_nonpublication("4" * 64, assert_nonpublication=lambda: None)
+    assert journal.revision == revision
+    with pytest.raises(WindowContractError, match="nonpublication"):
+        journal.record_nonpublication("5" * 64, assert_nonpublication=lambda: None)
+    assert NativeChunkJournalV2(store, lease, _identity(plan)).data == journal.data
+
+
+def test_nonpublication_proof_freezes_new_attempts_and_writer_events(tmp_path):
+    _, _, _, journal = _journal(tmp_path)
+    attempt_id = _verified_chain(journal, tmp_path)
+    journal.verified(NativeChunkReceipt(0, attempt_id, "[schema].[table]", 1, 2, "e" * 64, "f" * 64))
+    journal.record_nonpublication("4" * 64, assert_nonpublication=lambda: None)
+    with pytest.raises(WindowContractError, match="nonpublication"):
+        journal.attempt(1, 0, EncodedNativeFile(tmp_path / "next.bcp", 1, 1, 2, "e" * 64, "f" * 64))
+    with pytest.raises(WindowContractError, match="nonpublication"):
+        journal.append_event(0, attempt_id, "VERIFIED")
+
+
 @pytest.mark.parametrize(
     "bad_observation",
     [
@@ -357,6 +381,37 @@ def test_quiescent_event_requires_proved_barrier(tmp_path):
     journal.append_event(0, attempt_id, "WRITER_TERMINAL", observation={**_observation(), "quiescence": "unverified"})
     with pytest.raises(WindowContractError, match="event"):
         journal.append_event(0, attempt_id, "QUIESCENT", observation={**_observation(), "quiescence": "failed"})
+
+
+def test_bcp_failed_terminal_cannot_become_quiescent_or_verified(tmp_path):
+    _, _, _, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    journal.append_event(0, attempt_id, "WRITING")
+    failure = {**_observation(), "writer_outcome": "failure", "quiescence": "unverified"}
+    journal.append_event(0, attempt_id, "WRITER_TERMINAL", observation=failure)
+    with pytest.raises(WindowContractError, match="transition"):
+        journal.append_event(0, attempt_id, "QUIESCENT", observation=_observation())
+    with pytest.raises(WindowContractError, match="transition"):
+        journal.append_event(0, attempt_id, "UNKNOWN", observation=_observation())
+
+
+@pytest.mark.parametrize("outcome", ["cleanup_failed", "custody_lost"])
+def test_ambiguous_bcp_outcome_is_recorded_as_unknown_then_incident(tmp_path, outcome):
+    _, _, _, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    journal.append_event(0, attempt_id, "WRITING")
+    ambiguous = {**_observation(), "writer_outcome": outcome, "quiescence": "unverified"}
+    journal.append_event(0, attempt_id, "UNKNOWN", observation=ambiguous)
+    journal.retain_bcp_incident(0, attempt_id)
+    assert journal.data["events"][attempt_id][-1]["observation"]["writer_outcome"] == outcome
 
 
 def test_shared_instance_serializes_snapshot_through_root_cas(tmp_path):
