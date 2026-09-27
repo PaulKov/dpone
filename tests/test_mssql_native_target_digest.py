@@ -61,6 +61,13 @@ def test_nullable_framing_keeps_missing_and_present_values_distinct() -> None:
     assert "THEN CONVERT(varbinary(max), 0xFFFFFFFFFFFFFFFF)" in sql
 
 
+def test_float_payload_reverses_sql_binary_cast_to_native_little_endian() -> None:
+    sql = build_target_digest_sql("[dbo].[stage]", _contract(("v", "float(53)")), 1)
+
+    offsets = [sql.index(f"SUBSTRING(CONVERT(binary(8), s.[v]), {offset}, 1)") for offset in range(8, 0, -1)]
+    assert offsets == sorted(offsets)
+
+
 def test_native_vectors_pin_high_bit_negative_nul_and_multibyte_prefix() -> None:
     contract = _contract(
         ("negative", "bigint nullable"),
@@ -92,6 +99,23 @@ def test_compiler_accepts_100_columns_but_rejects_101_and_other_types() -> None:
         build_target_digest_sql("[dbo].[stage]", too_wide, 0)
     with pytest.raises(ValueError, match="unsupported_type"):
         build_target_digest_sql("[dbo].[stage]", _contract(("x", "int")), 0)
+
+
+def test_wide100_composes_short_fragments_without_materializing_business_payload() -> None:
+    contract = _contract(*((f"c{i}", "bigint") for i in range(100)))
+
+    sql = build_target_digest_sql("[dbo].[stage]", contract, 4)
+
+    assert sql.count("FROM [dbo].[stage] AS s WITH (TABLOCKX, HOLDLOCK)") == 1
+    assert "SELECT TOP (5)" in sql
+    assert "INTO #dpone_target_hashes" in sql
+    assert "INTO #dpone_target_fields" not in sql
+    assert "CROSS APPLY (VALUES" in sql
+    assert "AS row_hash_chunk_0(payload)" in sql
+    assert "HASHBYTES('SHA2_256', CONVERT(varbinary(max), 0x) + row_hash_chunk_0.payload" in sql
+    fragments = [line for line in sql.splitlines() if line.startswith("CROSS APPLY")]
+    assert len(fragments) > 1
+    assert max(map(len, fragments)) < 8_000
 
 
 _FRAMEWORK_COLUMNS = (
@@ -144,13 +168,9 @@ def test_prepared_unbounded_metadata_uses_null_sentinel_without_hashing_mutated_
     full = _contract(("v", "bigint"), ("__dpone__meta", "nvarchar(max) nullable"))
 
     sql = build_prepared_target_digest_sql("[dbo].[stage]", business, full, 2)
-    full_hash_start = sql.index("HASHBYTES('SHA2_256'", sql.index("AS business_hash"))
-    full_hash_end = sql.index(" AS full_hash", full_hash_start)
-    full_payload = sql[full_hash_start:full_hash_end]
-
-    assert "CONVERT(varbinary(max), 0xFFFFFFFFFFFFFFFF)" in full_payload
-    assert "s.[__dpone__meta]" not in full_payload
-    assert "s.[__dpone__meta] IS NOT NULL" in sql[full_hash_end:]
+    assert "CONVERT(varbinary(max), 0xFFFFFFFFFFFFFFFF))) AS full_hash_chunk_0(payload)" in sql
+    assert sql.count("s.[__dpone__meta]") == 1
+    assert "s.[__dpone__meta] IS NOT NULL" in sql
     assert "IF EXISTS (SELECT 1 FROM #dpone_target_hashes WHERE invalid_metadata = 1)" in sql
     assert "THROW 51000" in sql
     assert sql.count("FROM [dbo].[stage] AS s") == 1
