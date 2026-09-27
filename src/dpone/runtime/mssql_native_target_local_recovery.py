@@ -42,13 +42,22 @@ def retire_exact_owned_stage(importer: Any, plan: Any, receipt: Any, lease: Any,
             raise ValueError("mssql_native.object_identity_unavailable")
         return value
 
+    def assert_absence_visibility() -> None:
+        # OBJECT_ID can also return NULL on metadata denial or error. Only a
+        # principal with unfiltered database metadata may interpret NULL here.
+        rows = connector.get_records("SELECT USER_NAME(), IS_SRVROLEMEMBER('sysadmin')")
+        if len(rows) != 1 or len(rows[0]) != 2 or (rows[0][0] != "dbo" and rows[0][1] != 1):
+            raise ValueError("mssql_native.stage_absence_visibility_unproved")
+
     with importer._mutation_scope(plan, receipt.attempt_id, lease):
         importer._assert_lease(lease)
         with connector.bounded_query_timeout(timeout_seconds):
             connector.begin()
             try:
                 current = current_object_id()
-                if current is not None:
+                if current is None:
+                    assert_absence_visibility()
+                else:
                     if current != object_id:
                         raise ValueError("mssql_native.stage_identity_mismatch")
                     connector.get_records(f"SELECT TOP (1) 1 FROM {qualified} WITH (TABLOCKX, HOLDLOCK)")

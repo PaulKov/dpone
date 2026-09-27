@@ -23,6 +23,7 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
         # This interaction fake keeps publication callbacks observable while
         # satisfying the runtime's concrete v2 journal admission check.
         identity = None
+        data = None
 
         def __init__(self):
             pass
@@ -293,3 +294,40 @@ def test_target_local_source_open_failure_requests_zero_stage_nonpublication(tmp
         value.run(cfg, owner="invocation")
     assert events[-2:] == ["source-open", ("nonpublication", True)]
     assert "stage" not in events
+
+
+def test_recovery_only_claim_without_journal_closes_zero_stage_before_reextract(tmp_path):
+    value, events, journal = runtime(tmp_path)
+    cfg = config()
+    cfg.options["native_transfer"]["execution"]["verification_backend"] = "target_local"
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+    )
+    journal.identity = identity
+    prior = value.store.acquire("target", "crashed", 60)
+    NativeTargetCustody(value.store, "target").claim(prior, identity.invocation_key)
+    value.store.release(prior)
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        bound.stage_context.plan = plan
+        bound.stage_context.executor = SimpleNamespace(
+            on_failed_stage=lambda current: events.append(("nonpublication", current is journal)) or True
+        )
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, identity)
+
+    value.bindings = bindings
+    value.source = lambda *args: pytest.fail("recovery-only claim must not open source")
+    with pytest.raises(Exception, match="pre_eof_reextract_required"):
+        value.run(cfg, owner="recovery")
+    assert events[-1] == ("nonpublication", True)
+    assert "source" not in events

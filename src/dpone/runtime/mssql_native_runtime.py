@@ -102,6 +102,9 @@ class NativeMssqlRuntime:
             handle = recovered if isinstance(recovered, StagedLoadHandle) else None
             if recovered is None:
                 if claim is not None and claim.recovery_only:
+                    journal = context.journal_factory()
+                    if journal.data is None and context.executor.on_failed_stage is not None:
+                        context.executor.on_failed_stage(journal)
                     raise WindowContractError("mssql_native.pre_eof_reextract_required")
                 source_entered = False
                 try:
