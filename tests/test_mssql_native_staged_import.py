@@ -9,10 +9,11 @@ import pytest
 
 from dpone.contracts.mssql_native_chunks import EncodedNativeFile, NativeChunkPlan
 from dpone.runtime.connectors.mssql_bulk import BcpOptions
+from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
 from dpone.runtime.sinks.mssql_native_import import MssqlNativeChunkImporter
 
 
-def importer(tmp_path, *, vendor=2, server_rows=(1, 1), rejected=False):
+def importer(tmp_path, *, vendor=2, server_rows=(1, 1), rejected=False, target_digest_contract=None, dtype="int"):
     class Connector:
         def quote_identifier(self, name):
             return f"[{name}]"
@@ -34,7 +35,7 @@ def importer(tmp_path, *, vendor=2, server_rows=(1, 1), rejected=False):
                 self.owner = params[0]
 
         def fetch_schema_columns(self, *args, **kwargs):
-            return [SimpleNamespace(name="n", dtype="int", nullable=False, collation=None)]
+            return [SimpleNamespace(name="n", dtype=dtype, nullable=False, collation=None)]
 
         def get_records(self, sql, params=()):
             if "extended_properties" in sql:
@@ -54,23 +55,29 @@ def importer(tmp_path, *, vendor=2, server_rows=(1, 1), rejected=False):
             return vendor
 
     def encode(row):
-        return int(row["n"]).to_bytes(4, "little", signed=True)
+        return int(row["n"]).to_bytes(8 if dtype == "bigint" else 4, "little", signed=True)
 
     value = MssqlNativeChunkImporter(
         Connector(),
         options_factory=BcpOptions,
         database="db",
         schema="stage",
-        columns=(SimpleNamespace(name="n", source_type="int", nullable=False),),
+        columns=(SimpleNamespace(name="n", source_type=dtype, nullable=False),),
         encode_row=encode,
         assert_lease=lambda lease: None,
         mutation_scope=lambda plan, attempt, lease: nullcontext(),
+        target_digest_contract=target_digest_contract,
     )
     path = tmp_path / "data.bin"
     path.write_bytes(encode({"n": 1}) * 2)
     plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
     file = EncodedNativeFile(
-        path, 0, 2, 8, sha256(path.read_bytes()).hexdigest(), value.digest_rows(({"n": 1}, {"n": 1}))[1]
+        path,
+        0,
+        2,
+        path.stat().st_size,
+        sha256(path.read_bytes()).hexdigest(),
+        value.digest_rows(({"n": 1}, {"n": 1}))[1],
     )
     return value, plan, file
 
@@ -117,3 +124,36 @@ def test_settlement_refuses_foreign_table_with_same_name(tmp_path):
     value.connector.owner = "another-invocation"
     with pytest.raises(ValueError, match="owner_mismatch"):
         value.settle(plan, "attempt", object())
+
+
+def test_target_local_raw_verification_returns_only_aggregate_and_never_iterates_rows(tmp_path):
+    contract = build_mssql_bcp_native_contract(schema=[("n", "bigint")], query="SELECT n")
+    value, _, file = importer(tmp_path, target_digest_contract=contract, dtype="bigint")
+    digest_word = int.from_bytes(sha256((1).to_bytes(8, "little", signed=True)).digest(), "big")
+    limbs = [((digest_word >> (32 * (7 - index))) & (2**32 - 1)) * 2 for index in range(8)]
+    queries = []
+
+    def aggregate(sql, params=()):
+        queries.append(sql)
+        return [(2, 0, *limbs)]
+
+    value.connector.get_records = aggregate
+    value.connector.get_records_iterator = lambda sql: pytest.fail("business-row readback forbidden")
+    assert value._verify_contents("stage", file.rows, file.typed_digest) == (2 * digest_word) % (1 << 256)
+    assert len(queries) == 1 and "#dpone_target_hashes" in queries[0]
+
+
+@pytest.mark.parametrize(
+    ("row", "code"),
+    [
+        ((2, 0, *([0] * 8)), "typed_digest_mismatch"),
+        ((3, 1, *([0] * 8)), "target_digest_count_overflow"),
+    ],
+)
+def test_target_local_raw_mismatch_and_overflow_reject_without_row_iterator(tmp_path, row, code):
+    contract = build_mssql_bcp_native_contract(schema=[("n", "bigint")], query="SELECT n")
+    value, _, file = importer(tmp_path, target_digest_contract=contract, dtype="bigint")
+    value.connector.get_records = lambda sql, params=(): [row]
+    value.connector.get_records_iterator = lambda sql: pytest.fail("business-row readback forbidden")
+    with pytest.raises(ValueError, match=code):
+        value._verify_contents("stage", file.rows, file.typed_digest)

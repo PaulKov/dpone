@@ -335,7 +335,7 @@ def matches_native_receipt(
 
 def ordered_native_receipts(chunks: dict[str, Any]) -> tuple[NativeChunkReceipt, ...]:
     """Require contiguous, independently verified stages before EOF authority."""
-    if not chunks or set(chunks) != {str(index) for index in range(len(chunks))}:
+    if set(chunks) != {str(index) for index in range(len(chunks))}:
         raise WindowContractError("mssql_native.noncontiguous_receipts")
     if any(chunk["phase"] != "verified" for chunk in chunks.values()):
         raise WindowContractError("mssql_native.unverified_attempts")

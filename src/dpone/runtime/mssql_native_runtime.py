@@ -15,9 +15,11 @@ from threading import Event, Thread
 from time import monotonic
 from typing import TYPE_CHECKING, Any
 
+from dpone.adapters.mssql_native_chunks_journal_v2 import NativeChunkJournalV2
+from dpone.adapters.mssql_native_custody import NativeTargetCustody
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
 from dpone.contracts.process_types import ProcessResult
-from dpone.manifest.mssql_native_policy import validate_native_config
+from dpone.manifest.mssql_native_policy import native_verification_backend, validate_native_config
 from dpone.ports.bounded_window import WindowStore
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session
@@ -34,6 +36,7 @@ class NativeRuntimeBindings:
     service: Any
     stage_context: Any
     admission: Any
+    verification_identity: Any = None
 
 
 class NativeMssqlRuntime:
@@ -64,6 +67,7 @@ class NativeMssqlRuntime:
     def run(self, load_config: Any, *, owner: str) -> ProcessResult:
         """Resume target receipts before any source factory; never replay unknown commit."""
         validate_native_config(load_config)
+        verification_backend = native_verification_backend(load_config)
         self.preflight(load_config)
         started = monotonic()
         lease = self.store.acquire(self.target_id, owner, self.lease_ttl)
@@ -76,10 +80,29 @@ class NativeMssqlRuntime:
             service, context = binding.service, binding.stage_context
             if context.plan.target_id != self.target_id or context.lease != lease or context.cancelled is not lost:
                 raise WindowContractError("mssql_native.binding_lease_mismatch")
+            custody = NativeTargetCustody(self.store, self.target_id)
+            claim = None
+            invocation_key: str | None = None
+            if verification_backend.value == "target_local":
+                identity = binding.verification_identity or getattr(context, "verification_identity", None)
+                journal = context.journal_factory()
+                if (
+                    not isinstance(journal, NativeChunkJournalV2)
+                    or identity is None
+                    or journal.identity != identity
+                    or identity.plan != context.plan
+                ):
+                    raise WindowContractError("mssql_native.invalid_v2_identity")
+                invocation_key = identity.invocation_key
+                claim = custody.claim(lease, invocation_key)
+            else:
+                custody.assert_available_for_v1(lease)
             recovered = service.resume(load_config, context, binding.admission)
             self._check(lease, lost)
             handle = recovered if isinstance(recovered, StagedLoadHandle) else None
             if recovered is None:
+                if claim is not None and claim.recovery_only:
+                    raise WindowContractError("mssql_native.pre_eof_reextract_required")
                 with self.source(load_config, binding) as payload:
                     handle = service.stage(load_config, payload)
                     result = self._publish(load_config, service, handle, lease, lost)
@@ -111,6 +134,19 @@ class NativeMssqlRuntime:
                 service.cleanup(handle)
             else:
                 service.cleanup_recovered(load_config, context, binding.admission)
+            if claim is not None:
+                if invocation_key is None:
+                    raise WindowContractError("mssql_native.invalid_v2_identity")
+                completed = journal.completed()
+                reason = (
+                    "empty_completion_cleanup" if completed is not None and completed.rows == 0 else "published_cleanup"
+                )
+
+                def assert_release_authority() -> None:
+                    if completed is None or journal.publication.state()["phase"] != "succeeded":
+                        raise WindowContractError("mssql_native.custody_release_unproved")
+
+                custody.release(lease, invocation_key, reason, assert_release_authority=assert_release_authority)
             return ProcessResult(
                 status="success",
                 inserted_rows=result.inserted_rows,

@@ -6,10 +6,17 @@ from types import SimpleNamespace
 
 import pytest
 
+from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
+from dpone.adapters.mssql_native_chunks_journal_v2 import NativeChunkJournalV2
+from dpone.adapters.mssql_native_custody import NativeTargetCustody
+from dpone.contracts.mssql_native_chunks import NativeChunkPlan, NativeChunkReceipt
+from dpone.contracts.mssql_native_verification import NativeVerificationBackend, NativeVerificationIdentityV2
 from dpone.manifest.mssql_native_policy import native_limits
 from dpone.runtime.connectors.mssql_bulk import BcpOptions
 from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
 from dpone.runtime.sinks.mssql_native_composition import compose_native_stage_context
+from dpone.runtime.sinks.mssql_native_import import MssqlNativeChunkImporter
+from tests.test_mssql_native_chunks_journal_v2 import _verified_chain
 from tests.test_mssql_native_policy import config
 
 
@@ -127,3 +134,65 @@ def test_preparation_preserves_primary_error_when_cleanup_also_fails(tmp_path):
     assert session.closed
     assert any("lock cleanup failed" in note for note in primary.__notes__)
     assert any("session cleanup failed" in note for note in primary.__notes__)
+
+
+def test_target_local_composition_selects_shared_v2_journal_and_supervised_importer(tmp_path, monkeypatch):
+    store = SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1.0)
+    lease = store.acquire("target", "owner", 60)
+    wire = build_mssql_bcp_native_contract(schema=[("value", "bigint")], query="SELECT synthetic")
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", wire.type_layout_hash)
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+    )
+
+    @contextmanager
+    def connection():
+        yield SimpleNamespace(get_records=lambda sql: [("synthetic",)])
+
+    context = compose_native_stage_context(
+        store=store,
+        plan=plan,
+        lease=lease,
+        wire_contract=wire,
+        limits=native_limits(config()),
+        work_dir=tmp_path / "files",
+        target_connector=SimpleNamespace(),
+        importer_connection=connection,
+        bcp_options_factory=BcpOptions,
+        database="synthetic",
+        schema="dbo",
+        row_source=lambda: iter(()),
+        journal_factory=lambda: pytest.fail("v1 journal must not be selected"),
+        cancelled=Event(),
+        required_target_headroom_bytes=1024,
+        verification_identity=identity,
+    )
+    assert isinstance(context.journal_factory(), NativeChunkJournalV2)
+    assert context.executor.journal_factory(plan, lease) is context.journal_factory()
+    assert context.executor.on_failed_stage is not None
+    with context.executor.importer_factory() as importer:
+        assert importer._target_digest_contract is wire
+        assert importer._target_local_attempt.journal is context.journal_factory()
+
+    NativeTargetCustody(store, "target").claim(lease, identity.invocation_key)
+    journal = context.journal_factory()
+    attempt_id = _verified_chain(journal, tmp_path)
+    journal.verified(NativeChunkReceipt(0, attempt_id, "[schema].[table]", 1, 2, "e" * 64, "f" * 64))
+    observed = []
+    monkeypatch.setattr(
+        MssqlNativeChunkImporter,
+        "drop_exact_owned",
+        lambda self, plan, receipt, lease: observed.append(journal.data["events"][attempt_id][-1]["event"]),
+    )
+    context.executor.on_failed_stage(journal)
+    assert observed == ["FAILED_RETIRABLE"]
+    assert journal.data["events"][attempt_id][-1]["event"] == "RETIRED"
+    custody = NativeTargetCustody(store, "target").inspect(lease)
+    assert custody.state == "clear" and custody.release_reason == "nonpublication_all_stages_retired"
