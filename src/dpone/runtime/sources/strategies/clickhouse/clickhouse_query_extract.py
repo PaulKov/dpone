@@ -63,7 +63,7 @@ class ClickHouseQueryExtractService:
 
     def _describe(self, sql: str) -> list[tuple[str, str]]:
         rows = self._connector.get_records(
-            f"DESCRIBE SELECT * FROM ({sql}) AS dpone_sql_query",
+            f"DESCRIBE (SELECT * FROM ({sql}) AS dpone_sql_query)",
             as_dict=True,
         )
         return [(str(row["name"]), str(row["type"])) for row in rows]

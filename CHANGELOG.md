@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.83.21 - 2026-09-27
+
+### Fixed
+
+- ClickHouse query schema inspection uses `DESCRIBE (SELECT ...)`.
+  ClickHouse 26 rejects the bare `DESCRIBE SELECT` form.
+
 ## 0.83.20 - 2026-09-27
 
 ### Fixed

@@ -97,7 +97,7 @@ def test_clickhouse_full_extract_returns_sql_query_artifact_without_row_streamin
     assert result.artifact.estimated_rows == 2
     assert result.artifact.rows_exported == 2
     assert result.artifact.row_count == 2
-    assert any("DESCRIBE SELECT" in query for query in connector.queries)
+    assert any("DESCRIBE (SELECT" in query for query in connector.queries)
     assert not any("SELECT id FROM" in query for query in connector.queries)
 
 
@@ -125,7 +125,7 @@ def test_clickhouse_source_uses_rendered_query_schema_instead_of_placeholder_tab
     assert result.schema == [("id", "UInt8"), ("name", "String")]
     assert result.relation_schema == (("id", "UInt8"), ("name", "String"))
     assert all(column.name in {"id", "name"} for column in result.relation_metadata)
-    assert sum("DESCRIBE SELECT" in query for query in connector.queries) == 2
+    assert sum("DESCRIBE (SELECT" in query for query in connector.queries) == 2
     assert not any("FROM system.columns" in query for query in connector.queries)
 
 
@@ -369,7 +369,7 @@ class _QueryConnector:
 
     def get_records(self, query: str, _params: object = None, *, as_dict: bool = False) -> list[object]:
         self.queries.append(query)
-        if "DESCRIBE SELECT" in query:
+        if "DESCRIBE (SELECT" in query:
             rows = [{"name": "id", "type": "UInt8"}, {"name": "name", "type": "String"}]
             return rows if as_dict else [(row["name"], row["type"]) for row in rows]
         if "count()" in query:
@@ -383,7 +383,7 @@ class _ChangingQueryConnector(_QueryConnector):
         self.describe_calls = 0
 
     def get_records(self, query: str, _params: object = None, *, as_dict: bool = False) -> list[object]:
-        if "DESCRIBE SELECT" not in query:
+        if "DESCRIBE (SELECT" not in query:
             return super().get_records(query, _params, as_dict=as_dict)
         self.queries.append(query)
         self.describe_calls += 1

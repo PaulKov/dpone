@@ -166,7 +166,7 @@ class _QueryConnector:
 
     def get_records(self, query: str, _params: object = None, *, as_dict: bool = False) -> list[object]:
         self.queries.append(query)
-        if "DESCRIBE SELECT" in query:
+        if "DESCRIBE (SELECT" in query:
             rows = [{"name": "id", "type": "UInt8"}, {"name": "name", "type": "String"}]
             return rows if as_dict else [(row["name"], row["type"]) for row in rows]
         if "count()" in query:
