@@ -11,6 +11,7 @@ from typing import Any, Protocol
 
 from dpone.runtime.connectors.bulk_text_codec import DEFAULT_EMPTY_STRING_MARKER
 from dpone.runtime.connectors.mssql_bcp_dsn import BcpDsnOptions
+from dpone.runtime.connectors.mssql_bcp_supervised import BcpSupervisedResult, observe_bcp_process
 from dpone.runtime.process_io import (
     DEFAULT_PROCESS_ABORT_TIMEOUT_SECONDS,
     ProcessOutputDrainer,
@@ -118,27 +119,6 @@ class BcpResult:
     rows_copied: int | None
 
 
-@dataclass(frozen=True)
-class BcpSupervisedResult:
-    """Closed process observation; only positive ACK and reap permit a stage barrier."""
-
-    classification: str
-    acknowledged: bool
-    reaped: bool
-    rows_copied: int | None
-
-    def __post_init__(self) -> None:
-        if (
-            self.classification not in {"success", "failure", "timeout", "lost_ack", "cleanup_failed", "custody_lost"}
-            or type(self.acknowledged) is not bool
-            or type(self.reaped) is not bool
-            or (self.rows_copied is not None and (type(self.rows_copied) is not int or self.rows_copied < 0))
-            or (self.classification == "success") != self.acknowledged
-            or (self.acknowledged and (not self.reaped or self.rows_copied is None))
-        ):
-            raise ValueError("mssql_native.invalid_writer_outcome")
-
-
 class BcpTimeoutError(subprocess.TimeoutExpired):
     """Redacted timeout raised after a supervised BCP process is reaped."""
 
@@ -165,37 +145,7 @@ class BcpProcess:
 
     def wait_supervised(self) -> BcpSupervisedResult:
         """Observe one launched child without converting ambiguous outcomes to success."""
-        result: BcpResult | None = None
-        failure: BaseException | None = None
-        try:
-            result = self.wait()
-        except Exception as error:
-            failure = error
-        try:
-            returncode = self.process.poll()
-            reaped = returncode is not None
-        except BaseException:
-            return BcpSupervisedResult("custody_lost", False, False, None)
-        if self._cleanup_failed:
-            classification = "cleanup_failed"
-        elif not reaped:
-            classification = "custody_lost"
-        elif isinstance(failure, BcpTimeoutError):
-            classification = "timeout"
-        elif failure is not None:
-            classification = "failure" if returncode != 0 else "lost_ack"
-        elif returncode != 0:
-            classification = "failure"
-        elif result is None or type(result.rows_copied) is not int:
-            classification = "lost_ack"
-        else:
-            classification = "success"
-        return BcpSupervisedResult(
-            classification,
-            classification == "success",
-            reaped,
-            result.rows_copied if classification == "success" and result is not None else None,
-        )
+        return observe_bcp_process(self)
 
     def wait(self) -> BcpResult:
         timeout_error: BcpTimeoutError | None = None

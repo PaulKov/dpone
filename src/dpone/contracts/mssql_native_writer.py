@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
 _BRACKETED_PART = r"\[(?:[^\]\x00-\x1f]|\]\])+\]"
@@ -67,3 +68,26 @@ class NativeStageWriteOutcome:
             or (self.positive_terminal and self.rows_consumed is None)
         ):
             raise ValueError("mssql_native.invalid_writer_outcome")
+
+
+def is_nonnegative_int(value: object) -> bool:
+    return type(value) is int and value >= 0
+
+
+def valid_native_writer_observation(value: dict[str, Any]) -> bool:
+    limbs = value["limbs"]
+    return (
+        value["writer_outcome"] in {"success", "failure", "timeout", "lost_ack"}
+        and (value["input_rows_consumed"] is None or is_nonnegative_int(value["input_rows_consumed"]))
+        and (value["row_count"] is None or is_nonnegative_int(value["row_count"]))
+        and (value["count_overflow"] is None or type(value["count_overflow"]) is bool)
+        and (
+            limbs is None
+            or isinstance(limbs, list)
+            and len(limbs) == 8
+            and all(type(limb) is str and re.fullmatch(r"0|[1-9][0-9]*", limb) is not None for limb in limbs)
+        )
+        and value["quiescence"] in {"unverified", "proved", "failed"}
+        and isinstance(value["diagnostic_code"], str)
+        and re.fullmatch(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*", value["diagnostic_code"]) is not None
+    )

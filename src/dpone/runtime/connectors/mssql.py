@@ -9,7 +9,7 @@ from typing import Any
 from dpone.contracts.mssql_object_name import MSSQLObjectName
 from dpone.contracts.mssql_type_contract import MssqlCatalogColumn
 from dpone.runtime.connectors.base import AbstractConnector
-from dpone.runtime.connectors.mssql_bcp_process import BcpProcess
+from dpone.runtime.connectors.mssql_bcp_supervised import SupervisedBcpImport
 from dpone.runtime.connectors.mssql_bulk import BcpCredentials, BcpDsnOptions, BcpOptions, BcpRunner
 from dpone.runtime.connectors.mssql_datetimeoffset import (
     SQL_SS_TIMESTAMPOFFSET as _SQL_SS_TIMESTAMPOFFSET,
@@ -41,7 +41,7 @@ _SQL_RENDERER_DELEGATES = {
 _BULK_OPERATION_DELEGATES = frozenset({"bcp_import", "bcp_import_process", "bcp_import_format", "bcp_queryout"})
 
 
-class _MssqlConnectorBulkOperations:
+class _MssqlConnectorBulkOperations(SupervisedBcpImport):
     """Connector-facing facade over injectable native BCP runners."""
 
     def __init__(
@@ -66,19 +66,6 @@ class _MssqlConnectorBulkOperations:
     ) -> int:
         target = self._qualified_name(schema, table, database=database)
         return self._runner_factory(options).import_file(target, file_path).rows_copied or 0
-
-    def bcp_import_process(
-        self,
-        schema: str,
-        table: str,
-        file_path: str,
-        *,
-        options: BcpOptions | None = None,
-        database: str | None = None,
-    ) -> BcpProcess:
-        """Return a supervised BCP handle for the opt-in native proof path."""
-        target = self._qualified_name(schema, table, database=database)
-        return self._runner_factory(options).import_file_process(target, file_path)
 
     def bcp_import_format(
         self,

@@ -18,7 +18,12 @@ from typing import Any, TypedDict
 
 from dpone.contracts.bounded_window import WindowContractError
 from dpone.contracts.mssql_native_chunks import NativeChunkPlan, NativeChunkReceipt
-from dpone.contracts.mssql_native_writer import BCP_STAGE_PROOF, SQLCLIENT_SESSION_PROOF
+from dpone.contracts.mssql_native_writer import (
+    BCP_STAGE_PROOF,
+    SQLCLIENT_SESSION_PROOF,
+    is_nonnegative_int,
+    valid_native_writer_observation,
+)
 from dpone.contracts.strict_json import canonical_json_bytes
 
 _SHA256 = re.compile(r"[0-9a-f]{64}\Z")
@@ -179,10 +184,6 @@ def is_sha256_digest(value: object) -> bool:
     return type(value) is str and _SHA256.fullmatch(value) is not None
 
 
-def is_nonnegative_int(value: object) -> bool:
-    return type(value) is int and value >= 0
-
-
 def validate_native_writer_event(
     identity: NativeVerificationIdentityV2,
     event: object,
@@ -275,7 +276,7 @@ def validate_native_writer_event(
     elif (
         not isinstance(observation, dict)
         or set(observation) != OBSERVATION_FIELDS
-        or not _valid_observation(observation)
+        or not valid_native_writer_observation(observation)
     ):
         raise ValueError("observation")
     if event["event"] in {"QUIESCENT", "PARTIAL_PROVED"} and observation["quiescence"] != "proved":
@@ -302,25 +303,6 @@ def validate_native_writer_event(
         or observation["limbs"] is None
     ):
         raise ValueError("verification proof")
-
-
-def _valid_observation(value: dict[str, Any]) -> bool:
-    limbs = value["limbs"]
-    return (
-        value["writer_outcome"] in {"success", "failure", "timeout", "lost_ack"}
-        and (value["input_rows_consumed"] is None or is_nonnegative_int(value["input_rows_consumed"]))
-        and (value["row_count"] is None or is_nonnegative_int(value["row_count"]))
-        and (value["count_overflow"] is None or type(value["count_overflow"]) is bool)
-        and (
-            limbs is None
-            or isinstance(limbs, list)
-            and len(limbs) == 8
-            and all(type(limb) is str and re.fullmatch(r"0|[1-9][0-9]*", limb) is not None for limb in limbs)
-        )
-        and value["quiescence"] in {"unverified", "proved", "failed"}
-        and isinstance(value["diagnostic_code"], str)
-        and re.fullmatch(r"[a-z][a-z0-9_]*\.[a-z][a-z0-9_]*", value["diagnostic_code"]) is not None
-    )
 
 
 def validated_native_receipt(value: object) -> NativeChunkReceipt:
