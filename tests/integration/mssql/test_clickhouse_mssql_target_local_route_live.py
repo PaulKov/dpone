@@ -128,7 +128,7 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
         receipt = complete.receipts[0]
         stages.append(receipt.stage_id)
         context.verify_receipts(complete.receipts)
-        events = context.journal_factory().data["events"][receipt.attempt_id]
+        events = tuple(context.journal_factory().data["events"][receipt.attempt_id])
         assert [event["event"] for event in events] == [
             "INTENT",
             "STAGE_OWNED",
@@ -159,7 +159,7 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
         finally:
             lock_holder.rollback()
             lock_holder.close()
-        assert context.journal_factory().data["events"][receipt.attempt_id] == events
+        assert tuple(context.journal_factory().data["events"][receipt.attempt_id]) == events
         context.verify_receipts(complete.receipts)
 
         # Rollback proves the previous target remains authoritative until commit.
