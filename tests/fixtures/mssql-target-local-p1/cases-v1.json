@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "kind": "dpone.mssql-target-local-p1.synthetic-cases",
+  "profiles": [
+    {
+      "id": "narrow",
+      "business_columns": 4,
+      "features": ["null", "empty", "unicode", "nul", "boundaries", "duplicates"]
+    },
+    {
+      "id": "wide100",
+      "business_columns": 100,
+      "features": ["null", "empty", "unicode", "boundaries"]
+    }
+  ],
+  "source": "deterministic-synthetic-only"
+}
