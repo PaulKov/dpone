@@ -249,6 +249,41 @@ def test_reopened_bcp_unknown_requires_positive_terminal_and_observation_only_ba
         reopened.attempt(0, 1, _file(tmp_path))
 
 
+def test_bcp_quiescent_digest_uncertainty_retains_positive_writer_outcome(tmp_path):
+    store, lease, plan, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    journal.append_event(0, attempt_id, "WRITING")
+    journal.append_event(0, attempt_id, "WRITER_TERMINAL", observation={**_observation(), "quiescence": "unverified"})
+    journal.append_event(0, attempt_id, "QUIESCENT", observation=_observation())
+    uncertain = {**_observation(), "quiescence": "failed", "diagnostic_code": "mssql_native.digest_uncertain"}
+    journal.append_event(0, attempt_id, "UNKNOWN", observation=uncertain)
+    reopened = NativeChunkJournalV2(store, lease, _identity(plan))
+    assert reopened.data["events"][attempt_id][-1]["observation"] == uncertain
+
+
+@pytest.mark.parametrize("outcome", ["lost_ack", "cleanup_failed", "custody_lost"])
+def test_bcp_custody_loss_after_positive_terminal_cannot_recover(tmp_path, outcome):
+    from contextlib import nullcontext
+
+    store, lease, plan, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    journal.append_event(0, attempt_id, "WRITING")
+    journal.append_event(0, attempt_id, "WRITER_TERMINAL", observation={**_observation(), "quiescence": "unverified"})
+    journal.append_event(0, attempt_id, "UNKNOWN", observation={**_observation(), "writer_outcome": outcome})
+    reopened = NativeChunkJournalV2(store, lease, _identity(plan))
+    with pytest.raises(WindowContractError, match="proof_missing"):
+        reopened.observe_bcp_recovery(0, attempt_id, barrier=nullcontext, observe=_observation)
+    reopened.retain_bcp_incident(0, attempt_id)
+
+
 def test_recovered_bcp_receipt_is_committed_inside_observation_barrier(tmp_path):
     from contextlib import contextmanager
 

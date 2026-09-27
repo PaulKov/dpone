@@ -113,7 +113,7 @@ def validate_bcp_writer_event(event: dict[str, Any], previous: dict[str, Any] | 
     if name == "UNKNOWN" and observation["writer_outcome"] == "success":
         if (
             previous is None
-            or previous["event"] != "WRITER_TERMINAL"
+            or previous["event"] not in {"WRITER_TERMINAL", "QUIESCENT"}
             or previous["observation"]["writer_outcome"] != "success"
         ):
             raise ValueError("bcp success authority missing")

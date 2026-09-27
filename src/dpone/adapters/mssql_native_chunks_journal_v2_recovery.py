@@ -27,6 +27,7 @@ def observe_bcp_recovery(
         journal.identity.import_backend != "bcp"
         or not events
         or events[-1]["event"] != "UNKNOWN"
+        or events[-1]["observation"]["writer_outcome"] != "success"
         or not any(
             event["event"] == "WRITER_TERMINAL" and event["observation"]["writer_outcome"] == "success"
             for event in events
@@ -66,6 +67,7 @@ def recover_bcp_verified(
         journal.identity.import_backend != "bcp"
         or not events
         or events[-1]["event"] not in {"UNKNOWN", "QUIESCENT", "VERIFIED"}
+        or (events[-1]["event"] == "UNKNOWN" and events[-1]["observation"]["writer_outcome"] != "success")
         or not any(
             event["event"] == "WRITER_TERMINAL" and event["observation"]["writer_outcome"] == "success"
             for event in events
