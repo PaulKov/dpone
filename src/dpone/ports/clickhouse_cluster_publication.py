@@ -81,13 +81,13 @@ def require_exact_ddl_entry(
 
 
 def require_verified_mutation(result: Any, *, permit: bool) -> contracts.VersionedAuthorityRecord:
-    """Reject ambiguous KeeperMap outcomes and missing dispatch permits."""
+    """Reject ambiguous authority outcomes and missing dispatch permits."""
 
     if result.status is not contracts.AuthorityMutationStatus.VERIFIED or result.observed is None:
         code = "DPONE_CLICKHOUSE_CLUSTER_CAS_UNKNOWN"
         if result.status is contracts.AuthorityMutationStatus.CONFLICT:
             code = "DPONE_CLICKHOUSE_CLUSTER_CAS_CONFLICT"
-        raise contracts.ClusterPublicationError(code, "KeeperMap mutation was not acknowledged and verified")
+        raise contracts.ClusterPublicationError(code, "authority mutation was not acknowledged and verified")
     if permit and result.permit is None:
         raise contracts.ClusterPublicationError(
             "DPONE_CLICKHOUSE_CLUSTER_CAS_UNKNOWN", "dispatch permit was not issued"

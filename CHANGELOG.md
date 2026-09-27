@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.83.20 - 2026-09-27
+
+### Fixed
+
+- Cluster publication stores its authority in ReplicatedReplacingMergeTree.
+  KeeperMap stays disabled on servers that do not define keeper_map_path_prefix,
+  and that setting cannot be enabled from a query.
+
 ## 0.83.19 - 2026-09-27
 
 ### Fixed

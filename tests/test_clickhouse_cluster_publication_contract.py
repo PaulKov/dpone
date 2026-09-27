@@ -18,7 +18,9 @@ from dpone.contracts.clickhouse_cluster_publication import (
     classify_aggregate,
     classify_replica,
 )
+from dpone.contracts.clickhouse_cluster_publication import ClusterPublicationError
 from dpone.runtime.sinks.clickhouse_cluster_publication_authority import ClickHouseKeeperMapAuthority
+from dpone.runtime.sinks.clickhouse_cluster_publication_bootstrap import ClickHouseClusterAuthorityBootstrap
 from dpone.runtime.sinks.clickhouse_cluster_publication_catalog import ClickHouseClusterPublicationCatalog
 
 
@@ -86,10 +88,13 @@ class _Connection:
 
 
 class _Connector:
-    def __init__(self, record: AuthorityRecord, *, raises: bool = False, bytes_hash: bool = False) -> None:
+    def __init__(
+        self, record: AuthorityRecord, *, raises: bool = False, bytes_hash: bool = False, version: int = 1
+    ) -> None:
         self.connection = _Connection(raises=raises)
         self.record = record
         self.bytes_hash = bytes_hash
+        self.version = version
 
     def get_records(self, query, params=None):
         record = self.record
@@ -101,7 +106,7 @@ class _Connector:
                 record.dispatch_epoch,
                 record.payload,
                 record.payload_sha256.encode() if self.bytes_hash else record.payload_sha256,
-                0,
+                self.version,
             )
         ]
 
@@ -130,8 +135,10 @@ def test_authority_create_uses_exactly_one_raw_transport_call() -> None:
     result = ClickHouseKeeperMapAuthority(connector, "analytics").create_if_absent(record)
     assert result.status is AuthorityMutationStatus.VERIFIED
     assert len(connector.connection.calls) == 1
-    _, kwargs = connector.connection.calls[0]
-    assert kwargs["settings"] == {"keeper_map_strict_mode": 1, "insert_keeper_max_retries": 0}
+    sql = connector.connection.calls[0][0][0]
+    assert "version" in sql
+    assert "keeper_map" not in sql.casefold()
+    assert "settings" not in connector.connection.calls[0][1]
 
 
 def test_lost_authority_response_is_unknown_and_never_retried() -> None:
@@ -149,11 +156,38 @@ def test_http_fixed_string_hash_is_decoded_without_losing_authority() -> None:
     assert observed.record == record
 
 
+def test_authority_bootstrap_does_not_require_keeper_map() -> None:
+    class Connection:
+        def __init__(self) -> None:
+            self.sql = ""
+
+        def execute(self, sql, params=None, query_id=None, settings=None):
+            self.sql = sql
+
+    class Connector:
+        def __init__(self) -> None:
+            self.connection = Connection()
+
+        def get_records(self, query, params=None):
+            return []
+
+    class Catalog:
+        def find_entries(self, cluster, token):
+            return []
+
+    connector = Connector()
+    with pytest.raises(ClusterPublicationError, match="BOOTSTRAP_UNKNOWN"):
+        ClickHouseClusterAuthorityBootstrap(connector, Catalog()).ensure("dwh", "analytics", ["host-a"])
+    assert "ReplicatedReplacingMergeTree" in connector.connection.sql
+    assert "ORDER BY target_key" in connector.connection.sql
+    assert "KeeperMap" not in connector.connection.sql
+
+
 def test_dispatch_permit_requires_exact_next_keeper_version() -> None:
     before = _record()
     desired = replace(before, phase=AuthorityPhase.DISPATCHING, dispatch_epoch=1, ddl_correlation_token="token")
-    connector = _Connector(desired)
-    # The fake returns version zero rather than the required version one.
+    connector = _Connector(desired, version=0)
+    # The fake returns version zero rather than the required next version.
     result = ClickHouseKeeperMapAuthority(connector, "analytics").compare_and_swap(
         type("Version", (), {"record": before, "version": 0})(), desired
     )

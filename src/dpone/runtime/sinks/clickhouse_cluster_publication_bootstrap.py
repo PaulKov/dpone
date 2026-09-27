@@ -1,4 +1,4 @@
-"""Strict bootstrap for the fixed KeeperMap publication facade."""
+"""Strict bootstrap for the replicated publication authority table."""
 
 from __future__ import annotations
 
@@ -9,10 +9,13 @@ from typing import Any
 
 from dpone.ports.clickhouse_cluster_publication import contracts
 
-_KEEPER_PATH = "/dpone_cluster_publication_authority"
 _COLUMNS = (
-    "target_key String PRIMARY KEY, operation_id String, fence_token String, phase String, "
-    "dispatch_epoch UInt64, payload String, payload_sha256 FixedString(64)"
+    "target_key String, operation_id String, fence_token String, phase String, "
+    "dispatch_epoch UInt64, payload String, payload_sha256 FixedString(64), version UInt64"
+)
+_ENGINE = (
+    "ENGINE=ReplicatedReplacingMergeTree('/clickhouse/tables/{uuid}/{shard}', '{replica}', version) "
+    "ORDER BY target_key"
 )
 
 
@@ -27,14 +30,14 @@ class ClickHouseClusterAuthorityBootstrap:
         observed = self._facades(cluster, database)
         if observed and not self._valid_existing(observed, hosts, allow_missing=True):
             raise contracts.ClusterPublicationError(
-                "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_INVALID", "KeeperMap facade differs across replicas"
+                "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_INVALID", "authority facade differs across replicas"
             )
         if Counter(host for host, _ in observed) == Counter(hosts):
             return
         token = f"dpone-v1-bootstrap-{secrets.token_hex(16)}"
         sql = (
             f"CREATE TABLE IF NOT EXISTS {_qualified(database, contracts.AUTHORITY_TABLE)} "
-            f"ON CLUSTER {_quote(cluster)} ({_COLUMNS}) ENGINE=KeeperMap('{_KEEPER_PATH}')"
+            f"ON CLUSTER {_quote(cluster)} ({_COLUMNS}) {_ENGINE}"
         )
         settings = {
             "skip_unavailable_shards": 0,
@@ -85,9 +88,7 @@ class ClickHouseClusterAuthorityBootstrap:
         if not allow_missing and Counter(actual) != Counter(hosts):
             return False
         engines = {engine for _, engine in rows}
-        return len(engines) <= 1 and all(
-            engine.startswith("KeeperMap(") and _KEEPER_PATH in engine for engine in engines
-        )
+        return len(engines) <= 1 and all(_is_authority_engine(engine) for engine in engines)
 
 
 def _queue_detail(entries: Sequence[Any], hosts: Sequence[str]) -> str:
@@ -109,6 +110,10 @@ def _queue_detail(entries: Sequence[Any], hosts: Sequence[str]) -> str:
 def _bounded(value: object) -> str:
     text = " ".join(str(value).split())
     return text[:300]
+
+
+def _is_authority_engine(engine: str) -> bool:
+    return engine.startswith("ReplicatedReplacingMergeTree(") and "ORDER BY target_key" in engine
 
 
 def _quote(value: str) -> str:

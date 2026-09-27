@@ -30,26 +30,29 @@ def test_keeper_cas_and_distributed_ddl_correlation() -> None:
     _execute(f"CREATE DATABASE publication_acceptance ON CLUSTER {cluster} ENGINE=Atomic")
     _execute(
         f"CREATE TABLE publication_acceptance.authority ON CLUSTER {cluster} "
-        "(target_key String PRIMARY KEY, operation_id String, fence_token String, phase String, "
-        "dispatch_epoch UInt64, payload String, payload_sha256 FixedString(64)) "
-        "ENGINE=KeeperMap('/publication_acceptance')"
+        "(target_key String, operation_id String, fence_token String, phase String, "
+        "dispatch_epoch UInt64, payload String, payload_sha256 FixedString(64), version UInt64) "
+        "ENGINE=ReplicatedReplacingMergeTree('/clickhouse/tables/{{uuid}}/{{shard}}', '{{replica}}', version) "
+        "ORDER BY target_key"
     )
     _execute(
         "INSERT INTO publication_acceptance.authority VALUES "
-        "('target','operation','fence','PREPARED',0,'{}','" + "0" * 64 + "')",
-        keeper_map_strict_mode=1,
-        insert_keeper_max_retries=0,
+        "('target','operation','fence','PREPARED',0,'{}','" + "0" * 64 + "',1)",
         query_id="publication-authority-create",
     )
-    before = int(_execute("SELECT _version FROM publication_acceptance.authority WHERE target_key='target'")[0][0])
+    before = int(
+        _execute("SELECT version FROM publication_acceptance.authority FINAL WHERE target_key='target'")[0][0]
+    )
     _execute(
-        "ALTER TABLE publication_acceptance.authority UPDATE phase='DISPATCHING', dispatch_epoch=1 "
-        f"WHERE target_key='target' AND _version={before} AND operation_id='operation' "
-        "AND fence_token='fence' AND phase='PREPARED' SETTINGS keeper_map_strict_mode=1, insert_keeper_max_retries=0",
+        "INSERT INTO publication_acceptance.authority "
+        "SELECT 'target','operation','fence','DISPATCHING',1,'{}','"
+        + "0" * 64
+        + f"', version + 1 FROM publication_acceptance.authority FINAL "
+        f"WHERE target_key='target' AND version={before}",
         query_id="publication-authority-cas",
     )
     raw_after = _execute(
-        "SELECT phase, dispatch_epoch, _version FROM publication_acceptance.authority WHERE target_key='target'"
+        "SELECT phase, dispatch_epoch, version FROM publication_acceptance.authority FINAL WHERE target_key='target'"
     )[0]
     after = (raw_after[0], int(raw_after[1]), int(raw_after[2]))
     token = f"dpone-v1-synthetic-publish-1-{secrets.token_hex(16)}"
@@ -377,12 +380,6 @@ def test_partial_authority_bootstrap_repairs_absence_and_blocks_mismatch() -> No
     _create_database(database)
     connector, catalog, _service_unused = _service(database)
     hosts = catalog.inventory(_CLUSTER).hosts
-    _execute(
-        f"CREATE TABLE {database}.{AUTHORITY_TABLE} "
-        "(target_key String PRIMARY KEY, operation_id String, fence_token String, phase String, "
-        "dispatch_epoch UInt64, payload String, payload_sha256 FixedString(64)) "
-        "ENGINE=KeeperMap('/dpone_cluster_publication_authority')"
-    )
     ClickHouseClusterAuthorityBootstrap(connector, catalog).ensure(_CLUSTER, database, hosts)
     facades = _execute(
         f"SELECT count() FROM clusterAllReplicas('{_CLUSTER}', system.tables) "
@@ -395,9 +392,9 @@ def test_partial_authority_bootstrap_repairs_absence_and_blocks_mismatch() -> No
     mismatch_connector, mismatch_catalog, _unused = _service(mismatch)
     _execute(
         f"CREATE TABLE {mismatch}.{AUTHORITY_TABLE} "
-        "(target_key String PRIMARY KEY, operation_id String, fence_token String, phase String, "
-        "dispatch_epoch UInt64, payload String, payload_sha256 FixedString(64)) "
-        "ENGINE=KeeperMap('/wrong_publication_authority')"
+        "(target_key String, operation_id String, fence_token String, phase String, "
+        "dispatch_epoch UInt64, payload String, payload_sha256 FixedString(64), version UInt64) "
+        "ENGINE=MergeTree ORDER BY target_key"
     )
     with pytest.raises(ClusterPublicationError, match="AUTHORITY_INVALID"):
         ClickHouseClusterAuthorityBootstrap(mismatch_connector, mismatch_catalog).ensure(_CLUSTER, mismatch, hosts)
