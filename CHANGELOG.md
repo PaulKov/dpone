@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.83.25 - 2026-09-27
+
+### Fixed
+
+- Cluster publication waits for an exact `count()` on every replica.
+  `system.tables.total_rows` is an estimate and is not the admission check.
+
 ## 0.83.24 - 2026-09-27
 
 ### Fixed

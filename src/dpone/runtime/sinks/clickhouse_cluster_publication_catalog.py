@@ -52,6 +52,14 @@ class ClickHouseClusterPublicationCatalog:
                 "DPONE_CLICKHOUSE_CLUSTER_DATABASE_UNSUPPORTED", "Atomic database required on every replica"
             )
 
+    def candidate_counts(self, cluster: str, database: str, table: str) -> dict[str, int]:
+        rows = self._rows(
+            f"SELECT hostName(), count() FROM clusterAllReplicas(%(cluster)s, {_qualified_table(database, table)}) "
+            "GROUP BY hostName()",
+            {"cluster": cluster},
+        )
+        return {str(host): int(count) for host, count in rows}
+
     def generations(
         self, cluster: str, database: str, target: str, candidate: str, hosts: Sequence[str]
     ) -> tuple[contracts.ReplicaGeneration, ...]:
@@ -177,6 +185,14 @@ class ClickHouseClusterPublicationCatalog:
             raise contracts.ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_INVENTORY_INCOMPLETE", f"{fact} facts do not cover exact inventory"
             )
+
+
+def _qualified_table(database: str, table: str) -> str:
+    return f"{_quote_identifier(database)}.{_quote_identifier(table)}"
+
+
+def _quote_identifier(value: str) -> str:
+    return "`" + value.replace("`", "``") + "`"
 
 
 def _normalize_engine(value: str) -> str:

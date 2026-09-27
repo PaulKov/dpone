@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import secrets
-from collections.abc import Mapping
+import time
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict, replace
 from typing import Any
 
@@ -25,6 +26,9 @@ from dpone.runtime.sinks.clickhouse_full_refresh_contract import (
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import REPLAY_OPTION, SCHEDULER_IDENTITY_OPTION
 from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
+
+_CANDIDATE_ROW_WAIT_SECONDS = 300
+_CANDIDATE_ROW_POLL_SECONDS = 2
 
 AggregatePublicationState = contracts.AggregatePublicationState
 AuthorityMutationStatus = contracts.AuthorityMutationStatus
@@ -61,6 +65,34 @@ class ClickHouseClusterFullRefreshPublicationService:
     def is_enabled(load_config: Any) -> bool:
         return ClickHouseTableDesign.from_options(getattr(load_config, "options", {}) or {}).cluster.on_cluster
 
+    def _require_replicated_candidate_rows(
+        self,
+        cluster: str,
+        database: str,
+        candidate: str,
+        hosts: Sequence[str],
+        staged_rows: int,
+    ) -> None:
+        """Wait until every replica count() matches the staged load.
+
+        ``system.tables.total_rows`` is an estimate and lags part replication.
+        Publication admits the candidate only from an exact per-replica count.
+        """
+
+        deadline = time.monotonic() + _CANDIDATE_ROW_WAIT_SECONDS
+        observed: dict[str, int] = {}
+        while True:
+            observed = self._catalog.candidate_counts(cluster, database, candidate)
+            if set(observed) == set(hosts) and all(observed.get(host) == staged_rows for host in hosts):
+                return
+            if time.monotonic() >= deadline:
+                detail = ",".join(f"{host}={observed.get(host, 'missing')}" for host in hosts)
+                raise ClusterPublicationError(
+                    "DPONE_CLICKHOUSE_CLUSTER_CANDIDATE_NOT_READY",
+                    f"row count differs by replica observed={detail} expected={staged_rows}",
+                )
+            time.sleep(_CANDIDATE_ROW_POLL_SECONDS)
+
     def publish(self, load_config: Any, candidate_config: Any, *, staged_rows: int) -> ClusterFullRefreshReceipt:
         cluster = _cluster(load_config)
         database, target = str(load_config.target_schema), str(load_config.target_table)
@@ -77,10 +109,9 @@ class ClickHouseClusterFullRefreshPublicationService:
         predecessor = _optional_one_identity(facts, "target")
         if predecessor == desired:
             raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_GENERATION_INVALID", "generations must differ")
-        if any(fact.row_count != staged_rows for fact in facts):
-            raise ClusterPublicationError(
-                "DPONE_CLICKHOUSE_CLUSTER_CANDIDATE_NOT_READY", "row count differs by replica"
-            )
+        self._require_replicated_candidate_rows(
+            cluster, database, candidate, inventory.hosts, staged_rows
+        )
         operation_id = _operation_id(load_config)
         target_key = digest_payload({"cluster": cluster, "database": database, "target": target})
         record = AuthorityRecord(

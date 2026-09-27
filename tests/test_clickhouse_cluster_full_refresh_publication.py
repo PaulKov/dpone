@@ -73,6 +73,10 @@ class _Catalog:
     def require_atomic_database(self, cluster, database, hosts):
         return None
 
+    def candidate_counts(self, cluster, database, candidate):
+        del cluster, database, candidate
+        return {"node-1": 2, "node-2": 2}
+
     def generations(self, cluster, database, target, candidate, hosts):
         target_identity, candidate_identity = (self.new, self.old) if self.committed else (self.old, self.new)
         return tuple(
