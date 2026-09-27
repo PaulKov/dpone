@@ -387,6 +387,50 @@ def test_identical_orphan_event_is_adopted_but_changed_bytes_are_rejected(tmp_pa
     assert NativeChunkJournalV2(store, lease, journal.identity).data == journal.data
 
 
+def test_reopened_pre_eof_journal_adopts_only_durable_identical_orphan(tmp_path):
+    store, lease, _, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    original_save = store.save
+    interrupted = False
+
+    def interrupt_root_once(key, expected, payload, writer_lease):
+        nonlocal interrupted
+        if key == journal.key and not interrupted:
+            interrupted = True
+            raise WindowContractError("injected root CAS interruption")
+        return original_save(key, expected, payload, writer_lease)
+
+    store.save = interrupt_root_once
+    with pytest.raises(WindowContractError, match="injected"):
+        journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    reopened = NativeChunkJournalV2(store, lease, journal.identity)
+    orphan_key = f"{journal.key}/{0:020d}/{attempt_id}/{1:020d}"
+    orphan = store.load(orphan_key)
+    assert orphan is not None
+    assert reopened.data["events"][attempt_id][-1]["event"] == "INTENT"
+
+    with pytest.raises(WindowContractError):
+        reopened.append_event(0, attempt_id, "STAGE_OWNED", stage_binding={**_stage(journal), "object_id": 2})
+    with pytest.raises(WindowContractError, match="orphan_event_changed"):
+        reopened.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    adopted = reopened.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    assert orphan.payload == json.dumps(adopted, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    assert NativeChunkJournalV2(store, lease, journal.identity).data == reopened.data
+
+    with pytest.raises(WindowContractError, match="reextract_required"):
+        reopened.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    with pytest.raises(WindowContractError, match="reextract_required"):
+        reopened.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    with pytest.raises(WindowContractError, match="reextract_required"):
+        reopened.attempt(1, 0, _file(tmp_path))
+    with pytest.raises(WindowContractError, match="reextract_required"):
+        reopened.record_observations(())
+    with pytest.raises(WindowContractError, match="reextract_required"):
+        reopened.complete(source_eof=True)
+
+
 def test_reopened_verified_pre_eof_journal_is_recovery_only(tmp_path):
     store, lease, plan, journal = _journal(tmp_path)
     attempt_id = _verified_chain(journal, tmp_path)
