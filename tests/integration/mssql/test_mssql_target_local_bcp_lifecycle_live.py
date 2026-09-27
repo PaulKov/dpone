@@ -109,6 +109,34 @@ def test_real_bcp_failure_never_becomes_positive_terminal(stand, tmp_path) -> No
     assert outcome.rows_consumed is None
 
 
+def test_real_bcp_cleanup_failure_retains_ambiguity_after_rows_arrive(stand, tmp_path) -> None:
+    case = digest_cases()[0]
+    table = stand.unique_table("cleanup")
+    file = case.sealed_file(tmp_path / "cleanup.native")
+    grant = NativeStageWriteGrant(
+        "attempt-cleanup",
+        stand.qualified(table),
+        file.path,
+        file.rows,
+        file.encoded_bytes,
+        file.file_sha256,
+        sha256(b"cleanup-grant").hexdigest(),
+        BCP_STAGE_PROOF,
+    )
+    try:
+        stand.create_empty_table(table, case)
+        writer = MssqlNativeBcpWriter(lambda current, path: stand.launch_bcp(current, path, fail_cleanup=True))
+
+        outcome = writer.write(grant, rejects_path=tmp_path / "cleanup.rejects")
+
+        assert outcome.classification == "cleanup_failed"
+        assert outcome.positive_terminal is False
+        assert outcome.rows_consumed is None
+        assert stand.table_rows(table) == file.rows
+    finally:
+        stand.drop_table(table)
+
+
 def test_changed_sealed_file_is_rejected_before_writer_launch(stand, tmp_path) -> None:
     case = digest_cases()[0]
     file = case.sealed_file(tmp_path / "changed.native")

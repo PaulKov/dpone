@@ -152,6 +152,7 @@ class TargetLocalDockerStand:
         rejects_path: Path,
         *,
         discard_bcp_output: bool = False,
+        fail_cleanup: bool = False,
         timeout_seconds: int = 30,
     ) -> BcpSupervisedResult:
         remote_file = f"/tmp/dpone-p1-{uuid.uuid4().hex}.native"
@@ -182,6 +183,8 @@ class TargetLocalDockerStand:
             if reject.returncode == 0 and reject.stdout:
                 rejects_path.write_bytes(reject.stdout)
             self.command(["exec", "-u", "0", self.sql_container, "rm", "-f", remote_file, remote_rejects])
+            if fail_cleanup:
+                raise RuntimeError("synthetic cleanup failure")
 
         handle = start_bcp_process(
             command,
