@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+## 0.83.23 - 2026-09-27
+
+### Fixed
+
+- An invalid cluster authority table is dropped and recreated.
+  A leftover KeeperMap facade no longer blocks publication on every replica.
+
 ## 0.83.22 - 2026-09-27
 
 ### Fixed

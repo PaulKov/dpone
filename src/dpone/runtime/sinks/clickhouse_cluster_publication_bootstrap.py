@@ -29,9 +29,8 @@ class ClickHouseClusterAuthorityBootstrap:
     def ensure(self, cluster: str, database: str, hosts: Sequence[str]) -> None:
         observed = self._facades(cluster, database)
         if observed and not self._valid_existing(observed, hosts, allow_missing=True):
-            raise contracts.ClusterPublicationError(
-                "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_INVALID", "authority facade differs across replicas"
-            )
+            self._replace_invalid(cluster, database, hosts)
+            observed = ()
         if Counter(host for host, _ in observed) == Counter(hosts):
             return
         token = f"dpone-v1-bootstrap-{secrets.token_hex(16)}"
@@ -71,6 +70,37 @@ class ClickHouseClusterAuthorityBootstrap:
                     f"facade is not complete observed={observed} engines={engines} expected={','.join(hosts)}"
                 ),
             )
+
+    def _replace_invalid(self, cluster: str, database: str, hosts: Sequence[str]) -> None:
+        token = f"dpone-v1-bootstrap-drop-{secrets.token_hex(16)}"
+        sql = f"DROP TABLE IF EXISTS {_qualified(database, contracts.AUTHORITY_TABLE)} ON CLUSTER {_quote(cluster)} SYNC"
+        drop_error = self._execute_ddl(sql, token)
+        entries = self._catalog.find_entries(cluster, token)
+        if len(entries) != 1 or entries[0].state_for(hosts) is not contracts.QueueState.TERMINAL_SUCCESS:
+            raise contracts.ClusterPublicationError(
+                "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_INVALID",
+                _bounded(
+                    "invalid authority facade was not removed: "
+                    f"{_queue_detail(entries, hosts) or drop_error or 'no queue entry'}"
+                ),
+            )
+
+    def _execute_ddl(self, sql: str, token: str) -> str:
+        settings = {
+            "skip_unavailable_shards": 0,
+            "distributed_ddl_output_mode": "throw",
+            "distributed_ddl_task_timeout": 60,
+            "log_comment": token,
+        }
+        try:
+            self._connector.connection.execute(
+                sql,
+                settings=settings,
+                query_id=f"dpone-authority-bootstrap-{token[-16:]}",
+            )
+        except Exception as exc:
+            return _bounded(exc)
+        return ""
 
     def _facades(self, cluster: str, database: str) -> tuple[tuple[str, str], ...]:
         rows = self._connector.get_records(

@@ -183,6 +183,40 @@ def test_authority_bootstrap_does_not_require_keeper_map() -> None:
     assert "KeeperMap" not in connector.connection.sql
 
 
+def test_invalid_authority_facade_is_replaced_before_create() -> None:
+    class Connection:
+        def __init__(self) -> None:
+            self.sql: list[str] = []
+
+        def execute(self, sql, params=None, query_id=None, settings=None):
+            self.sql.append(sql)
+
+    class Entry:
+        def state_for(self, hosts):
+            return QueueState.TERMINAL_SUCCESS
+
+    class Connector:
+        def __init__(self) -> None:
+            self.connection = Connection()
+            self.calls = 0
+
+        def get_records(self, query, params=None):
+            self.calls += 1
+            if self.calls == 1:
+                return [("host-a", "KeeperMap('/dpone_cluster_publication_authority')")]
+            return []
+
+    class Catalog:
+        def find_entries(self, cluster, token):
+            return [Entry()]
+
+    connector = Connector()
+    with pytest.raises(ClusterPublicationError, match="BOOTSTRAP_UNKNOWN"):
+        ClickHouseClusterAuthorityBootstrap(connector, Catalog()).ensure("dwh", "analytics", ["host-a", "host-b"])
+    assert any(sql.startswith("DROP TABLE IF EXISTS") for sql in connector.connection.sql)
+    assert any("ReplicatedReplacingMergeTree" in sql for sql in connector.connection.sql)
+
+
 def test_dispatch_permit_requires_exact_next_keeper_version() -> None:
     before = _record()
     desired = replace(before, phase=AuthorityPhase.DISPATCHING, dispatch_epoch=1, ddl_correlation_token="token")
