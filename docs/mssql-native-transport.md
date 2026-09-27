@@ -124,6 +124,10 @@ rejects an unsupported target-local layout before source extraction or writer
 launch. The content-addressed matrix is produced by
 `TARGET_LOCAL_LAYOUT_MATRIX_V1`; its exact-commit certification artifact is
 [`layout-matrix-v1.json`](../test_artifacts/live_certification/mssql-target-local-p1/layout-matrix-v1.json).
+The same synthetic receipt pack records only allowlisted runtime/service
+versions and content-addressed image identities in
+[`environment-v1.json`](../test_artifacts/live_certification/mssql-target-local-p1/environment-v1.json);
+it contains no host, port, login, database, schema, table, or path.
 
 Prepared verification additionally admits only the framework-owned suffix
 types `varchar(26)`, `varchar(32)`, `varchar(64)`, `nvarchar(max)`, `int`, and
