@@ -23,6 +23,7 @@ from dpone.contracts.mssql_native_writer import (
     SQLCLIENT_SESSION_PROOF,
     is_nonnegative_int,
     valid_native_writer_observation,
+    validate_bcp_writer_event,
 )
 from dpone.contracts.strict_json import canonical_json_bytes
 
@@ -282,20 +283,7 @@ def validate_native_writer_event(
     if event["event"] in {"QUIESCENT", "PARTIAL_PROVED"} and observation["quiescence"] != "proved":
         raise ValueError("quiescence proof")
     if identity.writer_proof_capability == BCP_STAGE_PROOF:
-        if event["event"] == "PARTIAL_PROVED":
-            raise ValueError("bcp partial proof forbidden")
-        if (
-            event["event"] == "WRITER_TERMINAL"
-            and observation["writer_outcome"] == "success"
-            and (observation["input_rows_consumed"] != artifact["rows"])
-        ):
-            raise ValueError("bcp vendor count")
-        if (
-            event["event"] == "UNKNOWN"
-            and observation["writer_outcome"] == "success"
-            and (previous is None or previous["event"] != "WRITER_TERMINAL")
-        ):
-            raise ValueError("bcp success authority missing")
+        validate_bcp_writer_event(event, previous, artifact["rows"])
     if event["event"] == "VERIFIED" and (
         observation["quiescence"] != "proved"
         or observation["row_count"] != artifact["rows"]

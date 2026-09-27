@@ -6,6 +6,7 @@ from collections.abc import Callable
 from contextlib import AbstractContextManager
 from typing import Any
 
+from dpone.adapters.mssql_native_chunks_journal_v2_events import commit_verified_receipt
 from dpone.contracts.bounded_window import WindowContractError
 from dpone.contracts.mssql_native_chunks import NativeChunkReceipt
 from dpone.contracts.mssql_native_verification import is_sha256_digest, matches_native_receipt
@@ -143,11 +144,15 @@ def record_nonpublication(journal: Any, proof_sha256: str, *, assert_nonpublicat
         )
     ):
         raise WindowContractError("mssql_native.nonpublication_proof_missing")
-    assert_nonpublication()
     proof = {"kind": "pre_eof_nonpublication", "proof_sha256": proof_sha256}
-    if proof not in data["rollback_history"]:
-        data["rollback_history"].append(proof)
-        journal._save(data)
+    existing = [item for item in data["rollback_history"] if item.get("kind") == "pre_eof_nonpublication"]
+    if existing:
+        if existing != [proof]:
+            raise WindowContractError("mssql_native.nonpublication_proof_changed")
+        return
+    assert_nonpublication()
+    data["rollback_history"].append(proof)
+    journal._save(data)
 
 
 def retire_verified(journal: Any, ordinal: int, attempt_id: str, *, drop_exact_owned: Callable[[], None]) -> None:
@@ -193,6 +198,14 @@ class BcpRecoveryMixin:
     """Serialize recovery methods against the journal's durable projection."""
 
     _lock: Any
+
+    def _commit_verified_receipt(self, receipt: NativeChunkReceipt, *, allow_recovery: bool) -> None:
+        commit_verified_receipt(self, receipt, allow_recovery=allow_recovery)
+
+    @staticmethod
+    def _assert_no_nonpublication(data: dict[str, Any]) -> None:
+        if any(item.get("kind") == "pre_eof_nonpublication" for item in data["rollback_history"]):
+            raise WindowContractError("mssql_native.nonpublication_frozen")
 
     def observe_bcp_recovery(
         self,
