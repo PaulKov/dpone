@@ -3,13 +3,14 @@
 from contextlib import contextmanager
 from dataclasses import replace
 from threading import Barrier, Lock
+from types import SimpleNamespace
 
 import pytest
 
 from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
 from dpone.adapters.mssql_native_chunks_journal import NativeChunkJournal
 from dpone.adapters.mssql_native_chunks_journal_v2 import NativeChunkJournalV2
-from dpone.contracts.bounded_window import WindowContractError, WindowTransientError
+from dpone.contracts.bounded_window import WindowContractError, WindowOutcomeUnknown, WindowTransientError
 from dpone.contracts.mssql_native_chunks import NativeChunkLimits, NativeChunkPlan, NativeChunkReceipt
 from dpone.contracts.mssql_native_verification import NativeVerificationBackend, NativeVerificationIdentityV2
 from dpone.runtime.mssql_native_chunks import BoundedNativeChunks, NativeReextractRequired
@@ -262,7 +263,7 @@ def test_target_local_failure_hook_runs_after_workers_settle(tmp_path):
     assert observed == [("staging", 0)]
 
 
-@pytest.mark.parametrize("last_event", ["UNKNOWN", "VERIFIED"])
+@pytest.mark.parametrize("last_event", ["UNKNOWN", "QUIESCENT", "VERIFIED"])
 def test_target_local_recovery_observes_positive_terminal_then_requires_reextraction(tmp_path, last_event):
     target = Target()
     executor, plan, lease, _ = setup(tmp_path, target)
@@ -296,6 +297,31 @@ def test_target_local_recovery_observes_positive_terminal_then_requires_reextrac
             @staticmethod
             def recover_positive(plan, file, attempt, lease):
                 calls.append(("observe", file.ordinal, attempt))
+                receipt = NativeChunkReceipt(
+                    file.ordinal,
+                    attempt,
+                    "[schema].[table]",
+                    file.rows,
+                    file.encoded_bytes,
+                    file.file_sha256,
+                    file.typed_digest,
+                )
+                journal.data["events"][attempt][-1] = {
+                    "event": "VERIFIED",
+                    "observation": {"writer_outcome": "success"},
+                }
+                journal.data["chunks"][str(file.ordinal)]["phase"] = "verified"
+                journal.data["chunks"][str(file.ordinal)]["receipt"] = {
+                    "ordinal": receipt.ordinal,
+                    "attempt_id": receipt.attempt_id,
+                    "stage_id": receipt.stage_id,
+                    "rows": receipt.rows,
+                    "encoded_bytes": receipt.encoded_bytes,
+                    "file_sha256": receipt.file_sha256,
+                    "typed_digest": receipt.typed_digest,
+                    "consumed_part_evidence": receipt.consumed_part_evidence,
+                }
+                return receipt
 
         yield Importer()
 
@@ -306,6 +332,52 @@ def test_target_local_recovery_observes_positive_terminal_then_requires_reextrac
     with pytest.raises(NativeReextractRequired):
         executor.recover(plan, lease)
     assert calls == [("observe", 0, attempt_id), ("retire", True)]
+
+
+def test_target_local_recovery_requires_durable_verified_postcondition(tmp_path):
+    target = Target()
+    executor, plan, lease, _ = setup(tmp_path, target)
+    attempt_id = "a" * 64
+
+    class Journal:
+        key = "mssql-native-chunks-v2/" + "d" * 64
+        data = {
+            "phase": "staging",
+            "chunks": {
+                "0": {
+                    "attempt_id": attempt_id,
+                    "file": dict(
+                        ordinal=0,
+                        rows=1,
+                        encoded_bytes=1,
+                        file_sha256="b" * 64,
+                        typed_digest="c" * 64,
+                    ),
+                    "phase": "staging",
+                }
+            },
+            "events": {attempt_id: [{"event": "QUIESCENT", "observation": {"writer_outcome": "success"}}]},
+            "rollback_history": [],
+        }
+        publication = type("Publication", (), {"state": lambda self: None})()
+
+        @staticmethod
+        def bind_limits(limits):
+            pass
+
+        @staticmethod
+        def completed():
+            return None
+
+    @contextmanager
+    def importer_factory():
+        yield SimpleNamespace(recover_positive=lambda *args: None)
+
+    executor.journal_factory = lambda current_plan, current_lease: Journal()
+    executor.importer_factory = importer_factory
+    executor._target_local = True
+    with pytest.raises(WindowOutcomeUnknown, match="recovery_postcondition_unproved"):
+        executor.recover(plan, lease)
 
 
 def test_total_cap_rejects_before_import_and_closes_source(tmp_path):

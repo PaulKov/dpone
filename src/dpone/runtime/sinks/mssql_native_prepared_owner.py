@@ -7,6 +7,11 @@ from dataclasses import asdict, replace
 from hashlib import sha256
 from typing import Any
 
+from dpone.runtime.sinks.mssql_native_object_authority import (
+    read_exact_object_id,
+    require_unfiltered_object_metadata,
+)
+
 
 def planned_stage(context: Any, config: Any) -> dict[str, str]:
     """Reserve one stable physical object before CREATE, including recovery."""
@@ -78,3 +83,47 @@ def require_prepared_owner(connector: Any, planned: dict[str, str]) -> None:
     )
     if len(rows) != 1 or rows[0][0] != planned["binding"]:
         raise ValueError("mssql_native.prepared_owner_mismatch")
+
+
+def retire_exact_prepared(
+    connector: Any,
+    planned: dict[str, str],
+    object_id: int,
+    drop: Callable[[], None],
+    *,
+    timeout_seconds: int,
+) -> None:
+    """Drop only the bound prepared object and prove authoritative absence.
+
+    SQL Server may return ``NULL`` from ``OBJECT_ID`` when metadata is hidden.
+    Consequently, both an already-absent replay and the post-drop check require
+    an unfiltered metadata principal before cleanup may release custody.
+    """
+    qualified = connector.qualified_name(planned["schema"], planned["table"], database=planned["database"])
+
+    with connector.bounded_query_timeout(timeout_seconds):
+        connector.begin()
+        try:
+            current = read_exact_object_id(connector, qualified)
+            if current is None:
+                require_unfiltered_object_metadata(
+                    connector, diagnostic="mssql_native.prepared_absence_visibility_unproved"
+                )
+            else:
+                if current != object_id:
+                    raise ValueError("mssql_native.prepared_object_identity_changed")
+                require_prepared_owner(connector, planned)
+                connector.get_records(f"SELECT TOP (1) 1 FROM {qualified} WITH (TABLOCKX, HOLDLOCK)")
+                if read_exact_object_id(connector, qualified) != object_id:
+                    raise ValueError("mssql_native.prepared_object_identity_changed")
+                require_prepared_owner(connector, planned)
+                drop()
+            if read_exact_object_id(connector, qualified) is not None:
+                raise ValueError("mssql_native.prepared_retirement_unproved")
+            require_unfiltered_object_metadata(
+                connector, diagnostic="mssql_native.prepared_absence_visibility_unproved"
+            )
+            connector.commit_transaction()
+        except BaseException:
+            connector.rollback()
+            raise

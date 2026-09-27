@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from contextlib import AbstractContextManager
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass, is_dataclass
 from pathlib import Path
 from typing import Any
+
+from dpone.runtime.sinks.mssql_native_object_authority import (
+    read_exact_object_id,
+    require_unfiltered_object_metadata,
+)
 
 
 @dataclass(frozen=True)
@@ -31,37 +36,23 @@ def retire_exact_owned_stage(importer: Any, plan: Any, receipt: Any, lease: Any,
         raise ValueError("mssql_native.stage_identity_mismatch")
     connector = importer.connector
 
-    def current_object_id() -> int | None:
-        rows = connector.get_records("SELECT OBJECT_ID(?)", (qualified,))
-        if len(rows) != 1 or len(rows[0]) != 1:
-            raise ValueError("mssql_native.object_identity_unavailable")
-        value = rows[0][0]
-        if value is not None and (type(value) is not int or value < 1):
-            raise ValueError("mssql_native.object_identity_unavailable")
-        return value
-
-    def assert_absence_visibility() -> None:
-        # OBJECT_ID can also return NULL on metadata denial or error. Only a
-        # principal with unfiltered database metadata may interpret NULL here.
-        rows = connector.get_records("SELECT USER_NAME(), IS_SRVROLEMEMBER('sysadmin')")
-        if len(rows) != 1 or len(rows[0]) != 2 or (rows[0][0] != "dbo" and rows[0][1] != 1):
-            raise ValueError("mssql_native.stage_absence_visibility_unproved")
-
     with importer._mutation_scope(plan, receipt.attempt_id, lease):
         importer._assert_lease(lease)
         with connector.bounded_query_timeout(timeout_seconds):
             connector.begin()
             try:
-                current = current_object_id()
+                current = read_exact_object_id(connector, qualified)
                 if current is None:
-                    assert_absence_visibility()
+                    require_unfiltered_object_metadata(
+                        connector, diagnostic="mssql_native.stage_absence_visibility_unproved"
+                    )
                 else:
                     if current != object_id:
                         raise ValueError("mssql_native.stage_identity_mismatch")
                     connector.get_records(f"SELECT TOP (1) 1 FROM {qualified} WITH (TABLOCKX, HOLDLOCK)")
                     importer._assert_stage_identity(plan, receipt.attempt_id, table, object_id)
                     connector.execute_query(f"DROP TABLE {qualified}")
-                if current_object_id() is not None:
+                if read_exact_object_id(connector, qualified) is not None:
                     raise ValueError("mssql_native.stage_retirement_unproved")
                 importer._assert_lease(lease)
                 connector.commit_transaction()
@@ -101,12 +92,25 @@ def recover_target_local_staging(
             if terminal["event"] in {"FAILED_RETIRABLE", "RETIRED"}:
                 continue
             if (
-                terminal["event"] in {"WRITER_TERMINAL", "UNKNOWN", "VERIFIED"}
+                terminal["event"] in {"WRITER_TERMINAL", "UNKNOWN", "QUIESCENT", "VERIFIED"}
                 and terminal["observation"]["writer_outcome"] == "success"
             ):
                 artifact = chunk["file"]
                 file = encoded_file_factory(directory / f"{ordinal}.native", **artifact)
-                importer.recover_positive(plan, file, attempt_id, lease)
+                recovered_receipt = importer.recover_positive(plan, file, attempt_id, lease)
+                recovered = journal.data
+                recovered_chunk = None if recovered is None else recovered["chunks"].get(str(ordinal))
+                recovered_events = () if recovered is None else recovered["events"].get(attempt_id, ())
+                durable_receipt = None if recovered_chunk is None else recovered_chunk.get("receipt")
+                recovered_payload = asdict(recovered_receipt) if is_dataclass(recovered_receipt) else None
+                if (
+                    recovered_chunk is None
+                    or recovered_chunk["phase"] != "verified"
+                    or not recovered_events
+                    or recovered_events[-1]["event"] != "VERIFIED"
+                    or recovered_payload != durable_receipt
+                ):
+                    raise failures.outcome_unknown("mssql_native.recovery_postcondition_unproved")
                 continue
             if terminal["event"] == "UNKNOWN":
                 journal.retain_bcp_incident(ordinal, attempt_id)

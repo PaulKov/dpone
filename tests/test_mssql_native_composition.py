@@ -230,3 +230,95 @@ def test_target_local_composition_selects_shared_v2_journal_and_supervised_impor
     assert journal.data["events"][attempt_id][-1]["event"] == "RETIRED"
     custody = NativeTargetCustody(store, "target").inspect(lease)
     assert custody.state == "clear" and custody.release_reason == "nonpublication_all_stages_retired"
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        (("value", "int"),),
+        tuple((f"c{index}", "bigint") for index in range(101)),
+    ],
+)
+def test_target_local_layout_is_rejected_before_source_or_importer_io(tmp_path, schema):
+    wire = build_mssql_bcp_native_contract(schema=schema, query="SELECT synthetic")
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", wire.type_layout_hash)
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+    )
+    touched = []
+
+    store = SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1.0)
+    lease = store.acquire("target", "owner", 60)
+    with pytest.raises(ValueError, match="target_digest_(unsupported_type|column_count)"):
+        compose_native_stage_context(
+            store=store,
+            plan=plan,
+            lease=lease,
+            wire_contract=wire,
+            limits=native_limits(config()),
+            work_dir=tmp_path,
+            target_connector=SimpleNamespace(),
+            importer_connection=lambda: touched.append("importer"),
+            bcp_options_factory=BcpOptions,
+            database="synthetic",
+            schema="dbo",
+            row_source=lambda: touched.append("source"),
+            journal_factory=lambda: None,
+            cancelled=Event(),
+            required_target_headroom_bytes=1024,
+            verification_identity=identity,
+        )
+
+    assert touched == []
+
+
+@pytest.mark.parametrize(
+    "schema",
+    [
+        (("value", "bigint"),),
+        tuple((f"c{index}", "bigint") for index in range(100)),
+    ],
+)
+def test_target_local_layout_admits_narrow_and_wide100_at_composition(tmp_path, schema):
+    wire = build_mssql_bcp_native_contract(schema=schema, query="SELECT synthetic")
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", wire.type_layout_hash)
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+    )
+
+    store = SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1.0)
+    lease = store.acquire("target", "owner", 60)
+    context = compose_native_stage_context(
+        store=store,
+        plan=plan,
+        lease=lease,
+        wire_contract=wire,
+        limits=native_limits(config()),
+        work_dir=tmp_path,
+        target_connector=SimpleNamespace(),
+        importer_connection=lambda: pytest.fail("composition must not open importer"),
+        bcp_options_factory=BcpOptions,
+        database="synthetic",
+        schema="dbo",
+        row_source=lambda: pytest.fail("composition must not open source"),
+        journal_factory=lambda: None,
+        cancelled=Event(),
+        required_target_headroom_bytes=1024,
+        verification_identity=identity,
+    )
+
+    assert context.wire_contract is wire

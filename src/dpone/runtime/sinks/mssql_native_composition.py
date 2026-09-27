@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 from dpone.runtime.sinks.mssql_native_bcp_writer import MssqlNativeBcpWriter
 from dpone.runtime.sinks.mssql_native_import import MssqlNativeChunkImporter, native_attempt_table_name
 from dpone.runtime.sinks.mssql_native_prepare import NativeStageContext
+from dpone.runtime.sinks.mssql_native_target_digest import require_target_local_raw_layout
 from dpone.runtime.sinks.mssql_native_target_local_import import NativeTargetLocalAttempt
 
 
@@ -60,6 +61,8 @@ def compose_native_stage_context(
     found no journal.
     """
     observations = delivery_session(observer)
+    if verification_identity is not None:
+        require_target_local_raw_layout(wire_contract)
     encoder = MssqlNativeEncoder(wire_contract, max_row_bytes=limits.max_row_bytes)
     if verification_identity is not None and verification_identity.plan != plan:
         raise ValueError("mssql_native.invalid_v2_identity")
@@ -254,4 +257,5 @@ def compose_native_stage_context(
         max_row_bytes=limits.max_row_bytes,
         cancelled=cancelled,
         verification_identity=verification_identity,
+        target_local_timeout_seconds=target_local_timeout_seconds,
     )

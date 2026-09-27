@@ -366,11 +366,13 @@ required environment, maintenance behavior and limits of the local experiment.
 The target-local suite uses deterministic synthetic narrow and exactly
 100-business-column fixtures. It covers digest parity, fixed-size hash state in
 `tempdb`, real supervised BCP outcomes, empty input without a writer launch,
-identity/schema/content drift, exact-stage crash recovery, retained custody, and
-one ClickHouse-to-MSSQL atomic publication path. It does not use production data
-or qualify production throughput.
+identity/schema/content drift, exact-stage crash recovery, retained custody,
+one ClickHouse-to-MSSQL transport/publication primitive, and one composed
+`NativeMssqlRuntime` path through prepare, reverify, publication, evidence,
+checkpoint, cleanup, and custody release. It does not use production data or
+qualify production throughput.
 
-Start the disposable services and run the three live modules from the exact
+Start the disposable services and run the four live modules from the exact
 candidate checkout in an integration environment that provides ODBC Driver 18,
 `pyodbc`, `bcp`, Docker CLI access, and pytest:
 
@@ -383,6 +385,7 @@ uv run pytest \
   tests/integration/mssql/test_mssql_target_local_digest_live.py \
   tests/integration/mssql/test_mssql_target_local_bcp_lifecycle_live.py \
   tests/integration/mssql/test_clickhouse_mssql_target_local_route_live.py \
+  tests/integration/mssql/test_clickhouse_mssql_target_local_runtime_live.py \
   -m "integration_live and integration_mssql" \
   --junitxml=/tmp/dpone-target-local-p1-junit.xml \
   -q -p no:cacheprovider
