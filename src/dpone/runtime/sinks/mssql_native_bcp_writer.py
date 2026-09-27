@@ -7,14 +7,18 @@ from hashlib import sha256
 from pathlib import Path
 from threading import Lock
 
-from dpone.ports.mssql_native_writer import BCP_STAGE_PROOF, NativeStageWriteGrant, NativeStageWriteOutcome
-from dpone.runtime.connectors.mssql_bcp_process import BcpSupervisedResult
+from dpone.ports.mssql_native_writer import (
+    BCP_STAGE_PROOF,
+    NativeStageProcessProof,
+    NativeStageWriteGrant,
+    NativeStageWriteOutcome,
+)
 
 
 class MssqlNativeBcpWriter:
     """Own one launch per grant in this process; journal owns durable launch fencing."""
 
-    def __init__(self, launch: Callable[[NativeStageWriteGrant, Path], BcpSupervisedResult]) -> None:
+    def __init__(self, launch: Callable[[NativeStageWriteGrant, Path], NativeStageProcessProof]) -> None:
         self._launch = launch
         self._launched: set[str] = set()
         self._lock = Lock()
