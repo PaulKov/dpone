@@ -1,0 +1,25 @@
+{
+  "cases": [
+    {
+      "node_id": "tests.integration.mssql.test_clickhouse_mssql_target_local_route_live::test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication",
+      "status": "passed"
+    }
+  ],
+  "commit_sha": "128c3601c8e615679e9035b72df1886b2850e092",
+  "gate": {
+    "max_skipped": 0,
+    "min_passed": 1
+  },
+  "junit": "test_artifacts/live_certification/mssql-target-local-p1/route.junit.xml",
+  "message": "junit gate ok (tests=1 passed=1 skipped=0 failures=0 errors=0)",
+  "profile": "mssql-target-local-p1-route",
+  "schema_version": 1,
+  "status": "PASS",
+  "totals": {
+    "errors": 0,
+    "failures": 0,
+    "passed": 1,
+    "skipped": 0,
+    "tests": 1
+  }
+}
