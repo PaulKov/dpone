@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable
+from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
@@ -74,7 +75,7 @@ class NativeTargetLocalAttempt:
             )
             self.journal.append_event(file.ordinal, attempt_id, "STAGE_OWNED", stage_binding=stage)
             self.custody.reassert_grant(lease, identity.invocation_key)
-            token = secrets.token_hex(32)
+            grant_token_sha256 = sha256(secrets.token_bytes(32)).hexdigest()
             grant = NativeStageWriteGrant(
                 attempt_id,
                 qualified,
@@ -82,7 +83,7 @@ class NativeTargetLocalAttempt:
                 file.rows,
                 file.encoded_bytes,
                 file.file_sha256,
-                token,
+                grant_token_sha256,
                 identity.writer_proof_capability,
             )
             writer_binding = dict(

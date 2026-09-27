@@ -372,6 +372,10 @@ contains a fresh 256-bit token and a closed proof-capability identifier; only
 the token digest is durable. For SqlClient, the application-lock resource is
 derived from that digest. For BCP P1, the digest binds one supervised launch
 and must not be described as a SQL-session token.
+Pre-release P1 journals that already contain a schema-valid 64-hex binding stay
+readable as opaque launch bindings; they are never reinterpreted as raw tokens
+or rewritten. Every new grant persists the SHA-256 of a newly generated
+256-bit token.
 The closed initial proof-capability values are
 `bcp-supervised-stage-barrier-v1` and `sqlclient-session-applock-v1`.
 The only admitted pairs are BCP plus the former and SqlClient plus the latter;

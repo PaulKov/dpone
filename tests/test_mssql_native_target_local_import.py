@@ -19,7 +19,9 @@ from dpone.runtime.sinks.mssql_native_target_local_import import NativeTargetLoc
 
 
 @pytest.mark.parametrize("barrier_fails", [False, True])
-def test_positive_attempt_records_boundary_order_and_one_aggregate(tmp_path: Path, barrier_fails: bool) -> None:
+def test_positive_attempt_records_boundary_order_and_one_aggregate(
+    tmp_path: Path, barrier_fails: bool, monkeypatch: pytest.MonkeyPatch
+) -> None:
     store = SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1.0)
     lease = store.acquire("target", "owner", 60)
     plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
@@ -43,6 +45,11 @@ def test_positive_attempt_records_boundary_order_and_one_aggregate(tmp_path: Pat
     journal.attempt(0, 0, file)
     attempt_id = journal.attempt_id(0, 0)
     calls = []
+    grant_secret = bytes(range(32))
+    monkeypatch.setattr(
+        "dpone.runtime.sinks.mssql_native_target_local_import.secrets.token_bytes",
+        lambda size: grant_secret if size == 32 else pytest.fail("unexpected grant secret size"),
+    )
 
     class Importer:
         _mutation_scope = staticmethod(lambda *args: nullcontext())
@@ -76,6 +83,8 @@ def test_positive_attempt_records_boundary_order_and_one_aggregate(tmp_path: Pat
     class Writer:
         def write(self, grant, *, rejects_path):
             calls.append("launch")
+            assert grant.grant_token_sha256 == sha256(grant_secret).hexdigest()
+            assert grant.grant_token_sha256 != grant_secret.hex()
             return NativeStageWriteOutcome(grant.attempt_id, True, 1, "success")
 
     def barrier(stage, assert_identity):
