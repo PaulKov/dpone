@@ -50,6 +50,7 @@ def test_v2_identity_is_immutable_and_binds_all_versioned_inputs():
         "wire_fingerprint": "wire",
         "import_backend": "bcp",
         "verification_backend": "target_local",
+        "writer_proof_capability": "bcp-supervised-stage-barrier-v1",
         "companion_protocol_sha256": "a" * 64,
         "companion_package_sha256": "b" * 64,
         "capability_layout_sha256": "c" * 64,
@@ -61,6 +62,19 @@ def test_v2_identity_is_immutable_and_binds_all_versioned_inputs():
     assert len(identity.invocation_key) == 64
     assert identity.invocation_key == _identity().invocation_key
     assert replace(identity, timeout_policy_sha256="e" * 64).invocation_key != identity.invocation_key
+    assert (
+        replace(
+            identity, import_backend="mssql_sqlclient", writer_proof_capability="sqlclient-session-applock-v1"
+        ).invocation_key
+        != identity.invocation_key
+    )
+
+
+def test_v2_identity_rejects_mismatched_backend_and_proof_capability():
+    with pytest.raises(ValueError, match="identity"):
+        _identity(import_backend="bcp", writer_proof_capability="sqlclient-session-applock-v1")
+    with pytest.raises(ValueError, match="identity"):
+        _identity(import_backend="mssql_sqlclient", writer_proof_capability="bcp-supervised-stage-barrier-v1")
 
 
 @pytest.mark.parametrize(

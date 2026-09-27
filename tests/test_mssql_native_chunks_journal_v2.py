@@ -50,10 +50,11 @@ def _stage(journal):
 def _writer():
     return {
         "import_backend": "bcp",
+        "writer_proof_capability": "bcp-supervised-stage-barrier-v1",
         "protocol_sha256": "a" * 64,
         "package_sha256": "b" * 64,
         "capability_sha256": "c" * 64,
-        "session_token_sha256": "3" * 64,
+        "grant_token_sha256": "3" * 64,
         "timeout_policy_sha256": "d" * 64,
     }
 
@@ -198,7 +199,7 @@ def test_identical_event_retry_is_idempotent_but_changed_event_is_rejected(tmp_p
         journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding={**_stage(journal), "object_id": 2})
 
 
-def test_unknown_requires_reconciliation_before_retirement_and_retry(tmp_path):
+def test_lost_ack_cannot_reconcile_from_stage_contents_or_retry(tmp_path):
     store, lease, plan, journal = _journal(tmp_path)
     journal.begin()
     journal.attempt(0, 0, _file(tmp_path))
@@ -212,17 +213,115 @@ def test_unknown_requires_reconciliation_before_retirement_and_retry(tmp_path):
     with pytest.raises(WindowContractError, match="transition"):
         journal.append_event(0, first_id, "RETIRED")
     proved = {**unknown, "quiescence": "proved", "row_count": 0}
-    journal.append_event(0, first_id, "PARTIAL_PROVED", observation=proved)
-    journal.append_event(0, first_id, "FAILED_RETIRABLE")
-    journal.append_event(0, first_id, "RETIRED")
-    journal.attempt(0, 1, _file(tmp_path))
-    assert journal.attempt_id(0, 1) != first_id
-    assert set(journal.attempts()) == {first_id, journal.attempt_id(0, 1)}
+    with pytest.raises(WindowContractError):
+        journal.append_event(0, first_id, "PARTIAL_PROVED", observation=proved)
+    with pytest.raises(WindowContractError):
+        journal.append_event(0, first_id, "QUIESCENT", observation=proved)
+    journal.append_event(0, first_id, "INCIDENT_RETAINED")
+    with pytest.raises(WindowContractError, match="retry"):
+        journal.attempt(0, 1, _file(tmp_path))
+    assert set(journal.attempts()) == {first_id}
     tampered = journal.data
     tampered["nonces"][first_id] = "0" * 64
     store.save(journal.key, journal.revision, json.dumps(tampered), lease)
     with pytest.raises(WindowContractError, match="event"):
         NativeChunkJournalV2(store, lease, _identity(plan))
+
+
+def test_reopened_bcp_unknown_requires_positive_terminal_and_observation_only_barrier(tmp_path):
+    from contextlib import nullcontext
+
+    store, lease, plan, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    journal.append_event(0, attempt_id, "WRITING")
+    journal.append_event(0, attempt_id, "WRITER_TERMINAL", observation={**_observation(), "quiescence": "unverified"})
+    journal.append_event(0, attempt_id, "UNKNOWN", observation={**_observation(), "quiescence": "failed"})
+    reopened = NativeChunkJournalV2(store, lease, _identity(plan))
+    with pytest.raises(WindowContractError, match="dedicated_recovery_required"):
+        reopened.append_event(0, attempt_id, "QUIESCENT", observation=_observation())
+    observed = reopened.observe_bcp_recovery(0, attempt_id, barrier=nullcontext, observe=_observation)
+    assert observed["event"] == "QUIESCENT"
+    with pytest.raises(WindowContractError, match="reextract_required"):
+        reopened.attempt(0, 1, _file(tmp_path))
+
+
+def test_recovered_bcp_receipt_is_committed_inside_observation_barrier(tmp_path):
+    from contextlib import contextmanager
+
+    store, lease, plan, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    journal.append_event(0, attempt_id, "WRITING")
+    journal.append_event(0, attempt_id, "WRITER_TERMINAL", observation={**_observation(), "quiescence": "unverified"})
+    journal.append_event(0, attempt_id, "UNKNOWN", observation={**_observation(), "quiescence": "failed"})
+    reopened = NativeChunkJournalV2(store, lease, _identity(plan))
+    ordering = []
+
+    @contextmanager
+    def barrier():
+        ordering.append("locked")
+        yield
+        ordering.append("released")
+
+    def observe():
+        ordering.append("digest")
+        receipt = NativeChunkReceipt(0, attempt_id, "[schema].[table]", 1, 2, "e" * 64, "f" * 64)
+        return _observation(), receipt
+
+    receipt = reopened.recover_bcp_verified(0, attempt_id, barrier=barrier, observe=observe)
+    assert receipt.attempt_id == attempt_id
+    assert ordering == ["locked", "digest", "released"]
+    assert reopened.data["chunks"]["0"]["phase"] == "verified"
+    assert reopened.data["events"][attempt_id][-1]["event"] == "VERIFIED"
+    assert reopened.recover_bcp_verified(0, attempt_id, barrier=barrier, observe=observe) == receipt
+    assert ordering == ["locked", "digest", "released", "locked", "digest", "released"]
+
+
+def test_reopened_lost_ack_may_only_retain_incident(tmp_path):
+    from contextlib import nullcontext
+
+    store, lease, plan, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    journal.append_event(
+        0,
+        attempt_id,
+        "UNKNOWN",
+        observation={**_observation(), "writer_outcome": "lost_ack", "quiescence": "unverified"},
+    )
+    reopened = NativeChunkJournalV2(store, lease, _identity(plan))
+    with pytest.raises(WindowContractError, match="proof_missing"):
+        reopened.observe_bcp_recovery(0, attempt_id, barrier=nullcontext, observe=_observation)
+    reopened.retain_bcp_incident(0, attempt_id)
+    assert reopened.data["events"][attempt_id][-1]["event"] == "INCIDENT_RETAINED"
+    with pytest.raises(WindowContractError):
+        reopened.attempt(0, 1, _file(tmp_path))
+
+
+def test_verified_pre_eof_retirement_requires_durable_nonpublication_and_exact_drop(tmp_path):
+    store, lease, plan, journal = _journal(tmp_path)
+    attempt_id = _verified_chain(journal, tmp_path)
+    journal.verified(NativeChunkReceipt(0, attempt_id, "[schema].[table]", 1, 2, "e" * 64, "f" * 64))
+    reopened = NativeChunkJournalV2(store, lease, _identity(plan))
+    with pytest.raises(WindowContractError, match="nonpublication"):
+        reopened.retire_verified(0, attempt_id, drop_exact_owned=lambda: None)
+    reopened.record_nonpublication("4" * 64, assert_nonpublication=lambda: None)
+    events = []
+    reopened.retire_verified(0, attempt_id, drop_exact_owned=lambda: events.append("dropped"))
+    assert events == ["dropped"]
+    assert reopened.data["events"][attempt_id][-1]["event"] == "RETIRED"
+    with pytest.raises(WindowContractError):
+        reopened.complete(source_eof=True)
 
 
 @pytest.mark.parametrize(
