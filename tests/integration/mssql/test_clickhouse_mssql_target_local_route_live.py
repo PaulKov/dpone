@@ -11,6 +11,7 @@ from tests.integration.mssql.mssql_live_support import clickhouse_connector, mss
 
 from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
 from dpone.adapters.mssql_native_custody import NativeTargetCustody
+from dpone.adapters.mssql_native_guard import native_exact_stage_barrier
 from dpone.contracts.mssql_native_chunks import NativeChunkLimits, NativeChunkPlan
 from dpone.contracts.mssql_native_verification import NativeVerificationBackend, NativeVerificationIdentityV2
 from dpone.runtime.connectors.mssql_bulk import BcpOptions
@@ -138,6 +139,29 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
             "VERIFIED",
         ]
 
+        lock_holder = mssql_connector()
+        try:
+            lock_holder.begin()
+            lock_holder.get_records(f"SELECT TOP (1) 1 FROM {receipt.stage_id} WITH (TABLOCKX,HOLDLOCK)")
+            with context.executor.importer_factory() as importer:
+                table = importer.table_name(plan, receipt.attempt_id)
+                object_id = receipt.consumed_part_evidence["native_object_id"]
+                with pytest.raises(Exception, match="timeout|expired|HYT00"):
+                    with native_exact_stage_barrier(
+                        importer.connector,
+                        receipt.stage_id,
+                        timeout_seconds=1,
+                        assert_identity=lambda: importer._assert_stage_identity(
+                            plan, receipt.attempt_id, table, object_id
+                        ),
+                    ):
+                        pass
+        finally:
+            lock_holder.rollback()
+            lock_holder.close()
+        assert context.journal_factory().data["events"][receipt.attempt_id] == events
+        context.verify_receipts(complete.receipts)
+
         # Rollback proves the previous target remains authoritative until commit.
         target.begin()
         target.execute_query(f"TRUNCATE TABLE [dbo].[{target_table}]")
@@ -162,6 +186,14 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
         with pytest.raises(ValueError, match="typed_digest_mismatch"):
             context.verify_receipts(complete.receipts)
         target.execute_query(f"UPDATE {receipt.stage_id} SET [text_value]=N'alpha' WHERE [row_key]=1")
+        context.verify_receipts(complete.receipts)
+
+        object_id = receipt.consumed_part_evidence["native_object_id"]
+        target.execute_query(f"ALTER TABLE {receipt.stage_id} ALTER COLUMN [ratio] real NULL")
+        assert target.get_records("SELECT OBJECT_ID(?)", (receipt.stage_id,))[0][0] == object_id
+        with pytest.raises(ValueError, match="stage_schema_changed"):
+            context.verify_receipts(complete.receipts)
+        target.execute_query(f"ALTER TABLE {receipt.stage_id} ALTER COLUMN [ratio] float NULL")
         context.verify_receipts(complete.receipts)
 
         with context.executor.importer_factory() as importer:
