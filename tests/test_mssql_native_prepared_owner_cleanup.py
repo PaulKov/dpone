@@ -74,6 +74,18 @@ def test_cleanup_requires_post_drop_absence_with_authoritative_visibility():
     assert connector.calls[-1] == "rollback"
 
 
+def test_v1_compatible_visible_owned_object_can_be_retired_by_least_privilege_principal():
+    connector = Connector(user="limited")
+
+    def drop():
+        connector.object_id = None
+
+    retire_exact_prepared(connector, PLANNED, 11, drop, timeout_seconds=3)
+
+    assert connector.calls[-1] == "commit"
+    assert "rollback" not in connector.calls
+
+
 def test_cleanup_replays_after_crash_following_drop():
     connector = Connector()
 

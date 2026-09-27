@@ -216,6 +216,42 @@ def test_v1_runtime_blocks_held_v2_custody_before_resume_or_source(tmp_path):
     assert "resume" not in events and "source" not in events
 
 
+@pytest.mark.parametrize("identity_location", ["binding", "context"])
+def test_v1_rejects_v2_identity_before_resume_or_source(tmp_path, identity_location):
+    value, events, _ = runtime(tmp_path)
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        identity = object()
+        if identity_location == "context":
+            bound.stage_context.verification_identity = identity
+            return bound
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, identity)
+
+    value.bindings = bindings
+    with pytest.raises(Exception, match="verification_identity_mismatch"):
+        value.run(config(), owner="new")
+    assert "resume" not in events and "source" not in events
+
+
+def test_target_local_requires_equal_binding_and_context_identity_before_resume(tmp_path):
+    value, events, _ = runtime(tmp_path)
+    cfg = config()
+    cfg.options["native_transfer"]["execution"]["verification_backend"] = "target_local"
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        bound.stage_context.verification_identity = object()
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, object())
+
+    value.bindings = bindings
+    with pytest.raises(Exception, match="verification_identity_mismatch"):
+        value.run(cfg, owner="new")
+    assert "resume" not in events and "source" not in events
+
+
 def test_target_local_claims_before_resume_and_releases_after_cleanup(tmp_path):
     value, events, journal = runtime(tmp_path)
     cfg = config()
@@ -237,6 +273,7 @@ def test_target_local_claims_before_resume_and_releases_after_cleanup(tmp_path):
     def bindings(*args):
         bound = original_bindings(*args)
         bound.stage_context.plan = plan
+        bound.stage_context.verification_identity = identity
         return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, identity)
 
     value.bindings = bindings
@@ -282,6 +319,7 @@ def test_target_local_source_open_failure_requests_zero_stage_nonpublication(tmp
     def bindings(*args):
         bound = original_bindings(*args)
         bound.stage_context.plan = plan
+        bound.stage_context.verification_identity = identity
         bound.stage_context.executor = SimpleNamespace(
             on_failed_stage=lambda current: events.append(("nonpublication", current is journal)) or True
         )
@@ -324,6 +362,7 @@ def test_recovery_only_claim_without_journal_closes_zero_stage_before_reextract(
     def bindings(*args):
         bound = original_bindings(*args)
         bound.stage_context.plan = plan
+        bound.stage_context.verification_identity = identity
         bound.stage_context.executor = SimpleNamespace(
             on_failed_stage=lambda current: events.append(("nonpublication", current is journal)) or True
         )
