@@ -32,6 +32,7 @@ owned_paths:
   - src/dpone/adapters/mssql_native_chunks_journal_v2_recovery.py
   - src/dpone/runtime/sinks/mssql_native_import.py
   - src/dpone/runtime/sinks/mssql_native_target_local_import.py
+  - src/dpone/runtime/mssql_native_target_local_recovery.py
   - src/dpone/runtime/sinks/mssql_native_prepared_digests.py
   - src/dpone/runtime/sinks/mssql_native_prepare.py
   - src/dpone/runtime/consumed_payload_evidence.py
@@ -56,6 +57,7 @@ owned_paths:
   - tests/test_consumed_payload_evidence.py
   - tests/test_mssql_native_staged_prepare.py
   - tests/test_mssql_native_target_local_import.py
+  - tests/test_mssql_native_target_local_recovery.py
   - tests/test_mssql_native_integrity_readbacks.py
   - tests/test_mssql_native_composition.py
   - tests/test_mssql_native_chunks_execution.py
