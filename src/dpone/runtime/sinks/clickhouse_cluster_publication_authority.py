@@ -8,9 +8,7 @@ from typing import Any
 from dpone.ports.clickhouse_cluster_publication import contracts
 
 AUTHORITY_TABLE = contracts.AUTHORITY_TABLE
-_INSERT_COLUMNS = (
-    "target_key, operation_id, fence_token, phase, dispatch_epoch, payload, payload_sha256, version"
-)
+_INSERT_COLUMNS = "target_key, operation_id, fence_token, phase, dispatch_epoch, payload, payload_sha256, version"
 
 
 class ClickHouseKeeperMapAuthority:

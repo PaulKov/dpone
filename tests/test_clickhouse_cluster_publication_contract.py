@@ -9,6 +9,7 @@ from dpone.contracts.clickhouse_cluster_publication import (
     AuthorityMutationStatus,
     AuthorityPhase,
     AuthorityRecord,
+    ClusterPublicationError,
     GenerationIdentity,
     QueueHostResult,
     QueueHostState,
@@ -18,7 +19,6 @@ from dpone.contracts.clickhouse_cluster_publication import (
     classify_aggregate,
     classify_replica,
 )
-from dpone.contracts.clickhouse_cluster_publication import ClusterPublicationError
 from dpone.runtime.sinks.clickhouse_cluster_publication_authority import ClickHouseKeeperMapAuthority
 from dpone.runtime.sinks.clickhouse_cluster_publication_bootstrap import ClickHouseClusterAuthorityBootstrap
 from dpone.runtime.sinks.clickhouse_cluster_publication_catalog import ClickHouseClusterPublicationCatalog
