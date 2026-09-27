@@ -42,6 +42,7 @@ from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession
 from dpone.runtime.mssql_native_sized_frames import sized_native_frames
 from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
 from dpone.runtime.native_wire_models import SourceNativeWireContract
+from dpone.runtime.sinks.mssql_native_target_local_import import recover_target_local_staging
 
 if TYPE_CHECKING:
     from dpone.ports.native_delivery_observer import NativeDeliveryObserver
@@ -185,7 +186,10 @@ class BoundedNativeChunks:
             raise WindowOutcomeUnknown("mssql_native.publication_requires_reconciliation")
         result = journal.completed()
         if self._target_local and result is None:
-            self._recover_target_local(journal, plan, lease)
+            recover_target_local_staging(
+                journal, plan, lease, self.work_dir, self.importer_factory, self.on_failed_stage
+            )
+            raise NativeReextractRequired("mssql_native.reextract_required")
         with self.importer_factory() as importer:
             if result is not None:
                 for receipt in result.receipts:
@@ -205,34 +209,6 @@ class BoundedNativeChunks:
         if journal.data is not None and journal.data["phase"] == "staging":
             journal.reextract_required()
         raise NativeReextractRequired("mssql_native.reextract_required")
-
-    def _recover_target_local(self, journal: Any, plan: NativeChunkPlan, lease: WindowLease) -> None:
-        """Reobserve only durable BCP success; pre-EOF never resumes the source."""
-        projection = journal.data
-        if projection is None or projection["phase"] != "staging":
-            raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
-        directory = self.work_dir / journal.key.rsplit("/", 1)[-1]
-        with self.importer_factory() as importer:
-            for ordinal in sorted(map(int, projection["chunks"])):
-                chunk = projection["chunks"][str(ordinal)]
-                attempt_id = chunk["attempt_id"]
-                terminal = projection["events"][attempt_id][-1]
-                if terminal["event"] == "VERIFIED" and chunk["phase"] == "verified":
-                    continue
-                if (
-                    terminal["event"] in {"WRITER_TERMINAL", "UNKNOWN", "VERIFIED"}
-                    and terminal["observation"]["writer_outcome"] == "success"
-                ):
-                    artifact = chunk["file"]
-                    file = EncodedNativeFile(directory / f"{ordinal}.native", **artifact)
-                    cast(Any, importer).recover_positive(plan, file, attempt_id, lease)
-                    continue
-                if terminal["event"] == "UNKNOWN":
-                    journal.retain_bcp_incident(ordinal, attempt_id)
-                raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
-        if self.on_failed_stage is not None and self.on_failed_stage(journal):
-            raise NativeReextractRequired("mssql_native.reextract_required")
-        raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
 
     def _import(
         self, plan: NativeChunkPlan, file: EncodedNativeFile, attempt: str, lease: WindowLease, cancelled: Event

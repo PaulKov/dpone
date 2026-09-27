@@ -4,13 +4,50 @@ from __future__ import annotations
 
 import secrets
 from collections.abc import Callable
+from contextlib import AbstractContextManager
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
+from dpone.contracts.bounded_window import WindowOutcomeUnknown
 from dpone.ports.mssql_native_writer import NativeStageWriteGrant
 from dpone.runtime.file_artifacts import FileExportArtifact
-from dpone.runtime.mssql_native_chunks_files import verify_native_file
+from dpone.runtime.mssql_native_chunks_files import EncodedNativeFile, verify_native_file
+
+
+def recover_target_local_staging(
+    journal: Any,
+    plan: Any,
+    lease: Any,
+    work_dir: Path,
+    importer_factory: Callable[[], AbstractContextManager[Any]],
+    on_failed_stage: Callable[[Any], bool] | None,
+) -> None:
+    """Reobserve durable BCP success without resuming a partial source query."""
+    projection = journal.data
+    if projection is None or projection["phase"] != "staging":
+        raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
+    directory = work_dir / journal.key.rsplit("/", 1)[-1]
+    with importer_factory() as importer:
+        for ordinal in sorted(map(int, projection["chunks"])):
+            chunk = projection["chunks"][str(ordinal)]
+            attempt_id = chunk["attempt_id"]
+            terminal = projection["events"][attempt_id][-1]
+            if terminal["event"] == "VERIFIED" and chunk["phase"] == "verified":
+                continue
+            if (
+                terminal["event"] in {"WRITER_TERMINAL", "UNKNOWN", "VERIFIED"}
+                and terminal["observation"]["writer_outcome"] == "success"
+            ):
+                artifact = chunk["file"]
+                file = EncodedNativeFile(directory / f"{ordinal}.native", **artifact)
+                importer.recover_positive(plan, file, attempt_id, lease)
+                continue
+            if terminal["event"] == "UNKNOWN":
+                journal.retain_bcp_incident(ordinal, attempt_id)
+            raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
+    if on_failed_stage is None or not on_failed_stage(journal):
+        raise WindowOutcomeUnknown("mssql_native.target_local_pre_eof_custody_retained")
 
 
 class NativeTargetLocalAttempt:
