@@ -1,7 +1,23 @@
 {
   "cases": [
     {
-      "node_id": "tests.integration.mssql.test_clickhouse_mssql_target_local_route_live::test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication",
+      "node_id": "tests.integration.mssql.test_clickhouse_mssql_target_local_route_live::test_clickhouse_rows_use_aggregate_only_publication_and_reject_object_replacement",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live::test_late_target_write_blocks_exact_stage_barrier_and_is_rejected",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live::test_controller_restart_recovers_verified_bcp_chunks_without_writer_or_source",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live::test_real_bcp_two_chunk_invocation_obeys_import_concurrency[1-1]",
+      "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live::test_real_bcp_two_chunk_invocation_obeys_import_concurrency[2-2]",
       "status": "passed"
     },
     {
@@ -9,21 +25,21 @@
       "status": "passed"
     }
   ],
-  "commit_sha": "ded7b7bd293ed098a6f6c01a0c8487b880f735b2",
+  "commit_sha": "066458abc977b6c9365542b6e39deb9199464ec5",
   "gate": {
     "max_skipped": 0,
-    "min_passed": 2
+    "min_passed": 6
   },
   "junit": "test_artifacts/live_certification/mssql-target-local-p1/route.junit.xml",
-  "message": "junit gate ok (tests=2 passed=2 skipped=0 failures=0 errors=0)",
+  "message": "junit gate ok (tests=6 passed=6 skipped=0 failures=0 errors=0)",
   "profile": "mssql-target-local-p1-route",
   "schema_version": 1,
   "status": "PASS",
   "totals": {
     "errors": 0,
     "failures": 0,
-    "passed": 2,
+    "passed": 6,
     "skipped": 0,
-    "tests": 2
+    "tests": 6
   }
 }

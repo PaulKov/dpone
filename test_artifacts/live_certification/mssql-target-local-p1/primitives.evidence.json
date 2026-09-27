@@ -53,7 +53,7 @@
       "status": "passed"
     },
     {
-      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_lock_timeout_is_ambiguous_and_cannot_release_custody",
+      "node_id": "tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_child_timeout_is_reaped_and_cannot_release_custody",
       "status": "passed"
     },
     {
@@ -69,7 +69,7 @@
       "status": "passed"
     }
   ],
-  "commit_sha": "ded7b7bd293ed098a6f6c01a0c8487b880f735b2",
+  "commit_sha": "066458abc977b6c9365542b6e39deb9199464ec5",
   "gate": {
     "max_skipped": 0,
     "min_passed": 17

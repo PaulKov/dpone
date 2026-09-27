@@ -18,16 +18,20 @@
 | `tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_cleanup_failure_retains_ambiguity_after_rows_arrive` | `passed` |
 | `tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_vendor_count_mismatch_cannot_create_authority` | `passed` |
 | `tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_changed_sealed_file_is_rejected_before_writer_launch` | `passed` |
-| `tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_lock_timeout_is_ambiguous_and_cannot_release_custody` | `passed` |
+| `tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_real_bcp_child_timeout_is_reaped_and_cannot_release_custody` | `passed` |
 | `tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_stable_custody_blocks_v1_and_overlap_after_lease_expiry` | `passed` |
 | `tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_empty_invocation_uses_distinct_custody_release_reason` | `passed` |
 | `tests.integration.mssql.test_mssql_target_local_bcp_lifecycle_live::test_empty_executor_completes_without_bcp_or_target_stage` | `passed` |
 ### JUnit evidence: `mssql-target-local-p1-route`
 
 - Status: `PASS`
-- Totals: `2 passed`, `0 failed`, `0 errors`, `0 skipped`
+- Totals: `6 passed`, `0 failed`, `0 errors`, `0 skipped`
 
 | test | status |
 |---|---|
-| `tests.integration.mssql.test_clickhouse_mssql_target_local_route_live::test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication` | `passed` |
+| `tests.integration.mssql.test_clickhouse_mssql_target_local_route_live::test_clickhouse_rows_use_aggregate_only_publication_and_reject_object_replacement` | `passed` |
+| `tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live::test_late_target_write_blocks_exact_stage_barrier_and_is_rejected` | `passed` |
+| `tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live::test_controller_restart_recovers_verified_bcp_chunks_without_writer_or_source` | `passed` |
+| `tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live::test_real_bcp_two_chunk_invocation_obeys_import_concurrency[1-1]` | `passed` |
+| `tests.integration.mssql.test_clickhouse_mssql_target_local_recovery_live::test_real_bcp_two_chunk_invocation_obeys_import_concurrency[2-2]` | `passed` |
 | `tests.integration.mssql.test_clickhouse_mssql_target_local_runtime_live::test_clickhouse_mssql_target_local_runtime_orders_publication_and_cleanup` | `passed` |
