@@ -1,6 +1,6 @@
 # Feature design: MSSQL target-local verification and SqlClient bulk transport v2
 
-- Status: RESEARCHED — P1 BCP proof amendment approval required
+- Status: APPROVED
 - Owner: dpone maintainers
 - Issue: TBD
 - Target release: phased minor releases after 0.83.23

@@ -10,11 +10,10 @@
 
 **Spec:** `docs/feature-specs/mssql-sqlclient-target-local-verification-v2.md`
 
-**Approval gate:** Task 3 is paused until the P1 BCP proof amendment is
-approved. The BCP CLI cannot satisfy the original same-session application-lock
-claim; P1 uses supervised process custody plus a transaction-held stage barrier
-for positively acknowledged success and retains every ambiguous outcome as
-`UNKNOWN` without automatic retry.
+**Approved P1 proof:** The BCP CLI cannot satisfy the original same-session
+application-lock claim. P1 therefore uses supervised process custody plus a
+transaction-held stage barrier for positively acknowledged success and retains
+every ambiguous outcome as `UNKNOWN` without automatic retry.
 
 ## Global Constraints
 
