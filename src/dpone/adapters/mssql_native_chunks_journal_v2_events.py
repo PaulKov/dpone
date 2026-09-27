@@ -107,7 +107,7 @@ def validate_projection(identity: NativeVerificationIdentityV2, value: dict[str,
         if identity.import_backend == "bcp":
             for index, event in enumerate(events):
                 if event["event"] == "QUIESCENT" and index and events[index - 1]["event"] == "UNKNOWN":
-                    if not any(
+                    if events[index - 1]["observation"]["writer_outcome"] != "success" or not any(
                         prior["event"] == "WRITER_TERMINAL" and prior["observation"]["writer_outcome"] == "success"
                         for prior in events[:index]
                     ):
