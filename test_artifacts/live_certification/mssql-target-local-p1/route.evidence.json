@@ -3,23 +3,27 @@
     {
       "node_id": "tests.integration.mssql.test_clickhouse_mssql_target_local_route_live::test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication",
       "status": "passed"
+    },
+    {
+      "node_id": "tests.integration.mssql.test_clickhouse_mssql_target_local_runtime_live::test_clickhouse_mssql_target_local_runtime_orders_publication_and_cleanup",
+      "status": "passed"
     }
   ],
-  "commit_sha": "3e624ecbae61c33cb3d748eb73ef8c36142f68a0",
+  "commit_sha": "33ac6767b1ddd25f208101de9d4f949f7c34633b",
   "gate": {
     "max_skipped": 0,
-    "min_passed": 1
+    "min_passed": 2
   },
   "junit": "test_artifacts/live_certification/mssql-target-local-p1/route.junit.xml",
-  "message": "junit gate ok (tests=1 passed=1 skipped=0 failures=0 errors=0)",
+  "message": "junit gate ok (tests=2 passed=2 skipped=0 failures=0 errors=0)",
   "profile": "mssql-target-local-p1-route",
   "schema_version": 1,
   "status": "PASS",
   "totals": {
     "errors": 0,
     "failures": 0,
-    "passed": 1,
+    "passed": 2,
     "skipped": 0,
-    "tests": 1
+    "tests": 2
   }
 }
