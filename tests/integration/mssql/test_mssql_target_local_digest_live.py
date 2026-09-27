@@ -2,20 +2,35 @@
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from tests.integration.mssql.mssql_target_local_p1_cases import digest_cases
 from tests.integration.mssql.mssql_target_local_p1_support import configured_target_local_stand
 
+from dpone.runtime.native_wire_models import stable_hash
 from dpone.runtime.sinks.mssql_native_target_digest import build_target_digest_sql, decode_target_digest_row
 
 pytestmark = [pytest.mark.integration_live, pytest.mark.integration_mssql]
+
+_FIXTURES = Path(__file__).parents[2] / "fixtures" / "mssql-target-local-p1"
 
 
 @pytest.fixture(scope="module")
 def stand():
     return configured_target_local_stand()
+
+
+@pytest.mark.parametrize("case", digest_cases(), ids=lambda case: case.name)
+def test_fixture_descriptor_is_bound_to_generated_schema(case) -> None:
+    descriptor = json.loads((_FIXTURES / f"{case.name}-v1.json").read_text(encoding="utf-8"))
+
+    assert descriptor["source"] == "deterministic-synthetic-only"
+    assert descriptor["business_column_count"] == len(case.columns)
+    assert descriptor["row_count"] == len(case.rows)
+    assert "sha256:" + descriptor["schema_sha256"] == stable_hash(case.columns)
 
 
 @pytest.mark.parametrize("case", digest_cases(), ids=lambda case: case.name)

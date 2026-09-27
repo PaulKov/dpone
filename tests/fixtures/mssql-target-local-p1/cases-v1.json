@@ -1,6 +1,8 @@
 {
   "schema_version": 1,
   "kind": "dpone.mssql-target-local-p1.synthetic-cases",
+  "generator_version": "mssql-target-local-p1-v1",
+  "seed": 0,
   "profiles": [
     {
       "id": "narrow",
@@ -13,5 +15,6 @@
       "features": ["null", "empty", "unicode", "boundaries"]
     }
   ],
-  "source": "deterministic-synthetic-only"
+  "source": "deterministic-synthetic-only",
+  "descriptors": ["narrow-v1.json", "wide100-v1.json"]
 }
