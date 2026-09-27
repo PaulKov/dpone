@@ -254,3 +254,19 @@ def test_source_provenance_digest_binds_dialect_declared_type_and_metadata() -> 
 def test_consumed_payload_rejects_unknown_evidence_versions() -> None:
     with pytest.raises(ArtifactIntegrityError, match="version_unsupported"):
         ConsumedPayloadEvidence(version=2)
+
+
+def test_verified_empty_requires_explicit_zero_row_native_contract() -> None:
+    bare = ConsumedPayloadEvidence.empty()
+    with pytest.raises(ArtifactIntegrityError, match="parts_required"):
+        bare.require_complete(native=False)
+    digest = "a" * 64
+    verified = ConsumedPayloadEvidence.verified_empty(digest)
+    assert verified.parts == () and verified.actual_native_rows == 0
+    assert verified.native_contract_sha256 == digest
+    assert verified.require_complete(native=False) is verified
+    assert verified.require_complete() is verified
+    with pytest.raises(ArtifactIntegrityError, match="native_row_count_mismatch"):
+        ConsumedPayloadEvidence((), 1, digest)
+    with pytest.raises(ArtifactIntegrityError, match="parts_required"):
+        bare.with_native_rows(0, native_contract_sha256=digest)

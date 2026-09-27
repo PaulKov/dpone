@@ -149,6 +149,16 @@ def test_event_chain_is_closed_hash_linked_and_reloadable(tmp_path):
     assert NativeChunkJournalV2(store, lease, _identity(plan)).completed().rows == 1
 
 
+def test_empty_v2_eof_has_durable_zero_receipt_authority(tmp_path):
+    store, lease, plan, journal = _journal(tmp_path)
+    journal.begin()
+    completed = journal.complete(source_eof=True, completion_metadata={"empty": True})
+    assert completed.rows == 0 and completed.receipts == ()
+    assert journal.data["chunks"] == {} and journal.data["events"] == {}
+    assert journal.attempts() == ()
+    assert NativeChunkJournalV2(store, lease, _identity(plan)).completed() == completed
+
+
 def test_verified_requires_a_real_terminal_event_and_matching_binding(tmp_path):
     _, _, _, journal = _journal(tmp_path)
     journal.begin()
@@ -317,6 +327,70 @@ def test_recovered_bcp_receipt_is_committed_inside_observation_barrier(tmp_path)
     assert reopened.data["events"][attempt_id][-1]["event"] == "VERIFIED"
     assert reopened.recover_bcp_verified(0, attempt_id, barrier=barrier, observe=observe) == receipt
     assert ordering == ["locked", "digest", "released", "locked", "digest", "released"]
+
+
+@pytest.mark.parametrize("outcome", ["success", "failure"])
+def test_crash_after_durable_terminal_recovery_requires_positive_ack(tmp_path, outcome):
+    from contextlib import nullcontext
+
+    store, lease, plan, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    journal.append_event(0, attempt_id, "WRITING")
+    journal.append_event(
+        0,
+        attempt_id,
+        "WRITER_TERMINAL",
+        observation={**_observation(), "writer_outcome": outcome, "quiescence": "unverified"},
+    )
+    reopened = NativeChunkJournalV2(store, lease, _identity(plan))
+    original = reopened.data
+    receipt = NativeChunkReceipt(0, attempt_id, "[schema].[table]", 1, 2, "e" * 64, "f" * 64)
+    if outcome == "failure":
+        with pytest.raises(WindowContractError, match="proof_missing"):
+            reopened.recover_bcp_verified(0, attempt_id, barrier=nullcontext, observe=lambda: (_observation(), receipt))
+        assert reopened.data == original
+        return
+    recovered = reopened.recover_bcp_verified(
+        0, attempt_id, barrier=nullcontext, observe=lambda: (_observation(), receipt)
+    )
+    assert recovered == receipt
+    assert [event["event"] for event in reopened.data["events"][attempt_id]][-2:] == ["QUIESCENT", "VERIFIED"]
+
+
+def test_crash_after_durable_terminal_barrier_failure_keeps_custody(tmp_path):
+    from contextlib import contextmanager
+
+    store, lease, plan, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(0, attempt_id, "GRANTED", writer_binding=_writer())
+    journal.append_event(0, attempt_id, "WRITING")
+    journal.append_event(0, attempt_id, "WRITER_TERMINAL", observation={**_observation(), "quiescence": "unverified"})
+    reopened = NativeChunkJournalV2(store, lease, _identity(plan))
+    original = reopened.data
+
+    @contextmanager
+    def unavailable():
+        raise TimeoutError("barrier unavailable")
+        yield
+
+    with pytest.raises(TimeoutError, match="barrier"):
+        reopened.recover_bcp_verified(
+            0,
+            attempt_id,
+            barrier=unavailable,
+            observe=lambda: (
+                _observation(),
+                NativeChunkReceipt(0, attempt_id, "[schema].[table]", 1, 2, "e" * 64, "f" * 64),
+            ),
+        )
+    assert reopened.data == original
 
 
 def test_reopened_lost_ack_may_only_retain_incident(tmp_path):

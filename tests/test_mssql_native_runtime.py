@@ -6,6 +6,10 @@ from types import SimpleNamespace
 import pytest
 
 from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
+from dpone.adapters.mssql_native_chunks_journal_v2 import NativeChunkJournalV2
+from dpone.adapters.mssql_native_custody import NativeTargetCustody
+from dpone.contracts.mssql_native_chunks import NativeChunkPlan
+from dpone.contracts.mssql_native_verification import NativeVerificationBackend, NativeVerificationIdentityV2
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.mssql_native_runtime import NativeMssqlRuntime, NativeRuntimeBindings
 from dpone.runtime.sinks.load_result import LoadResult
@@ -15,7 +19,14 @@ from tests.test_mssql_native_policy import config
 def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=False, observer=None):
     events = []
 
-    class Journal:
+    class Journal(NativeChunkJournalV2):
+        # This interaction fake keeps publication callbacks observable while
+        # satisfying the runtime's concrete v2 journal admission check.
+        identity = None
+
+        def __init__(self):
+            pass
+
         @property
         def publication(self):
             return self
@@ -32,6 +43,9 @@ def runtime(tmp_path, *, recovered=False, evidence_fails=False, quality_fails=Fa
         def succeeded(self):
             self.phase = "succeeded"
             events.append("state-marker")
+
+        def completed(self):
+            return SimpleNamespace(rows=2)
 
     journal = Journal()
     handle = StagedLoadHandle(None, (), 2)
@@ -185,3 +199,58 @@ def test_runtime_observations_identify_the_executing_thread(tmp_path):
         worker = pool.submit(execute).result()
     assert worker != get_ident()
     assert {item["worker_id"] for item in observer.snapshot()["observations"]} == {f"runtime:{worker}"}
+
+
+def test_v1_runtime_blocks_held_v2_custody_before_resume_or_source(tmp_path):
+    value, events, _ = runtime(tmp_path)
+    lease = value.store.acquire("target", "prior", 60)
+    NativeTargetCustody(value.store, "target").claim(lease, "a" * 64)
+    value.store.release(lease)
+    with pytest.raises(Exception, match="custody_held"):
+        value.run(config(), owner="new")
+    assert "resume" not in events and "source" not in events
+
+
+def test_target_local_claims_before_resume_and_releases_after_cleanup(tmp_path):
+    value, events, journal = runtime(tmp_path)
+    cfg = config()
+    cfg.options["native_transfer"]["execution"]["verification_backend"] = "target_local"
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+    )
+    journal.identity = identity
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        bound.stage_context.plan = plan
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, identity)
+
+    value.bindings = bindings
+    original_resume = value.bindings
+    custody = NativeTargetCustody(value.store, "target")
+
+    def asserting_bindings(*args):
+        bound = original_resume(*args)
+        original = bound.service.resume
+
+        def resume(*resume_args):
+            assert custody.inspect(bound.stage_context.lease).holder_invocation_key == identity.invocation_key
+            events.append("custody-claimed")
+            return original(*resume_args)
+
+        bound.service.resume = resume
+        return bound
+
+    value.bindings = asserting_bindings
+    assert value.run(cfg, owner="invocation").status == "success"
+    assert events.index("custody-claimed") < events.index("resume") < events.index("source")
+    assert custody.inspect(value.store.acquire("target", "inspect", 60)).release_reason == "published_cleanup"

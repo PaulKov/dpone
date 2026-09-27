@@ -4,6 +4,7 @@ from collections.abc import Iterator
 from dataclasses import FrozenInstanceError
 from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
+from hashlib import sha256
 from types import SimpleNamespace
 from uuid import UUID
 
@@ -12,7 +13,11 @@ import pytest
 from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
 from dpone.runtime.native_wire_mssql import _MssqlDateTime2, _MssqlTime, build_mssql_bcp_native_contract
 from dpone.runtime.sinks.mssql_native_prepare import MssqlNativeStagePreparer
-from dpone.runtime.sinks.mssql_native_prepared_digests import PreparedDigests, digest_prepared_rows
+from dpone.runtime.sinks.mssql_native_prepared_digests import (
+    PreparedDigests,
+    digest_prepared_rows,
+    digest_prepared_target,
+)
 
 
 def wire(schema):
@@ -90,6 +95,71 @@ def test_one_iterator_two_encodings_per_row_and_golden_multiset(count, monkeypat
     assert len(calls) == 2 * count
     if count:
         assert len({id(encoder) for encoder in calls}) == 2
+
+
+def test_target_local_prepared_digest_reads_one_aggregate_row_only():
+    contract = wire((("n", "bigint"),))
+    word = int.from_bytes(sha256((1).to_bytes(8, "little", signed=True)).digest(), "big")
+    limbs = [((word >> (32 * (7 - index))) & (2**32 - 1)) * 2 for index in range(8)]
+    queries = []
+
+    def aggregate(sql):
+        queries.append(sql)
+        return [(2, 0, *limbs, *limbs)]
+
+    result = digest_prepared_target(
+        aggregate,
+        qualified_stage="[db].[dbo].[prepared]",
+        business_contract=contract,
+        full_contract=contract,
+        expected_rows=2,
+    )
+    assert result.business_digest == result.full_digest
+    assert result.rows == 2 and len(queries) == 1
+    assert "#dpone_target_hashes" in queries[0]
+
+
+@pytest.mark.parametrize(
+    ("row", "code"),
+    [
+        ((1, 0, *([0] * 16)), "prepared_count_mismatch"),
+        ((3, 1, *([0] * 16)), "target_digest_count_overflow"),
+    ],
+)
+def test_target_local_prepared_aggregate_mismatch_or_overflow_fails_closed(row, code):
+    contract = wire((("n", "bigint"),))
+    with pytest.raises(ValueError, match=code):
+        digest_prepared_target(
+            lambda sql: [row],
+            qualified_stage="[db].[dbo].[prepared]",
+            business_contract=contract,
+            full_contract=contract,
+            expected_rows=2,
+        )
+
+
+def test_target_local_prepublication_queries_independently_without_row_iterator():
+    contract = wire((("n", "bigint"),))
+    word = int.from_bytes(sha256((1).to_bytes(8, "little", signed=True)).digest(), "big")
+    limbs = [((word >> (32 * (7 - index))) & (2**32 - 1)) * 2 for index in range(8)]
+    queries = []
+    connector = SimpleNamespace(
+        quote_identifier=lambda name: f"[{name}]",
+        get_records=lambda sql: queries.append(sql) or [(2, 0, *limbs, *limbs)],
+        get_records_iterator=lambda sql: pytest.fail("business-row readback forbidden"),
+    )
+    strategy = SimpleNamespace(connector=connector, _staging_name=lambda stage: "[db].[dbo].[prepared]")
+    stage = SimpleNamespace(
+        columns=["n"],
+        column_types={"n": "bigint"},
+        target_column_nullability={"n": False},
+        row_count=2,
+    )
+    context = SimpleNamespace(wire_contract=contract, max_row_bytes=64, verification_identity=object())
+    first = MssqlNativeStagePreparer._stage_digest(strategy, stage, context, all_columns=True)
+    second = MssqlNativeStagePreparer._stage_digest(strategy, stage, context, all_columns=True)
+    assert first == second and len(queries) == 2
+    assert all("#dpone_target_hashes" in sql for sql in queries)
 
 
 @pytest.mark.parametrize(

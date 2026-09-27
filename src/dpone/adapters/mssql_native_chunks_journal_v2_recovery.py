@@ -26,7 +26,7 @@ def observe_bcp_recovery(
     if (
         journal.identity.import_backend != "bcp"
         or not events
-        or events[-1]["event"] != "UNKNOWN"
+        or events[-1]["event"] not in {"UNKNOWN", "WRITER_TERMINAL"}
         or events[-1]["observation"]["writer_outcome"] != "success"
         or not any(
             event["event"] == "WRITER_TERMINAL" and event["observation"]["writer_outcome"] == "success"
@@ -66,8 +66,11 @@ def recover_bcp_verified(
     if (
         journal.identity.import_backend != "bcp"
         or not events
-        or events[-1]["event"] not in {"UNKNOWN", "QUIESCENT", "VERIFIED"}
-        or (events[-1]["event"] == "UNKNOWN" and events[-1]["observation"]["writer_outcome"] != "success")
+        or events[-1]["event"] not in {"WRITER_TERMINAL", "UNKNOWN", "QUIESCENT", "VERIFIED"}
+        or (
+            events[-1]["event"] in {"WRITER_TERMINAL", "UNKNOWN"}
+            and events[-1]["observation"]["writer_outcome"] != "success"
+        )
         or not any(
             event["event"] == "WRITER_TERMINAL" and event["observation"]["writer_outcome"] == "success"
             for event in events
@@ -83,7 +86,7 @@ def recover_bcp_verified(
         ):
             raise WindowContractError("mssql_native.bcp_recovery_proof_missing")
         previous = events[-1]
-        if previous["event"] == "UNKNOWN":
+        if previous["event"] in {"WRITER_TERMINAL", "UNKNOWN"}:
             journal._append(
                 data,
                 ordinal,
