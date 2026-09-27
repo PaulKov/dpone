@@ -27,6 +27,7 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
     suffix = uuid.uuid4().hex[:16]
     source_table = f"dpone_p1_source_{suffix}"
     target_table = f"dpone_p1_target_{suffix}"
+    limited_user = f"dpone_p1_limited_{suffix}"
     target_id = f"synthetic-target-{suffix}"
     schema = (
         ("row_key", "bigint"),
@@ -167,6 +168,16 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
             importer.drop_exact_owned(plan, receipt, lease)
             importer.drop_exact_owned(plan, receipt, lease)
 
+        target.execute_query(f"CREATE USER [{limited_user}] WITHOUT LOGIN")
+        with context.executor.importer_factory() as importer:
+            importer.connector.execute_query(f"EXECUTE AS USER = N'{limited_user}'")
+            try:
+                with pytest.raises(ValueError, match="stage_absence_visibility_unproved"):
+                    importer.drop_exact_owned(plan, receipt, lease)
+            finally:
+                importer.connector.execute_query("REVERT")
+        target.execute_query(f"DROP USER [{limited_user}]")
+
         target.execute_query(
             f"CREATE TABLE {receipt.stage_id} ("
             "[row_key] bigint NOT NULL,[ratio] real NULL,[text_value] nvarchar(max) NULL,"
@@ -183,6 +194,7 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
     finally:
         for stage in stages:
             target.execute_query(f"DROP TABLE IF EXISTS {stage}")
+        target.execute_query(f"DROP USER IF EXISTS [{limited_user}]")
         target.execute_query(f"DROP TABLE IF EXISTS [dbo].[{target_table}]")
         clickhouse.execute_query(f"DROP TABLE IF EXISTS `{source_table}`")
         target.close()
