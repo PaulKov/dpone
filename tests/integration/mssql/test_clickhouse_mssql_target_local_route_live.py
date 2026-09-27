@@ -160,8 +160,13 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
         target.execute_query(f"UPDATE {receipt.stage_id} SET [text_value]=N'drifted' WHERE [row_key]=1")
         with pytest.raises(ValueError, match="typed_digest_mismatch"):
             context.verify_receipts(complete.receipts)
+        target.execute_query(f"UPDATE {receipt.stage_id} SET [text_value]=N'alpha' WHERE [row_key]=1")
+        context.verify_receipts(complete.receipts)
 
-        target.execute_query(f"DROP TABLE {receipt.stage_id}")
+        with context.executor.importer_factory() as importer:
+            importer.drop_exact_owned(plan, receipt, lease)
+            importer.drop_exact_owned(plan, receipt, lease)
+
         target.execute_query(
             f"CREATE TABLE {receipt.stage_id} ("
             "[row_key] bigint NOT NULL,[ratio] real NULL,[text_value] nvarchar(max) NULL,"
@@ -169,10 +174,12 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
         )
         with pytest.raises(ValueError, match="stage_identity_mismatch|prepared_owner"):
             context.verify_receipts(complete.receipts)
+        with context.executor.importer_factory() as importer:
+            with pytest.raises(ValueError, match="stage_identity_mismatch|prepared_owner"):
+                importer.drop_exact_owned(plan, receipt, lease)
+        assert target.get_records(f"SELECT OBJECT_ID(N'{receipt.stage_id}')")[0][0] is not None
 
         target.execute_query(f"DROP TABLE {receipt.stage_id}")
-        with context.executor.importer_factory() as importer:
-            importer.drop_exact_owned(plan, receipt, lease)
     finally:
         for stage in stages:
             target.execute_query(f"DROP TABLE IF EXISTS {stage}")
