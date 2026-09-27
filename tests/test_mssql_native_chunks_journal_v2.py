@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from threading import Event, Thread, current_thread
 
 import pytest
 
@@ -257,3 +258,141 @@ def test_quiescent_event_requires_proved_barrier(tmp_path):
     journal.append_event(0, attempt_id, "WRITER_TERMINAL", observation={**_observation(), "quiescence": "unverified"})
     with pytest.raises(WindowContractError, match="event"):
         journal.append_event(0, attempt_id, "QUIESCENT", observation={**_observation(), "quiescence": "failed"})
+
+
+def test_shared_instance_serializes_snapshot_through_root_cas(tmp_path):
+    _, _, _, journal = _journal(tmp_path)
+    journal.begin()
+    first_snapshot, release_first, second_started, second_done = Event(), Event(), Event(), Event()
+    failures = []
+    original_staging = journal._staging
+
+    def paused_staging():
+        snapshot = original_staging()
+        if current_thread().name == "observations":
+            first_snapshot.set()
+            assert release_first.wait(5)
+        return snapshot
+
+    journal._staging = paused_staging
+
+    def observations():
+        try:
+            journal.record_observations(({"worker": "complete"},))
+        except Exception as error:
+            failures.append(error)
+
+    def limits():
+        second_started.set()
+        try:
+            journal.bind_limits({"capacity": 1})
+        except Exception as error:
+            failures.append(error)
+        finally:
+            second_done.set()
+
+    first = Thread(target=observations, name="observations")
+    second = Thread(target=limits, name="limits")
+    first.start()
+    assert first_snapshot.wait(5)
+    second.start()
+    assert second_started.wait(5)
+    try:
+        assert not second_done.wait(0.2), "second mutation entered before the first CAS finished"
+    finally:
+        release_first.set()
+        first.join(5)
+        second.join(5)
+    assert not first.is_alive() and not second.is_alive()
+    assert not failures
+    assert journal.data["observations"] == [{"worker": "complete"}]
+    assert journal.data["limits"] == {"capacity": 1}
+
+
+def test_publication_callbacks_are_serialized_with_snapshot_and_save(tmp_path):
+    store, _, _, journal = _journal(tmp_path)
+    attempt_id = _verified_chain(journal, tmp_path)
+    journal.verified(NativeChunkReceipt(0, attempt_id, "[schema].[table]", 1, 2, "e" * 64, "f" * 64))
+    journal.complete(source_eof=True)
+    first_save, release_first, second_started, second_done = Event(), Event(), Event(), Event()
+    failures = []
+    original_save = store.save
+
+    def paused_save(key, expected, payload, lease):
+        if key == journal.key and current_thread().name == "preparing":
+            first_save.set()
+            assert release_first.wait(5)
+        return original_save(key, expected, payload, lease)
+
+    store.save = paused_save
+
+    def preparing():
+        try:
+            journal.publication.preparation_started({"stage": "bound"})
+        except Exception as error:
+            failures.append(error)
+
+    def prepared():
+        second_started.set()
+        try:
+            journal.publication.prepared({"stage": "bound"})
+        except Exception as error:
+            failures.append(error)
+        finally:
+            second_done.set()
+
+    first = Thread(target=preparing, name="preparing")
+    second = Thread(target=prepared, name="prepared")
+    first.start()
+    assert first_save.wait(5)
+    second.start()
+    assert second_started.wait(5)
+    try:
+        assert not second_done.wait(0.2), "publication callback ran before the first CAS finished"
+    finally:
+        release_first.set()
+        first.join(5)
+        second.join(5)
+    assert not first.is_alive() and not second.is_alive()
+    assert not failures
+    assert journal.publication.state()["phase"] == "prepared"
+
+
+def test_identical_orphan_event_is_adopted_but_changed_bytes_are_rejected(tmp_path):
+    store, lease, _, journal = _journal(tmp_path)
+    journal.begin()
+    journal.attempt(0, 0, _file(tmp_path))
+    attempt_id = journal.attempt_id(0, 0)
+    original_save = store.save
+    failed = False
+
+    def fail_root_once(key, expected, payload, writer_lease):
+        nonlocal failed
+        if key == journal.key and not failed:
+            failed = True
+            raise WindowContractError("injected root CAS interruption")
+        return original_save(key, expected, payload, writer_lease)
+
+    store.save = fail_root_once
+    with pytest.raises(WindowContractError, match="injected"):
+        journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    assert journal.data["events"][attempt_id][-1]["event"] == "INTENT"
+    orphan_key = f"{journal.key}/{0:020d}/{attempt_id}/{1:020d}"
+    orphan = store.load(orphan_key)
+    assert orphan is not None
+    with pytest.raises(WindowContractError):
+        journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding={**_stage(journal), "object_id": 2})
+    adopted = journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    assert orphan.payload == json.dumps(adopted, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    assert NativeChunkJournalV2(store, lease, journal.identity).data == journal.data
+
+
+def test_reopened_verified_pre_eof_journal_is_recovery_only(tmp_path):
+    store, lease, plan, journal = _journal(tmp_path)
+    attempt_id = _verified_chain(journal, tmp_path)
+    journal.verified(NativeChunkReceipt(0, attempt_id, "[schema].[table]", 1, 2, "e" * 64, "f" * 64))
+    reopened = NativeChunkJournalV2(store, lease, _identity(plan))
+    with pytest.raises(WindowContractError, match="reextract_required"):
+        reopened.complete(source_eof=True)
+    assert reopened.completed() is None
+    assert journal.complete(source_eof=True).rows == 1
