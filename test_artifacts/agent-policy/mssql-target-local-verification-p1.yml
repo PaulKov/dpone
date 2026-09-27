@@ -26,6 +26,7 @@ owned_paths:
   - src/dpone/runtime/sinks/mssql_native_target_digest.py
   - src/dpone/contracts/mssql_native_verification.py
   - src/dpone/adapters/mssql_native_chunks_journal_v2.py
+  - src/dpone/adapters/mssql_native_chunks_journal_v2_events.py
   - src/dpone/runtime/sinks/mssql_native_import.py
   - src/dpone/runtime/sinks/mssql_native_prepared_digests.py
   - src/dpone/runtime/sinks/mssql_native_prepare.py
