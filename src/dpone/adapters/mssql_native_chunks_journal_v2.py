@@ -10,7 +10,6 @@ from __future__ import annotations
 import json
 import secrets
 from collections.abc import Callable
-from contextlib import AbstractContextManager
 from datetime import UTC, datetime
 from functools import wraps
 from threading import RLock
@@ -24,21 +23,7 @@ from dpone.adapters.mssql_native_chunks_journal_v2_events import (
     requires_dedicated_recovery,
     validate_projection,
 )
-from dpone.adapters.mssql_native_chunks_journal_v2_events import (
-    observe_bcp_recovery as _observe_bcp_recovery,
-)
-from dpone.adapters.mssql_native_chunks_journal_v2_events import (
-    record_nonpublication as _record_nonpublication,
-)
-from dpone.adapters.mssql_native_chunks_journal_v2_events import (
-    recover_bcp_verified as _recover_bcp_verified,
-)
-from dpone.adapters.mssql_native_chunks_journal_v2_events import (
-    retain_bcp_incident as _retain_bcp_incident,
-)
-from dpone.adapters.mssql_native_chunks_journal_v2_events import (
-    retire_verified as _retire_verified,
-)
+from dpone.adapters.mssql_native_chunks_journal_v2_recovery import BcpRecoveryMixin
 from dpone.adapters.mssql_native_publication_journal import NativePublicationJournal, validate_publication_state
 from dpone.contracts.bounded_window import WindowContractError, WindowLease
 from dpone.contracts.mssql_native_chunks import (
@@ -107,7 +92,7 @@ class _PublicationView:
         return call
 
 
-class NativeChunkJournalV2:
+class NativeChunkJournalV2(BcpRecoveryMixin):
     """Own v2 identity, immutable event keys, and the existing publication view."""
 
     def __init__(self, store: WindowStore, lease: WindowLease, identity: NativeVerificationIdentityV2) -> None:
@@ -255,45 +240,6 @@ class NativeChunkJournalV2:
                 raise WindowContractError("mssql_native.pre_eof_reextract_required")
             return json.loads(json.dumps(prior))
         return self._append(data, ordinal, attempt_id, event, chunk["file"], stage, writer, observed, created_at)
-
-    @_serialized
-    def observe_bcp_recovery(
-        self,
-        ordinal: int,
-        attempt_id: str,
-        *,
-        barrier: Callable[[], AbstractContextManager[Any]],
-        observe: Callable[[], dict[str, Any]],
-    ) -> dict[str, Any]:
-        """Observe an already authorized BCP attempt under a supplied exact-stage barrier."""
-        return _observe_bcp_recovery(self, ordinal, attempt_id, barrier=barrier, observe=observe)
-
-    @_serialized
-    def recover_bcp_verified(
-        self,
-        ordinal: int,
-        attempt_id: str,
-        *,
-        barrier: Callable[[], AbstractContextManager[Any]],
-        observe: Callable[[], tuple[dict[str, Any], NativeChunkReceipt]],
-    ) -> NativeChunkReceipt:
-        """Commit a recovered receipt while the supplied exact-stage barrier is held."""
-        return _recover_bcp_verified(self, ordinal, attempt_id, barrier=barrier, observe=observe)
-
-    @_serialized
-    def retain_bcp_incident(self, ordinal: int, attempt_id: str) -> dict[str, Any]:
-        """Retain an ambiguous BCP attempt without authorizing stage classification."""
-        return _retain_bcp_incident(self, ordinal, attempt_id)
-
-    @_serialized
-    def record_nonpublication(self, proof_sha256: str, *, assert_nonpublication: Callable[[], None]) -> None:
-        """Persist an invocation-level exclusion proof before verified retirement."""
-        _record_nonpublication(self, proof_sha256, assert_nonpublication=assert_nonpublication)
-
-    @_serialized
-    def retire_verified(self, ordinal: int, attempt_id: str, *, drop_exact_owned: Callable[[], None]) -> None:
-        """Retire a writer-proved stage only after exact-owner drop."""
-        _retire_verified(self, ordinal, attempt_id, drop_exact_owned=drop_exact_owned)
 
     def _append(
         self,
