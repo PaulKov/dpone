@@ -33,6 +33,16 @@ def test_fixture_descriptor_is_bound_to_generated_schema(case) -> None:
     assert "sha256:" + descriptor["schema_sha256"] == stable_hash(case.columns)
 
 
+def test_wide_compiler_materializes_only_fixed_hash_state() -> None:
+    case = digest_cases()[1]
+
+    sql = build_target_digest_sql("[synthetic].[dbo].[stage]", case.contract, len(case.rows))
+
+    assert "#dpone_target_fields" not in sql
+    assert sql.count("INTO #dpone_target_hashes") == 1
+    assert "HASHBYTES('SHA2_256'" in sql
+
+
 @pytest.mark.parametrize("case", digest_cases(), ids=lambda case: case.name)
 def test_python_and_sql_target_digest_are_identical(stand, case) -> None:
     table = stand.unique_table(case.name)
