@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "fixture_id": "wide100",
+  "generator_version": "mssql-target-local-p1-v1",
+  "seed": 0,
+  "row_count": 4,
+  "business_column_count": 100,
+  "schema_sha256": "92d1a79411478f52340ac3fe89b38a31c1daff10241ee1f4a3ef3543e3c69da9",
+  "max_row_bytes": 1048576,
+  "column_groups": {
+    "repeat": 25,
+    "types": ["bigint nullable", "float(53) nullable", "nvarchar(max) nullable", "datetime2(6) nullable"]
+  },
+  "coverage": {
+    "null_rule": "row_index_2_and_group_index_multiple_of_5",
+    "boundaries": ["negative", "zero", "fractional", "microsecond"],
+    "text": ["empty", "unicode"]
+  },
+  "source": "deterministic-synthetic-only"
+}

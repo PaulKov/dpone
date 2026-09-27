@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "fixture_id": "narrow",
+  "generator_version": "mssql-target-local-p1-v1",
+  "seed": 0,
+  "row_count": 5,
+  "business_column_count": 4,
+  "schema_sha256": "d22f1fd20e40ff72298b9123c5475b72ccd59b0299d7a2ffa7ed32ac1290516d",
+  "max_row_bytes": 1048576,
+  "columns": [
+    ["row_key", "bigint"],
+    ["ratio", "float(53) nullable"],
+    ["text_value", "nvarchar(max) nullable"],
+    ["happened_at", "datetime2(6) nullable"]
+  ],
+  "coverage": {
+    "null_row_count": 1,
+    "duplicate_row_count": 2,
+    "boundaries": ["negative", "zero", "fractional", "leap-day", "microsecond"],
+    "text": ["empty", "unicode", "nul"]
+  },
+  "source": "deterministic-synthetic-only"
+}
