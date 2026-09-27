@@ -25,8 +25,9 @@
 ### JUnit evidence: `mssql-target-local-p1-route`
 
 - Status: `PASS`
-- Totals: `1 passed`, `0 failed`, `0 errors`, `0 skipped`
+- Totals: `2 passed`, `0 failed`, `0 errors`, `0 skipped`
 
 | test | status |
 |---|---|
 | `tests.integration.mssql.test_clickhouse_mssql_target_local_route_live::test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication` | `passed` |
+| `tests.integration.mssql.test_clickhouse_mssql_target_local_runtime_live::test_clickhouse_mssql_target_local_runtime_orders_publication_and_cleanup` | `passed` |
