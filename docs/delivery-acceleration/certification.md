@@ -360,3 +360,40 @@ fresh integration validation, and preserve this distinction in any release claim
 
 Use the [local Docker runbook](local-docker.md) for the real source/BCP factory,
 required environment, maintenance behavior and limits of the local experiment.
+
+### Target-local P1 matrix
+
+The target-local suite uses deterministic synthetic narrow and exactly
+100-business-column fixtures. It covers digest parity, fixed-size hash state in
+`tempdb`, real supervised BCP outcomes, empty input without a writer launch,
+identity/schema/content drift, exact-stage crash recovery, retained custody, and
+one ClickHouse-to-MSSQL atomic publication path. It does not use production data
+or qualify production throughput.
+
+Start the disposable services and run the three live modules from the exact
+candidate checkout in an integration environment that provides ODBC Driver 18,
+`pyodbc`, `bcp`, Docker CLI access, and pytest:
+
+```bash
+docker compose -f docker/docker-compose.integration.yml up -d --wait clickhouse mssql
+export DPONE_RUN_INTEGRATION=1
+export DPONE_IT_DOCKER=/Applications/Docker.app/Contents/Resources/bin/docker
+uv run pytest \
+  tests/integration/mssql/test_mssql_target_local_digest_live.py \
+  tests/integration/mssql/test_mssql_target_local_bcp_lifecycle_live.py \
+  tests/integration/mssql/test_clickhouse_mssql_target_local_route_live.py \
+  -m "integration_live and integration_mssql" \
+  --junitxml=/tmp/dpone-target-local-p1-junit.xml \
+  -q -p no:cacheprovider
+```
+
+Certification requires every collected case to execute: failures, errors, and
+skips must all be zero. A missing Docker service, driver, or tool is a failed
+prerequisite for this certification run, not a passing skip. The integrator
+stores the sanitized exact-commit receipt under
+`test_artifacts/live_certification/mssql-target-local-p1/`.
+
+Evidence may contain the commit, dependency and image identities, test node IDs,
+counts, and aggregate results. It must not contain credentials, endpoints, SQL
+object names, query text, business rows, corporate table names, or private
+performance measurements.

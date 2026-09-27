@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- MSSQL bounded native delivery accepts the opt-in
+  `verification_backend: target_local` selector. It keeps supervised BCP,
+  verifies raw and prepared stages with aggregate-only SQL Server digests, and
+  records a v2 verifier identity, writer proof, and stable target custody.
+  Ambiguous writer outcomes retain custody and fail closed. Omitting the
+  selector continues to use the v1 BCP plus Python-readback path.
+
 ## 0.83.25 - 2026-09-27
 
 ### Fixed

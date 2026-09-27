@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import uuid
 from contextlib import contextmanager
-from hashlib import sha256
 
 import pytest
 from tests.integration.mssql.mssql_live_support import clickhouse_connector, mssql_connector
@@ -13,7 +12,7 @@ from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
 from dpone.adapters.mssql_native_custody import NativeTargetCustody
 from dpone.adapters.mssql_native_guard import native_exact_stage_barrier
 from dpone.contracts.mssql_native_chunks import NativeChunkLimits, NativeChunkPlan
-from dpone.contracts.mssql_native_verification import NativeVerificationBackend, NativeVerificationIdentityV2
+from dpone.contracts.mssql_native_verification_identity import build_bcp_target_local_verification_identity
 from dpone.runtime.connectors.mssql_bulk import BcpOptions
 from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
 from dpone.runtime.sinks.mssql_native_composition import compose_native_stage_context
@@ -40,16 +39,7 @@ def test_clickhouse_rows_use_aggregate_only_verification_and_atomic_publication(
     plan = NativeChunkPlan(
         "synthetic-run", target_id, "synthetic-query", "synthetic-window", "synthetic-schema", wire.type_layout_hash
     )
-    identity = NativeVerificationIdentityV2(
-        plan,
-        "bcp",
-        NativeVerificationBackend.TARGET_LOCAL,
-        sha256(b"no-companion-protocol").hexdigest(),
-        sha256(b"no-companion-package").hexdigest(),
-        sha256(wire.type_layout_hash.encode()).hexdigest(),
-        "mssql-native-sha256-sum-v1",
-        sha256(b"synthetic-timeout-policy").hexdigest(),
-    )
+    identity = build_bcp_target_local_verification_identity(plan, timeout_seconds=30)
     store = SQLiteWindowStore(tmp_path / "route-state.sqlite", clock=lambda: 1.0)
     lease = store.acquire(target_id, "synthetic-owner", 300)
     custody = NativeTargetCustody(store, target_id)
