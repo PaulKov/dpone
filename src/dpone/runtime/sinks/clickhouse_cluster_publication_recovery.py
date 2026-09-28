@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from dataclasses import replace
 from typing import TypeVar
@@ -12,6 +13,7 @@ from dpone.ports.clickhouse_cluster_publication import (
     contracts,
     require_verified_mutation,
 )
+from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import DEFAULT_WAIT_SECONDS
 from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import require_candidate_rows as require_candidate_rows
 
 _Receipt = TypeVar("_Receipt")
@@ -70,10 +72,43 @@ def require_first_publication_complete(
         )
 
 
+def candidate_readiness_deadline() -> float:
+    """Start one monotonic budget shared by pre-authority and pre-DDL checks."""
+    return time.monotonic() + DEFAULT_WAIT_SECONDS
+
+
 def require_pre_dispatch_generation(
-    catalog: ClusterPublicationCatalogPort, cluster: str, record: contracts.AuthorityRecord
+    catalog: ClusterPublicationCatalogPort,
+    cluster: str,
+    record: contracts.AuthorityRecord,
+    *,
+    deadline: float | None = None,
+    monotonic: Callable[[], float] = time.monotonic,
+    sleep: Callable[[float], None] = time.sleep,
 ) -> None:
-    """Recheck the immutable generation identity and staged row count."""
+    """Wait for rows/health, but reject immutable generation drift immediately."""
+
+    inventory = catalog.inventory(cluster)
+    contracts.require_inventory(record, inventory)
+    require_candidate_rows(
+        contracts.ClusterPublicationError,
+        catalog.candidate_counts,
+        cluster,
+        record.database,
+        record.candidate,
+        inventory.hosts,
+        record.staged_rows,
+        deadline=deadline,
+        additional_readiness=lambda: _generation_readiness(catalog, cluster, record),
+        monotonic=monotonic,
+        sleep=sleep,
+    )
+
+
+def _generation_readiness(
+    catalog: ClusterPublicationCatalogPort, cluster: str, record: contracts.AuthorityRecord
+) -> str | None:
+    """Keep hard identity checks distinct from transient replication readiness."""
 
     inventory = catalog.inventory(cluster)
     contracts.require_inventory(record, inventory)
@@ -82,11 +117,14 @@ def require_pre_dispatch_generation(
     if (
         contracts.one_generation_identity(facts, "candidate") != record.desired
         or contracts.optional_generation_identity(facts, "target") != record.predecessor
-        or any(not fact.candidate_healthy or fact.row_count != record.staged_rows for fact in facts)
     ):
         raise contracts.ClusterPublicationError(
             "DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED", "generation changed before publication dispatch"
         )
+    pending = ",".join(
+        fact.host for fact in facts if not fact.candidate_healthy or fact.row_count != record.staged_rows
+    )
+    return f"candidate replica health or metadata count is not ready on hosts={pending}" if pending else None
 
 
 def complete_authority(authority: ClusterPublicationAuthorityPort, current: contracts.VersionedAuthorityRecord) -> None:

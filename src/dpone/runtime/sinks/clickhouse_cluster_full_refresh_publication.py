@@ -24,13 +24,13 @@ from dpone.runtime.sinks.clickhouse_cluster_publication_identity import is_clust
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import operation_id as _operation_id
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
 from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
-    complete_authority as _complete,
-)
-from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
-    require_candidate_rows,
+    candidate_readiness_deadline,
     require_first_publication_complete,
     require_pre_dispatch_generation,
     settle_prior_publication,
+)
+from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
+    complete_authority as _complete,
 )
 from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
     require_same_operation as _require_same_operation,
@@ -87,15 +87,6 @@ class ClickHouseClusterFullRefreshPublicationService:
         predecessor = _optional_one_identity(facts, "target")
         if predecessor == desired:
             raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_GENERATION_INVALID", "generations must differ")
-        require_candidate_rows(
-            ClusterPublicationError,
-            self._catalog.candidate_counts,
-            cluster,
-            database,
-            candidate,
-            inventory.hosts,
-            staged_rows,
-        )
         operation_id = _operation_id(load_config)
         target_key = digest_payload({"cluster": cluster, "database": database, "target": target})
         record = AuthorityRecord(
@@ -119,6 +110,8 @@ class ClickHouseClusterFullRefreshPublicationService:
             predecessor=predecessor,
             staged_rows=staged_rows,
         )
+        readiness_deadline = candidate_readiness_deadline()
+        require_pre_dispatch_generation(self._catalog, cluster, record, deadline=readiness_deadline)
         authority = self._authority_factory(database)
         current = authority.read_versioned(target_key)
         if current is None:
@@ -136,7 +129,7 @@ class ClickHouseClusterFullRefreshPublicationService:
             if record.phase is not AuthorityPhase.PREPARED:
                 _require_inventory(record, inventory)
                 return self._reconcile_existing(authority, current, cluster)
-        require_pre_dispatch_generation(self._catalog, cluster, record)
+        require_pre_dispatch_generation(self._catalog, cluster, record, deadline=readiness_deadline)
         token = _correlation_token(operation_id, "publish", record.dispatch_epoch + 1)
         dispatching = record.dispatching(
             token=token,

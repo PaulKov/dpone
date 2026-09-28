@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.84.2 - 2026-09-28
+## 0.84.3 - 2026-09-28
 
 ### Fixed
 
@@ -11,6 +11,14 @@
 - Native MSSQL-to-ClickHouse ingestion preserves the exported physical source
   schema when a logical payload contract normalizes types. Column identity and
   target type validation remain required before decoding.
+- Replicated cluster publication waits for exact candidate rows and replica
+  health before preparing authority and before dispatching publication, sharing
+  one bounded polling budget. Immutable generation drift still fails immediately.
+
+## 0.84.2 - 2026-09-28
+
+### Fixed
+
 - Local live certification builds its pinned test S3 server from upstream
   source and initializes the bucket with a bounded, verified S3 API flow,
   avoiding reliance on an inaccessible container registry.
