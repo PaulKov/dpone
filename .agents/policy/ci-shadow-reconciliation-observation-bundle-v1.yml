@@ -6,7 +6,7 @@ entries:
     blob_sha256: "sha256:c1032334f30d1e86295a92a0c19a78c3bdca40600b72af3fc58ca58c1d96482c"
   - path: pyproject.toml
     mode: "100644"
-    blob_sha256: "sha256:868c81e468bd109ad1d964d9569269f22f726b3add79832566647a4ed84d113c"
+    blob_sha256: "sha256:cad597feca197fac4f825a491be2b1d60eb42a6e08985aabbe58b9d45c68ebbf"
   - path: src/dpone/adapters/ci_shadow_reconciliation_github.py
     mode: "100644"
     blob_sha256: "sha256:e733fe454257d042e2e7a1912fe296eb26719da745fa6f9ed224a6c9032fb26b"
@@ -63,4 +63,4 @@ entries:
     blob_sha256: "sha256:0a507fbb9dfcc988e9b5382362ba383547cacba00660606a37702617224edc23"
   - path: uv.lock
     mode: "100644"
-    blob_sha256: "sha256:daddc5da3ed4ccb087b9b9d4f0d6f0259e139028459e363275ca5c0b77a89b6a"
+    blob_sha256: "sha256:97f5165de0db1b1a07413e1ffe116dec8f4211e289eb5fa43f79bb0449e49042"
