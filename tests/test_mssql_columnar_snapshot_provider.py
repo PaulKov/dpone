@@ -995,6 +995,9 @@ class _AuthorityConnector:
         self.bounds_queries.append(query)
         return [self.bounds_row] if self.bounds_row is not None else []
 
+    def open_session(self, *, application_name: str):
+        return SimpleNamespace(application_name=application_name)
+
 
 class _ConcurrentUploadClient:
     def __init__(self, delegate: LocalObjectStorageClient, *, workers: int) -> None:

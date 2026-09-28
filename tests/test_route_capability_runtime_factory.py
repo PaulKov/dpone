@@ -95,9 +95,9 @@ def test_columnar_request_factory_resolves_auto_range_bounds() -> None:
     assert request.range_plan is not None
     assert len(request.range_plan.ranges) == 2
     assert source.connector.bounds_queries == [
-        "SELECT MIN([id]) AS dpone_min_value, MAX([id]) AS dpone_max_value, "
-        "COUNT_BIG(1) AS dpone_row_count, SUM(CASE WHEN [id] IS NULL THEN 1 ELSE 0 END) "
-        "AS dpone_null_count FROM (SELECT id, name FROM dbo.orders) AS dpone_bounds"
+        "SELECT MIN([id]), MAX([id]), COUNT_BIG(1), "
+        "SUM(CASE WHEN [id] IS NULL THEN 1 ELSE 0 END) "
+        "FROM (SELECT id, name FROM dbo.orders) AS dpone_bounds"
     ]
 
 
