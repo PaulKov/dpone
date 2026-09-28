@@ -48,6 +48,11 @@ def test_columnar_chunked_windows_publish_slice_export_evidence() -> None:
         },
     ]
 
+    artifact.record_range_staging_metric({"staging_topology": "shared_per_run", "observed_load_concurrency": 1})
+    assert artifact.to_evidence()["range_staging_metrics"] == [
+        {"staging_topology": "shared_per_run", "observed_load_concurrency": 1}
+    ]
+
 
 def test_columnar_chunked_quality_scope_uses_export_rows_after_windows_materialize() -> None:
     artifact = ObjectStorageColumnarChunkedArtifact(

@@ -8,6 +8,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from enum import Enum
 from typing import Any
+from uuid import UUID
 
 
 class PartitionBoundKind(str, Enum):  # noqa: UP042
@@ -18,6 +19,7 @@ class PartitionBoundKind(str, Enum):  # noqa: UP042
     DATETIME = "datetime"
     DATETIME_OFFSET = "datetimeoffset"
     ROWVERSION = "rowversion"
+    UUID = "uuid"
     TIME_CYCLIC = "time_cyclic"
 
 
@@ -29,6 +31,21 @@ class PartitionBoundaryResolution:
     source_type: str = ""
     scale: int | None = None
     warning_code: str | None = None
+
+
+class PreciseTemporalBound(str):
+    """Canonical SQL temporal literal retaining the seventh fractional digit."""
+
+    comparison_key: tuple[int, ...]
+
+    def __new__(cls, text: str, comparison_key: tuple[int, ...]) -> PreciseTemporalBound:
+        value = str.__new__(cls, text)
+        value.comparison_key = comparison_key
+        return value
+
+    @property
+    def text(self) -> str:
+        return str(self)
 
 
 class PartitionBoundaryTypeResolver:
@@ -70,6 +87,8 @@ class PartitionBoundaryTypeResolver:
             )
         if normalized in {"rowversion", "bytea_boundary"}:
             return PartitionBoundaryResolution(PartitionBoundKind.ROWVERSION, source_type=normalized)
+        if normalized in {"uuid", "uniqueidentifier"}:
+            return PartitionBoundaryResolution(PartitionBoundKind.UUID, source_type=normalized)
         if normalized == "date":
             return PartitionBoundaryResolution(PartitionBoundKind.DATE, source_type=normalized)
         if normalized in {"datetime", "smalldatetime"} or normalized.startswith("datetime2"):
@@ -78,7 +97,9 @@ class PartitionBoundaryTypeResolver:
                 source_type=normalized,
                 scale=_temporal_scale(normalized),
             )
-        if normalized in {"datetimeoffset", "timestamptz", "timestamp with time zone"}:
+        if normalized in {"datetimeoffset", "timestamptz", "timestamp with time zone"} or normalized.startswith(
+            "datetimeoffset("
+        ):
             return PartitionBoundaryResolution(
                 PartitionBoundKind.DATETIME_OFFSET,
                 source_type=normalized,
@@ -104,6 +125,8 @@ class PartitionBoundaryTypeResolver:
             return PartitionBoundaryResolution(PartitionBoundKind.DATE)
         if isinstance(value, bytes | bytearray):
             return PartitionBoundaryResolution(PartitionBoundKind.ROWVERSION)
+        if isinstance(value, UUID):
+            return PartitionBoundaryResolution(PartitionBoundKind.UUID)
         if isinstance(value, int | float | Decimal):
             return PartitionBoundaryResolution(PartitionBoundKind.NUMERIC)
         if isinstance(value, str):
@@ -136,15 +159,44 @@ def normalize_partition_bound(value: Any, resolution: PartitionBoundaryResolutio
     if resolution.kind == PartitionBoundKind.DATE:
         return _parse_date(value)
     if resolution.kind in {PartitionBoundKind.DATETIME, PartitionBoundKind.DATETIME_OFFSET}:
+        if isinstance(value, str) and (_fractional_scale(value) or 0) > 6:
+            return _precise_temporal(value, with_offset=resolution.kind == PartitionBoundKind.DATETIME_OFFSET)
         parsed = _parse_datetime(value)
         if resolution.kind == PartitionBoundKind.DATETIME_OFFSET and parsed.tzinfo is not None:
             return parsed.astimezone(timezone.utc)  # noqa: UP017
         return parsed
     if resolution.kind == PartitionBoundKind.ROWVERSION:
         return _rowversion_to_int(value)
+    if resolution.kind == PartitionBoundKind.UUID:
+        return UUID(str(value))
     if resolution.kind == PartitionBoundKind.TIME_CYCLIC:
         raise ValueError("time-only partition boundaries are cyclic and require an explicit certified policy.")
     return _normalize_numeric(value)
+
+
+def compare_partition_bounds(left: Any, right: Any, resolution: PartitionBoundaryResolution) -> int:
+    """Compare normalized bounds using source semantics.
+
+    SQL Server compares ``uniqueidentifier`` values in a byte-group order that
+    differs from UUID text and raw byte ordering.  UUID range validation uses
+    the same group significance and never performs arithmetic splitting.
+    """
+
+    if resolution.kind == PartitionBoundKind.UUID:
+        left_key = mssql_uuid_sort_key(left)
+        right_key = mssql_uuid_sort_key(right)
+        return (left_key > right_key) - (left_key < right_key)
+    if isinstance(left, PreciseTemporalBound) and isinstance(right, PreciseTemporalBound):
+        return (left.comparison_key > right.comparison_key) - (left.comparison_key < right.comparison_key)
+    return (left > right) - (left < right)
+
+
+def mssql_uuid_sort_key(value: Any) -> tuple[int, ...]:
+    """Return the comparison key used by SQL Server ``uniqueidentifier``."""
+
+    raw = UUID(str(value)).bytes
+    order = (10, 11, 12, 13, 14, 15, 8, 9, 6, 7, 4, 5, 0, 1, 2, 3)
+    return tuple(raw[index] for index in order)
 
 
 def format_datetime_literal(value: datetime, *, scale: int | None) -> str:
@@ -200,6 +252,25 @@ def _parse_datetime(value: Any) -> datetime:
     return datetime.fromisoformat(text)
 
 
+def _precise_temporal(value: str, *, with_offset: bool) -> PreciseTemporalBound:
+    text = value.strip().replace(" ", "T").replace("Z", "+00:00")
+    match = re.fullmatch(
+        r"(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.(\d{1,7})([+-]\d{2}:\d{2})?",
+        text,
+    )
+    if match is None:
+        raise ValueError("Invalid precise temporal partition boundary.")
+    zone = match.group(3) or ""
+    if with_offset != bool(zone):
+        raise ValueError("datetimeoffset boundaries require an explicit UTC offset.")
+    fraction = match.group(2).ljust(7, "0")
+    parsed = datetime.fromisoformat(f"{match.group(1)}.{fraction[:6]}{zone}")
+    if with_offset:
+        parsed = parsed.astimezone(timezone.utc)  # noqa: UP017
+    key = (*parsed.timetuple()[:6], parsed.microsecond, int(fraction[6]))
+    return PreciseTemporalBound(f"{match.group(1)}.{fraction}{zone}", key)
+
+
 def _rowversion_to_int(value: Any) -> int:
     if isinstance(value, int):
         return value
@@ -239,3 +310,16 @@ def _clean(value: str | None) -> str:
 
 
 _DATE_RE = re.compile(r"\d{4}-\d{2}-\d{2}")
+
+
+__all__ = [
+    "PartitionBoundaryResolution",
+    "PartitionBoundaryTypeResolver",
+    "PartitionBoundKind",
+    "PreciseTemporalBound",
+    "compare_partition_bounds",
+    "format_datetime_literal",
+    "format_rowversion_literal",
+    "mssql_uuid_sort_key",
+    "normalize_partition_bound",
+]

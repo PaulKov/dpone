@@ -2,9 +2,80 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections import defaultdict
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass
 from importlib import import_module
+from threading import Lock
 from typing import Any
+
+
+@dataclass(frozen=True, slots=True)
+class ClickHouseRangeStagingCallbacks:
+    """Injected ClickHouse operations for range-owned staging resources."""
+
+    clone_connector: Callable[[int], Any]
+    plan_partition: Callable[[Any, int], Any]
+    create_partition: Callable[[Any, Any], None]
+    assemble_partitions: Callable[[tuple[Any, ...], Any], int]
+    drop_partition: Callable[[Any], None]
+
+
+@dataclass(frozen=True, slots=True)
+class RangeWindowGroup:
+    range_id: str
+    ordinal: int
+    windows: tuple[Any, ...]
+
+    @property
+    def expected_rows(self) -> int:
+        return sum(int(getattr(window, "row_count", 0) or 0) for window in self.windows)
+
+
+class RangeLoadConcurrencyTracker:
+    def __init__(self) -> None:
+        self._lock = Lock()
+        self._active = 0
+        self.maximum = 0
+
+    def enter(self) -> None:
+        with self._lock:
+            self._active += 1
+            self.maximum = max(self.maximum, self._active)
+
+    def leave(self) -> None:
+        with self._lock:
+            self._active -= 1
+
+
+class RangeLoadCancellation:
+    """Cancel every active worker while preserving the first load error."""
+
+    def __init__(self, connectors: Sequence[Any]) -> None:
+        self._connectors = tuple(connectors)
+        self._lock = Lock()
+        self._started = False
+        self.primary_error: BaseException | None = None
+
+    def fail(self, error: BaseException) -> None:
+        with self._lock:
+            if self._started:
+                return
+            self._started = True
+            self.primary_error = error
+        cleanup_error: BaseException | None = None
+        for connector in self._connectors:
+            try:
+                cancel = getattr(connector, "cancel", None)
+                if callable(cancel):
+                    cancel()
+                close = getattr(connector, "close", None)
+                if callable(close):
+                    close()
+            except BaseException as caught:
+                cleanup_error = cleanup_error or caught
+        if cleanup_error is not None:
+            error.add_note(f"range load cancellation failed: {type(cleanup_error).__name__}")
 
 
 def is_source_native_artifact(artifact: Any) -> bool:
@@ -34,6 +105,7 @@ def columnar_pull_loader(sink: Any) -> Any:
         connector=sink.connector,
         table_name=sink._table,
         count_rows=sink._count,
+        range_staging=_range_staging_callbacks(sink),
     )
 
 
@@ -61,3 +133,289 @@ def is_local_columnar_staging_manifest(artifact: Any) -> bool:
 
 def is_local_columnar_chunked_artifact(artifact: Any) -> bool:
     return artifact.__class__.__name__ == "LocalColumnarChunkedArtifact" and hasattr(artifact, "iter_chunks")
+
+
+def range_staging_policy(artifact: Any) -> tuple[str, int] | None:
+    request = getattr(artifact, "request", None)
+    plan = getattr(request, "range_plan", None)
+    candidates = (
+        getattr(artifact, "range_parallelism_policy", None),
+        getattr(request, "range_parallelism_policy", None),
+        getattr(plan, "policy", None),
+    )
+    policy = next((item for item in candidates if item is not None), None)
+    if policy is None:
+        options = getattr(request, "options", None)
+        if isinstance(options, Mapping):
+            partitioning = options.get("partitioning")
+            if isinstance(partitioning, Mapping):
+                policy = partitioning.get("range_parallelism")
+            if policy is None:
+                policy = options.get("range_parallelism")
+    if policy is None:
+        return None
+    if isinstance(policy, Mapping):
+        topology = policy.get("staging_topology", "shared_per_run")
+        workers = policy.get("load_workers", 1)
+    else:
+        topology = getattr(policy, "staging_topology", "shared_per_run")
+        workers = getattr(policy, "load_workers", 1)
+    if topology not in {"shared_per_run", "per_partition"}:
+        raise ValueError("clickhouse_range_staging_topology_invalid")
+    if isinstance(workers, bool) or not isinstance(workers, int) or workers < 1:
+        raise ValueError("clickhouse_range_load_workers_invalid")
+    return str(topology), workers
+
+
+def group_range_windows(windows: tuple[Any, ...], *, artifact: Any | None = None) -> tuple[RangeWindowGroup, ...]:
+    plan = getattr(getattr(artifact, "request", None), "range_plan", None)
+    if plan is not None:
+        return _group_planned_range_windows(windows, artifact=artifact, plan=plan)
+    return _group_emitted_range_windows(windows)
+
+
+def payload_staged_cleanup_owner(payload: Any) -> Any | None:
+    artifact = getattr(payload, "artifact", None)
+    owner = getattr(artifact, "staged_cleanup_owner", None)
+    return owner() if callable(owner) else None
+
+
+def cleanup_staged_object_owner(owner: Any, *, primary: BaseException | None = None) -> bool:
+    cleanup = getattr(owner, "cleanup_owned_object_storage", None)
+    if not callable(cleanup):
+        return True
+    try:
+        cleanup()
+    except BaseException as error:
+        if primary is None:
+            raise
+        primary.add_note(f"object storage cleanup failed: {type(error).__name__}")
+        return False
+    return True
+
+
+def cleanup_failed_clickhouse_stage(
+    drop_configs: Callable[..., None],
+    owner: Any,
+    error: BaseException,
+    *configs: Any | None,
+) -> bool:
+    cleanup_succeeded = True
+    if any(config is not None for config in configs):
+        try:
+            drop_configs(*configs)
+        except Exception as cleanup_error:
+            cleanup_succeeded = False
+            error.add_note(f"raw staging cleanup failed: {type(cleanup_error).__name__}")
+    return cleanup_staged_object_owner(owner, primary=error) and cleanup_succeeded
+
+
+def cleanup_clickhouse_stage(sink: Any, external: Any, drop_configs: Callable[..., None], handle: Any) -> None:
+    if external.cleanup(handle, abort=False):
+        return
+    try:
+        finalizer = getattr(sink, "_staging_finalizer", None)
+        retire = getattr(finalizer, "retire_strategy_staging_validations", None)
+        if callable(retire):
+            retire(handle.finalization_config or handle.staging_config)
+        module = import_module("dpone.runtime.sinks.clickhouse_full_refresh_staged")
+        configs, publication = module.publication_cleanup_plan(handle)
+        drop_configs(*configs)
+        if publication is not None:
+            sink._cleanup_full_refresh_publication(publication)
+    except BaseException as error:
+        cleanup_staged_object_owner(getattr(handle, "sink_state", None), primary=error)
+        raise
+    cleanup_staged_object_owner(getattr(handle, "sink_state", None))
+
+
+def _group_emitted_range_windows(windows: tuple[Any, ...]) -> tuple[RangeWindowGroup, ...]:
+    grouped: dict[int, list[Any]] = defaultdict(list)
+    identities: dict[int, str] = {}
+    for window in windows:
+        range_id = getattr(window, "range_id", None)
+        ordinal = getattr(window, "range_ordinal", None)
+        if not isinstance(range_id, str) or not range_id or isinstance(ordinal, bool) or not isinstance(ordinal, int):
+            raise ValueError("clickhouse_range_window_identity_missing")
+        if ordinal < 0 or (ordinal in identities and identities[ordinal] != range_id):
+            raise ValueError("clickhouse_range_window_identity_invalid")
+        identities[ordinal] = range_id
+        grouped[ordinal].append(window)
+    ordinals = tuple(sorted(grouped))
+    if ordinals != tuple(range(len(ordinals))) or len(set(identities.values())) != len(identities):
+        raise ValueError("clickhouse_range_window_ordinals_invalid")
+    return tuple(RangeWindowGroup(identities[ordinal], ordinal, tuple(grouped[ordinal])) for ordinal in ordinals)
+
+
+def _group_planned_range_windows(windows: tuple[Any, ...], *, artifact: Any, plan: Any) -> tuple[RangeWindowGroup, ...]:
+    descriptors = tuple(getattr(plan, "ranges", ()) or ())
+    expected: dict[int, str] = {}
+    for descriptor in descriptors:
+        ordinal = getattr(descriptor, "ordinal", None)
+        range_id = getattr(descriptor, "range_id", None)
+        if isinstance(ordinal, bool) or not isinstance(ordinal, int) or not isinstance(range_id, str) or not range_id:
+            raise ValueError("clickhouse_range_plan_invalid")
+        expected[ordinal] = range_id
+    if (
+        not descriptors
+        or tuple(sorted(expected)) != tuple(range(len(descriptors)))
+        or len(expected) != len(descriptors)
+        or len(set(expected.values())) != len(expected)
+    ):
+        raise ValueError("clickhouse_range_plan_invalid")
+    grouped: dict[int, list[Any]] = {ordinal: [] for ordinal in expected}
+    for window in windows:
+        ordinal = getattr(window, "range_ordinal", None)
+        range_id = getattr(window, "range_id", None)
+        if isinstance(ordinal, bool) or not isinstance(ordinal, int) or ordinal not in expected:
+            raise ValueError("clickhouse_range_window_not_planned")
+        if range_id != expected[ordinal]:
+            raise ValueError("clickhouse_range_window_identity_mismatch")
+        grouped[ordinal].append(window)
+    confirmed_rows = _confirmed_range_rows(artifact, expected)
+    groups = tuple(RangeWindowGroup(expected[ordinal], ordinal, tuple(grouped[ordinal])) for ordinal in expected)
+    for group in groups:
+        if group.expected_rows != confirmed_rows[group.range_id]:
+            raise ValueError(f"clickhouse_range_confirmation_row_count_mismatch:{group.range_id}")
+    return groups
+
+
+def _confirmed_range_rows(artifact: Any, expected: Mapping[int, str]) -> dict[str, int]:
+    evidence = getattr(artifact, "range_execution_evidence", None)
+    if isinstance(evidence_ranges := getattr(evidence, "ranges", None), tuple):
+        strict_confirmed = {item.range_id: item.rows for item in evidence_ranges if item.eof_confirmed}
+        if getattr(evidence, "outcome_status", None) != "extracted" or len(strict_confirmed) != len(evidence_ranges):
+            raise ValueError("clickhouse_range_execution_confirmation_invalid")
+        if set(strict_confirmed) != set(expected.values()):
+            raise ValueError("clickhouse_range_execution_confirmation_set_mismatch")
+        return strict_confirmed
+    if not isinstance(evidence, Mapping) or evidence.get("all_ranges_confirmed") is not True:
+        raise ValueError("clickhouse_range_execution_confirmation_missing")
+    if not isinstance(raw_ranges := evidence.get("ranges"), list | tuple):
+        raise ValueError("clickhouse_range_execution_confirmation_invalid")
+    confirmed: dict[str, int] = {}
+    for item in raw_ranges:
+        if not isinstance(item, Mapping) or item.get("eof_confirmed") is not True:
+            raise ValueError("clickhouse_range_execution_confirmation_invalid")
+        range_id = item.get("range_id")
+        rows = item.get("rows")
+        if not isinstance(range_id, str) or isinstance(rows, bool) or not isinstance(rows, int) or rows < 0:
+            raise ValueError("clickhouse_range_execution_confirmation_invalid")
+        if range_id in confirmed:
+            raise ValueError("clickhouse_range_execution_confirmation_invalid")
+        confirmed[range_id] = rows
+    if set(confirmed) != set(expected.values()):
+        raise ValueError("clickhouse_range_execution_confirmation_set_mismatch")
+    return confirmed
+
+
+def count_connector_rows(connector: Any, table_name: str) -> int:
+    rows = connector.get_records(f"SELECT count() FROM {table_name}")
+    return int(rows[0][0]) if rows else 0
+
+
+def cleanup_range_resources(
+    windows: Sequence[Any],
+    partitions: Sequence[Any],
+    *,
+    drop_partition: Callable[[Any], None] | None,
+) -> BaseException | None:
+    failure: BaseException | None = None
+    for partition in reversed(tuple(partitions)):
+        if drop_partition is None:
+            break
+        try:
+            drop_partition(partition)
+        except BaseException as error:
+            failure = failure or error
+    for window in windows:
+        cleanup = getattr(window, "cleanup", None)
+        if not callable(cleanup):
+            continue
+        try:
+            cleanup()
+        except BaseException as error:
+            failure = failure or error
+    return failure
+
+
+def mark_source_byte_measurement_complete(artifact: Any) -> None:
+    mark_complete = getattr(artifact, "mark_source_byte_measurement_complete", None)
+    if callable(mark_complete):
+        mark_complete()
+
+
+def record_range_staging_metric(
+    artifact: Any,
+    *,
+    topology: str,
+    requested_workers: int,
+    observed_workers: int,
+    groups: Sequence[RangeWindowGroup],
+    stage_configs: Sequence[Any],
+    authoritative_config: Any,
+    assembly_rows: int | None,
+    observed_rows: Mapping[str, int],
+) -> None:
+    recorder = getattr(artifact, "record_range_staging_metric", None)
+    if callable(recorder):
+        recorder(
+            {
+                "schema_version": "dpone.native_transfer.columnar_range_staging.v1",
+                "staging_topology": topology,
+                "requested_load_workers": requested_workers,
+                "observed_load_workers": observed_workers,
+                "range_count": len(groups),
+                "rows": sum(group.expected_rows for group in groups),
+                "range_confirmations": [
+                    {
+                        "range_id": group.range_id,
+                        "range_ordinal": group.ordinal,
+                        "rows": observed_rows[group.range_id],
+                        "stage_confirmed": True,
+                    }
+                    for group in groups
+                ],
+            }
+        )
+    advance = getattr(artifact, "advance_range_staging", None)
+    if callable(advance):
+        advance(groups, stage_configs, observed_workers, assembly_rows, authoritative_config, observed_rows)
+
+
+def rows_per_second(rows: int, seconds: float) -> float | None:
+    if seconds <= 0:
+        return None
+    return rows / seconds
+
+
+def elapsed(started: float, finished: float) -> float:
+    return max(0.0, finished - started)
+
+
+def _create_range_partition(sink: Any, parent: Any, partition: Any) -> None:
+    sink._ensure_database(partition)
+    sink.connector.execute_query(
+        f"CREATE TABLE {sink._table(partition)}{sink._cluster_ddl_clause(parent)} AS {sink._table(parent)}"
+    )
+
+
+def _assemble_range_partitions(sink: Any, partitions: tuple[Any, ...], target: Any) -> int:
+    if not partitions:
+        return 0
+    select_sql = " UNION ALL ".join(f"SELECT * FROM {sink._table(config)}" for config in partitions)
+    sink.connector.execute_query(f"INSERT INTO {sink._table(target)} {select_sql}")
+    return int(sink._count(target))
+
+
+def _range_staging_callbacks(sink: Any) -> ClickHouseRangeStagingCallbacks | None:
+    required = ("_clone_connector", "_operation_table_config", "_drop_table", "_ensure_database")
+    if any(not callable(getattr(sink, name, None)) for name in required):
+        return None
+    return ClickHouseRangeStagingCallbacks(
+        clone_connector=sink._clone_connector,
+        plan_partition=lambda config, ordinal: sink._operation_table_config(config, f"range_{ordinal:06d}"),
+        create_partition=lambda parent, partition: _create_range_partition(sink, parent, partition),
+        assemble_partitions=lambda partitions, target: _assemble_range_partitions(sink, partitions, target),
+        drop_partition=lambda config: sink._drop_table(sink._table(config), config),
+    )

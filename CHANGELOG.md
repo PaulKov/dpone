@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Opt-in bounded range parallelism for the MSSQL → Parquet/object-storage →
+  ClickHouse columnar route. Canonical typed ranges, independent reader sessions,
+  aggregate row/byte/inflight limits, explicit source-consistency authority,
+  configurable staging topology, and one all-ranges publication barrier are
+  exposed in plan and runtime evidence. Existing manifests remain serial.
+
 ## 0.86.0 - 2026-09-29
 
 ### Added

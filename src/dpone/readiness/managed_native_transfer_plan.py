@@ -1,17 +1,21 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from dpone.readiness.managed_utils import _source_columns
+from dpone.readiness.migration_control import stable_fingerprint
 from dpone.readiness.native_snapshot_planning import build_native_transfer_snapshot_optimization
 from dpone.runtime.bulk_wire import BulkWirePlanner
 from dpone.runtime.columnar_fast_path_planner import ColumnarFastPathPlanner
 from dpone.runtime.columnar_parquet_writer import PyArrowParquetChunkWriter, mssql_source_type_supported
+from dpone.runtime.columnar_range_parallelism import build_columnar_range_plan
 from dpone.runtime.native_transfer_capabilities import NativeTransferCapabilityPlanner
 from dpone.runtime.native_transfer_execution import NativeTransferExecutionPolicy
 from dpone.runtime.native_transfer_route_planner import NativeTransferRoutePlanner
+from dpone.runtime.partitioning import RangePartitioner
 
 
 def native_transfer_execution(raw: Mapping[str, Any]) -> dict[str, Any]:
@@ -86,7 +90,54 @@ def columnar_fast_path_plan(
         clickhouse_pull_available=source_type == "mssql" and sink_type == "clickhouse",
         current_provider="mssql_bcp_queryout_to_clickhouse_direct_tsv",
     )
-    return decision.to_evidence()
+    details = dict(decision.details)
+    range_parallelism = _columnar_range_parallelism_plan(source_options, raw)
+    if range_parallelism:
+        details["range_parallelism"] = range_parallelism
+    return replace(decision, details=details).to_evidence()
+
+
+def _columnar_range_parallelism_plan(
+    source_options: Mapping[str, Any],
+    raw: Mapping[str, Any],
+) -> dict[str, Any]:
+    partitioning = source_options.get("partitioning")
+    if not isinstance(partitioning, Mapping) or not isinstance(partitioning.get("range_parallelism"), Mapping):
+        return {}
+    try:
+        partitioner = RangePartitioner.from_options(dict(source_options))
+        if not partitioner.enabled:
+            policy = partitioner.range_parallelism
+            return {
+                "status": "serial",
+                "policy": policy.to_dict(),
+                "policy_fingerprint": policy.fingerprint,
+                "planned_range_count": 1,
+            }
+        identity = stable_fingerprint(
+            {
+                "source": _source_identity(raw),
+                "columns": source_options.get("columns", ()),
+            }
+        )
+        plan = build_columnar_range_plan(partitioner, query_identity=identity)
+        return {"status": "planned", **plan.to_dict()}
+    except ValueError as exc:
+        return {
+            "status": "blocked",
+            "blockers": [f"columnar_range_parallelism:{exc}"],
+        }
+
+
+def _source_identity(raw: Mapping[str, Any]) -> dict[str, Any]:
+    source = raw.get("source")
+    if not isinstance(source, Mapping):
+        return {}
+    table = source.get("table")
+    return {
+        "type": source.get("type"),
+        "table": dict(table) if isinstance(table, Mapping) else table,
+    }
 
 
 def requests_object_storage_pull(raw: Mapping[str, Any]) -> bool:

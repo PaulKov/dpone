@@ -6,10 +6,12 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Protocol
+from uuid import UUID
 
 from dpone.runtime.partitioning_bounds import (
     PartitionBoundaryResolution,
     PartitionBoundKind,
+    PreciseTemporalBound,
     format_datetime_literal,
     format_rowversion_literal,
 )
@@ -30,6 +32,9 @@ class PartitionLike(Protocol):
 
     @property
     def is_null_partition(self) -> bool: ...
+
+    @property
+    def include_nulls(self) -> bool: ...
 
     @property
     def boundary(self) -> PartitionBoundaryResolution: ...
@@ -60,11 +65,19 @@ class DefaultPartitionPredicateRenderer:
                 f"{quoted_column} {'<=' if partition.include_upper else '<'} "
                 f"{self.literal(partition.upper_bound, partition.boundary)}"
             )
-        if not clauses:
-            return "1 = 1"
-        return " AND ".join(clauses)
+        predicate = " AND ".join(clauses) if clauses else "1 = 1"
+        if partition.include_nulls:
+            return f"({quoted_column} IS NULL OR ({predicate}))"
+        return predicate
 
     def literal(self, value: object, boundary: PartitionBoundaryResolution) -> str:
+        if isinstance(value, PreciseTemporalBound):
+            dtype = (
+                _mssql_datetimeoffset_type(boundary)
+                if boundary.kind == PartitionBoundKind.DATETIME_OFFSET
+                else _mssql_temporal_type(boundary)
+            )
+            return f"CONVERT({dtype}, '{value.text}', 127)"
         if isinstance(value, bool):
             return "1" if value else "0"
         if isinstance(value, int | float | Decimal):
@@ -93,6 +106,8 @@ class MssqlPartitionPredicateRenderer(DefaultPartitionPredicateRenderer):
             return f"CONVERT({dtype}, '{rendered}', 127)"
         if boundary.kind == PartitionBoundKind.ROWVERSION:
             return format_rowversion_literal(value)
+        if boundary.kind == PartitionBoundKind.UUID:
+            return f"CONVERT(uniqueidentifier, '{UUID(str(value))}')"
         return DefaultPartitionPredicateRenderer.literal(self, value, boundary)
 
 

@@ -18,6 +18,7 @@ from dpone.runtime.sinks.clickhouse_staging_finalizer import (
     CLICKHOUSE_STAGED_VALIDATION_RECEIPT_INVALID,
     ClickHouseStagingFinalizer,
 )
+from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.merge_policy import MergePolicy
 
 
@@ -207,6 +208,22 @@ def test_validated_finalizer_rejects_forged_or_drifted_token_before_target() -> 
     assert sink.swapped is False
 
 
+def test_full_refresh_dispatch_preserves_service_override() -> None:
+    expected = LoadResult(1, 0, 1, staging_rows=1)
+
+    class Service(ClickHouseStagedLoadService):
+        def _full_refresh(self, _config: object, _handle: object) -> LoadResult:
+            return expected
+
+    sink = FakeSink()
+    service = Service(sink)
+    config = _config(LoadStrategy.FULL_REFRESH)
+    handle = _handle()
+    token = service.validate(config, handle)
+
+    assert service.finalize_validated(config, handle, token) is expected
+
+
 def test_clickhouse_sink_rejects_lookalike_validation_receipt() -> None:
     staged_sink = FakeSink()
     facade = object.__new__(ClickHouseSink)
@@ -246,6 +263,22 @@ def test_clickhouse_validation_token_is_single_use() -> None:
 
     with pytest.raises(AttributeError):
         setattr(validation_token, "load_config", load_config)
+
+
+def test_clickhouse_validation_receipt_is_safe_and_attempt_bound() -> None:
+    sink = FakeSink()
+    config = _config(LoadStrategy.FULL_REFRESH)
+    handle = _handle()
+    first = sink._staging_finalizer.validate_strategy_staging_key_integrity(config, handle.staging_config)
+    second = sink._staging_finalizer.validate_strategy_staging_key_integrity(config, handle.staging_config)
+
+    first_receipt = sink._staging_finalizer.strategy_staging_validation_receipt(first, config, handle.staging_config)
+    second_receipt = sink._staging_finalizer.strategy_staging_validation_receipt(second, config, handle.staging_config)
+
+    assert first_receipt.startswith("sha256:") and len(first_receipt) == 71
+    assert first_receipt != second_receipt
+    with pytest.raises(ValueError, match=CLICKHOUSE_STAGED_VALIDATION_RECEIPT_INVALID):
+        sink._staging_finalizer.strategy_staging_validation_receipt(object(), config, handle.staging_config)
 
 
 def test_clickhouse_validation_snapshot_preserves_runtime_connector_identity() -> None:

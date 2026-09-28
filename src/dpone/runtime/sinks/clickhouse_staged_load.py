@@ -1,5 +1,3 @@
-"""Staged ClickHouse load lifecycle used by governed and legacy loads."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
@@ -7,6 +5,7 @@ from dataclasses import replace
 from typing import Any
 
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION, LoadStrategy
+from dpone.runtime.columnar_range_evidence_lifecycle import range_evidence_transitions
 from dpone.runtime.governance.clickhouse_acceptance_metrics import ClickHouseAcceptanceMetricProbe
 from dpone.runtime.governance.ports import (
     StagedLoadHandle,
@@ -16,8 +15,13 @@ from dpone.runtime.governance.ports import (
 )
 from dpone.runtime.process_io import add_exception_note
 from dpone.runtime.sinks.clickhouse_external_staged_lifecycle import ClickHouseExternalStagedLifecycle
-from dpone.runtime.sinks.clickhouse_full_refresh_staged import finalize_full_refresh, publication_cleanup_plan
+from dpone.runtime.sinks.clickhouse_full_refresh_staged import finalize_full_refresh
 from dpone.runtime.sinks.clickhouse_loaded_contract import pending_native_observation
+from dpone.runtime.sinks.clickhouse_payload_support import (
+    cleanup_clickhouse_stage,
+    cleanup_failed_clickhouse_stage,
+    payload_staged_cleanup_owner,
+)
 from dpone.runtime.sinks.clickhouse_production_finalize import ClickHouseProductionFinalizer
 from dpone.runtime.sinks.clickhouse_staged_cleanup import drop_staging_configs
 from dpone.runtime.sinks.clickhouse_staged_evidence import enforce_source_byte_budget, staged_handle_metadata
@@ -32,8 +36,6 @@ from dpone.runtime.sinks.strategies.backfill import backfill_inner_strategy
 
 
 class ClickHouseStagedLoadService:
-    """Split ClickHouse bulk loading into stage, finalize, abort and cleanup."""
-
     def __init__(
         self,
         sink: Any,
@@ -53,9 +55,11 @@ class ClickHouseStagedLoadService:
         load_config = self._effective_config(load_config)
         if self._external.is_enabled(load_config):
             return self._external.stage(load_config, payload)
-        staging_config = self._create_staging(load_config, payload)
+        cleanup_owner = payload_staged_cleanup_owner(payload)
+        staging_config = None
         finalization_config = decoded_config = None
         try:
+            staging_config = self._create_staging(load_config, payload)
             observation = pending_native_observation(load_config, payload)
             if observation is None:
                 staged_rows = self._sink._insert_payload(staging_config, payload)
@@ -77,15 +81,12 @@ class ClickHouseStagedLoadService:
                 payload,
             )
         except BaseException as error:
-            try:
-                self._drop_configs(
-                    finalization_config,
-                    decoded_config,
-                    staging_config,
-                )
-            except Exception as cleanup_error:
-                add_exception_note(error, f"raw staging cleanup failed: {type(cleanup_error).__name__}")
+            cleanup_succeeded = cleanup_failed_clickhouse_stage(
+                self._drop_configs, cleanup_owner, error, finalization_config, decoded_config, staging_config
+            )
+            range_evidence_transitions.stage_failed(cleanup_owner, cleanup_succeeded)
             raise
+        assert staging_config is not None
         metadata = staged_handle_metadata(load_config, staging_config, finalization_config, decoded_config, payload)
         if source_byte_budget is not None:
             metadata["source_byte_budget"] = source_byte_budget.to_dict()
@@ -96,11 +97,10 @@ class ClickHouseStagedLoadService:
             finalization_config=finalization_config,
             decoded_config=decoded_config,
             metadata=metadata,
+            sink_state=cleanup_owner,
         )
 
     def load(self, load_config: Any, payload: Any) -> LoadResult:
-        """Run the direct staged lifecycle while preserving its primary error."""
-
         handle = self.stage(load_config, payload)
         try:
             validation_token = self.validate(load_config, handle)
@@ -134,30 +134,36 @@ class ClickHouseStagedLoadService:
 
     def finalize(self, load_config: Any, handle: StagedLoadHandle) -> LoadResult:
         load_config = self._effective_config(load_config)
-        validation_token = self.validate(load_config, handle)
-        return self.finalize_validated(load_config, handle, validation_token)
+        return self.finalize_validated(load_config, handle, self.validate(load_config, handle))
 
-    def finalize_validated(
-        self,
-        load_config: Any,
-        handle: StagedLoadHandle,
-        validation_token: object,
-    ) -> LoadResult:
-        """Finalize a handle whose exact effective table already passed validation."""
-
+    def finalize_validated(self, load_config: Any, handle: StagedLoadHandle, validation_token: object) -> LoadResult:
         load_config = self._effective_config(load_config)
-        if (external_result := self._external.publish(handle, validation_token)) is not None:
-            return external_result
+        try:
+            self._prepare_validated_publication(load_config, handle, validation_token)
+        except Exception:
+            range_evidence_transitions.prepublication_failed(handle.sink_state)
+            raise
+        publish = lambda: self._publish_validated(load_config, handle, validation_token)  # noqa: E731
+        return range_evidence_transitions.published(handle.sink_state, publish, load_config)
+
+    def _prepare_validated_publication(
+        self, load_config: Any, handle: StagedLoadHandle, validation_token: object
+    ) -> None:
+        if self._external.context(handle) is not None:
+            return
         self._sink._staging_finalizer.require_strategy_staging_validation(
             validation_token,
             load_config,
             self._finalization_config(handle),
         )
-        prepare = getattr(self._sink, "_prepare_staged_finalization", None)
-        if callable(prepare):
+        if callable(prepare := getattr(self._sink, "_prepare_staged_finalization", None)):
             prepare(load_config, handle)
-        strategy = load_config.load_strategy
-        if strategy == LoadStrategy.FULL_REFRESH:
+
+    def _publish_validated(self, load_config: Any, handle: StagedLoadHandle, validation_token: object) -> LoadResult:
+        load_config = self._effective_config(load_config)
+        if (external_result := self._external.publish(handle, validation_token)) is not None:
+            return external_result
+        if (strategy := load_config.load_strategy) == LoadStrategy.FULL_REFRESH:
             return self._full_refresh(load_config, handle)
         if strategy == LoadStrategy.INCREMENTAL_APPEND:
             return self._incremental_append(load_config, handle)
@@ -174,39 +180,29 @@ class ClickHouseStagedLoadService:
         raise ValueError(f"Unsupported ClickHouse load strategy: {strategy.value}")
 
     def validate(self, load_config: Any, handle: StagedLoadHandle) -> object:
-        """Validate the exact post-projection table before target finalization."""
-
         load_config = self._effective_config(load_config)
-        if (external_validation := self._external.validate(handle)) is not None:
-            return external_validation
-        return self._sink._staging_finalizer.validate_strategy_staging_key_integrity(
-            load_config,
-            self._finalization_config(handle),
+        staging_config = self._finalization_config(handle)
+        return range_evidence_transitions.validated(
+            handle.sink_state,
+            load_config=load_config,
+            staging_config=staging_config,
+            external_validation=self._external.validate(handle),
+            validate=lambda: self._sink._staging_finalizer.validate_strategy_staging_key_integrity(
+                load_config, staging_config
+            ),
+            authority=getattr(self._sink, "_staging_finalizer", None),
         )
 
     def _effective_config(self, load_config: Any) -> Any:
-        if load_config.load_strategy != LoadStrategy.BACKFILL:
-            return load_config
-        return replace(load_config, load_strategy=backfill_inner_strategy(load_config))
+        if load_config.load_strategy == LoadStrategy.BACKFILL:
+            return replace(load_config, load_strategy=backfill_inner_strategy(load_config))
+        return load_config
 
     def cleanup(self, handle: StagedLoadHandle) -> None:
-        if self._external.cleanup(handle, abort=False):
-            return
-        finalizer = getattr(self._sink, "_staging_finalizer", None)
-        retire = getattr(finalizer, "retire_strategy_staging_validations", None)
-        if callable(retire):
-            retire(self._finalization_config(handle))
-        configs, publication = publication_cleanup_plan(handle)
-        if publication is None:
-            self._drop_configs(*configs)
-            return
-        self._drop_configs(*configs)
-        self._sink._cleanup_full_refresh_publication(publication)
+        range_evidence_transitions.cleaned_clickhouse(self, handle, cleanup_clickhouse_stage)
 
     def abort(self, handle: StagedLoadHandle) -> None:
-        if self._external.cleanup(handle, abort=True):
-            return
-        self.cleanup(handle)
+        range_evidence_transitions.aborted_clickhouse(self, handle, cleanup_clickhouse_stage)
 
     def _create_staging(self, load_config: Any, payload: Any) -> Any:
         if self._plan_staging_table is not None:
@@ -376,6 +372,3 @@ class ClickHouseStagedLoadService:
 
     def _drop_configs(self, *configs: Any | None) -> None:
         drop_staging_configs(self._sink, *configs)
-
-
-__all__ = ["ClickHouseStagedLoadService"]

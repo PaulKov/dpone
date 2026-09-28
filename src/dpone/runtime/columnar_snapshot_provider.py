@@ -18,6 +18,8 @@ class ColumnarSnapshotRequest:
     format: str = "parquet"
     compression: str = "zstd"
     options: Mapping[str, object] | None = None
+    range_partitioner: Any | None = None
+    range_plan: Any | None = None
 
 
 @dataclass(frozen=True, slots=True)

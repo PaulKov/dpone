@@ -358,7 +358,44 @@ source:
         min_partition_rows: 50000
         null_bucket: separate
         low_confidence_policy: conservative
+      range_parallelism:
+        mode: required
+        reader_workers: 4
+        upload_workers: 2
+        max_inflight_ranges: 4
+        max_inflight_rows: 200000
+        max_inflight_bytes: 536870912
+        gap_policy: reject
+        consistency: immutable
+        staging_topology: shared_per_run
+        group_key: []
 ```
+
+`partitioning.num_partitions` controls planned ranges. The route-local
+`reader_workers`, `upload_workers`, and `load_workers` independently control
+MSSQL sessions, Parquet/object uploads, and ClickHouse loads. A legacy
+`export_workers` value must agree with `reader_workers`; disagreement is an
+error, not a silent override.
+For `shared_per_run`, set `load_workers: 1`: dpone measures each range as a
+target-table count delta and rejects parallel shared-table loads before source
+I/O. Select `per_partition` when `load_workers` is greater than one.
+All counts are configuration values; examples such as four readers are not
+runtime constants. `max_inflight_rows`, `max_inflight_bytes`, and
+`max_inflight_ranges` are run-wide limits shared by every reader. A byte-bound
+claim is valid only when every retained batch reports its byte size.
+
+Parallel readers require an explicit `consistency` authority: an immutable
+source, a database snapshot, a temporal `AS OF` source, or operator-enforced
+write exclusion. Independent SQL Server snapshot transactions are not one
+shared snapshot. Explicit `ranges` are typed data, not SQL fragments; they are
+validated for overlap, gaps, inclusivity, NULL routing, and source ordering.
+SQL Server `uniqueidentifier` ranges must be explicit and are compared by SQL
+Server, never by Python UUID byte order.
+
+`shared_per_run` discards and rebuilds the complete run-owned staging attempt on
+an ambiguous partition load. `per_partition` isolates each range in a run-owned
+staging table and assembles all confirmed partitions before the existing quality
+and publication lifecycle. Neither topology can publish a partial range set.
 
 For `streaming.provider: bcp_pipe`, `read_buffer_bytes` is the per-read FIFO
 buffer (`4MiB` default, `64KiB..16MiB` valid range). It is independent of

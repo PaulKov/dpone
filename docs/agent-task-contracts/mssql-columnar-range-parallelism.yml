@@ -1,0 +1,157 @@
+schema_version: 1
+task_id: "DPONE-MSSQL-COLUMNAR-RANGE-PARALLELISM-V1"
+title: "Bounded MSSQL columnar range parallelism"
+goal: "Add configurable deterministic range readers and a single governed ClickHouse publication barrier."
+specification: "docs/feature-design-mssql-columnar-range-parallelism-v1.md"
+base_commit: "043e1078aa1d7184125ea6ba22df89d87e98cd0f"
+integrator: "/root"
+
+acceptance_criteria:
+  - "Existing serial manifests retain their behavior and defaults."
+  - "Typed non-overlapping ranges use independent MSSQL sessions and configurable concurrency."
+  - "Aggregate row, byte, and inflight budgets apply across all readers."
+  - "Window/group splits and unsafe source consistency fail before source I/O."
+  - "Both shared_per_run and per_partition staging topologies use one publication barrier."
+  - "Partial failure cancels all work, cleans owned resources, and cannot report success."
+  - "Plan, pack, runtime evidence, tests, docs, and changelog expose the actual policy."
+  - "No version, tag, release-controller, PyPI, or 0.85.0 artifact is changed."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - manifest/schema
+    - CLI plan JSON/text/Markdown
+    - runtime evidence
+    - object-storage artifact layout
+    - ClickHouse staging lifecycle
+    - documentation and examples
+  migration_required: false
+
+owned_paths:
+  - src/dpone/contracts/columnar_range_parallelism.py
+  - src/dpone/contracts/columnar_range_evidence.py
+  - src/dpone/contracts/columnar_range_evidence_validation.py
+  - src/dpone/ports/columnar_range_parallelism.py
+  - src/dpone/runtime/partitioning.py
+  - src/dpone/runtime/partitioning_bounds.py
+  - src/dpone/runtime/partitioning_options.py
+  - src/dpone/runtime/partitioning_predicates.py
+  - src/dpone/runtime/partitioning_support.py
+  - src/dpone/runtime/columnar_range_parallelism.py
+  - src/dpone/runtime/columnar_range_evidence_lifecycle.py
+  - src/dpone/runtime/columnar_range_quality_bridge.py
+  - src/dpone/runtime/columnar_range_source_evidence.py
+  - src/dpone/runtime/columnar_object_storage_windows.py
+  - src/dpone/runtime/columnar_snapshot_provider.py
+  - src/dpone/readiness/managed_native_transfer_plan.py
+  - src/dpone/runtime/columnar_fast_path_models.py
+  - src/dpone/runtime/columnar_fast_path_planner.py
+  - src/dpone/runtime/columnar_runtime_assembly.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_provider.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_reader.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_windows.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_queryout_bridge.py
+  - src/dpone/runtime/governance/finalization.py
+  - src/dpone/runtime/governance/ports.py
+  - src/dpone/runtime/sinks/clickhouse_columnar_pull.py
+  - src/dpone/runtime/sinks/clickhouse_payload_support.py
+  - src/dpone/runtime/sinks/clickhouse_staged_load.py
+  - src/dpone/runtime/sinks/clickhouse_staged_evidence.py
+  - src/dpone/runtime/sinks/clickhouse_staging_finalizer.py
+  - tests/test_mssql_columnar_range_parallelism.py
+  - tests/test_mssql_columnar_snapshot_provider.py
+  - tests/test_runtime_typed_partitioning.py
+  - tests/test_columnar_chunked_source_row_authority.py
+  - tests/test_columnar_range_plan_output.py
+  - tests/test_columnar_range_execution_evidence.py
+  - tests/test_clickhouse_columnar_range_staging.py
+  - tests/test_clickhouse_governed_publication_lifecycle.py
+  - tests/test_clickhouse_production_finalize.py
+  - tests/test_route_capability_runtime_factory.py
+  - tests/test_columnar_fast_path_contracts.py
+
+integrator_owned_paths:
+  - docs/feature-design-mssql-columnar-range-parallelism-v1.md
+  - docs/adr/0075-mssql-columnar-range-parallelism.md
+  - docs/agent-task-contracts/mssql-columnar-range-parallelism.yml
+  - src/dpone/schema/etl-config.schema.json
+  - src/dpone/schema/etl-batch-manifest.schema.json
+  - docs/reference/configuration.md
+  - docs/source-sink/mssql-to-clickhouse.md
+  - docs/object-storage-staging.md
+  - docs/source-sink-matrix.md
+  - examples/mssql_to_clickhouse_columnar_parallel.yml
+  - CHANGELOG.md
+  - mkdocs.yml
+  - docs/adr-index.md
+  - docs/module_size_baseline.json
+  - docs/quality-metrics.md
+
+read_only_paths:
+  - src/dpone/runtime/sinks/clickhouse_sink.py
+  - docs/architecture.md
+  - docs/engineering-standards.md
+  - docs/testing/index.md
+  - docs/release.md
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - docs/feature-design-mssql-columnar-range-parallelism-v1.md
+  - docs/adr/0075-mssql-columnar-range-parallelism.md
+  - docs/agent-task-contracts/mssql-columnar-range-parallelism.yml
+  - docs/quality-metrics.md
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - src/dpone/schema/etl-config.schema.json
+  - src/dpone/schema/etl-batch-manifest.schema.json
+  - docs/reference/configuration.md
+  - docs/source-sink/mssql-to-clickhouse.md
+  - docs/object-storage-staging.md
+  - docs/source-sink-matrix.md
+  - examples/mssql_to_clickhouse_columnar_parallel.yml
+  - docs/adr-index.md
+  - docs/module_size_baseline.json
+  - dpone-release-controller
+  - any version or tag metadata for 0.85.0
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "ADR 0057 ClickHouse staged publication"
+  - "canonical RangePartitioner and MSSQL predicate renderer"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_mssql_columnar_range_parallelism.py tests/test_runtime_typed_partitioning.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+  live:
+    - "SKIP unless an explicitly approved synthetic MSSQL/ClickHouse/object-store environment is supplied"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Another writer owns the same semantic contract."
+  - "Required edit conflicts with another active writer."
+  - "Runtime cannot enforce a public option it accepts."
+  - "A topology cannot preserve one publication barrier."
+  - "A byte-bound claim lacks measured retained bytes."
+  - "A live check requires unapproved credentials or environment."

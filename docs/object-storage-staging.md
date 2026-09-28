@@ -174,6 +174,22 @@ required. In `required` mode, any failed access check blocks before source IO. I
 `auto` mode, dpone may choose another route, but the fallback reason is recorded
 in runtime decision audit.
 
+### Bounded range parallelism
+
+The columnar route can split one synthetic/table snapshot into deterministic
+typed ranges. Configure the canonical `source.options.partitioning` block; do
+not embed worker predicates as SQL strings. Every reader owns an independent
+MSSQL session, while rows, bytes, and inflight ranges share one aggregate
+budget. The object layout is run-owned and range-qualified.
+
+All planned ranges, including empty and NULL ranges, must record EOF before the
+range group is complete. ClickHouse publication is invoked once, only after
+every range load is confirmed and the authoritative staging topology passes the
+existing quality gates. A reader, upload, or load failure cancels the group and
+cannot produce success. See
+[the approved feature contract](feature-design-mssql-columnar-range-parallelism-v1.md)
+for consistency, topology, replay, and evidence semantics.
+
 ## Columnar ClickHouse pull fast path
 
 For large MSSQL -> ClickHouse snapshots, the preferred high-throughput shape is:

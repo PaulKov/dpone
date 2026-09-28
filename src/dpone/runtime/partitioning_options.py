@@ -12,6 +12,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+import dpone.ports.columnar_range_parallelism as range_contracts
+
 
 @dataclass(frozen=True, slots=True)
 class PartitionPlannerOptions:
@@ -39,7 +41,17 @@ class PartitionPlannerOptions:
             min_partition_rows=int(raw.get("min_partition_rows") or 50_000),
             boundary_type=_choice(
                 raw.get("boundary_type"),
-                {"auto", "numeric", "date", "datetime", "datetime2", "datetimeoffset", "rowversion"},
+                {
+                    "auto",
+                    "numeric",
+                    "date",
+                    "datetime",
+                    "datetime2",
+                    "datetimeoffset",
+                    "rowversion",
+                    "uuid",
+                    "uniqueidentifier",
+                },
                 "auto",
             ),
             bounds_role=_choice(raw.get("bounds_role"), {"filter", "stride"}, "filter"),
@@ -86,6 +98,10 @@ class PartitioningOptions:
     planner: PartitionPlannerOptions = field(default_factory=PartitionPlannerOptions)
     export_workers: int = 1
     load_workers: int = 1
+    ranges: tuple[Mapping[str, Any], ...] = ()
+    range_parallelism: range_contracts.RangeParallelismPolicy = field(
+        default_factory=range_contracts.RangeParallelismPolicy
+    )
     deprecated_aliases: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
@@ -148,6 +164,24 @@ class PartitioningOptionsResolver:
             aliases=("parallel_load_workers", "partition_load_workers"),
             default=export_workers,
         )
+        explicit_ranges = nested.get("ranges")
+        if explicit_ranges is None:
+            ranges: tuple[Mapping[str, Any], ...] = ()
+        elif not isinstance(explicit_ranges, list) or any(not isinstance(item, Mapping) for item in explicit_ranges):
+            raise ValueError("source.options.partitioning.ranges must be a list of range mappings.")
+        else:
+            ranges = tuple(dict(item) for item in explicit_ranges)
+        parallelism_raw = nested.get("range_parallelism")
+        if parallelism_raw is not None and not isinstance(parallelism_raw, Mapping):
+            raise ValueError("source.options.partitioning.range_parallelism must be a mapping.")
+        parallelism = dict(parallelism_raw or {})
+        _reject_worker_conflict(nested, parallelism, outer_key="export_workers", route_key="reader_workers")
+        _reject_worker_conflict(nested, parallelism, outer_key="load_workers", route_key="load_workers")
+        range_parallelism = range_contracts.RangeParallelismPolicy.from_mapping(
+            parallelism,
+            reader_workers=int(nested.get("export_workers") or 1),
+            load_workers=int(nested.get("load_workers") or 1),
+        )
 
         warnings = tuple(
             f"{alias} is deprecated; use source.options.partitioning.{_canonical_name(alias)}." for alias in deprecated
@@ -164,6 +198,8 @@ class PartitioningOptionsResolver:
             planner=planner,
             export_workers=max(1, int(export_workers or 1)),
             load_workers=max(1, int(load_workers or 1)),
+            ranges=ranges,
+            range_parallelism=range_parallelism,
             deprecated_aliases=tuple(deprecated),
             warnings=warnings,
         )
@@ -212,6 +248,21 @@ def _canonical_name(alias: str) -> str:
 def _choice(value: Any, allowed: set[str], default: str) -> str:
     normalized = str(value or default).strip().lower()
     return normalized if normalized in allowed else default
+
+
+def _reject_worker_conflict(
+    partitioning: Mapping[str, Any],
+    parallelism: Mapping[str, Any],
+    *,
+    outer_key: str,
+    route_key: str,
+) -> None:
+    if outer_key not in partitioning or route_key not in parallelism:
+        return
+    if isinstance(partitioning[outer_key], bool) or isinstance(parallelism[route_key], bool):
+        raise ValueError(f"partitioning.{outer_key} and range_parallelism.{route_key} must be integers.")
+    if int(partitioning[outer_key]) != int(parallelism[route_key]):
+        raise ValueError(f"partitioning.{outer_key} conflicts with range_parallelism.{route_key}; configure one value.")
 
 
 __all__ = ["PartitionPlannerOptions", "PartitioningOptions", "PartitioningOptionsResolver"]

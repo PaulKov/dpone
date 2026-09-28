@@ -122,6 +122,7 @@ def _source_parts(artifact: Any) -> dict[tuple[object, ...], int] | None:
             not isinstance(value, bool) and isinstance(value, int) and value >= 0 for value in (chunks, size_bytes)
         )
         if valid_stats and isinstance(digest, str) and digest and _extraction_complete(artifact):
+            assert isinstance(size_bytes, int)
             return {("stream", digest): size_bytes}
     return None
 
