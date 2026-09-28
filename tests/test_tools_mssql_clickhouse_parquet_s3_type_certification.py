@@ -138,7 +138,10 @@ def test_local_compose_prepares_bucket_and_clickhouse_named_collection() -> None
     services = compose["services"]
     assert services["minio-init"]["depends_on"] == ["minio"]
     init_command = services["minio-init"]["entrypoint"][-1]
-    assert "mc mb --ignore-existing local/dpone-stage" in init_command
+    assert "s3api list-buckets" in init_command
+    assert "s3api head-bucket --bucket dpone-stage" in init_command
+    assert "s3api create-bucket --bucket dpone-stage" in init_command
+    assert 'if [ "$$attempt" -ge 60 ]' in init_command
     clickhouse = services["clickhouse"]
     assert any("local-object-storage.xml" in volume for volume in clickhouse["volumes"])
     assert any("users.d/local-object-storage.xml" in volume for volume in clickhouse["volumes"])
