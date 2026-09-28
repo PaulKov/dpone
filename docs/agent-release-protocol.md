@@ -19,6 +19,13 @@ paired-tag campaign. Those distinctions are not permission to skip applicable
 source-readiness checks. A `GO` recommendation is not upload authorization;
 the release-auditor role remains read-only.
 
+Routine releases do not require manual inspection of PyPI Trusted Publisher
+settings, a browser login, or a provider-settings attestation. Missing access to
+the PyPI management UI is not an R8 blocker. Record the actual controller run and
+public archive verification; do not invent a PASS for unobserved provider settings.
+An authentication/upload failure still stops publication and requires diagnosis
+without an automatic upload retry or an unauthorized provider change.
+
 For an already published version, use the controller's read-only
 `tools.retro_pypi_verification` and report `PASS`, `FAIL`, or `UNVERIFIED` for
 that observation. Do not run publication to obtain a receipt, require a GitHub

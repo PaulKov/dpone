@@ -644,18 +644,22 @@ The source repository's `release.yml` does not upload to PyPI or automatically
 dispatch that controller. Follow [Release](../release.md), not a legacy
 same-version retry or source-publisher restoration recipe.
 
-### Trusted Publisher parity is missing
+<a id="trusted-publisher-parity-is-missing"></a>
 
-Before an authorized dispatch, inspect every project's live PyPI publishing
-settings. The exact tuple is `PaulKov` / `dpone-release-controller` /
-`pypi-release.yml` / `pypi` for all four projects. See the
-[Trusted Publisher parity gate](release-and-pages.md#trusted-publisher-parity-gate).
+### OIDC publisher authentication fails
 
-Record current credential-free evidence. Missing access or configuration is
-`UNVERIFIED` and blocks production dispatch. Do not probe with a tag/upload,
-restore `dpone/release.yml` or the historical controller writer, or inject an
-API token. A configuration change requires explicit provider authorization;
-an old inventory does not prove current permissions.
+Manual inspection of PyPI publishing settings is not a routine pre-dispatch
+requirement, and missing browser access is not a release blocker. See the
+[Trusted Publisher operating policy](../release.md#trusted-publisher-configuration).
+
+If the authorized controller run fails authentication, retain its run/attempt,
+logs, original archives and manifest. Diagnose the reported mismatch against the
+configured tuple `PaulKov` / `dpone-release-controller` / `pypi-release.yml` /
+`pypi`. Do not claim that configuration was independently inspected unless it was.
+Reconcile public state before considering any separately authorized recovery;
+failure does not authorize an automatic upload retry. Do not restore
+`dpone/release.yml` or the historical controller writer, or inject an API token.
+A provider configuration change requires explicit authorization.
 
 ### PyPI upload succeeds but installers cannot see the version
 

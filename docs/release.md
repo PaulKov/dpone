@@ -20,9 +20,11 @@ The approved authority and implementation were checked at controller commit
 - [Publication workflow](https://github.com/PaulKov/dpone-release-controller/blob/3b6ff638e2dbefc092447c584084a75ac72fd117/.github/workflows/pypi-release.yml).
 - [Controller operating guide and retrospective verifier](https://github.com/PaulKov/dpone-release-controller/blob/3b6ff638e2dbefc092447c584084a75ac72fd117/README.md).
 
-Re-observe the controller revision and provider configuration before a new
-release. These source references are not proof of current PyPI permissions or
-of any particular version's successful publication.
+Re-observe the controller revision and workflow permission boundary before a
+new release. Routine releases do not require a manual inspection of PyPI Trusted
+Publisher settings or a browser login. These source references describe the
+configured publisher; publication success requires the actual controller result
+and exact public archive verification.
 
 The controller does not create a GitHub Release or publish a GHCR image.
 Source-repository `release.yml` and `runtime-image.yml` still exist and were
@@ -86,14 +88,17 @@ commit, operation, and approval in the
    `apache-airflow-providers-dpone`.
 3. Validate the exact source identity, required checks, changed-scope evidence,
    and annotated tag. Do not move or replace an existing release tag.
-4. Check the controller revision, permission boundary, and publisher parity.
-   Resolve uncertainty before authorizing a production dispatch.
+4. Check the controller revision and workflow permission boundary. Manual PyPI
+   Trusted Publisher inspection is not a per-release prerequisite; an unavailable
+   PyPI browser session does not block an otherwise authorized dispatch.
 5. Preserve run/artifact IDs and immutable bytes promptly: current controller
    build and manifest artifacts expire after 14 days.
 
-### Trusted Publisher parity gate
+<a id="trusted-publisher-parity-gate"></a>
 
-Each of the four PyPI projects must trust this exact tuple:
+### Trusted Publisher configuration
+
+The existing OIDC publisher uses this configured tuple for all four PyPI projects:
 
 | Setting | Required value |
 | --- | --- |
@@ -101,6 +106,14 @@ Each of the four PyPI projects must trust this exact tuple:
 | Repository | `dpone-release-controller` |
 | Workflow filename | `pypi-release.yml` |
 | Environment | `pypi` |
+
+The maintainer's operating policy, updated 2026-09-28, does not require a
+manual provider-settings check before each release. Do not request a PyPI login,
+screenshot, or configuration attestation as a routine release gate. This is not a
+claim that settings were independently inspected. Use the actual OIDC publisher
+run and public filename/SHA-256 verification as publication evidence. If the
+publisher rejects authentication, preserve the failed run and follow the failure
+runbook; do not automatically retry an upload.
 
 Do not restore `dpone/release.yml` or the
 historical `release-controller.yml` as a second publisher. No API-token

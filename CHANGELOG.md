@@ -15,6 +15,11 @@
   prior behavior. Synthetic checks cover the capability; live certification is
   unverified.
 
+### Changed
+
+- Ordinary releases no longer require manual inspection of PyPI Trusted Publisher
+  settings or a browser login. The existing controller remains the sole publisher;
+  publication verification still requires its result and exact public archive hashes.
 
 ## 0.84.4 - 2026-09-28
 

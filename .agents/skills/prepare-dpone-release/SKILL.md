@@ -7,7 +7,10 @@ description: Audit a named dpone version and frozen commit using scoped R1-R9 ev
 
 1. Read `docs/release.md` and `docs/agent-release-protocol.md` for current
    authority. Require operation, version, release type, frozen source commit,
-   changed-scope inventory, and reviewed controller revision.
+   changed-scope inventory, and reviewed controller revision. Routine releases do
+   not require manual PyPI Trusted Publisher inspection, browser login, or a
+   provider-settings attestation. Use the actual controller result and exact
+   public archive verification; do not report unobserved settings as verified.
 2. For retrospective verification, follow the controller command in the runbook
    with the original run/artifact identities and unaltered ZIP. Use a fresh
    output directory per observation; the verifier requires an overall

@@ -30,13 +30,17 @@ permission to restore source-repository PyPI publishing. Do not claim they are
 disabled, that their handoff message dispatches the controller, or that a
 source-workflow green result proves controller publication.
 
-## Trusted Publisher parity gate
+<a id="trusted-publisher-parity-gate"></a>
 
-The live PyPI tuple on every release project must be
+## Trusted Publisher configuration
+
+The configured PyPI publisher tuple is
 `PaulKov` / `dpone-release-controller` / `pypi-release.yml` / `pypi`.
-Follow the [current parity checklist](../release.md#trusted-publisher-parity-gate)
-and retain current, credential-free provider observations. A source-code
-configuration or old screenshot is not current permission evidence.
+Follow the [current operating policy](../release.md#trusted-publisher-configuration).
+Routine releases do not require manual inspection of PyPI settings or a browser
+login. Record the actual controller result and exact public archive verification;
+do not label unobserved settings as independently verified. An authentication
+failure requires diagnosis of the failed run, not an automatic upload retry.
 Do not restore `dpone/release.yml` or the retired controller writer as another
 publisher; changing provider authority requires explicit authorization.
 
