@@ -9,11 +9,20 @@ from dpone.runtime.partitioning_bounds import compare_partition_bounds
 
 
 class RangeLike(Protocol):
-    upper_bound: Any
-    lower_bound: Any
-    include_upper: bool
-    include_lower: bool
-    boundary: Any
+    @property
+    def upper_bound(self) -> Any: ...
+
+    @property
+    def lower_bound(self) -> Any: ...
+
+    @property
+    def include_upper(self) -> bool: ...
+
+    @property
+    def include_lower(self) -> bool: ...
+
+    @property
+    def boundary(self) -> Any: ...
 
 
 def unpack_bounds(value: tuple[Any, ...]) -> tuple[Any, Any, int | None, int | None]:

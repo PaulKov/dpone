@@ -257,7 +257,6 @@ class MssqlColumnarSnapshotProvider:
         prefix = ObjectStorageUri.parse(request.uri_prefix.format(run_id=request.run_id)).prefix()
         schema_hash = chunks.schema_hash(request.schema)
         active_windows: list[ObjectStorageChunkWindow] = []
-        completed = False
         try:
             write_columnar_run_marker(self._object_client, prefix, request)
             with tempfile.TemporaryDirectory(prefix="dpone-mssql-columnar-", dir=self._temp_dir) as tmp_dir:
@@ -280,18 +279,27 @@ class MssqlColumnarSnapshotProvider:
                     active_windows.append(window)
                     yield window
                     active_windows.remove(window)
-                completed = True
         except BaseException:
             self._object_client.delete_prefix(prefix)
             raise
         finally:
             for window in active_windows:
                 window.cleanup()
-            if completed:
-                self._cleanup_object_storage_run_prefix(prefix, request)
 
     def range_execution_evidence(self, request: ColumnarSnapshotRequest) -> dict[str, object] | None:
         return self._range_evidence.get(id(request))
+
+    def cleanup_object_storage_run(self, request: ColumnarSnapshotRequest) -> None:
+        """Delete only the range attempt prefix after its lifecycle releases ownership."""
+
+        cleanup_policy = str((request.options or {}).get("cleanup_policy") or "eager")
+        if cleanup_policy not in {"eager", "on_success"} or self._object_client is None:
+            return
+        prefix = ObjectStorageUri.parse(request.uri_prefix.format(run_id=request.run_id)).prefix()
+        key_parts = tuple(part for part in prefix.key.split("/") if part)
+        if request.run_id not in key_parts or len(key_parts) < 2:
+            raise ValueError("Refusing to cleanup a non-run-owned object-storage prefix")
+        self._object_client.delete_prefix(prefix)
 
     def _iter_batches(self, request: ColumnarSnapshotRequest):
         yield from iter_columnar_batches(
@@ -377,13 +385,5 @@ class MssqlColumnarSnapshotProvider:
         if self._read_contract is not None:
             return self._read_contract
         return read_contract_from_options(_read_contract_options(request))
-
-    def _cleanup_object_storage_run_prefix(self, prefix: ObjectStorageUri, request: ColumnarSnapshotRequest) -> None:
-        cleanup_policy = str((request.options or {}).get("cleanup_policy") or "eager")
-        if cleanup_policy not in {"eager", "on_success"}:
-            return
-        if self._object_client is not None:
-            self._object_client.delete_prefix(prefix)
-
 
 __all__ = ["MssqlColumnarSnapshotProvider"]

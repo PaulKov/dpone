@@ -199,8 +199,7 @@ def _range_request(
             supported_topologies={"shared_per_run", "per_partition"},
         )
     partitioner = RangePartitioner.from_options(load_config.options, bounds_resolver=bounds_resolver)
-    policy = partitioner.range_parallelism
-    mode = str(getattr(policy, "mode", "off"))
+    mode = str(getattr(partitioner.range_parallelism, "mode", "off"))
     if mode == "off":
         return None, None
     if not partitioner.enabled:

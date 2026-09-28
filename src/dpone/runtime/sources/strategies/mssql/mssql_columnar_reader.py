@@ -44,6 +44,8 @@ def range_read_blockers(request: Any, connector: Any) -> tuple[str, ...]:
         blockers.append("mssql_independent_range_sessions_unavailable")
     if request.uri_prefix.startswith("local://"):
         blockers.append("columnar_range_parallelism_requires_object_storage")
+    if "{run_id}" not in request.uri_prefix:
+        blockers.append("columnar_range_uri_prefix_must_include_run_id")
     partitioner = request.range_partitioner
     if partitioner is None:
         blockers.append("columnar_range_partitioner_missing")

@@ -34,6 +34,7 @@ owned_paths:
   - src/dpone/runtime/partitioning_bounds.py
   - src/dpone/runtime/partitioning_options.py
   - src/dpone/runtime/partitioning_predicates.py
+  - src/dpone/runtime/partitioning_support.py
   - src/dpone/runtime/columnar_range_parallelism.py
   - src/dpone/runtime/columnar_object_storage_windows.py
   - src/dpone/runtime/columnar_snapshot_provider.py

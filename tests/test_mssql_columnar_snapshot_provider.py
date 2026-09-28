@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, time
 from pathlib import Path
 from threading import Barrier
@@ -412,9 +413,10 @@ def test_parallel_windows_use_independent_typed_ranges_and_wait_for_all_eof(tmp_
         run_id="run-ranges",
     )
     connector = _ParallelMssqlConnector(partitions=2)
+    object_client = LocalObjectStorageClient(tmp_path / "store")
     provider = MssqlColumnarSnapshotProvider(
         connector=connector,
-        object_client=LocalObjectStorageClient(tmp_path / "store"),
+        object_client=object_client,
         parquet_writer=_FakeParquetWriter(),
     )
 
@@ -447,6 +449,15 @@ def test_parallel_windows_use_independent_typed_ranges_and_wait_for_all_eof(tmp_
     assert evidence["rows_high_water"] <= 10
     assert evidence["rss_bounded"] is False
     assert all(session.closed for session in connector.sessions)
+    run_prefix = ObjectStorageUri.parse("s3://dpone-stage/msql/run-ranges/")
+    assert object_client.list_prefix(run_prefix)
+    for window in windows:
+        window.cleanup()
+    assert object_client.list_prefix(run_prefix) == (
+        "s3://dpone-stage/msql/run-ranges/__dpone_run_marker.json",
+    )
+    provider.cleanup_object_storage_run(request)
+    assert object_client.list_prefix(run_prefix) == ()
 
 
 def test_parallel_window_failure_cleans_owned_prefix_and_never_yields(tmp_path: Path) -> None:
@@ -514,6 +525,31 @@ def test_parallel_window_budget_contract_blocks_unsafe_declared_items_before_io(
 
     assert "columnar_range_max_chunk_exceeds_inflight_byte_budget" in capability.blockers
     assert "columnar_range_batch_size_exceeds_inflight_row_budget" in capability.blockers
+    assert connector.sessions == []
+
+
+def test_parallel_window_requires_run_owned_object_prefix_before_io(tmp_path: Path) -> None:
+    config = _load_config()
+    _configure_parallel(config)
+    request = replace(
+        build_columnar_snapshot_request(
+            load_config=config,
+            query="SELECT id, name FROM dbo.orders",
+            schema=[("id", "int"), ("name", "nvarchar(50)")],
+            run_id="run-shared-prefix",
+        ),
+        uri_prefix="s3://dpone-stage/msql/shared/",
+    )
+    connector = _ParallelMssqlConnector(partitions=2)
+    provider = MssqlColumnarSnapshotProvider(
+        connector=connector,
+        object_client=LocalObjectStorageClient(tmp_path / "store"),
+        parquet_writer=_FakeParquetWriter(),
+    )
+
+    capability = provider.capabilities(request)
+
+    assert "columnar_range_uri_prefix_must_include_run_id" in capability.blockers
     assert connector.sessions == []
 
 
