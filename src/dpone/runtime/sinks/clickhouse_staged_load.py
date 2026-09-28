@@ -16,8 +16,13 @@ from dpone.runtime.governance.ports import (
 )
 from dpone.runtime.process_io import add_exception_note
 from dpone.runtime.sinks.clickhouse_external_staged_lifecycle import ClickHouseExternalStagedLifecycle
-from dpone.runtime.sinks.clickhouse_full_refresh_staged import finalize_full_refresh, publication_cleanup_plan
+from dpone.runtime.sinks.clickhouse_full_refresh_staged import finalize_full_refresh
 from dpone.runtime.sinks.clickhouse_loaded_contract import pending_native_observation
+from dpone.runtime.sinks.clickhouse_payload_support import (
+    cleanup_clickhouse_stage,
+    cleanup_failed_clickhouse_stage,
+    payload_staged_cleanup_owner,
+)
 from dpone.runtime.sinks.clickhouse_production_finalize import ClickHouseProductionFinalizer
 from dpone.runtime.sinks.clickhouse_staged_cleanup import drop_staging_configs
 from dpone.runtime.sinks.clickhouse_staged_evidence import enforce_source_byte_budget, staged_handle_metadata
@@ -53,9 +58,11 @@ class ClickHouseStagedLoadService:
         load_config = self._effective_config(load_config)
         if self._external.is_enabled(load_config):
             return self._external.stage(load_config, payload)
-        staging_config = self._create_staging(load_config, payload)
+        cleanup_owner = payload_staged_cleanup_owner(payload)
+        staging_config = None
         finalization_config = decoded_config = None
         try:
+            staging_config = self._create_staging(load_config, payload)
             observation = pending_native_observation(load_config, payload)
             if observation is None:
                 staged_rows = self._sink._insert_payload(staging_config, payload)
@@ -77,15 +84,11 @@ class ClickHouseStagedLoadService:
                 payload,
             )
         except BaseException as error:
-            try:
-                self._drop_configs(
-                    finalization_config,
-                    decoded_config,
-                    staging_config,
-                )
-            except Exception as cleanup_error:
-                add_exception_note(error, f"raw staging cleanup failed: {type(cleanup_error).__name__}")
+            cleanup_failed_clickhouse_stage(
+                self._drop_configs, cleanup_owner, error, finalization_config, decoded_config, staging_config
+            )
             raise
+        assert staging_config is not None
         metadata = staged_handle_metadata(load_config, staging_config, finalization_config, decoded_config, payload)
         if source_byte_budget is not None:
             metadata["source_byte_budget"] = source_byte_budget.to_dict()
@@ -96,6 +99,7 @@ class ClickHouseStagedLoadService:
             finalization_config=finalization_config,
             decoded_config=decoded_config,
             metadata=metadata,
+            sink_state=cleanup_owner,
         )
 
     def load(self, load_config: Any, payload: Any) -> LoadResult:
@@ -190,18 +194,7 @@ class ClickHouseStagedLoadService:
         return replace(load_config, load_strategy=backfill_inner_strategy(load_config))
 
     def cleanup(self, handle: StagedLoadHandle) -> None:
-        if self._external.cleanup(handle, abort=False):
-            return
-        finalizer = getattr(self._sink, "_staging_finalizer", None)
-        retire = getattr(finalizer, "retire_strategy_staging_validations", None)
-        if callable(retire):
-            retire(self._finalization_config(handle))
-        configs, publication = publication_cleanup_plan(handle)
-        if publication is None:
-            self._drop_configs(*configs)
-            return
-        self._drop_configs(*configs)
-        self._sink._cleanup_full_refresh_publication(publication)
+        cleanup_clickhouse_stage(self._sink, self._external, self._drop_configs, handle)
 
     def abort(self, handle: StagedLoadHandle) -> None:
         if self._external.cleanup(handle, abort=True):

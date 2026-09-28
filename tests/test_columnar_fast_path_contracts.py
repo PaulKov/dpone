@@ -246,10 +246,10 @@ def test_object_storage_chunked_artifact_materializes_through_window_loader() ->
     assert sink.windowed_loaded == [(artifact, [("id", "int")])]
 
 
-def test_clickhouse_columnar_pull_loader_loads_object_windows_and_cleans_each_prefix() -> None:
+def test_clickhouse_columnar_pull_loader_defers_object_cleanup_to_staged_lifecycle() -> None:
     connector = _RecordingClickHouseConnector(count=8)
     cleanup = _CleanupRecorder()
-    clock = _StepClock([0.0, 2.0, 2.5, 3.0, 5.0, 5.25])
+    clock = _StepClock([0.0, 2.0, 3.0, 5.0])
     windows = [
         ObjectStorageChunkWindow(
             uri_prefix="s3://dpone-stage/msql/run-1/window-000001/",
@@ -313,10 +313,7 @@ def test_clickhouse_columnar_pull_loader_loads_object_windows_and_cleans_each_pr
         "FROM s3Cluster('dwh', dpone_stage, filename='msql/run-1/window-000002/*.parquet')" in query
         for query in connector.queries
     ] == [False, True]
-    assert cleanup.deleted_prefixes == [
-        "s3://dpone-stage/msql/run-1/window-000001",
-        "s3://dpone-stage/msql/run-1/window-000002",
-    ]
+    assert cleanup.deleted_prefixes == []
     assert artifact.to_evidence()["window_metrics"] == [
         {
             "schema_version": "dpone.native_transfer.columnar_window_metrics.v1",
@@ -326,7 +323,7 @@ def test_clickhouse_columnar_pull_loader_loads_object_windows_and_cleans_each_pr
             "uri_prefix": "s3://dpone-stage/msql/run-1/window-000001/",
             "producer_metrics": {},
             "clickhouse_pull_seconds": 2.0,
-            "window_cleanup_seconds": 0.5,
+            "window_cleanup_seconds": 0.0,
             "rows_per_second": 2.0,
         },
         {
@@ -337,7 +334,7 @@ def test_clickhouse_columnar_pull_loader_loads_object_windows_and_cleans_each_pr
             "uri_prefix": "s3://dpone-stage/msql/run-1/window-000002/",
             "producer_metrics": {},
             "clickhouse_pull_seconds": 2.0,
-            "window_cleanup_seconds": 0.25,
+            "window_cleanup_seconds": 0.0,
             "rows_per_second": 2.0,
         },
     ]

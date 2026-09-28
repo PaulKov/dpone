@@ -48,6 +48,36 @@ class RangeLoadConcurrencyTracker:
             self._active -= 1
 
 
+class RangeLoadCancellation:
+    """Cancel every active worker while preserving the first load error."""
+
+    def __init__(self, connectors: Sequence[Any]) -> None:
+        self._connectors = tuple(connectors)
+        self._lock = Lock()
+        self._started = False
+        self.primary_error: BaseException | None = None
+
+    def fail(self, error: BaseException) -> None:
+        with self._lock:
+            if self._started:
+                return
+            self._started = True
+            self.primary_error = error
+        cleanup_error: BaseException | None = None
+        for connector in self._connectors:
+            try:
+                cancel = getattr(connector, "cancel", None)
+                if callable(cancel):
+                    cancel()
+                close = getattr(connector, "close", None)
+                if callable(close):
+                    close()
+            except BaseException as caught:
+                cleanup_error = cleanup_error or caught
+        if cleanup_error is not None:
+            error.add_note(f"range load cancellation failed: {type(cleanup_error).__name__}")
+
+
 def is_source_native_artifact(artifact: Any) -> bool:
     return getattr(artifact, "native_wire_contract", None) is not None
 
@@ -139,15 +169,60 @@ def range_staging_policy(artifact: Any) -> tuple[str, int] | None:
 
 def group_range_windows(windows: tuple[Any, ...], *, artifact: Any | None = None) -> tuple[RangeWindowGroup, ...]:
     plan = getattr(getattr(artifact, "request", None), "range_plan", None)
+    if plan is not None:
+        return _group_planned_range_windows(windows, artifact=artifact, plan=plan)
+    return _group_emitted_range_windows(windows)
+
+
+def payload_staged_cleanup_owner(payload: Any) -> Any | None:
+    artifact = getattr(payload, "artifact", None)
+    owner = getattr(artifact, "staged_cleanup_owner", None)
+    return owner() if callable(owner) else None
+
+
+def cleanup_staged_object_owner(owner: Any, *, primary: BaseException | None = None) -> None:
+    cleanup = getattr(owner, "cleanup_owned_object_storage", None)
+    if not callable(cleanup):
+        return
     try:
-        if plan is not None:
-            return _group_planned_range_windows(windows, artifact=artifact, plan=plan)
-        return _group_emitted_range_windows(windows)
+        cleanup()
     except BaseException as error:
-        cleanup_error = cleanup_range_resources(windows, (), drop_partition=None)
-        if cleanup_error is not None:
-            error.add_note(f"range window cleanup failed: {type(cleanup_error).__name__}")
+        if primary is None:
+            raise
+        primary.add_note(f"object storage cleanup failed: {type(error).__name__}")
+
+
+def cleanup_failed_clickhouse_stage(
+    drop_configs: Callable[..., None],
+    owner: Any,
+    error: BaseException,
+    *configs: Any | None,
+) -> None:
+    if any(config is not None for config in configs):
+        try:
+            drop_configs(*configs)
+        except Exception as cleanup_error:
+            error.add_note(f"raw staging cleanup failed: {type(cleanup_error).__name__}")
+    cleanup_staged_object_owner(owner, primary=error)
+
+
+def cleanup_clickhouse_stage(sink: Any, external: Any, drop_configs: Callable[..., None], handle: Any) -> None:
+    if external.cleanup(handle, abort=False):
+        return
+    try:
+        finalizer = getattr(sink, "_staging_finalizer", None)
+        retire = getattr(finalizer, "retire_strategy_staging_validations", None)
+        if callable(retire):
+            retire(handle.finalization_config or handle.staging_config)
+        module = import_module("dpone.runtime.sinks.clickhouse_full_refresh_staged")
+        configs, publication = module.publication_cleanup_plan(handle)
+        drop_configs(*configs)
+        if publication is not None:
+            sink._cleanup_full_refresh_publication(publication)
+    except BaseException as error:
+        cleanup_staged_object_owner(getattr(handle, "sink_state", None), primary=error)
         raise
+    cleanup_staged_object_owner(getattr(handle, "sink_state", None))
 
 
 def _group_emitted_range_windows(windows: tuple[Any, ...]) -> tuple[RangeWindowGroup, ...]:

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Mapping, Sequence
+from threading import Lock
 from typing import Any
 
 from dpone.runtime.artifact_models import BaseExtractionArtifact, StagingTableArtifact
@@ -117,6 +118,8 @@ class ObjectStorageColumnarChunkedArtifact(BaseExtractionArtifact):
         self.source_byte_measurement_complete = False
         self.range_execution_evidence: dict[str, object] | None = None
         self.range_staging_metrics: list[dict[str, object]] = []
+        self._cleanup_lock = Lock()
+        self._cleanup_complete = False
 
     @property
     def range_parallelism_policy(self) -> object | None:
@@ -207,7 +210,27 @@ class ObjectStorageColumnarChunkedArtifact(BaseExtractionArtifact):
         }
 
     def cleanup(self) -> None:
-        return
+        self.cleanup_owned_object_storage()
+
+    def cleanup_owned_object_storage(self) -> None:
+        """Delete the run-owned prefix only at a reconciled staged boundary."""
+
+        if self.cleanup_policy not in {"eager", "on_success"}:
+            return
+        with self._cleanup_lock:
+            if self._cleanup_complete:
+                return
+            cleanup = getattr(self.provider, "cleanup_object_storage_run", None)
+            if callable(cleanup):
+                cleanup(self.request)
+            self._cleanup_complete = True
+
+    def staged_cleanup_owner(self) -> ObjectStorageColumnarChunkedArtifact:
+        return self
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> ObjectStorageColumnarChunkedArtifact:
+        memo[id(self)] = self
+        return self
 
 
 def _window_digest(window: object) -> str | None:

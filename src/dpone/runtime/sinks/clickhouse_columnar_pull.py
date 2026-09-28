@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 
 from dpone.runtime.sinks.clickhouse_payload_support import (
     ClickHouseRangeStagingCallbacks,
+    RangeLoadCancellation,
     RangeLoadConcurrencyTracker,
     RangeWindowGroup,
     cleanup_range_resources,
@@ -130,7 +131,7 @@ class ClickHouseColumnarPullLoader:
         except BaseException as error:
             primary = error
         cleanup_error = cleanup_range_resources(
-            windows,
+            (),
             partitions,
             drop_partition=self._range_staging.drop_partition if self._range_staging is not None else None,
         )
@@ -155,17 +156,12 @@ class ClickHouseColumnarPullLoader:
             self._connector.execute_query(sql)
             pull_seconds = elapsed(pull_started, self._clock())
             loaded_any = True
-            cleanup = getattr(window, "cleanup", None)
-            cleanup_seconds = 0.0
-            if callable(cleanup):
-                cleanup()
-                cleanup_seconds = elapsed(pull_started + pull_seconds, self._clock())
             _record_window_metric(
                 artifact,
                 window=window,
                 window_index=window_index,
                 clickhouse_pull_seconds=pull_seconds,
-                window_cleanup_seconds=cleanup_seconds,
+                window_cleanup_seconds=0.0,
             )
         mark_complete = getattr(artifact, "mark_source_byte_measurement_complete", None)
         if callable(mark_complete):
@@ -226,6 +222,7 @@ class ClickHouseColumnarPullLoader:
             raise ValueError("clickhouse_range_load_workers_require_independent_connectors")
         lanes = tuple(groups[index::workers] for index in range(workers))
         stop = Event()
+        cancellation = RangeLoadCancellation(connectors)
 
         def run_lane(index: int) -> None:
             try:
@@ -234,8 +231,9 @@ class ClickHouseColumnarPullLoader:
                         return
                     try:
                         load(connectors[index], group)
-                    except BaseException:
+                    except BaseException as error:
                         stop.set()
+                        cancellation.fail(error)
                         raise
             finally:
                 close = getattr(connectors[index], "close", None)
@@ -244,14 +242,13 @@ class ClickHouseColumnarPullLoader:
 
         with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="dpone-ch-range-load") as executor:
             futures = tuple(executor.submit(run_lane, index) for index in range(workers))
-            failures: list[tuple[int, BaseException]] = []
-            for index, future in enumerate(futures):
+            for future in futures:
                 try:
                     future.result()
-                except BaseException as error:
-                    failures.append((lanes[index][0].ordinal, error))
-            if failures:
-                raise min(failures, key=lambda item: item[0])[1]
+                except BaseException:
+                    continue
+            if cancellation.primary_error is not None:
+                raise cancellation.primary_error
 
     def _load_group(
         self,
@@ -378,8 +375,8 @@ def _record_window_metric(
     range_ordinal = getattr(window, "range_ordinal", None)
     if isinstance(range_id, str) and range_id:
         metric["range_id"] = range_id
-    if isinstance(range_ordinal, int) and not isinstance(range_ordinal, bool) and range_ordinal >= 0:
-        metric["range_ordinal"] = range_ordinal
+        if isinstance(range_ordinal, int) and not isinstance(range_ordinal, bool) and range_ordinal >= 0:
+            metric["range_ordinal"] = range_ordinal
     recorder(metric)
 
 
