@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.87.0 - 2026-09-29
+
 ### Added
 
 - Opt-in bounded range parallelism for the MSSQL → Parquet/object-storage →
