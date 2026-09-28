@@ -8,9 +8,13 @@ MinIO for the next routes.
 ## Start local services
 
 ```bash
-docker compose -f docker/docker-compose.integration.yml up -d postgres mysql mssql clickhouse kafka schema-registry minio
+docker compose -f docker/docker-compose.integration.yml up -d --build postgres mysql mssql clickhouse kafka schema-registry minio
 docker compose -f docker/docker-compose.integration.yml ps
 ```
+
+The test-only S3 server is built from a pinned upstream source revision on the
+first run, so allow extra time for the initial image build. Later runs reuse
+the local image unless its build inputs change.
 
 Default local endpoints:
 

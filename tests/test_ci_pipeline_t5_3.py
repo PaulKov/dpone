@@ -27,8 +27,13 @@ def test_integration_compose_file_exposes_minio() -> None:
     compose = yaml.safe_load((ROOT / "docker" / "docker-compose.integration.yml").read_text(encoding="utf-8"))
     assert "minio" in compose["services"]
     minio = compose["services"]["minio"]
-    assert minio["image"] == "quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z"
-    assert compose["services"]["minio-init"]["image"] == "quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z"
+    assert minio["build"] == {"context": ".", "dockerfile": "minio/Dockerfile"}
+    assert "image" not in minio
+    dockerfile = (ROOT / "docker" / "minio" / "Dockerfile").read_text(encoding="utf-8")
+    assert "github.com/minio/minio@9e49d5e7a648f00e26f2246f4dc28e6b07f8c84a" in dockerfile
+    assert "@sha256:" in dockerfile
+    minio_init = compose["services"]["minio-init"]
+    assert minio_init["image"].startswith("public.ecr.aws/aws-cli/aws-cli:2.36.46@sha256:")
     assert any("59090" in str(port) for port in minio["ports"])
     assert any("59091" in str(port) for port in minio["ports"])
 

@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Local live certification builds its pinned test S3 server from upstream
+  source and initializes the bucket with a bounded, verified S3 API flow,
+  avoiding reliance on an inaccessible container registry.
 - Governed ClickHouse full refresh keeps one validated staged handle through
   publication and cleanup, so a committed predecessor is not treated as an
   unpublished staging table.

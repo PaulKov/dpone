@@ -141,7 +141,9 @@ services:
 
 
   minio:
-    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
+    build:
+      context: .
+      dockerfile: minio/Dockerfile
     container_name: dpone-it-minio
     environment:
       MINIO_ROOT_USER: ${DPONE_IT_MINIO_ACCESS_KEY:-minioadmin}
@@ -151,18 +153,32 @@ services:
       - "${DPONE_IT_MINIO_PORT_FORWARD:-59090}:9000"
       - "${DPONE_IT_MINIO_CONSOLE_PORT_FORWARD:-59091}:9001"
   minio-init:
-    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
+    image: public.ecr.aws/aws-cli/aws-cli:2.36.46@sha256:eedfdcb56e9a1b02fabcf656977ca226f40860c6672aca41d435e036bc95a075
     depends_on:
       - minio
     environment:
-      DPONE_IT_MINIO_ACCESS_KEY: ${DPONE_IT_MINIO_ACCESS_KEY:-minioadmin}
-      DPONE_IT_MINIO_SECRET_KEY: ${DPONE_IT_MINIO_SECRET_KEY:-minioadmin}
+      AWS_ACCESS_KEY_ID: ${DPONE_IT_MINIO_ACCESS_KEY:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${DPONE_IT_MINIO_SECRET_KEY:-minioadmin}
+      AWS_DEFAULT_REGION: us-east-1
+      AWS_EC2_METADATA_DISABLED: "true"
+      AWS_PAGER: ""
     entrypoint:
       - /bin/sh
       - -ec
       - |
-        until mc alias set local http://minio:9000 "$${DPONE_IT_MINIO_ACCESS_KEY}" "$${DPONE_IT_MINIO_SECRET_KEY}" >/dev/null 2>&1 && mc ready local >/dev/null 2>&1; do sleep 1; done
-        mc mb --ignore-existing local/dpone-stage >/dev/null
+        attempt=0
+        until aws --endpoint-url http://minio:9000 s3api list-buckets >/dev/null 2>&1; do
+          attempt=$$((attempt + 1))
+          if [ "$$attempt" -ge 60 ]; then
+            echo "S3 test server did not become ready with valid credentials" >&2
+            exit 1
+          fi
+          sleep 2
+        done
+        if ! aws --endpoint-url http://minio:9000 s3api head-bucket --bucket dpone-stage >/dev/null 2>&1; then
+          aws --endpoint-url http://minio:9000 s3api create-bucket --bucket dpone-stage >/dev/null
+        fi
+        aws --endpoint-url http://minio:9000 s3api head-bucket --bucket dpone-stage >/dev/null
 
   mssql:
     image: mcr.microsoft.com/mssql/server:2022-latest@sha256:ba4c8329f48fb8f02e1416be6a930ebfd71268caee78aa985f3af4315e457c89
