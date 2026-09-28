@@ -4,9 +4,25 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+from threading import Event
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
+
+from dpone.runtime.sinks.clickhouse_payload_support import (
+    ClickHouseRangeStagingCallbacks,
+    RangeLoadConcurrencyTracker,
+    RangeWindowGroup,
+    cleanup_range_resources,
+    count_connector_rows,
+    elapsed,
+    group_range_windows,
+    mark_source_byte_measurement_complete,
+    range_staging_policy,
+    record_range_staging_metric,
+    rows_per_second,
+)
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
@@ -49,11 +65,13 @@ class ClickHouseColumnarPullLoader:
         table_name: Callable[[LoadConfig], str],
         count_rows: Callable[[LoadConfig], int],
         clock: Callable[[], float] | None = None,
+        range_staging: ClickHouseRangeStagingCallbacks | None = None,
     ) -> None:
         self._connector = connector
         self._table_name = table_name
         self._count_rows = count_rows
         self._clock = clock or perf_counter
+        self._range_staging = range_staging
 
     def load(
         self,
@@ -71,18 +89,78 @@ class ClickHouseColumnarPullLoader:
         artifact: Any,
         schema: Sequence[tuple[str, str]],
     ) -> int:
+        policy = range_staging_policy(artifact)
+        if policy is None:
+            return self._load_legacy_windowed(load_config, artifact, schema)
+        windows = tuple(artifact.iter_windows())
+        groups = group_range_windows(windows)
+        if not groups:
+            mark_source_byte_measurement_complete(artifact)
+            return 0
+        topology, load_workers = policy
+        if topology == "per_partition" and self._range_staging is None:
+            raise ValueError("clickhouse_per_partition_staging_callbacks_missing")
+        tracker = RangeLoadConcurrencyTracker()
+        primary: BaseException | None = None
+        partitions: tuple[Any, ...] = ()
+        try:
+            if topology == "shared_per_run":
+                self._load_groups(load_config, artifact, schema, groups, load_workers, tracker)
+            else:
+                assert self._range_staging is not None
+                partitions = tuple(self._range_staging.plan_partition(load_config, group.ordinal) for group in groups)
+                for partition in partitions:
+                    self._range_staging.create_partition(load_config, partition)
+                self._load_partition_groups(partitions, artifact, schema, groups, load_workers, tracker)
+                assembled = int(self._range_staging.assemble_partitions(partitions, load_config))
+                expected = sum(group.expected_rows for group in groups)
+                if assembled != expected or self._count_rows(load_config) != expected:
+                    raise ValueError("clickhouse_range_partition_assembly_row_count_mismatch")
+            expected_rows = sum(group.expected_rows for group in groups)
+            if self._count_rows(load_config) != expected_rows:
+                raise ValueError("clickhouse_range_staging_row_count_mismatch")
+            record_range_staging_metric(
+                artifact,
+                topology=topology,
+                requested_workers=load_workers,
+                observed_workers=tracker.maximum,
+                range_count=len(groups),
+                rows=expected_rows,
+            )
+            mark_source_byte_measurement_complete(artifact)
+        except BaseException as error:
+            primary = error
+        cleanup_error = cleanup_range_resources(
+            windows,
+            partitions,
+            drop_partition=self._range_staging.drop_partition if self._range_staging is not None else None,
+        )
+        if primary is not None:
+            if cleanup_error is not None:
+                primary.add_note(f"range staging cleanup failed: {type(cleanup_error).__name__}")
+            raise primary
+        if cleanup_error is not None:
+            raise cleanup_error
+        return sum(group.expected_rows for group in groups)
+
+    def _load_legacy_windowed(
+        self,
+        load_config: LoadConfig,
+        artifact: Any,
+        schema: Sequence[tuple[str, str]],
+    ) -> int:
         loaded_any = False
         for window_index, window in enumerate(artifact.iter_windows(), start=1):
             sql = self.render_insert_sql(load_config, window, schema)
             pull_started = self._clock()
             self._connector.execute_query(sql)
-            pull_seconds = _elapsed(pull_started, self._clock())
+            pull_seconds = elapsed(pull_started, self._clock())
             loaded_any = True
             cleanup = getattr(window, "cleanup", None)
             cleanup_seconds = 0.0
             if callable(cleanup):
                 cleanup()
-                cleanup_seconds = _elapsed(pull_started + pull_seconds, self._clock())
+                cleanup_seconds = elapsed(pull_started + pull_seconds, self._clock())
             _record_window_metric(
                 artifact,
                 window=window,
@@ -94,6 +172,112 @@ class ClickHouseColumnarPullLoader:
         if callable(mark_complete):
             mark_complete()
         return self._count_rows(load_config) if loaded_any else 0
+
+    def _load_groups(
+        self,
+        load_config: LoadConfig,
+        artifact: Any,
+        schema: Sequence[tuple[str, str]],
+        groups: tuple[RangeWindowGroup, ...],
+        load_workers: int,
+        tracker: RangeLoadConcurrencyTracker,
+    ) -> None:
+        self._run_group_lanes(
+            groups,
+            load_workers,
+            lambda connector, group: self._load_group(connector, load_config, artifact, schema, group, tracker),
+        )
+
+    def _load_partition_groups(
+        self,
+        partitions: tuple[Any, ...],
+        artifact: Any,
+        schema: Sequence[tuple[str, str]],
+        groups: tuple[RangeWindowGroup, ...],
+        load_workers: int,
+        tracker: RangeLoadConcurrencyTracker,
+    ) -> None:
+        by_ordinal = {group.ordinal: partition for group, partition in zip(groups, partitions, strict=True)}
+
+        def load(connector: Any, group: RangeWindowGroup) -> None:
+            partition = by_ordinal[group.ordinal]
+            self._load_group(connector, partition, artifact, schema, group, tracker)
+            if count_connector_rows(connector, self._table_name(partition)) != group.expected_rows:
+                raise ValueError(f"clickhouse_range_staging_row_count_mismatch:{group.range_id}")
+
+        self._run_group_lanes(groups, load_workers, load)
+
+    def _run_group_lanes(
+        self,
+        groups: tuple[RangeWindowGroup, ...],
+        requested_workers: int,
+        load: Callable[[Any, RangeWindowGroup], None],
+    ) -> None:
+        workers = min(requested_workers, len(groups))
+        if workers == 1:
+            for group in groups:
+                load(self._connector, group)
+            return
+        if self._range_staging is None:
+            raise ValueError("clickhouse_parallel_range_load_callbacks_missing")
+        connectors = tuple(self._range_staging.clone_connector(index) for index in range(workers))
+        if len({id(connector) for connector in connectors}) != workers or any(
+            connector is self._connector for connector in connectors
+        ):
+            raise ValueError("clickhouse_range_load_workers_require_independent_connectors")
+        lanes = tuple(groups[index::workers] for index in range(workers))
+        stop = Event()
+
+        def run_lane(index: int) -> None:
+            try:
+                for group in lanes[index]:
+                    if stop.is_set():
+                        return
+                    try:
+                        load(connectors[index], group)
+                    except BaseException:
+                        stop.set()
+                        raise
+            finally:
+                close = getattr(connectors[index], "close", None)
+                if callable(close):
+                    close()
+
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="dpone-ch-range-load") as executor:
+            futures = tuple(executor.submit(run_lane, index) for index in range(workers))
+            failures: list[tuple[int, BaseException]] = []
+            for index, future in enumerate(futures):
+                try:
+                    future.result()
+                except BaseException as error:
+                    failures.append((lanes[index][0].ordinal, error))
+            if failures:
+                raise min(failures, key=lambda item: item[0])[1]
+
+    def _load_group(
+        self,
+        connector: Any,
+        load_config: Any,
+        artifact: Any,
+        schema: Sequence[tuple[str, str]],
+        group: RangeWindowGroup,
+        tracker: RangeLoadConcurrencyTracker,
+    ) -> None:
+        for window_index, window in enumerate(group.windows, start=1):
+            sql = self.render_insert_sql(load_config, window, schema)
+            started = self._clock()
+            tracker.enter()
+            try:
+                connector.execute_query(sql)
+            finally:
+                tracker.leave()
+            _record_window_metric(
+                artifact,
+                window=window,
+                window_index=window_index,
+                clickhouse_pull_seconds=elapsed(started, self._clock()),
+                window_cleanup_seconds=0.0,
+            )
 
     def render_insert_sql(
         self,
@@ -189,22 +373,19 @@ def _record_window_metric(
         "producer_metrics": dict(getattr(window, "producer_metrics", {}) or {}),
         "clickhouse_pull_seconds": clickhouse_pull_seconds,
         "window_cleanup_seconds": window_cleanup_seconds,
-        "rows_per_second": _rows_per_second(row_count, clickhouse_pull_seconds),
+        "rows_per_second": rows_per_second(row_count, clickhouse_pull_seconds),
     }
+    range_id = getattr(window, "range_id", None)
+    range_ordinal = getattr(window, "range_ordinal", None)
+    if isinstance(range_id, str) and range_id:
+        metric["range_id"] = range_id
+    if isinstance(range_ordinal, int) and not isinstance(range_ordinal, bool) and range_ordinal >= 0:
+        metric["range_ordinal"] = range_ordinal
     recorder(metric)
-
-
-def _rows_per_second(rows: int, seconds: float) -> float | None:
-    if seconds <= 0:
-        return None
-    return rows / seconds
-
-
-def _elapsed(started: float, finished: float) -> float:
-    return max(0.0, finished - started)
 
 
 __all__ = [
     "ClickHouseColumnarPullConfig",
     "ClickHouseColumnarPullLoader",
+    "ClickHouseRangeStagingCallbacks",
 ]
