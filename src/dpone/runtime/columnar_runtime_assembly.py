@@ -331,28 +331,6 @@ def _select_query(
     return f"{query} WHERE {predicate}" if predicate else query
 
 
-def _resolve_partition_bounds(connector: Any, query: str, column: str) -> tuple[Any, Any, int | None, int]:
-    """Resolve canonical range bounds through the selected source connector."""
-
-    quoted_column = connector.quote_identifier(column)
-    bounds_query = (
-        "SELECT "
-        f"MIN({quoted_column}) AS dpone_min_value, "
-        f"MAX({quoted_column}) AS dpone_max_value, "
-        "COUNT_BIG(1) AS dpone_row_count, "
-        f"SUM(CASE WHEN {quoted_column} IS NULL THEN 1 ELSE 0 END) AS dpone_null_count "
-        f"FROM ({query}) AS dpone_bounds"
-    )
-    rows = connector.get_records(bounds_query)
-    if not rows:
-        raise ValueError(f"Unable to resolve MSSQL partition bounds for column {column!r}.")
-    lower, upper, row_count, *rest = rows[0]
-    if lower is None or upper is None:
-        raise ValueError(f"MSSQL partition column {column!r} has no non-null bounds.")
-    null_count = rest[0] if rest else None
-    return lower, upper, int(row_count) if row_count is not None else None, int(null_count or 0)
-
-
 def _columnar_mode(load_config: LoadConfig) -> str:
     options = _columnar_fast_path_options(load_config)
     return str(options.get("mode") or "auto").strip().lower() if options else ""
