@@ -139,7 +139,7 @@ def resolve_partition_bounds(connector: Any, *, query: str, column: str, source_
     if normalized.startswith("datetime2"):
         expression = f"CONVERT(varchar(33), {quoted}, 121)"
     elif normalized.startswith("datetimeoffset"):
-        expression = f"CONVERT(varchar(40), {quoted}, 127)"
+        expression = f"CONVERT(varchar(40), SWITCHOFFSET({quoted}, '+00:00'), 127)"
     rows = connector.get_records(
         "SELECT "
         f"MIN({expression}), MAX({expression}), COUNT_BIG(1), "

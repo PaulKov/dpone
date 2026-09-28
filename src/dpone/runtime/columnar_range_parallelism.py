@@ -145,18 +145,29 @@ class BoundedRangeExecutor:
             max_bytes=policy.max_inflight_bytes,
         )
         sessions: list[RangeSession] = []
-        sessions_lock, active_lock = Lock(), Lock()
+        active_lock = Lock()
         active = 0
         observed = 0
 
-        def execute_one(item: range_contracts.ColumnarRangeDescriptor) -> RangeExecutionResult:
+        try:
+            for item in plan.ranges:
+                sessions.append(self._session_factory(item))
+        except BaseException as error:
+            for session in reversed(sessions):
+                try:
+                    session.close()
+                except BaseException as cleanup_error:
+                    _note_cleanup_error(error, cleanup_error)
+            raise
+
+        def execute_one(
+            item: range_contracts.ColumnarRangeDescriptor,
+            session: RangeSession,
+        ) -> RangeExecutionResult:
             nonlocal active, observed
             if cancelled.is_set():
-                raise RuntimeError("Range execution cancelled before session creation.")
+                raise RuntimeError("Range execution cancelled before source read.")
             with budget.open_range(cancelled):
-                session = self._session_factory(item)
-                with sessions_lock:
-                    sessions.append(session)
                 with active_lock:
                     active += 1
                     observed = max(observed, active)
@@ -168,36 +179,42 @@ class BoundedRangeExecutor:
                 finally:
                     with active_lock:
                         active -= 1
-                    primary = sys.exc_info()[1]
-                    try:
-                        session.close()
-                    except BaseException as cleanup_error:
-                        if primary is None:
-                            raise
-                        _note_cleanup_error(primary, cleanup_error)
 
         futures: dict[Future[RangeExecutionResult], int] = {}
         results: dict[int, RangeExecutionResult] = {}
         pool = self._executor_factory(min(policy.reader_workers, len(plan.ranges)))
         try:
-            futures = {pool.submit(execute_one, item): item.ordinal for item in plan.ranges}
+            futures = {
+                pool.submit(execute_one, item, sessions[item.ordinal]): item.ordinal for item in plan.ranges
+            }
             for future in as_completed(futures):
                 results[futures[future]] = future.result()
         except BaseException:
             cancelled.set()
-            with sessions_lock:
-                for session in sessions:
-                    cancel = getattr(session, "cancel", None)
-                    if callable(cancel):
-                        try:
-                            cancel()
-                        except BaseException as cleanup_error:
-                            _note_cleanup_error(sys.exc_info()[1], cleanup_error)
+            for session in sessions:
+                cancel = getattr(session, "cancel", None)
+                if callable(cancel):
+                    try:
+                        cancel()
+                    except BaseException as cleanup_error:
+                        _note_cleanup_error(sys.exc_info()[1], cleanup_error)
             for future in futures:
                 future.cancel()
             raise
         finally:
             pool.shutdown(wait=True, cancel_futures=True)
+            primary = sys.exc_info()[1]
+            close_error: BaseException | None = None
+            for session in reversed(sessions):
+                try:
+                    session.close()
+                except BaseException as cleanup_error:
+                    if primary is not None:
+                        _note_cleanup_error(primary, cleanup_error)
+                    else:
+                        close_error = close_error or cleanup_error
+            if close_error is not None:
+                raise close_error
         if len(results) != len(plan.ranges):
             raise RuntimeError("Range executor did not complete every planned range.")
         return RangeExecutionSummary(
