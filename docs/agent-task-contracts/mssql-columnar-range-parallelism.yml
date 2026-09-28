@@ -30,6 +30,7 @@ public_contract_impact:
 owned_paths:
   - src/dpone/contracts/columnar_range_parallelism.py
   - src/dpone/contracts/columnar_range_evidence.py
+  - src/dpone/contracts/columnar_range_evidence_validation.py
   - src/dpone/ports/columnar_range_parallelism.py
   - src/dpone/runtime/partitioning.py
   - src/dpone/runtime/partitioning_bounds.py
@@ -38,6 +39,8 @@ owned_paths:
   - src/dpone/runtime/partitioning_support.py
   - src/dpone/runtime/columnar_range_parallelism.py
   - src/dpone/runtime/columnar_range_evidence_lifecycle.py
+  - src/dpone/runtime/columnar_range_quality_bridge.py
+  - src/dpone/runtime/columnar_range_source_evidence.py
   - src/dpone/runtime/columnar_object_storage_windows.py
   - src/dpone/runtime/columnar_snapshot_provider.py
   - src/dpone/runtime/columnar_fast_path_models.py
@@ -47,9 +50,11 @@ owned_paths:
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_reader.py
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_windows.py
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_queryout_bridge.py
+  - src/dpone/runtime/governance/finalization.py
   - src/dpone/runtime/sinks/clickhouse_columnar_pull.py
   - src/dpone/runtime/sinks/clickhouse_payload_support.py
   - src/dpone/runtime/sinks/clickhouse_staged_load.py
+  - src/dpone/runtime/sinks/clickhouse_staging_finalizer.py
   - tests/test_mssql_columnar_range_parallelism.py
   - tests/test_mssql_columnar_snapshot_provider.py
   - tests/test_runtime_typed_partitioning.py
@@ -57,6 +62,8 @@ owned_paths:
   - tests/test_columnar_range_plan_output.py
   - tests/test_columnar_range_execution_evidence.py
   - tests/test_clickhouse_columnar_range_staging.py
+  - tests/test_clickhouse_governed_publication_lifecycle.py
+  - tests/test_clickhouse_production_finalize.py
   - tests/test_route_capability_runtime_factory.py
 
 integrator_owned_paths:
@@ -74,7 +81,6 @@ integrator_owned_paths:
 
 read_only_paths:
   - src/dpone/runtime/sinks/clickhouse_sink.py
-  - src/dpone/runtime/sinks/clickhouse_staging_finalizer.py
   - docs/architecture.md
   - docs/engineering-standards.md
   - docs/testing/index.md
