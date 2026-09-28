@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Native MSSQL-to-ClickHouse ingestion preserves the exported physical source
+  schema when a logical payload contract normalizes types. Column identity and
+  target type validation remain required before decoding.
 - Governed ClickHouse full refresh keeps one validated staged handle through
   publication and cleanup, so a committed predecessor is not treated as an
   unpublished staging table.

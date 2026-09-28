@@ -178,9 +178,15 @@ class ClickHousePayloadIngestionService:
         schema: Sequence[tuple[str, str]],
     ) -> int:
         if is_source_native_artifact(artifact):
+            # Payload types may be normalized; only the export contract describes BCP framing.
+            contract = getattr(artifact, "native_wire_contract")
+            source_schema = tuple((column.name, column.source_type) for column in contract.columns)
+            source_columns = tuple(column for column, _ in source_schema)
+            if source_columns != tuple(artifact.columns) or source_columns != tuple(column for column, _ in schema):
+                raise ValueError("native_wire_source_schema_mismatch:column_identity")
             stream_artifact = native_wire_transcoder().to_clickhouse_binary(
                 artifact,
-                schema,
+                source_schema,
                 clickhouse_schema=self._clickhouse_schema(load_config, schema),
                 type_policy=self._type_policy(load_config),
             )

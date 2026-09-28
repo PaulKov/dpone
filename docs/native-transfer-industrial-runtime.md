@@ -490,6 +490,14 @@ runtime evidence reports `mssql_source_escaping: true`, or the generated MSSQL
 query contains `REPLACE(`, the route is using the legacy `source_encoded`
 fallback.
 
+Native BCP files are decoded with the physical MSSQL column types sealed into
+their export artifact. A logical payload schema may normalize those types for
+the ClickHouse target, but it must preserve the same column names and order.
+The target mapping continues to use the logical schema; a changed column
+identity fails before decoding with
+`native_wire_source_schema_mismatch:column_identity`. No source-type override
+or runtime import patch is needed.
+
 `dpone plan` writes `native_transfer_bulk_wire` evidence with the selected
 route, ClickHouse input format, delimiter profile, schema hash, source escaping
 flag, acceleration backend decision, fallback reason, warnings, and blockers.
