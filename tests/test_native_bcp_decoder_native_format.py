@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import json
 import struct
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 from dpone.config import LoadConfig
 from dpone.runtime.bulk_wire import BulkWirePlanner
+from dpone.runtime.clickhouse_native import ClickHouseNativeEncoder
+from dpone.runtime.native_acceleration import (
+    NATIVE_ACCELERATION_BATCH_SCHEMA_VERSION,
+    NATIVE_ACCELERATION_SCHEMA_VERSION,
+)
 from dpone.runtime.native_wire_artifacts import SourceNativeArtifact
 from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
 from dpone.runtime.native_wire_transcoder import NativeWireTranscoder
@@ -186,7 +192,7 @@ def test_strategy_plan_names_bcp_native_clickhouse_native_fast_path() -> None:
     assert plan.native_ingest_settings["bulk_wire"]["input_format"] == "Native"
 
 
-def test_native_physical_chunks_reach_native_sink_with_required_acceleration(tmp_path: Path) -> None:
+def test_native_physical_chunks_reach_native_sink_with_required_acceleration(monkeypatch, tmp_path: Path) -> None:
     from dpone.runtime.native_wire_chunk_rows import NativeWireRowFramer
     from dpone.runtime.physical_chunking import (
         PhysicalChunkedFileExportArtifact,
@@ -202,6 +208,36 @@ def test_native_physical_chunks_reach_native_sink_with_required_acceleration(tmp
 
         def insert_stream(self, _table, _columns, chunks):
             self.calls.append((self.options.input_format, b"".join(chunks)))
+
+    def transcode_batches(request):
+        (value,) = struct.unpack("<i", Path(request["artifact_path"]).read_bytes())
+        payload = next(ClickHouseNativeEncoder([("id", "int")]).iter_batches([{"id": value}]))
+        return [
+            {
+                "schema_version": NATIVE_ACCELERATION_BATCH_SCHEMA_VERSION,
+                "payload": payload,
+                "rows": 1,
+            }
+        ]
+
+    fake_accelerator = SimpleNamespace(
+        __version__="test",
+        capabilities=lambda: {
+            "schema_version": NATIVE_ACCELERATION_SCHEMA_VERSION,
+            "backends": [
+                {
+                    "backend_id": "mssql_bcp_native_to_clickhouse_native",
+                    "source_format": "mssql-bcp-native",
+                    "target_format": "Native",
+                    "certified": True,
+                    "supported_types": ["int"],
+                    "native_wire_revision": 2,
+                }
+            ],
+        },
+        transcode_batches=transcode_batches,
+    )
+    monkeypatch.setitem(sys.modules, "dpone_native_accel", fake_accelerator)
 
     schema = [("id", "int")]
     contract = build_mssql_bcp_native_contract(schema=schema, query="SELECT synthetic", target_format="Native")
