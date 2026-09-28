@@ -35,6 +35,8 @@ def test_preserves_projected_physical_type(render, dtype: str) -> None:
         "Array(String) DEFAULT []",
         "Array(String",
         "Array(String))",
+        "Array(String # '\n), DROP COLUMN victim # ')",
+        'Tuple("named" String)',
     ],
 )
 def test_rejects_statement_tokens(dtype: str) -> None:

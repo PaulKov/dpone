@@ -116,7 +116,7 @@ def _mssql_collation(value: str | None) -> str:
 
 def _to_clickhouse_type(dtype: str) -> str:
     physical_type = str(dtype).strip()
-    if any(token in physical_type for token in (";", "--", "/*", "*/", "`")):
+    if any(token in physical_type for token in (";", "--", "/*", "*/", "`", "#", '"')):
         raise ValueError("Unsafe ClickHouse schema-evolution type")
     # The sink projects physical types before comparison; never remap them.
     if is_probable_clickhouse_type(physical_type):
