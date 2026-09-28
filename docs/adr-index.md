@@ -94,3 +94,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0072: MSSQL native writers expose explicit proof capabilities (Accepted)](adr/0072-mssql-native-writer-proof-capabilities.md)
 
 - [ADR 0073: Durable evidence reissues process-local quality authority (Accepted for bounded opt-in)](adr/0073-durable-committed-replay-quality.md)
+
+- [ADR 0074: Declarative replay uses guarded target completion (Proposed)](adr/0074-declarative-replay-target-completion.md)
