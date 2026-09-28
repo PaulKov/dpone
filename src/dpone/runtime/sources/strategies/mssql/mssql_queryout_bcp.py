@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
 
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from contextlib import nullcontext
 from typing import Any
 
@@ -59,6 +59,11 @@ def build_bcp_queryout_artifact(
         if native.blockers:
             raise ValueError("; ".join(native.blockers) + ":use_row_stream_or_nullable_projection")
     physical_chunk_policy = PhysicalChunkPolicy.from_source_options(load_config.options)
+    _guard_native_chunk_admission(
+        load_config,
+        native_wire=wire is not None and wire.selected_route == "typed_binary_bcp_native",
+        physical_chunk_policy=physical_chunk_policy,
+    )
     streaming_policy = StreamingTransferPolicy.from_options(load_config.options)
     bounds_query = query
     materialized = maybe_materialize_query(
@@ -244,6 +249,27 @@ def _build_queryout_transport(
         tmp_dir=tmp_dir,
     )
     return wrap_prepared_source_artifact(file_artifact, materialized)
+
+
+def _guard_native_chunk_admission(
+    load_config: LoadConfig,
+    *,
+    native_wire: bool,
+    physical_chunk_policy: PhysicalChunkPolicy,
+) -> None:
+    """Reject lazy native combinations before source materialization or BCP I/O."""
+
+    if not native_wire:
+        return
+    strategy = str(getattr(getattr(load_config, "load_strategy", None), "value", ""))
+    if strategy in {"snapshot_diff", "scd2"}:
+        raise ValueError(f"mssql_bcp_native_strategy_metadata_unsupported:{strategy}")
+    if physical_chunk_policy.mode == "off":
+        return
+    raw_contract = getattr(load_config, "options", {}).get("schema_contract")
+    columns = raw_contract.get("columns") if isinstance(raw_contract, Mapping) else None
+    if isinstance(columns, Mapping) and columns:
+        raise ValueError("mssql_bcp_native_physical_chunks_schema_contract_unsupported")
 
 
 def _single_scan_artifact(

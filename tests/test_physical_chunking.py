@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from threading import Event, Thread
 from types import SimpleNamespace
 
 import pytest
@@ -15,6 +16,7 @@ from dpone.runtime.physical_chunking import (
 )
 from dpone.runtime.source_scan import SourceScanPlanner, SourceShape
 from dpone.runtime.sources.strategies.mssql.mssql_queryout_artifacts import MSSQLQueryoutArtifactFactory
+from dpone.runtime.sources.strategies.mssql.mssql_single_scan_chunks import BcpSingleScanChunkExporter
 from dpone.runtime.sources.strategies.mssql.mssql_source_shape import MSSQLSourceShapeInspector
 
 
@@ -237,6 +239,74 @@ def test_mssql_queryout_forced_range_blocks_heap_before_source_io(tmp_path: Path
     assert not any("dpone_bounds" in query for query in connector.queries)
 
 
+@pytest.mark.parametrize("strategy", [LoadStrategy.SNAPSHOT_DIFF, LoadStrategy.SCD2])
+def test_mssql_native_chunks_reject_strategy_metadata_before_source_io(
+    tmp_path: Path,
+    strategy: LoadStrategy,
+) -> None:
+    connector = _FakeMssqlConnector(table_kind="heap", has_seekable_boundary=False)
+    config = _native_chunk_config(tmp_path)
+    config.load_strategy = strategy
+
+    with pytest.raises(ValueError, match="mssql_bcp_native_strategy_metadata_unsupported"):
+        MSSQLQueryoutArtifactFactory(
+            connector,
+            CapturingLogger(),
+            sink_connector=ClickHouseConnector(),
+        ).artifact_for_query(config, "SELECT [id] FROM [reporting].[orders]", [("id", "int")])
+
+    assert connector.queries == []
+    assert connector.bcp_runner_calls == 0
+
+
+def test_mssql_native_chunks_reject_schema_contract_before_source_io(tmp_path: Path) -> None:
+    connector = _FakeMssqlConnector(table_kind="heap", has_seekable_boundary=False)
+    config = _native_chunk_config(tmp_path)
+    config.options["schema_contract"] = {"columns": {"id": {"nullable": False}}}
+
+    with pytest.raises(ValueError, match="mssql_bcp_native_physical_chunks_schema_contract_unsupported"):
+        MSSQLQueryoutArtifactFactory(
+            connector,
+            CapturingLogger(),
+            sink_connector=ClickHouseConnector(),
+        ).artifact_for_query(config, "SELECT [id] FROM [reporting].[orders]", [("id", "int")])
+
+    assert connector.queries == []
+    assert connector.bcp_runner_calls == 0
+
+
+def test_late_bcp_failure_drops_stage_and_cleans_fifo_and_chunks(tmp_path: Path) -> None:
+    connector = _LateFailingBcpConnector(payload=b"1\n2\n")
+    artifact = BcpSingleScanChunkExporter(connector, CapturingLogger()).artifact(
+        query="SELECT [id] FROM [reporting].[orders]",
+        columns=("id",),
+        directory=tmp_path,
+        bcp_options=SimpleNamespace(row_terminator="\n"),
+        policy=PhysicalChunkPolicy(
+            mode="required",
+            target_chunk_bytes=2,
+            max_chunk_bytes=16,
+            cleanup_policy="eager",
+        ),
+        source_table="reporting.orders",
+        artifact_format="mssql-delimited",
+        bulk_text_codec=None,
+        bulk_wire_contract=None,
+        source_scan_decision=None,
+    )
+    staging = _RecordingStagingManager()
+
+    with pytest.raises(RuntimeError, match="late_bcp_failure"):
+        artifact.materialize(staging, object(), [("id", "int")])
+
+    assert staging.loaded_payloads == [b"1\n", b"2\n"]
+    assert staging.cleanup_calls == 1
+    assert connector.process.reaped is True
+    assert connector.process.aborted is True
+    assert not list(tmp_path.glob("dpone_mssql_single_scan_*.fifo"))
+    assert not list(tmp_path.glob("dpone_physical_chunk_*.bcp"))
+
+
 class _FakeMssqlConnector:
     bcp_path = "bcp"
     trust_server_certificate = "yes"
@@ -245,6 +315,7 @@ class _FakeMssqlConnector:
         self.table_kind = table_kind
         self.has_seekable_boundary = has_seekable_boundary
         self.queries: list[str] = []
+        self.bcp_runner_calls = 0
 
     def quote_identifier(self, name: str) -> str:
         return f"[{name}]"
@@ -264,7 +335,79 @@ class _FakeMssqlConnector:
 
     def _bcp_runner(self, options=None):
         del options
+        self.bcp_runner_calls += 1
         return SimpleNamespace()
+
+
+class _LateFailingBcpProcess:
+    def __init__(self, fifo_path: str, payload: bytes) -> None:
+        self._done = Event()
+        self.reaped = False
+        self.aborted = False
+        self._thread = Thread(target=self._write, args=(fifo_path, payload), daemon=True)
+        self._thread.start()
+
+    def _write(self, fifo_path: str, payload: bytes) -> None:
+        with Path(fifo_path).open("wb", buffering=0) as stream:
+            stream.write(payload)
+        self._done.set()
+
+    def poll(self) -> int | None:
+        return 1 if self._done.is_set() else None
+
+    def wait(self):
+        self._thread.join(timeout=2)
+        self.reaped = True
+        raise RuntimeError("late_bcp_failure")
+
+    def abort(self) -> None:
+        self._thread.join(timeout=2)
+        self.aborted = True
+        self.reaped = True
+
+
+class _LateFailingBcpConnector:
+    def __init__(self, *, payload: bytes) -> None:
+        self.payload = payload
+        self.process: _LateFailingBcpProcess
+
+    def _bcp_runner(self, options):
+        del options
+        connector = self
+
+        class _Runner:
+            @staticmethod
+            def queryout_process(query: str, fifo_path: str) -> _LateFailingBcpProcess:
+                del query
+                connector.process = _LateFailingBcpProcess(fifo_path, connector.payload)
+                return connector.process
+
+        return _Runner()
+
+
+class _StagingHandle:
+    def __init__(self, owner: _RecordingStagingManager) -> None:
+        self.owner = owner
+        self.row_count = 0
+
+    def cleanup(self) -> None:
+        self.owner.cleanup_calls += 1
+
+
+class _RecordingStagingManager:
+    def __init__(self) -> None:
+        self.loaded_payloads: list[bytes] = []
+        self.cleanup_calls = 0
+
+    def create(self, load_config, schema):
+        del load_config, schema
+        return _StagingHandle(self)
+
+    def load_from_file(self, handle, artifact) -> int:
+        del handle
+        payload = Path(artifact.file_path).read_bytes()
+        self.loaded_payloads.append(payload)
+        return payload.count(b"\n")
 
 
 class ClickHouseConnector:
@@ -291,6 +434,21 @@ def _load_config(tmp_path: Path, *, scan: dict[str, object], physical_chunking: 
             "native_transfer": {"snapshot": {"scan": scan, "physical_chunking": physical_chunking}},
         },
     )
+
+
+def _native_chunk_config(tmp_path: Path) -> LoadConfig:
+    config = _load_config(
+        tmp_path,
+        scan={"mode": "single_scan", "heap_policy": "single_scan_chunks", "require_index_for_range": True},
+        physical_chunking={"mode": "required", "target_chunk_bytes": "8MiB"},
+    )
+    config.options["native_transfer"]["wire"] = {
+        "mode": "typed_binary",
+        "source_native_format": "bcp_native",
+        "binary_format": "native",
+    }
+    config.options["clickhouse_bulk"] = {"mode": "http", "ingest_contract": "typed_binary_staging"}
+    return config
 
 
 @pytest.mark.parametrize("binary_format,target_format", [("native", "Native"), ("rowbinary", "RowBinary")])
