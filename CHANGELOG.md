@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.84.2 - 2026-09-28
+
 ### Fixed
 
 - Governed ClickHouse full refresh keeps one validated staged handle through
