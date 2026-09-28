@@ -16,14 +16,9 @@ from dpone.runtime.columnar_parquet_writer import ParquetChunkWriter, PyArrowPar
 from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotCapability, ColumnarSnapshotRequest
 from dpone.runtime.object_storage_access_models import ObjectStorageReadContract, read_contract_from_options
 from dpone.runtime.sources.strategies.mssql import mssql_columnar_chunks as chunks
+from dpone.runtime.sources.strategies.mssql import mssql_columnar_schema as columnar_schema
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_markers import write_columnar_run_marker
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_reader import iter_columnar_batches, range_read_blockers
-from dpone.runtime.sources.strategies.mssql.mssql_columnar_schema import (
-    read_contract_options as _read_contract_options,
-)
-from dpone.runtime.sources.strategies.mssql.mssql_columnar_schema import (
-    schema_blockers as _schema_blockers,
-)
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_windows import (
     build_parallel_object_windows,
     iter_serial_object_windows,
@@ -62,7 +57,7 @@ class MssqlColumnarSnapshotProvider:
             blockers.append("parquet_writer_unavailable")
         if request.format.lower() != "parquet":
             blockers.append("columnar_format_not_supported")
-        blockers.extend(_schema_blockers(request.schema))
+        blockers.extend(columnar_schema.schema_blockers(request.schema))
         blockers.extend(range_read_blockers(request, self._connector))
         return ColumnarSnapshotCapability(
             provider_id=self.provider_id,
@@ -384,7 +379,7 @@ class MssqlColumnarSnapshotProvider:
     def _resolve_read_contract(self, request: ColumnarSnapshotRequest) -> ObjectStorageReadContract:
         if self._read_contract is not None:
             return self._read_contract
-        return read_contract_from_options(_read_contract_options(request))
+        return read_contract_from_options(columnar_schema.read_contract_options(request))
 
 
 __all__ = ["MssqlColumnarSnapshotProvider"]
