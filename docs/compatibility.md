@@ -1304,3 +1304,13 @@ class. Optional verification budgets preserve legacy no-budget calls; unsupporte
 budgeted authorities fail closed. Binary `none` in this API means raw bytes.
 Stop new calls and reconcile retained attempts before moving caller/package back
 together. See [API and recovery guidance](validated-clickhouse-file-staging.md).
+
+## Declarative committed replay and target acceptance
+
+`sink.options.durable_quality_replay` is a strict boolean, defaulting to false.
+Existing Python source/staged capsules retain v1 bytes. Target capture uses v2 and
+requires a compatible reader until pending operations finish; quiesce writers
+before upgrading or rolling back. No historical evidence is synthesized from old
+reports or today's target data. CLI retries require the same explicit run/DAG/path
+identity; Airflow try number alone does not create a new logical operation.
+See [configuration and recovery](declarative-replay-quality.md).

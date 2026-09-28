@@ -16,6 +16,7 @@ from dpone.runtime.credentials.config import ConnectionType
 from dpone.runtime.credentials.resolved_connector_factory import (
     ResolvedConnectorFactory,
 )
+from dpone.runtime.quality_replay_contracts import require_replay_boolean
 
 
 class ResolvedEndpointFactory:
@@ -82,10 +83,12 @@ class ResolvedEndpointFactory:
         autocommit: bool = True,
         proxy_connection: ResolvedBindingConnection | None = None,
         runtime_storage_policy: RuntimeStoragePolicy | None = None,
+        durable_quality_replay: bool = False,
     ) -> Any:
         """Create a sink from one immutable resolved connection."""
 
         connection_type = cls._connection_type(connection, endpoint="sink")
+        require_replay_boolean(durable_quality_replay, sink_type=connection_type.value)
         connector = ResolvedConnectorFactory.create(
             connection,
             autocommit=autocommit,
@@ -123,6 +126,7 @@ class ResolvedEndpointFactory:
                 connector=connector,
                 state_storage=state_storage,
                 logger=etl_logger,
+                **({"durable_quality_replay": True} if durable_quality_replay else {}),
             )
         if connection_type == ConnectionType.KAFKA:
             from dpone.runtime.sinks.kafka import KafkaSink

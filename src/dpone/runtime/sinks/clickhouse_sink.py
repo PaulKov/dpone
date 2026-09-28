@@ -18,6 +18,7 @@ from dpone.runtime.clickhouse_staging_composition import (
     ClickHouseFullRefreshPublicationMixin,
     build_clickhouse_staging_components,
     build_full_refresh_publication_router,
+    configure_quality_replay,
 )
 from dpone.runtime.clickhouse_staging_composition import (
     build_file_runner as build_file_runner,
@@ -54,6 +55,9 @@ class ClickHouseSink(
     """ClickHouse sink optimized for MSSQL/Postgres exported files and row streams."""
 
     supports_staged_validation_receipts = True
+    target_acceptance_reader: Any | None
+    durable_quality_replay: bool
+    quality_replay_store: Any | None
 
     def __init__(
         self,
@@ -67,10 +71,12 @@ class ClickHouseSink(
         validated_file_runner_factory: Callable[[LoadConfig, ClickHouseValidatedFilePolicy], ClickHouseFileStageRunner]
         | None = None,
         durable_quality_replay: bool = False,
+        target_acceptance_reader: Any | None = None,
     ):
+        configure_quality_replay(
+            self, durable_quality_replay=durable_quality_replay, target_acceptance_reader=target_acceptance_reader
+        )
         self.connector = connector
-        self.durable_quality_replay = durable_quality_replay
-        self.quality_replay_store: Any | None = None
         self.state_storage = state_storage
         self.logger = logger or _default_etl_logger()
         self.acceptance_metric_probe = _default_acceptance_metric_probe(connector)
@@ -278,6 +284,8 @@ class ClickHouseSink(
             logger=self.logger,
             client_runner_cls=self._client_runner_cls,
             http_runner_cls=self._http_runner_cls,
+            durable_quality_replay=self.durable_quality_replay,
+            target_acceptance_reader=self.target_acceptance_reader if connector is self.connector else None,
         )
 
     def _execute_insert(self, load_config: LoadConfig, columns: Sequence[str], rows: Sequence[tuple[Any, ...]]) -> int:

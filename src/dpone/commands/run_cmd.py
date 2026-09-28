@@ -304,7 +304,10 @@ def register_parser(subparsers: argparse._SubParsersAction) -> argparse.Argument
         help="YAML manifest path; safe-sample mode also accepts a canonical pipeline ID or directory",
     )
     parser.add_argument("--selector", help="Process selector inside a batch manifest")
-    parser.add_argument("--run-id", help="Explicit run id; defaults to process name")
+    parser.add_argument(
+        "--run-id",
+        help="Explicit run id; defaults to scheduler identity or a fresh manual UUID; reuse for the same operation",
+    )
     parser.add_argument(
         "--dag-id",
         action=ExplicitOptionAction,

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dpone.contracts.process_types import TransformConfig
+from dpone.contracts.quality_replay_selection import validate_replay_configuration
 from dpone.dag.dependency_parser import DependencyParser
 from dpone.dag.errors import DagConfigurationError
 from dpone.dag.load_config_builder import LoadConfigBuilder
@@ -36,6 +37,7 @@ class ETLProcessConfigParser:
         metadata_only: bool = False,
         parse_tracer: ParseTracer | None = None,
     ) -> ETLProcessConfig:
+        validate_replay_configuration(config)
         try:
             name = config["name"]
         except KeyError as exc:

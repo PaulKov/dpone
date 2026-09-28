@@ -19,6 +19,7 @@ from dpone.runtime.etl.processor_payload_mixin import ProcessorPayloadMixin
 from dpone.runtime.etl.reconciliation_service import ReconciliationService
 from dpone.runtime.etl.run_state_tracker import RunStateTracker
 from dpone.runtime.etl.source_state import SourceStateService
+from dpone.runtime.governance.quality_replay import receipt_already_accepted
 from dpone.runtime.process_logging import create_etl_logger
 
 if TYPE_CHECKING:
@@ -238,10 +239,9 @@ class ETLProcessor(ProcessorPayloadMixin):
                     load_result,
                     extract_result,
                 )
-                quality_execution.accept_state(
-                    getattr(load_result, "quality_gate_receipt", None),
-                    load_config=effective_config,
-                )
+                receipt = getattr(load_result, "quality_gate_receipt", None)
+                if not receipt_already_accepted(quality_execution, receipt, config=effective_config):
+                    quality_execution.accept_state(receipt, load_config=effective_config)
                 runtime.populate_success_result(
                     result,
                     load_result,

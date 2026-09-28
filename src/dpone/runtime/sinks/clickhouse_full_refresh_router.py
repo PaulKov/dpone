@@ -55,7 +55,9 @@ class ClickHouseFullRefreshPublicationRouter:
 
         router = cls.from_connector(sink.connector)
         if getattr(sink, "durable_quality_replay", False):
-            router._cluster, sink.quality_replay_store = build_clickhouse_quality_publication(sink.connector)
+            router._cluster, sink.quality_replay_store = build_clickhouse_quality_publication(
+                sink.connector, target_acceptance_reader=getattr(sink, "target_acceptance_reader", None)
+            )
             router._durable_quality = True
         router._external = build_clickhouse_external_replication(sink)
         return router

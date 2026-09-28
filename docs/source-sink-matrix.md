@@ -188,3 +188,12 @@ Use [Type mapping matrix](type-mapping-matrix.md) for cross-system type conversi
 - [CDC live runtime adapters](cdc-live-runtime-adapters.md) add live MSSQL -> ClickHouse readers, ClickHouse CDC apply, and SQL-backed offsets.
 - [ClickHouse CDC materialization](cdc-clickhouse-materialization.md) rebuilds current-state serving tables from the ClickHouse append-only CDC log.
 - [ClickHouse CDC typed materialization](cdc-clickhouse-typed-materialization.md) rebuilds CDC typed serving materialization tables with declared ClickHouse columns.
+
+### Durable quality replay scope
+
+[Declarative committed replay](declarative-replay-quality.md) is a separate opt-in
+for bounded full refresh into one-shard internally replicated ClickHouse. It does
+not remove existing append, merge or other strategy support. Those strategies do
+not gain this durable replay guarantee. Synthetic tests are available; live target
+reader and end-to-end publication certification remain environment-specific and
+unverified for this addition.

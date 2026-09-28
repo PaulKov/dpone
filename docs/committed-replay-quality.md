@@ -29,6 +29,9 @@ finishes governance. The second retries a successful publication twice through
 traps. Exactly one publication dispatch remains recorded. These tests demonstrate
 the algorithm, not a ClickHouse deployment or Keeper durability certification.
 
+For declarative pipelines, start with the [CLI and Airflow tutorial](declarative-replay-quality.md).
+The Python composition below remains available for trusted integrators.
+
 ## Prepare and configure the Python integration
 
 1. Select the existing bounded, one-shard replicated ClickHouse cluster
@@ -71,21 +74,26 @@ the algorithm, not a ClickHouse deployment or Keeper durability certification.
    }
    ```
 
-   Target capture defaults to enabled when acceptance is selected, so explicitly
-   setting it to `False` is required for this version, including `warn_only`.
+   This source/staged-only example requires no target reader. To request target
+   capture in trusted Python composition, inject the bounded
+   `target_acceptance_reader` capability alongside the durable store selector.
+   Declarative factories compose that reader from the admitted sink connection;
+   selecting target capture without a reader fails before extraction.
 5. Keep the same scheduler invocation, process identity and semantic
    configuration on retry. Supply a stable `RunContext.run_id` and `dag_id`
    to `ETLProcessor.run`; setting `options["run_id"]` alone is insufficient.
    A different invocation is a successor operation, not a recovery attempt.
 
-The constructor defaults to `False`. There is currently no manifest key or CLI
-switch for selecting this store. CLI/Airflow factory composition and external
-replication are not enabled by the Python constructor example.
+The constructor defaults to `False`. Declarative CLI and Airflow consumers select
+the same capability through `sink.options.durable_quality_replay: true`; see the
+[complete examples and identity instructions](declarative-replay-quality.md).
+External replication remains outside this durable quality capability.
 
 ## Observe the result
 
 A successful replay includes `reconciliation_metrics.quality_replay` in the
-processor result. Its `kind` is `dpone.quality.replay.result.v1`; `core_digest`
+processor result. Its `kind` is `dpone.quality.replay.result.v1` for source/staged
+evidence or `dpone.quality.replay.result.v2` for target completion; `core_digest`
 identifies the immutable original evidence, `replayed_from` records the original
 run/load IDs, and `quality_gates` and `acceptance` expose validated projections.
 These result fields are diagnostics; copying them does not authorize replay.
@@ -101,4 +109,5 @@ Use the [reference](committed-replay-quality-reference.md) to check policy and
 identity limits before rollout. Use [ADR 0073](adr/0073-durable-committed-replay-quality.md)
 for the producer, receipt, and concurrency model. The
 [approved design](feature-design-committed-replay-quality-evidence.md) records the
-larger protocol; its target-capture and additional-backend work remains deferred.
+original source/staged protocol. [ADR 0074](adr/0074-declarative-replay-target-completion.md)
+adds bounded target completion; additional backends remain outside scope.

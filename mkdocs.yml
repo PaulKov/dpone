@@ -268,6 +268,7 @@ nav:
       - ClickHouse external cluster publication: clickhouse-cluster-publication.md
       - ClickHouse cluster publication reference: clickhouse-cluster-publication-reference.md
       - ClickHouse cluster publication recovery: clickhouse-cluster-publication-runbook.md
+      - Configure declarative replay: declarative-replay-quality.md
       - Committed replay quality guide: committed-replay-quality.md
       - Committed replay quality reference: committed-replay-quality-reference.md
       - Committed replay quality recovery: committed-replay-quality-runbook.md
@@ -543,6 +544,7 @@ nav:
       - Feature design - Airflow repair-authority dag_run.conf: feature-design-airflow-repair-authority-dag-run-conf.md
       - Feature design - governed REST bulk delivery V1: feature-design-rest-api-sink-v1.md
       - Feature design - committed replay quality evidence: feature-design-committed-replay-quality-evidence.md
+      - Feature design - declarative replay quality: feature-design-declarative-replay-quality.md
       - Governed REST bulk-delivery threat model: rest-bulk-delivery-threat-model.md
       - Documentation standard: documentation-standard.md
       - Agent templates:
@@ -668,6 +670,7 @@ nav:
       - ADR 0065: adr/0065-trusted-isolated-native-generation-execution.md
       - ADR 0069: adr/0069-clickhouse-external-replication-publication.md
       - ADR 0073: adr/0073-durable-committed-replay-quality.md
+      - ADR 0074: adr/0074-declarative-replay-target-completion.md
 
 extra:
   generator: false

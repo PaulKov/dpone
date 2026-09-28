@@ -15,6 +15,7 @@ from typing import Any
 from dpone.config.env import ENV_CODE
 from dpone.contracts.api_sources import get_api_source_defaults
 from dpone.runtime.errors import RuntimeConfigurationError
+from dpone.runtime.quality_replay_contracts import replay_selection
 
 
 class RuntimeEndpointFactory:
@@ -70,6 +71,7 @@ class RuntimeEndpointFactory:
 
         if not sink_cfg:
             raise RuntimeConfigurationError("Не задан блок sink")
+        selected_replay = replay_selection(sink_cfg.get("options", {}), sink_type=str(sink_cfg.get("type") or ""))
         if connection is None:
             raise RuntimeConfigurationError("Resolved sink connection is required for strict runtime.")
         descriptor = connection.descriptor
@@ -93,6 +95,7 @@ class RuntimeEndpointFactory:
             xmin_state_storage,
             proxy_connection=proxy_connection,
             runtime_storage_policy=runtime_storage_policy,
+            **({"durable_quality_replay": True} if selected_replay else {}),
         )
 
     @staticmethod
@@ -175,6 +178,7 @@ class RuntimeEndpointFactory:
 
         if not sink_cfg:
             raise RuntimeConfigurationError("Не задан блок sink")
+        selected_replay = replay_selection(sink_cfg.get("options", {}), sink_type=str(sink_cfg.get("type") or ""))
 
         conn_id = sink_cfg.get("connection_id")
         conn_type = sink_cfg.get("type", "postgres")
@@ -210,6 +214,7 @@ class RuntimeEndpointFactory:
             proxy_mount_point=proxy_config.get("vault_mount_point") or "",
             proxy_path=proxy_config.get("vault_path", "network/proxy/gcp/current"),
             runtime_storage_policy=runtime_storage_policy,
+            **({"durable_quality_replay": True} if selected_replay else {}),
         )
 
     @staticmethod

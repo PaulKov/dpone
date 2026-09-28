@@ -1,0 +1,61 @@
+# yaml-language-server: $schema=../../src/dpone/schema/etl-flow-manifest.schema.json
+# Synthetic names: provision matching runtime connections and authority before execution.
+kind: dpone.flow.v1
+authoring:
+  mode: flow
+  source: durable-replay-full-refresh.flow.yaml
+metadata:
+  id: durable_replay
+processes:
+- name: refresh
+  source:
+    type: clickhouse
+    table:
+      schema: source
+      name: records
+    connection_ref: replay_source
+  sink:
+    type: clickhouse
+    table:
+      schema: analytics
+      name: replay_records
+    staging:
+      schema: analytics
+    strategy:
+      mode: full_refresh
+      max_source_bytes: 104857600
+    options:
+      durable_quality_replay: true
+      lineage: false
+      physical_design:
+        storage:
+          clickhouse:
+            engine: ReplicatedMergeTree
+            order_by:
+            - record_id
+            cluster:
+              name: replay_cluster
+              ddl_scope: cluster
+              replication_mode: internal
+    connection_ref: replay_target
+  quality:
+    gates:
+    - id: rows
+      type: row_count_reconciliation
+      severity: error
+      tolerance:
+        mode: absolute
+        value: 0
+    acceptance:
+      enabled: true
+      mode: required
+      capture:
+        source: true
+        staged: true
+        target: true
+      checks:
+        row_count: true
+        null_counts:
+        - record_id
+        distinct_counts:
+        - record_id

@@ -44,6 +44,7 @@ from dpone.runtime.governance.acceptance_metrics import AcceptanceMetricPolicy
 from dpone.runtime.governance.finalization import LoadGovernanceFinalizationCoordinator
 from dpone.runtime.governance.legacy_acceptance import LegacyLoadGovernanceCoordinator
 from dpone.runtime.governance.quality_receipt import validate_quality_gate_receipt
+from dpone.runtime.governance.quality_replay import receipt_already_accepted
 from dpone.runtime.governance.service import LoadGovernanceService
 
 
@@ -267,7 +268,8 @@ class PayloadLoadService(PayloadLoadTerminalMixin):
         validator = getattr(self.load_governance_service, "validate_quality_gate_receipt", None)
         receipt = getattr(load_result, "quality_gate_receipt", None)
         if quality_execution is not None:
-            quality_execution.accept_payload(receipt, load_config=load_config)
+            if not receipt_already_accepted(quality_execution, receipt, config=load_config):
+                quality_execution.accept_payload(receipt, load_config=load_config)
             return load_result
         if callable(validator):
             validated = validator(load_config=load_config, receipt=receipt)
