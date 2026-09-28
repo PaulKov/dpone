@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Added
+
+- Declarative `sink.options.durable_quality_replay` opt-in for bounded internal
+  replicated ClickHouse full refresh through CLI and Airflow runtime composition.
+  Required target acceptance uses a supervised native reader, an immutable v2
+  target plan and guarded durable completion. Same-operation retries preserve
+  gates, avoid source reads/publication redispatch and never rescan COMPLETE
+  target observations. Existing source/staged v1 evidence remains readable.
+  Other load strategies keep their prior behavior; live certification remains
+  unverified.
+
+### Fixed
+
+- Manual run-ID help now describes the generated UUID. Safe replay diagnostics
+  distinguish proven target commit from incomplete governance, including JSON
+  output and wrapped invalid configuration errors.
+
 ## 0.85.0 - 2026-09-28
 
 ### Added
