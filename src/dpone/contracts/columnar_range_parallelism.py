@@ -17,6 +17,12 @@ DEFAULT_MAX_INFLIGHT_ROWS = 100_000
 DEFAULT_MAX_INFLIGHT_BYTES = 256 * 1024 * 1024
 
 
+def columnar_range_fingerprint(payload: Mapping[str, Any]) -> str:
+    """Return the canonical public identity for a range-policy payload."""
+
+    return canonical_fingerprint(payload)
+
+
 @dataclass(frozen=True, slots=True)
 class RangeParallelismPolicy:
     """Normalized resource, consistency, and staging policy."""
@@ -293,4 +299,5 @@ __all__ = [
     "ColumnarRangePlan",
     "RangeEvidenceItem",
     "RangeParallelismPolicy",
+    "columnar_range_fingerprint",
 ]

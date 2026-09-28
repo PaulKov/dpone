@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-import dpone.contracts.columnar_range_parallelism as range_contracts
+import dpone.ports.columnar_range_parallelism as range_contracts
 
 
 @dataclass(frozen=True, slots=True)

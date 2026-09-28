@@ -13,8 +13,7 @@ from threading import Condition, Event, Lock
 from typing import Any, Protocol
 from uuid import UUID
 
-import dpone.contracts.columnar_range_parallelism as range_contracts
-from dpone.contracts.airflow_deployment import canonical_fingerprint
+import dpone.ports.columnar_range_parallelism as range_contracts
 from dpone.runtime.partitioning import RangePartition, RangePartitioner
 
 
@@ -245,7 +244,7 @@ def build_columnar_range_plan(
         payload = _range_payload(partition, ordinal=ordinal)
         descriptors.append(
             range_contracts.ColumnarRangeDescriptor(
-                range_id=canonical_fingerprint(payload),
+                range_id=range_contracts.columnar_range_fingerprint(payload),
                 ordinal=ordinal,
                 boundary_family=partition.boundary.kind.value,
                 lower=_bound_digest(partition.lower_bound),
@@ -281,7 +280,7 @@ def _bound_digest(value: object) -> str | None:
         typed = str(value)
     else:
         typed = value
-    return canonical_fingerprint({"value": typed, "python_type": type(value).__name__})
+    return range_contracts.columnar_range_fingerprint({"value": typed, "python_type": type(value).__name__})
 
 
 def _positive(name: str, value: object) -> int:
