@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+## 0.84.4 - 2026-09-28
+
+### Fixed
+
+- ClickHouse physical reconciliation preserves nested and quoted key expressions
+  when reading sorting and primary keys, preventing false shadow-migration
+  blockers for unchanged layouts. Actual key changes remain blocked.
+
 ## 0.84.3 - 2026-09-28
 
 ### Fixed

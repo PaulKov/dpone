@@ -7,6 +7,7 @@ from dataclasses import asdict, dataclass, field
 from typing import Any, Protocol
 
 from dpone.readiness.physical_design_models import PhysicalDesignPlan
+from dpone.readiness.physical_key_expressions import split_physical_key_expressions
 from dpone.runtime.sinks.clickhouse_table_ddl import normalize_clickhouse_ttl_expression
 
 TableSettingValue = str | int | float | bool
@@ -250,10 +251,7 @@ def _list_option(value: Any) -> list[str]:
 
 
 def _split_expression_list(value: str) -> list[str]:
-    normalized = value.strip()
-    if not normalized or normalized.lower() == "tuple()":
-        return []
-    return [item.strip().strip("`") for item in normalized.split(",") if item.strip()]
+    return split_physical_key_expressions(value)
 
 
 def _optional_str(value: Any) -> str | None:
