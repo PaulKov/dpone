@@ -1,6 +1,5 @@
 """Dependency boundary for immutable columnar range contracts."""
 
-from dpone.contracts.columnar_range_evidence import ColumnarRangeExecutionEvidence
 from dpone.contracts.columnar_range_parallelism import (
     ColumnarRangeDescriptor,
     ColumnarRangePlan,
@@ -13,7 +12,6 @@ from dpone.contracts.columnar_range_parallelism import (
 
 __all__ = [
     "ColumnarRangeDescriptor",
-    "ColumnarRangeExecutionEvidence",
     "ColumnarRangePlan",
     "RangeChunkReceipt",
     "RangeEvidenceItem",

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
-from dpone.contracts.airflow_deployment import is_canonical_sha256_digest
 from dpone.contracts.columnar_range_parallelism import (
     ColumnarRangePlan,
     RangeChunkReceipt,
@@ -362,7 +362,7 @@ def _validate_topology(evidence: ColumnarRangeExecutionEvidence) -> None:
 
 
 def _digest(name: str, value: object) -> None:
-    if not is_canonical_sha256_digest(value):
+    if not isinstance(value, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", value) is None:
         raise ValueError(f"{name} must be a canonical SHA-256 digest.")
 
 
