@@ -13,6 +13,7 @@ from dpone.runtime.columnar_fast_path_models import (
 )
 from dpone.runtime.columnar_object_storage_windows import ObjectStorageChunkWindow
 from dpone.runtime.columnar_parquet_writer import ParquetChunkWriter, PyArrowParquetChunkWriter
+from dpone.runtime.columnar_range_source_evidence import RangeEvidenceHandoff
 from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotCapability, ColumnarSnapshotRequest
 from dpone.runtime.object_storage_access_models import ObjectStorageReadContract, read_contract_from_options
 from dpone.runtime.sources.strategies.mssql import mssql_columnar_chunks as chunks
@@ -29,10 +30,10 @@ from dpone.storage.protocols import ObjectStorageClient
 
 
 class MssqlColumnarSnapshotProvider:
-    # Range evidence remains attempt-local and keyed by the immutable request.
-    # The chunked artifact reads it only after source iteration reaches EOF.
-    # Failed range attempts publish their fail-closed evidence before rethrowing.
-    # Serial attempts keep the pre-existing provider contract unchanged.
+    # Range evidence is scoped by run and execution identity, never object id.
+    # A new attempt clears any unconsumed terminal value before validation.
+    # Artifact handoff consumes the value and validates its plan fingerprint.
+    # Serial attempts retain the existing provider behavior without a slot.
     provider_id = "mssql_odbc_arrow_parquet"
 
     def __init__(
@@ -49,7 +50,7 @@ class MssqlColumnarSnapshotProvider:
         self._parquet_writer = parquet_writer or PyArrowParquetChunkWriter()
         self._read_contract = read_contract
         self._temp_dir = Path(temp_dir) if temp_dir else None
-        self._range_evidence: dict[int, object] = {}
+        self._range_evidence = RangeEvidenceHandoff()
 
     def capabilities(self, request: ColumnarSnapshotRequest) -> ColumnarSnapshotCapability:
         blockers: list[str] = []
@@ -245,6 +246,7 @@ class MssqlColumnarSnapshotProvider:
             chunks.cleanup_dir(base_dir)
 
     def iter_object_storage_windows(self, request: ColumnarSnapshotRequest):
+        self._range_evidence.begin(request)
         capability = self.capabilities(request)
         if not capability.supports(request):
             raise RuntimeError(", ".join(capability.blockers or ("mssql_columnar_provider_uncertified",)))
@@ -252,7 +254,6 @@ class MssqlColumnarSnapshotProvider:
             raise RuntimeError("object_storage_client_missing")
 
         prefix = ObjectStorageUri.parse(request.uri_prefix.format(run_id=request.run_id)).prefix()
-        schema_hash = chunks.schema_hash(request.schema)
         active_windows: list[ObjectStorageChunkWindow] = []
         try:
             write_columnar_run_marker(self._object_client, prefix, request)
@@ -260,7 +261,7 @@ class MssqlColumnarSnapshotProvider:
                 common = {
                     "request": request,
                     "prefix": prefix,
-                    "schema_hash": schema_hash,
+                    "schema_hash": chunks.schema_hash(request.schema),
                     "object_client": self._object_client,
                     "write_chunk_file": self._write_chunk_file_for_window,
                     "read_contract": self._resolve_read_contract(request),
@@ -268,8 +269,7 @@ class MssqlColumnarSnapshotProvider:
                 }
                 if request.range_plan is not None:
                     result = build_parallel_object_windows(connector=self._connector, **common)
-                    windows = result.windows
-                    self._range_evidence[id(request)] = result.evidence
+                    windows = self._range_evidence.publish_windows(request, result)
                 else:
                     windows = iter_serial_object_windows(connector=self._connector, **common)
                 for window in windows:
@@ -280,14 +280,14 @@ class MssqlColumnarSnapshotProvider:
             if (evidence := getattr(error, "_dpone_range_execution_evidence", None)) is None:
                 self._object_client.delete_prefix(prefix)
             else:
-                self._range_evidence[id(request)] = evidence
+                self._range_evidence.publish(request, evidence)
             raise
         finally:
             for window in active_windows:
                 window.cleanup()
 
     def range_execution_evidence(self, request: ColumnarSnapshotRequest) -> object | None:
-        return self._range_evidence.get(id(request))
+        return self._range_evidence.consume(request)
 
     def cleanup_object_storage_run(self, request: ColumnarSnapshotRequest) -> None:
         cleanup_policy = str((request.options or {}).get("cleanup_policy") or "eager")

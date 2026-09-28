@@ -174,4 +174,55 @@ class RangeSourceObservation:
         setattr(error, "_dpone_range_execution_evidence", evidence)
 
 
-__all__.append("RangeSourceObservation")
+class RangeEvidenceHandoff:
+    """Publish one fingerprint-bound source result for one artifact handoff."""
+
+    def __init__(self) -> None:
+        self._lock = Lock()
+        self._evidence: dict[str, object] = {}
+
+    def begin(self, request: Any) -> None:
+        key = self._key(request)
+        if key is not None:
+            with self._lock:
+                self._evidence.pop(key, None)
+
+    def publish(self, request: Any, evidence: object) -> None:
+        key = self._key(request)
+        if key is None:
+            raise ValueError("columnar_range_evidence_requires_execution_identity")
+        self._validate(request, evidence)
+        with self._lock:
+            self._evidence[key] = evidence
+
+    def publish_windows(self, request: Any, result: Any) -> Any:
+        """Publish a completed executor result and return its immutable windows."""
+
+        self.publish(request, result.evidence)
+        return result.windows
+
+    def consume(self, request: Any) -> object | None:
+        key = self._key(request)
+        if key is None:
+            return None
+        with self._lock:
+            evidence = self._evidence.pop(key, None)
+        if evidence is not None:
+            self._validate(request, evidence)
+        return evidence
+
+    @staticmethod
+    def _key(request: Any) -> str | None:
+        plan = getattr(request, "range_plan", None)
+        fingerprint = getattr(plan, "execution_plan_fingerprint", None)
+        return f"{request.run_id}:{fingerprint}" if isinstance(fingerprint, str) and fingerprint else None
+
+    @staticmethod
+    def _validate(request: Any, evidence: object) -> None:
+        plan = getattr(request, "range_plan", None)
+        expected = getattr(plan, "execution_plan_fingerprint", None)
+        if getattr(evidence, "execution_plan_fingerprint", None) != expected:
+            raise ValueError("columnar_range_evidence_execution_identity_mismatch")
+
+
+__all__.extend(("RangeEvidenceHandoff", "RangeSourceObservation"))

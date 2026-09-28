@@ -634,6 +634,33 @@ def test_parallel_upload_failure_cancels_readers_and_cleans_owned_prefix(tmp_pat
     assert object_client.list_prefix(ObjectStorageUri.parse("s3://dpone-stage/msql/run-upload-failed/")) == ()
 
 
+def test_range_evidence_handoff_is_consumed_and_cleared_before_retry(tmp_path: Path) -> None:
+    config = _load_config()
+    _configure_parallel(config)
+    request = build_columnar_snapshot_request(
+        load_config=config,
+        query="SELECT id, name FROM dbo.orders",
+        schema=[("id", "int"), ("name", "nvarchar(50)")],
+        run_id="run-evidence-retry",
+    )
+    writer = _FakeParquetWriter()
+    provider = MssqlColumnarSnapshotProvider(
+        connector=_ParallelMssqlConnector(partitions=2),
+        object_client=LocalObjectStorageClient(tmp_path / "store"),
+        parquet_writer=writer,
+    )
+
+    assert len(list(provider.iter_object_storage_windows(request))) == 2
+    assert provider.range_execution_evidence(request) is not None
+    assert provider.range_execution_evidence(request) is None
+
+    assert len(list(provider.iter_object_storage_windows(request))) == 2
+    writer.available = False
+    with pytest.raises(RuntimeError, match="parquet_writer_unavailable"):
+        list(provider.iter_object_storage_windows(request))
+    assert provider.range_execution_evidence(request) is None
+
+
 def test_parallel_failure_is_bound_to_consumed_artifact(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)
