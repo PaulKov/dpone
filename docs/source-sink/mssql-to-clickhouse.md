@@ -308,8 +308,8 @@ whole attempt.
 
 | Topology | Loading behavior | Failure and replay boundary |
 | --- | --- | --- |
-| `shared_per_run` | Confirmed ranges load into the one run-owned staging table. | An ambiguous or partial range load invalidates and rebuilds the complete staging attempt. |
-| `per_partition` | Each range loads into a run-owned staging table; one assembly writes the authoritative staging table. | Failed range resources are discarded; publication still waits for complete assembly and validation. |
+| `shared_per_run` | Confirmed ranges load sequentially into one run-owned staging table (`load_workers: 1`); authoritative before/after target counts confirm each range. | An ambiguous or partial range load invalidates and rebuilds the complete staging attempt. |
+| `per_partition` | Each range may load in parallel into a run-owned staging table; one assembly writes the authoritative staging table. | Failed range resources are discarded; publication still waits for complete assembly and validation. |
 
 Both topologies use the existing single ClickHouse publication lifecycle. No
 business target is published until every planned range has confirmed EOF, the

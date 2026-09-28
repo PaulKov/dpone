@@ -81,6 +81,22 @@ def test_preflight_accepts_supported_topology_and_declared_group_key(topology: s
     )
 
 
+def test_preflight_rejects_parallel_shared_staging_without_range_attribution() -> None:
+    policy = RangeParallelismPolicy.from_mapping(
+        {"mode": "required", "consistency": "immutable", "staging_topology": "shared_per_run"},
+        reader_workers=2,
+        load_workers=2,
+    )
+
+    with pytest.raises(ValueError, match="shared_per_run staging requires load_workers=1"):
+        RangeParallelismPreflight.validate(
+            policy,
+            partition_column="record_id",
+            query_has_window_functions=False,
+            supported_topologies={"shared_per_run", "per_partition"},
+        )
+
+
 def test_preflight_rejects_window_split_and_unsafe_consistency() -> None:
     policy = RangeParallelismPolicy.from_mapping(
         {"mode": "required", "consistency": "immutable", "group_key": ["tenant_id"]},
@@ -194,6 +210,37 @@ def test_executor_uses_independent_sessions_observes_bound_and_closes() -> None:
     assert result.observed_reader_concurrency == observed == 2
     assert len({id(session) for session in sessions}) == len(plan.ranges)
     assert all(session.closed for session in sessions)
+
+
+def test_executor_never_opens_more_sessions_than_reader_workers() -> None:
+    options = _options()
+    partitioning = options["partitioning"]
+    assert isinstance(partitioning, dict)
+    partitioning["num_partitions"] = 5
+    plan = build_columnar_range_plan(RangePartitioner.from_options(options), query_identity="sha256:query")
+    open_sessions = 0
+    peak_open_sessions = 0
+
+    class TrackingSession(_Session):
+        def close(self) -> None:
+            nonlocal open_sessions
+            super().close()
+            open_sessions -= 1
+
+    def session_factory(_range):
+        nonlocal open_sessions, peak_open_sessions
+        open_sessions += 1
+        peak_open_sessions = max(peak_open_sessions, open_sessions)
+        return TrackingSession()
+
+    def worker(_session, item, _cancelled, _budget):
+        return RangeExecutionResult(item.range_id, rows=0, retained_bytes=0, eof_confirmed=True)
+
+    result = BoundedRangeExecutor(session_factory=session_factory, worker=worker).execute(plan)
+
+    assert len(result.ranges) == 5
+    assert peak_open_sessions == plan.policy.reader_workers
+    assert open_sessions == 0
 
 
 def test_executor_cancels_other_sessions_and_never_returns_partial_success() -> None:

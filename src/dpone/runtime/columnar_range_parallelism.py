@@ -149,17 +149,6 @@ class BoundedRangeExecutor:
         active = 0
         observed = 0
 
-        try:
-            for item in plan.ranges:
-                sessions.append(self._session_factory(item))
-        except BaseException as error:
-            for session in reversed(sessions):
-                try:
-                    session.close()
-                except BaseException as cleanup_error:
-                    _note_cleanup_error(error, cleanup_error)
-            raise
-
         def execute_one(
             item: range_contracts.ColumnarRangeDescriptor,
             session: RangeSession,
@@ -180,39 +169,44 @@ class BoundedRangeExecutor:
                     with active_lock:
                         active -= 1
 
-        futures: dict[Future[RangeExecutionResult], int] = {}
         results: dict[int, RangeExecutionResult] = {}
-        pool = self._executor_factory(min(policy.reader_workers, len(plan.ranges)))
-        try:
-            futures = {pool.submit(execute_one, item, sessions[item.ordinal]): item.ordinal for item in plan.ranges}
-            for future in as_completed(futures):
-                results[futures[future]] = future.result()
-        except BaseException:
-            cancelled.set()
-            for session in sessions:
-                cancel = getattr(session, "cancel", None)
-                if callable(cancel):
-                    try:
-                        cancel()
-                    except BaseException as cleanup_error:
-                        _note_cleanup_error(sys.exc_info()[1], cleanup_error)
-            for future in futures:
-                future.cancel()
-            raise
-        finally:
-            pool.shutdown(wait=True, cancel_futures=True)
-            primary = sys.exc_info()[1]
-            close_error: BaseException | None = None
-            for session in reversed(sessions):
-                try:
-                    session.close()
-                except BaseException as cleanup_error:
-                    if primary is not None:
-                        _note_cleanup_error(primary, cleanup_error)
-                    else:
-                        close_error = close_error or cleanup_error
-            if close_error is not None:
-                raise close_error
+        worker_limit = min(policy.reader_workers, len(plan.ranges))
+        for offset in range(0, len(plan.ranges), worker_limit):
+            items = plan.ranges[offset : offset + worker_limit]
+            batch_sessions: list[RangeSession] = []
+            try:
+                for item in items:
+                    session = self._session_factory(item)
+                    sessions.append(session)
+                    batch_sessions.append(session)
+            except BaseException as error:
+                _close_sessions(batch_sessions, primary=error)
+                raise
+
+            futures: dict[Future[RangeExecutionResult], int] = {}
+            pool = self._executor_factory(len(items))
+            try:
+                futures = {
+                    pool.submit(execute_one, item, session): item.ordinal
+                    for item, session in zip(items, batch_sessions, strict=True)
+                }
+                for future in as_completed(futures):
+                    results[futures[future]] = future.result()
+            except BaseException:
+                cancelled.set()
+                for session in batch_sessions:
+                    cancel = getattr(session, "cancel", None)
+                    if callable(cancel):
+                        try:
+                            cancel()
+                        except BaseException as cleanup_error:
+                            _note_cleanup_error(sys.exc_info()[1], cleanup_error)
+                for future in futures:
+                    future.cancel()
+                raise
+            finally:
+                pool.shutdown(wait=True, cancel_futures=True)
+                _close_sessions(batch_sessions, primary=sys.exc_info()[1])
         if len(results) != len(plan.ranges):
             raise RuntimeError("Range executor did not complete every planned range.")
         return RangeExecutionSummary(
@@ -235,6 +229,8 @@ class RangeParallelismPreflight:
     ) -> None:
         if policy.staging_topology not in supported_topologies:
             raise ValueError(f"Staging topology {policy.staging_topology!r} is not supported by the sink.")
+        if policy.staging_topology == "shared_per_run" and policy.load_workers != 1:
+            raise ValueError("shared_per_run staging requires load_workers=1 for authoritative range receipts.")
         if policy.group_key and partition_column not in policy.group_key:
             raise ValueError("The partition column must be part of the declared group key.")
         if not query_has_window_functions:
@@ -325,6 +321,20 @@ def _nonnegative(name: str, value: object) -> int:
 def _note_cleanup_error(primary: BaseException | None, cleanup: BaseException) -> None:
     if primary is not None and hasattr(primary, "add_note"):
         primary.add_note(f"Session cancellation also failed: {type(cleanup).__name__}: {cleanup}")
+
+
+def _close_sessions(sessions: Sequence[RangeSession], *, primary: BaseException | None) -> None:
+    close_error: BaseException | None = None
+    for session in reversed(sessions):
+        try:
+            session.close()
+        except BaseException as cleanup_error:
+            if primary is not None:
+                _note_cleanup_error(primary, cleanup_error)
+            else:
+                close_error = close_error or cleanup_error
+    if close_error is not None:
+        raise close_error
 
 
 __all__ = [

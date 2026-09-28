@@ -30,7 +30,7 @@ source:
         max_inflight_bytes: 536870912
         gap_policy: reject
         consistency: immutable
-        staging_topology: shared_per_run
+        staging_topology: per_partition
         group_key: []
     native_transfer:
       snapshot:

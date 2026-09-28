@@ -376,6 +376,9 @@ source:
 MSSQL sessions, Parquet/object uploads, and ClickHouse loads. A legacy
 `export_workers` value must agree with `reader_workers`; disagreement is an
 error, not a silent override.
+For `shared_per_run`, set `load_workers: 1`: dpone measures each range as a
+target-table count delta and rejects parallel shared-table loads before source
+I/O. Select `per_partition` when `load_workers` is greater than one.
 All counts are configuration values; examples such as four readers are not
 runtime constants. `max_inflight_rows`, `max_inflight_bytes`, and
 `max_inflight_ranges` are run-wide limits shared by every reader. A byte-bound

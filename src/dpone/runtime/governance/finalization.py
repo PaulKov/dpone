@@ -13,7 +13,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 from dpone.contracts.quality_failure import QualityGateReceiptError
-from dpone.runtime.columnar_range_quality_bridge import advance_range_governed_quality
+from dpone.runtime import columnar_range_quality_bridge as range_quality
 from dpone.runtime.governance.acceptance_metrics import (
     AcceptanceMetricPolicy,
     AcceptanceMetricsRecorder,
@@ -22,7 +22,6 @@ from dpone.runtime.governance.finalization_support import (
     capture_acceptance,
     classify_post_commit_cleanup_failure,
     completed_acceptance_metrics,
-    load_result_details,
     prepare_acceptance,
     preserve_completed_replay_truth,
     staged_probe_result,
@@ -170,7 +169,7 @@ class LoadGovernanceFinalizationCoordinator:
                     receipt=quality_receipt,
                 )
                 assert quality_receipt is not None
-            advance_range_governed_quality(projected.handle, quality_receipt, quality_evidence)
+            range_quality.advance_range_governed_quality(projected.handle, quality_receipt, quality_evidence)
             validation_receipt = validate_staged_load_if_supported(sink, load_config, projected.handle)
             if validation_receipt.validated:
                 _token, lifecycle_load_config, lifecycle_handle = validation_receipt.frozen_inputs(
@@ -226,7 +225,7 @@ class LoadGovernanceFinalizationCoordinator:
                     "finalized",
                     "succeeded",
                     started_at=finalize_started,
-                    details=load_result_details(load_result),
+                    details=range_quality.range_load_result_details(load_result, lifecycle_handle),
                 )
             except Exception:
                 self._record_preserving_primary(
@@ -306,6 +305,8 @@ class LoadGovernanceFinalizationCoordinator:
                     )
                     if failure is None:
                         raise classified from cleanup_error
+                terminal_recorder = self._record if failure is None else None
+                range_quality.record_terminal_range_evidence(terminal_recorder, load_record, lifecycle_handle)
 
         return with_governance_metrics(
             load_result,

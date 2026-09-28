@@ -162,7 +162,20 @@ def staged_load_handle_details(handle: Any) -> dict[str, Any]:
         "decoded_schema": getattr(decoded_config, "target_schema", None),
         "decoded_table": getattr(decoded_config, "target_table", None),
         "metadata": dict(getattr(handle, "metadata", {}) or {}),
+        **staged_load_range_evidence_details(handle),
     }
+
+
+def staged_load_range_evidence_details(handle: Any) -> dict[str, Any]:
+    """Read the current sanitized range evidence instead of a staged-time snapshot."""
+
+    owner = getattr(handle, "sink_state", None)
+    evidence = getattr(owner, "range_execution_evidence", None)
+    serialize = getattr(evidence, "to_dict", None)
+    if not callable(serialize):
+        return {}
+    value = serialize()
+    return {"range_execution": dict(value)} if isinstance(value, Mapping) else {}
 
 
 def staged_load_failure_details(
@@ -183,6 +196,7 @@ def staged_load_failure_details(
         "cleanup_attempted": True,
         "cleanup_status": cleanup_status,
         "cleanup_verification_required": True,
+        **staged_load_range_evidence_details(handle),
     }
 
 
@@ -200,6 +214,7 @@ def staged_load_commit_unknown_details(error: BaseException, handle: Any) -> dic
         "cleanup_status": "retained_for_reconciliation",
         "cleanup_verification_required": True,
         "safe_to_retry": False,
+        **staged_load_range_evidence_details(handle),
     }
 
 
@@ -218,6 +233,7 @@ def staged_load_post_commit_cleanup_details(error: BaseException, handle: Any) -
         "cleanup_status": "failed",
         "cleanup_verification_required": True,
         "safe_to_retry": False,
+        **staged_load_range_evidence_details(handle),
     }
 
 
@@ -273,6 +289,7 @@ __all__ = [
     "staged_load_commit_unknown_details",
     "staged_load_failure_details",
     "staged_load_handle_details",
+    "staged_load_range_evidence_details",
     "staged_load_post_commit_cleanup_details",
     "validate_staged_load_if_supported",
 ]

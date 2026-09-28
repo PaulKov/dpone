@@ -43,6 +43,7 @@ owned_paths:
   - src/dpone/runtime/columnar_range_source_evidence.py
   - src/dpone/runtime/columnar_object_storage_windows.py
   - src/dpone/runtime/columnar_snapshot_provider.py
+  - src/dpone/readiness/managed_native_transfer_plan.py
   - src/dpone/runtime/columnar_fast_path_models.py
   - src/dpone/runtime/columnar_fast_path_planner.py
   - src/dpone/runtime/columnar_runtime_assembly.py
@@ -51,9 +52,11 @@ owned_paths:
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_windows.py
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_queryout_bridge.py
   - src/dpone/runtime/governance/finalization.py
+  - src/dpone/runtime/governance/ports.py
   - src/dpone/runtime/sinks/clickhouse_columnar_pull.py
   - src/dpone/runtime/sinks/clickhouse_payload_support.py
   - src/dpone/runtime/sinks/clickhouse_staged_load.py
+  - src/dpone/runtime/sinks/clickhouse_staged_evidence.py
   - src/dpone/runtime/sinks/clickhouse_staging_finalizer.py
   - tests/test_mssql_columnar_range_parallelism.py
   - tests/test_mssql_columnar_snapshot_provider.py
@@ -65,8 +68,12 @@ owned_paths:
   - tests/test_clickhouse_governed_publication_lifecycle.py
   - tests/test_clickhouse_production_finalize.py
   - tests/test_route_capability_runtime_factory.py
+  - tests/test_columnar_fast_path_contracts.py
 
 integrator_owned_paths:
+  - docs/feature-design-mssql-columnar-range-parallelism-v1.md
+  - docs/adr/0075-mssql-columnar-range-parallelism.md
+  - docs/agent-task-contracts/mssql-columnar-range-parallelism.yml
   - src/dpone/schema/etl-config.schema.json
   - src/dpone/schema/etl-batch-manifest.schema.json
   - docs/reference/configuration.md
@@ -78,6 +85,7 @@ integrator_owned_paths:
   - mkdocs.yml
   - docs/adr-index.md
   - docs/module_size_baseline.json
+  - docs/quality-metrics.md
 
 read_only_paths:
   - src/dpone/runtime/sinks/clickhouse_sink.py
@@ -89,6 +97,10 @@ read_only_paths:
 forbidden_paths:
   - pyproject.toml
   - uv.lock
+  - docs/feature-design-mssql-columnar-range-parallelism-v1.md
+  - docs/adr/0075-mssql-columnar-range-parallelism.md
+  - docs/agent-task-contracts/mssql-columnar-range-parallelism.yml
+  - docs/quality-metrics.md
   - CHANGELOG.md
   - mkdocs.yml
   - .github/workflows

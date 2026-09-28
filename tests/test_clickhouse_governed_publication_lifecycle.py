@@ -6,9 +6,11 @@ from dataclasses import replace
 
 import pytest
 
+from dpone.governance.hooks import InMemoryLoadStepAuditStorage
 from dpone.runtime.artifacts import InMemoryRowsArtifact
 from dpone.runtime.governance.finalization import LoadGovernanceFinalizationCoordinator
 from dpone.runtime.governance.ports import StagedLoadHandle
+from dpone.runtime.governance.service import LoadGovernanceService
 from dpone.runtime.normalization.staged_mutation import NestedPackageStagedMutation
 from dpone.runtime.sinks.clickhouse_cluster_full_refresh_publication import (
     ClickHouseClusterFullRefreshPublicationService,
@@ -29,14 +31,29 @@ from tests.test_native_load_governance_finalization import _load_record
 
 
 class _RangeQualityOwner:
-    range_execution_evidence = None
-
     def __init__(self) -> None:
         self.receipt: dict[str, object] | None = None
+        self.range_execution_evidence = _MutableRangeEvidence()
 
     def mark_range_governed_quality_passed(self, *, config: object, quality_receipt: dict[str, object]) -> None:
         del config
         self.receipt = quality_receipt
+        self.range_execution_evidence.outcome_status = "quality_passed"
+
+    def mark_range_publication_confirmed(self, *, result: object, config: object) -> None:
+        del result, config
+        self.range_execution_evidence.outcome_status = "published"
+
+    def mark_range_cleanup_succeeded(self) -> None:
+        self.range_execution_evidence.outcome_status = "succeeded"
+
+
+class _MutableRangeEvidence:
+    def __init__(self) -> None:
+        self.outcome_status = "staged"
+
+    def to_dict(self) -> dict[str, object]:
+        return {"schema_version": "dpone.columnar_range_execution.v1", "outcome_status": self.outcome_status}
 
 
 @pytest.mark.parametrize("coordinator", ["governance", "nested"])
@@ -105,7 +122,8 @@ def test_governance_coordinator_threads_authoritative_quality_receipt_to_range_o
     facade.stage_payload = lambda _config, _payload: handle
     payload = LoadPayload(artifact=InMemoryRowsArtifact([{"id": 1}, {"id": 2}]), schema=[("id", "Int64")])
 
-    LoadGovernanceFinalizationCoordinator().load(
+    audit = InMemoryLoadStepAuditStorage()
+    LoadGovernanceFinalizationCoordinator(LoadGovernanceService(audit_storage=audit)).load(
         sink=facade,
         load_config=config,
         payload=payload,
@@ -118,3 +136,7 @@ def test_governance_coordinator_threads_authoritative_quality_receipt_to_range_o
     report = owner.receipt["report"]
     assert isinstance(report, dict)
     assert report["passed"] is True
+    finalized = next(record for record in audit.records if record.step_id == "finalized")
+    terminal = next(record for record in audit.records if record.step_id == "range_evidence_terminal")
+    assert finalized.details["range_execution"]["outcome_status"] == "published"
+    assert terminal.details["range_execution"]["outcome_status"] == "succeeded"

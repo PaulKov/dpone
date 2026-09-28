@@ -32,7 +32,9 @@ also not raw-bit ordering, so Python-side UUID arithmetic is unsafe.
 7. Window/group partitions cannot be split. Unprovable queries fail preflight.
 8. `shared_per_run` and `per_partition` are capability-negotiated topologies.
    Per-partition staging must assemble into one authoritative run staging before
-   quality checks and publication.
+   quality checks and publication. Shared staging admits one load worker because
+   authoritative per-range receipts require sequential target-count deltas;
+   parallel load workers require isolated per-partition staging.
 9. All planned ranges must reach EOF and all stage counts must be confirmed before
    the existing ClickHouse quality/publication lifecycle may run.
 10. First failure cancels and joins all workers; partial work cannot report
@@ -56,4 +58,3 @@ target tables and is rejected when the sink cannot assemble them safely.
 - A row-count-only queue advertised as byte bounded: false safety claim.
 - Publishing successful partitions independently: exposes partial business data.
 - Hidden tenant overrides or monkey patches: not a public reproducible contract.
-

@@ -173,15 +173,18 @@ class ClickHouseColumnarPullLoader:
         load_workers: int,
         tracker: RangeLoadConcurrencyTracker,
     ) -> dict[str, int]:
+        if load_workers != 1:
+            raise ValueError("clickhouse_shared_range_staging_requires_one_load_worker")
         observed: dict[str, int] = {}
-        observed_lock = Lock()
+        table = self._table_name(load_config)
 
         def load(connector: Any, group: RangeWindowGroup) -> None:
-            actual = self._load_group(connector, load_config, artifact, schema, group, tracker)
+            before = count_connector_rows(connector, table)
+            self._load_group(connector, load_config, artifact, schema, group, tracker)
+            actual = count_connector_rows(connector, table) - before
             if actual != group.expected_rows:
                 raise ValueError(f"clickhouse_range_staging_row_count_mismatch:{group.range_id}")
-            with observed_lock:
-                observed[group.range_id] = actual
+            observed[group.range_id] = actual
 
         self._run_group_lanes(groups, load_workers, load)
         return observed
@@ -267,16 +270,12 @@ class ClickHouseColumnarPullLoader:
         schema: Sequence[tuple[str, str]],
         group: RangeWindowGroup,
         tracker: RangeLoadConcurrencyTracker,
-    ) -> int:
-        reported_rows = 0
+    ) -> None:
         for window_index, window in enumerate(group.windows, start=1):
             sql = self.render_insert_sql(load_config, window, schema)
             started = self._clock()
             tracker.enter()
             try:
-                config = ClickHouseColumnarPullConfig.from_load_config(load_config)
-                source = self._table_function_sql(config, window) + _settings_clause(config.settings)
-                reported_rows += count_connector_rows(connector, source)
                 connector.execute_query(sql)
             finally:
                 tracker.leave()
@@ -287,7 +286,6 @@ class ClickHouseColumnarPullLoader:
                 clickhouse_pull_seconds=elapsed(started, self._clock()),
                 window_cleanup_seconds=0.0,
             )
-        return reported_rows
 
     def render_insert_sql(
         self,

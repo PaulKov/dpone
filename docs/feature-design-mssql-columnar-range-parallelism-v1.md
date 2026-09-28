@@ -124,11 +124,15 @@ source:
 
 `num_partitions` remains the canonical partition count. The route-local
 `reader_workers`, `upload_workers`, and `load_workers` are strict concurrency
-controls; a simultaneously supplied legacy `export_workers` must agree with
+caps; a simultaneously supplied legacy `export_workers` must agree with
 `reader_workers` or preflight rejects the manifest. New settings are strictly
 validated and appear in compiled/pack fingerprints.
 Defaults preserve one reader and `shared_per_run`; byte-bounded claims require a
 positive byte budget and byte measurements from every producer item.
+`shared_per_run` requires `load_workers: 1` so each range receipt is measured as
+an authoritative staging-table count delta. Use `per_partition` for parallel
+ClickHouse range loads; its isolated staging tables make per-range counts
+independently observable before assembly.
 
 Manual explicit intervals may be supplied as `partitioning.ranges`, each with a
 typed `lower`, `upper`, `include_lower`, `include_upper`, and optional `null`
@@ -183,7 +187,9 @@ executing it serially.
 9. Load into the selected topology. `shared_per_run` uses one run-owned staging
    table. `per_partition` uses one run-owned staging table per range and then a
    supported all-partitions assembly step into the authoritative run staging.
-10. Confirm staged row counts for every range. Run existing quality gates against
+10. Confirm staged row counts for every range from target-side observations. A
+    shared table uses sequential before/after count deltas; parallel loads use
+    isolated per-partition tables. Run existing quality gates against
     the authoritative staging table. Only then invoke the existing single
     ClickHouse publication path and emit success evidence/checkpoint.
 11. Cleanup occurs after publication reconciliation. Partial business targets are

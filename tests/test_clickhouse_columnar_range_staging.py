@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from threading import Barrier, Event
+from threading import Event
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -130,17 +130,6 @@ class _Connector:
         return [(self.counts.get(table, 0),)]
 
 
-class _ConcurrentConnector(_Connector):
-    def __init__(self, counts: dict[str, int], barrier: Barrier) -> None:
-        super().__init__(counts)
-        self._barrier = barrier
-
-    def execute_query(self, sql: str) -> int:
-        self._barrier.wait(timeout=2)
-        super().execute_query(sql)
-        return 0
-
-
 class _Harness:
     def __init__(self, *, fail_range: int | None = None, fail_assembly: bool = False) -> None:
         self.counts = {"authoritative": 0}
@@ -190,7 +179,8 @@ def test_range_windows_stage_with_configured_topology_and_one_authoritative_resu
     topology: str,
 ) -> None:
     harness = _Harness()
-    artifact = _Artifact([_Window(ordinal) for ordinal in range(count)], topology=topology, load_workers=count)
+    load_workers = count if topology == "per_partition" else 1
+    artifact = _Artifact([_Window(ordinal) for ordinal in range(count)], topology=topology, load_workers=load_workers)
 
     loaded = harness.loader().load_windowed(
         cast(Any, _Config("authoritative", {})),
@@ -209,7 +199,8 @@ def test_range_windows_stage_with_configured_topology_and_one_authoritative_resu
 @pytest.mark.parametrize("topology", ["shared_per_run", "per_partition"])
 def test_range_load_failure_cleans_owned_resources_without_assembly(topology: str) -> None:
     harness = _Harness(fail_range=1)
-    artifact = _Artifact([_Window(0), _Window(1), _Window(2)], topology=topology, load_workers=2)
+    load_workers = 2 if topology == "per_partition" else 1
+    artifact = _Artifact([_Window(0), _Window(1), _Window(2)], topology=topology, load_workers=load_workers)
 
     with pytest.raises(RuntimeError, match="load-1-failed"):
         harness.loader().load_windowed(
@@ -223,30 +214,15 @@ def test_range_load_failure_cleans_owned_resources_without_assembly(topology: st
     assert all(window.cleaned == 0 for window in artifact._windows)
 
 
-def test_shared_topology_honors_parallel_load_workers_and_reconciles_total() -> None:
-    counts = {"authoritative": 0}
-    barrier = Barrier(2)
-    callbacks = ClickHouseRangeStagingCallbacks(
-        clone_connector=lambda _ordinal: _ConcurrentConnector(counts, barrier),
-        plan_partition=lambda config, _ordinal: config,
-        create_partition=lambda _parent, _partition: None,
-        assemble_partitions=lambda _partitions, _target: 0,
-        drop_partition=lambda _partition: None,
-    )
-    loader = ClickHouseColumnarPullLoader(
-        connector=_Connector(counts),
-        table_name=lambda config: cast(_Config, config).table,
-        count_rows=lambda config: counts[cast(_Config, config).table],
-        range_staging=callbacks,
-    )
+def test_shared_topology_rejects_parallel_load_workers_without_range_attribution() -> None:
+    harness = _Harness()
     artifact = _Artifact([_Window(0), _Window(1)], topology="shared_per_run", load_workers=2)
 
-    assert loader.load_windowed(cast(Any, _Config("authoritative", {})), artifact, (("id", "Int64"),)) == 2
-    assert artifact.staging_metrics[0]["observed_load_workers"] == 2
-    assert artifact.staging_metrics[0]["range_confirmations"] == [
-        {"range_id": "range-0", "range_ordinal": 0, "rows": 1, "stage_confirmed": True},
-        {"range_id": "range-1", "range_ordinal": 1, "rows": 1, "stage_confirmed": True},
-    ]
+    with pytest.raises(ValueError, match="shared_range_staging_requires_one_load_worker"):
+        harness.loader().load_windowed(cast(Any, _Config("authoritative", {})), artifact, (("id", "Int64"),))
+
+    assert harness.counts["authoritative"] == 0
+    assert artifact.staging_metrics == []
 
 
 def test_partition_assembly_failure_drops_every_partition_and_does_not_report_success() -> None:
@@ -284,7 +260,8 @@ def test_sink_callbacks_use_cluster_ddl_and_one_partition_assembly_statement() -
 @pytest.mark.parametrize("topology", ["shared_per_run", "per_partition"])
 def test_authoritative_plan_preserves_mixed_empty_ranges(topology: str) -> None:
     harness = _Harness()
-    artifact = _Artifact([_Window(1)], topology=topology, load_workers=2, planned_count=3)
+    load_workers = 2 if topology == "per_partition" else 1
+    artifact = _Artifact([_Window(1)], topology=topology, load_workers=load_workers, planned_count=3)
 
     loaded = harness.loader().load_windowed(cast(Any, _Config("authoritative", {})), artifact, (("id", "Int64"),))
 
@@ -303,7 +280,8 @@ def test_authoritative_plan_preserves_mixed_empty_ranges(topology: str) -> None:
 @pytest.mark.parametrize("topology", ["shared_per_run", "per_partition"])
 def test_authoritative_plan_records_all_empty_ranges(topology: str) -> None:
     harness = _Harness()
-    artifact = _Artifact([], topology=topology, load_workers=2, planned_count=4)
+    load_workers = 2 if topology == "per_partition" else 1
+    artifact = _Artifact([], topology=topology, load_workers=load_workers, planned_count=4)
 
     loaded = harness.loader().load_windowed(cast(Any, _Config("authoritative", {})), artifact, (("id", "Int64"),))
 
@@ -562,15 +540,17 @@ class _LifecycleConnector:
         self.objects = objects
         self.events = events
         self.fail_insert = fail_insert
+        self.rows = 0
 
     def execute_query(self, _sql: str) -> None:
         assert self.objects == {"run/_dpone_run.json", "run/range-0/chunk.parquet"}
         self.events.append(("insert", "objects_present"))
         if self.fail_insert:
             raise RuntimeError("stage-failure")
+        self.rows += 1
 
     def get_records(self, _sql: str):
-        return [(1,)]
+        return [(self.rows,)]
 
 
 class _LifecycleSink:
