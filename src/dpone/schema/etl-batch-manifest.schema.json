@@ -2080,6 +2080,12 @@
                     "range_parallelism": {
                       "type": "object",
                       "additionalProperties": false,
+                      "allOf": [
+                        {
+                          "if": {"properties": {"mode": {"enum": ["auto", "required"]}}, "required": ["mode"]},
+                          "then": {"required": ["consistency"]}
+                        }
+                      ],
                       "properties": {
                         "mode": {"type": "string", "enum": ["off", "auto", "required"], "default": "off"},
                         "reader_workers": {"type": "integer", "minimum": 1, "default": 1},

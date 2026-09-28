@@ -395,6 +395,8 @@ def test_columnar_snapshot_request_carries_canonical_range_plan(tmp_path: Path) 
     assert request.range_plan is not None
     assert len(request.range_plan.ranges) == 2
     assert request.range_plan.policy.reader_workers == 2
+    assert request.range_plan.execution_identity is not None
+    assert request.range_plan.execution_plan_fingerprint is not None
 
     provider = MssqlColumnarSnapshotProvider(
         connector=_ParallelMssqlConnector(partitions=2),

@@ -101,6 +101,7 @@ def _snapshot_request(
         query=query,
         schema=schema,
         bounds_resolver=bounds_resolver,
+        execution_identity=f"sha256:{sha256(request_run_id.encode()).hexdigest()}",
     )
     if not isinstance(object_storage, dict):
         return _local_snapshot_request(
@@ -195,6 +196,7 @@ def _range_request(
     query: str,
     schema: list[tuple[str, str]],
     bounds_resolver: Callable[[str], tuple[Any, ...]] | None,
+    execution_identity: str,
 ) -> tuple[RangePartitioner | None, Any | None]:
     source_options = load_config.options.get("source_options")
     canonical_options = source_options if isinstance(source_options, dict) else load_config.options
@@ -224,7 +226,11 @@ def _range_request(
         {"query": query, "schema": schema}, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
     query_identity = f"sha256:{sha256(identity_payload.encode()).hexdigest()}"
-    return partitioner, build_columnar_range_plan(partitioner, query_identity=query_identity)
+    return partitioner, build_columnar_range_plan(
+        partitioner,
+        query_identity=query_identity,
+        execution_identity=execution_identity,
+    )
 
 
 def _columnar_fast_path_options(options: dict[str, Any]) -> dict[str, Any]:
