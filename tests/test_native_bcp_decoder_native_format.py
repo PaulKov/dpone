@@ -184,3 +184,67 @@ def test_strategy_plan_names_bcp_native_clickhouse_native_fast_path() -> None:
 
     assert plan.fast_path_id == "mssql_bcp_native_to_clickhouse_native"
     assert plan.native_ingest_settings["bulk_wire"]["input_format"] == "Native"
+
+
+def test_native_physical_chunks_reach_native_sink_with_required_acceleration(tmp_path: Path) -> None:
+    from dpone.runtime.native_wire_chunk_rows import NativeWireRowFramer
+    from dpone.runtime.physical_chunking import (
+        PhysicalChunkedFileExportArtifact,
+        PhysicalChunkPolicy,
+        RowBoundaryChunkWriter,
+    )
+
+    class FakeRunner:
+        calls = []
+
+        def __init__(self, _credentials, options):
+            self.options = options
+
+        def insert_stream(self, _table, _columns, chunks):
+            self.calls.append((self.options.input_format, b"".join(chunks)))
+
+    schema = [("id", "int")]
+    contract = build_mssql_bcp_native_contract(schema=schema, query="SELECT synthetic", target_format="Native")
+    wire = BulkWirePlanner().plan(
+        source_type="mssql",
+        sink_type="clickhouse",
+        schema=schema,
+        source_options={
+            "native_transfer": {
+                "wire": {
+                    "mode": "typed_binary",
+                    "source_native_format": "bcp_native",
+                    "binary_format": "native",
+                    "acceleration": {"mode": "required"},
+                }
+            }
+        },
+        sink_options={"clickhouse_bulk": {"mode": "http", "ingest_contract": "typed_binary_staging"}},
+    )
+    writer = RowBoundaryChunkWriter(
+        policy=PhysicalChunkPolicy(target_chunk_bytes=4, max_chunk_bytes=4),
+        columns=["id"],
+        directory=tmp_path,
+        format="mssql-bcp-native",
+    )
+    artifact = PhysicalChunkedFileExportArtifact(
+        chunk_generator=lambda: writer.write_rows(
+            NativeWireRowFramer(contract, max_row_bytes=4).rows([struct.pack("<ii", 7, 8)])
+        ),
+        columns=["id"],
+        evidence_path=tmp_path / "chunks.json",
+        native_wire_contract=contract,
+        bulk_wire_contract=wire,
+        cleanup_policy="eager",
+    )
+    sink = ClickHouseSink(ClickHouseConnector(), http_runner_cls=FakeRunner)
+    rows = sink._payload_ingestion.insert_payload(
+        _load_config({"clickhouse_bulk": {"mode": "http", "ingest_contract": "typed_binary_staging"}}),
+        LoadPayload(artifact=artifact, schema=schema),
+    )
+    assert rows == 2
+    assert len(FakeRunner.calls) == 2
+    assert all(fmt == "Native" for fmt, _ in FakeRunner.calls)
+    assert FakeRunner.calls[0][1].endswith(struct.pack("<i", 7))
+    assert FakeRunner.calls[1][1].endswith(struct.pack("<i", 8))
+    assert not list(tmp_path.glob("dpone_physical_chunk_*.bcp"))

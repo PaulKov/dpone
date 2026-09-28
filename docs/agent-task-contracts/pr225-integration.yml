@@ -1,0 +1,88 @@
+schema_version: 1
+task_id: "PR-225-INTEGRATION"
+title: "Rebase and certify bounded BCP native physical chunks"
+goal: "Rebase PR #225 onto current master, preserve its approved additive contract, resolve code/test regressions, and produce exact-head review evidence."
+specification: "docs/feature-specs/bounded-bcp-native-stream.md"
+base_commit: "2938ff3784cd8ca3e522cc34a37aac7c3ab68226"
+integrator: "/root"
+
+acceptance_criteria:
+  - "PR #225 is conflict-free against current origin/master."
+  - "Bounded BCP-native rows remain complete, byte-bounded, fail-closed, and opt-in."
+  - "Focused unit and integration-contract tests pass on the rebased head."
+  - "Unrelated CI flakes are classified without weakening assertions."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - "MSSQL native-transfer physical chunking"
+    - "route documentation"
+  migration_required: false
+
+owned_paths:
+  - src/dpone/runtime/native_wire_chunk_rows.py
+  - src/dpone/runtime/native_wire_mssql_framing.py
+  - src/dpone/runtime/physical_chunk_writer.py
+  - src/dpone/runtime/physical_chunking.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_bcp_native_artifacts.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_export_providers.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_queryout_bcp.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_single_scan_chunks.py
+  - tests/integration/mssql/test_bounded_native_chunks_live.py
+  - tests/test_native_bcp_decoder_native_format.py
+  - tests/test_native_wire_chunk_rows.py
+  - tests/test_physical_chunking.py
+
+integrator_owned_paths:
+  - CHANGELOG.md
+  - docs/feature-specs/bounded-bcp-native-stream.md
+  - docs/source-sink/mssql-to-clickhouse.md
+  - docs/quality-metrics.md
+  - docs/agent-task-contracts/pr225-integration.yml
+
+read_only_paths:
+  - pyproject.toml
+  - uv.lock
+  - mkdocs.yml
+  - .github/workflows
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - mkdocs.yml
+  - .github/workflows
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "origin/master"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_native_wire_chunk_rows.py tests/test_native_bcp_decoder_native_format.py tests/test_physical_chunking.py -q"
+  broad:
+    - "uv run ruff check ."
+    - "uv run mypy --config-file mypy.ini"
+  live:
+    - "tests/integration/mssql/test_bounded_native_chunks_live.py (approved local synthetic services only)"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed:
+    - PASS
+    - FAIL
+    - SKIP
+    - N/A
+    - UNVERIFIED
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

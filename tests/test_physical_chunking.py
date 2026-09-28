@@ -291,3 +291,28 @@ def _load_config(tmp_path: Path, *, scan: dict[str, object], physical_chunking: 
             "native_transfer": {"snapshot": {"scan": scan, "physical_chunking": physical_chunking}},
         },
     )
+
+
+@pytest.mark.parametrize("binary_format,target_format", [("native", "Native"), ("rowbinary", "RowBinary")])
+def test_native_required_chunks_preserve_selected_binary_format(tmp_path, binary_format, target_format):
+    connector = _FakeMssqlConnector(table_kind="heap", has_seekable_boundary=False)
+    config = _load_config(
+        tmp_path,
+        scan={"mode": "single_scan", "heap_policy": "single_scan_chunks", "require_index_for_range": True},
+        physical_chunking={"mode": "required", "target_chunk_bytes": "8MiB"},
+    )
+    config.options["native_transfer"]["wire"] = {
+        "mode": "typed_binary",
+        "source_native_format": "bcp_native",
+        "binary_format": binary_format,
+    }
+    config.options["clickhouse_bulk"] = {"mode": "http", "ingest_contract": "typed_binary_staging"}
+    artifact = MSSQLQueryoutArtifactFactory(
+        connector,
+        CapturingLogger(),
+        sink_connector=ClickHouseConnector(),
+    ).artifact_for_query(config, "SELECT [id] FROM [reporting].[orders]", [("id", "int")])
+    assert isinstance(artifact, PhysicalChunkedFileExportArtifact)
+    assert artifact.native_wire_contract.target_format == target_format
+    assert artifact.bulk_wire_contract.input_format == target_format
+    assert artifact.format == "mssql-bcp-native"

@@ -18,8 +18,8 @@ class MssqlExportProviderCatalog(SourceExportProviderCatalog):
                 source_type="mssql",
                 artifact_kind="bcp_native_file",
                 preserves_types=True,
-                supports_physical_chunking=False,
-                worker_disk_pressure="file",
+                supports_physical_chunking=True,
+                worker_disk_pressure="chunked_file",
             ),
             SourceExportProviderDescriptor(
                 provider_id="mssql_bcp_character_raw",

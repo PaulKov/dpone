@@ -70,16 +70,8 @@ def read_native_payload(handle: BinaryIO, layout: NativeWireColumnLayout, ordina
                 raise ValueError(f"native_wire_unexpected_null:{context}")
             return None
         length = indicator
-    if length is None or length < 0:
-        raise ValueError(f"native_wire_invalid_length:{context}")
-    if layout.fixed_length is not None and length != layout.fixed_length:
-        raise ValueError(f"native_wire_invalid_length:{context}:expected={layout.fixed_length}:actual={length}")
-    if layout.fixed_length is None:
-        match = re.search(r"\((\d+)\)", layout.source_type)
-        if match:
-            maximum = int(match[1]) * {"nvarchar": 2, "nchar": 2, "varchar": 4, "char": 4}.get(layout.storage_type, 1)
-            if length > maximum:
-                raise ValueError(f"native_wire_invalid_length:{context}:maximum={maximum}:actual={length}")
+    validate_payload_length(layout, length, context)
+    assert length is not None
     payload = read_exact(handle, length, context)
     if layout.storage_type in {"decimal", "numeric"}:
         precision = 18 if layout.precision is None else layout.precision
@@ -97,6 +89,20 @@ def read_native_payload(handle: BinaryIO, layout: NativeWireColumnLayout, ordina
         raise ValueError(f"native_wire_invalid_bit:{context}")
     _validate_scalar_domain(payload, layout, context)
     return payload
+
+
+def validate_payload_length(layout: NativeWireColumnLayout, length: int | None, context: str) -> None:
+    """Validate a declared payload size before allocating or reading it."""
+    if length is None or length < 0:
+        raise ValueError(f"native_wire_invalid_length:{context}")
+    if layout.fixed_length is not None and length != layout.fixed_length:
+        raise ValueError(f"native_wire_invalid_length:{context}:expected={layout.fixed_length}:actual={length}")
+    if layout.fixed_length is None:
+        match = re.search(r"\((\d+)\)", layout.source_type)
+        if match:
+            maximum = int(match[1]) * {"nvarchar": 2, "nchar": 2, "varchar": 4, "char": 4}.get(layout.storage_type, 1)
+            if length > maximum:
+                raise ValueError(f"native_wire_invalid_length:{context}:maximum={maximum}:actual={length}")
 
 
 def _validate_scalar_domain(payload: bytes, field: NativeWireColumnLayout, context: str) -> None:

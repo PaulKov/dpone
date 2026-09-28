@@ -31,6 +31,7 @@ class PhysicalTransferChunk:
         *,
         bulk_text_codec: Any | None = None,
         bulk_wire_contract: Any | None = None,
+        native_wire_contract: Any | None = None,
     ) -> FileExportArtifact:
         artifact = FileExportArtifact(
             file_path=self.file_path,
@@ -40,6 +41,8 @@ class PhysicalTransferChunk:
             rows_exported=self.row_count,
             bulk_text_codec=bulk_text_codec,
         )
+        if native_wire_contract is not None:
+            setattr(artifact, "native_wire_contract", native_wire_contract)
         if bulk_wire_contract is not None:
             setattr(artifact, "bulk_wire_contract", bulk_wire_contract)
         return artifact
@@ -92,6 +95,29 @@ class RowBoundaryChunkWriter:
                 if sealed is not None:
                     yield sealed
                 state.write(pending)
+            if state.byte_count:
+                sealed = state.seal()
+                state = _OpenChunkState(self.directory, self.format, state.next_index)
+                yield sealed
+        finally:
+            state.discard()
+
+    def write_rows(self, rows: Iterable[bytes]) -> Iterator[PhysicalTransferChunk]:
+        """Write already framed rows using the same byte budget and receipts."""
+        self.directory.mkdir(parents=True, exist_ok=True)
+        state = _OpenChunkState(self.directory, self.format)
+        try:
+            for row in rows:
+                if not row:
+                    raise ValueError("physical_chunk_empty_row")
+                state, sealed = self._prepare_row(state, row)
+                if sealed is not None:
+                    yield sealed
+                state.write(row)
+                if state.byte_count >= self.policy.target_chunk_bytes:
+                    sealed = state.seal()
+                    state = _OpenChunkState(self.directory, self.format, state.next_index)
+                    yield sealed
             if state.byte_count:
                 sealed = state.seal()
                 state = _OpenChunkState(self.directory, self.format, state.next_index)
