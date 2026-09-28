@@ -373,8 +373,8 @@
     "src/dpone/runtime/sources/strategies/mssql/mssql_columnar_provider.py": {
       "accepted_adr": null,
       "baseline_commit": "f8c6a4a5e75d167829c05f65d5d3033acb193878",
-      "max_lines": 389,
-      "max_sloc": 362,
+      "max_lines": 385,
+      "max_sloc": 357,
       "owner": "architecture",
       "reason": "audited pre-existing debt at DPONE-CI-SHADOW-CLOSURE bootstrap",
       "target_date": "2026-12-31",
