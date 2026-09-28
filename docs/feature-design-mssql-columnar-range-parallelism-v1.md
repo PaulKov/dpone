@@ -110,18 +110,23 @@ source:
         null_bucket: separate
       range_parallelism:
         mode: required          # off | auto | required
+        reader_workers: 4
         upload_workers: 2
         max_inflight_ranges: 4
         max_inflight_rows: 200000
         max_inflight_bytes: 536870912
         gap_policy: reject      # reject | allow_explicit
         consistency: immutable  # immutable | database_snapshot | temporal_as_of | write_exclusion
+        consistency_authority: {}
         staging_topology: shared_per_run # shared_per_run | per_partition
         group_key: []
 ```
 
-`num_partitions`, `export_workers`, and `load_workers` remain canonical. New
-settings are strictly validated and appear in compiled/pack fingerprints.
+`num_partitions` remains the canonical partition count. The route-local
+`reader_workers`, `upload_workers`, and `load_workers` are strict concurrency
+controls; a simultaneously supplied legacy `export_workers` must agree with
+`reader_workers` or preflight rejects the manifest. New settings are strictly
+validated and appear in compiled/pack fingerprints.
 Defaults preserve one reader and `shared_per_run`; byte-bounded claims require a
 positive byte budget and byte measurements from every producer item.
 
@@ -136,15 +141,15 @@ Evidence schema `dpone.native_transfer.columnar_range_parallelism.v1` contains:
 
 - policy and plan fingerprints;
 - source consistency mode and staging topology;
-- normalized ranges and typed boundary family;
+- sanitized ranges, typed boundary family, inclusivity, and boundary hashes;
 - requested and observed maximum reader/upload/load concurrency;
 - per-range state, rows, bytes, object checksums, EOF and stage confirmation;
 - aggregate rows/bytes/inflight high-water marks;
 - cancellation/failure and cleanup outcomes;
 - publication barrier and receipt identity.
 
-Passwords, connection strings, SQL parameters, and unredacted source values are
-never evidence fields.
+Passwords, connection strings, SQL parameters, and unredacted boundary/source
+values are never evidence fields.
 
 ### Compatibility and migration
 
@@ -242,6 +247,9 @@ stateDiagram-v2
   machine-checkable group-integrity declaration proves whole-group routing.
 - Oversized single batches fail before exceeding a claimed aggregate byte budget.
 - Source changes are safe only under the selected consistency authority.
+- `database_snapshot`, `temporal_as_of`, and `write_exclusion` require a
+  structured database-snapshot name, typed `as_of` value, or lease/proof
+  reference respectively. Missing authority blocks before source I/O.
 
 ## Architecture
 
@@ -372,4 +380,3 @@ exact-version synthetic certification and benchmark evidence.
 - [x] Tests, evidence, docs, rollout, and rollback are complete.
 - [x] Path ownership and integration plan are conflict-safe.
 - [x] Explicit user implementation request on 2026-09-28 constitutes maintainer approval.
-

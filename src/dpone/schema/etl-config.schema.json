@@ -826,6 +826,21 @@
                     }
                   ]
                 },
+                "ranges": {
+                  "type": "array",
+                  "description": "Explicit typed source ranges validated for deterministic coverage; SQL fragments are not accepted.",
+                  "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": {
+                      "lower": {},
+                      "upper": {},
+                      "include_lower": {"type": "boolean", "default": true},
+                      "include_upper": {"type": "boolean", "default": false},
+                      "null": {"type": "boolean", "default": false}
+                    }
+                  }
+                },
                 "num_partitions": {
                   "type": "integer",
                   "minimum": 1
@@ -848,6 +863,31 @@
                 "load_workers": {
                   "type": "integer",
                   "minimum": 1
+                },
+                "range_parallelism": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "mode": {"type": "string", "enum": ["off", "auto", "required"], "default": "off"},
+                    "reader_workers": {"type": "integer", "minimum": 1, "default": 1},
+                    "upload_workers": {"type": "integer", "minimum": 1, "default": 1},
+                    "max_inflight_ranges": {"type": "integer", "minimum": 1, "default": 1},
+                    "max_inflight_rows": {"type": "integer", "minimum": 1},
+                    "max_inflight_bytes": {"type": "integer", "minimum": 1},
+                    "gap_policy": {"type": "string", "enum": ["reject", "allow_explicit"], "default": "reject"},
+                    "consistency": {"type": "string", "enum": ["immutable", "database_snapshot", "temporal_as_of", "write_exclusion"]},
+                    "consistency_authority": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "properties": {
+                        "database_snapshot": {"type": "string", "minLength": 1},
+                        "as_of": {"type": "string", "minLength": 1},
+                        "write_exclusion_ref": {"type": "string", "minLength": 1}
+                      }
+                    },
+                    "staging_topology": {"type": "string", "enum": ["shared_per_run", "per_partition"], "default": "shared_per_run"},
+                    "group_key": {"type": "array", "items": {"type": "string"}, "default": []}
+                  }
                 }
               }
             },

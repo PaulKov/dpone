@@ -1,0 +1,68 @@
+name: mssql_to_clickhouse_columnar_parallel
+
+source:
+  type: mssql
+  connection_id: synthetic_mssql
+  connection_type: env
+  table:
+    schema: dbo
+    name: synthetic_events
+  options:
+    partitioning:
+      strategy: range
+      column: event_id
+      bounds:
+        lower: 1
+        upper: 1000000
+      num_partitions: 8
+      export_workers: 4
+      load_workers: 2
+      planner:
+        boundary_type: numeric
+        bounds_role: filter
+        null_bucket: separate
+      range_parallelism:
+        mode: required
+        reader_workers: 4
+        upload_workers: 2
+        max_inflight_ranges: 4
+        max_inflight_rows: 200000
+        max_inflight_bytes: 536870912
+        gap_policy: reject
+        consistency: immutable
+        staging_topology: shared_per_run
+        group_key: []
+    native_transfer:
+      snapshot:
+        columnar_fast_path:
+          mode: required
+          provider: object_storage_pull
+          execution:
+            mode: chunked
+            target_chunk_bytes: 128MiB
+            max_chunk_bytes: 256MiB
+            max_inflight_chunks: 2
+          object_storage:
+            uri_prefix: s3://synthetic-dpone-stage/mssql-clickhouse/{run_id}/
+            format: parquet
+            compression: zstd
+            runtime_access:
+              connection_type: airflow
+              connection_id: synthetic_stage_writer
+            clickhouse_read_access:
+              mode: named_collection
+              named_collection: synthetic_stage
+
+sink:
+  type: clickhouse
+  connection_id: synthetic_clickhouse
+  connection_type: env
+  table:
+    schema: analytics
+    name: synthetic_events
+  strategy:
+    mode: full_refresh
+  options:
+    clickhouse_bulk:
+      columnar_pull:
+        use_cluster_function: auto

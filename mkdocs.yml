@@ -528,6 +528,7 @@ nav:
       - Feature design - MCP connector onboarding gate: feature-design-mcp-connector-onboarding-gate.md
       - Feature design - Bounded streaming windows and acceptance: feature-design-bounded-streaming-window-v1.md
       - Feature design - Bounded native MSSQL transport: feature-design-clickhouse-mssql-bounded-native-v1.md
+      - Feature design - MSSQL columnar range parallelism: feature-design-mssql-columnar-range-parallelism-v1.md
       - Feature design - Data-delivery acceleration: feature-design-data-delivery-acceleration-v1.md
       - Data-delivery acceleration tasks: data-delivery-acceleration-tasks.md
       - Runtime patch removal inventory: runtime-patch-removal-inventory.md
@@ -671,6 +672,7 @@ nav:
       - ADR 0069: adr/0069-clickhouse-external-replication-publication.md
       - ADR 0073: adr/0073-durable-committed-replay-quality.md
       - ADR 0074: adr/0074-declarative-replay-target-completion.md
+      - ADR 0075: adr/0075-mssql-columnar-range-parallelism.md
 
 extra:
   generator: false
