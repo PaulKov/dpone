@@ -47,6 +47,11 @@ read_only_paths:
   - .github/workflows
 
 forbidden_paths:
+  - CHANGELOG.md
+  - docs/agent-task-contracts/pr225-integration.yml
+  - docs/feature-specs/bounded-bcp-native-stream.md
+  - docs/quality-metrics.md
+  - docs/source-sink/mssql-to-clickhouse.md
   - pyproject.toml
   - uv.lock
   - mkdocs.yml
@@ -82,7 +87,7 @@ completion_statuses:
 
 stop_conditions:
   - "Required edit falls outside owned_paths."
-  - "Approved specification is contradicted."
+  - "Approved specification is missing or contradicted."
   - "Public-contract impact is larger than declared."
   - "A live check requires unapproved credentials or environment."
   - "Another writer owns the same semantic contract."
