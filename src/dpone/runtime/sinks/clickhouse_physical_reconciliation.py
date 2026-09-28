@@ -7,7 +7,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from dpone.readiness.physical_state import PhysicalColumnState, PhysicalTableState, TableSettingValue
+from dpone.readiness.physical_state import (
+    PhysicalColumnState,
+    PhysicalTableState,
+    TableSettingValue,
+    split_physical_key_expressions,
+)
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
@@ -167,10 +172,7 @@ def _row_mapping(row: Any, columns: tuple[str, ...]) -> Mapping[str, Any]:
 def _list_option(value: Any) -> list[str]:
     if value is None:
         return []
-    text = str(value).strip()
-    if not text or text.lower() == "tuple()":
-        return []
-    return [item.strip().strip("`") for item in text.split(",") if item.strip()]
+    return split_physical_key_expressions(str(value))
 
 
 def _quote_table(table: str) -> str:

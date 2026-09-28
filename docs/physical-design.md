@@ -64,6 +64,12 @@ approval, and connector-specific execution testable.
 
 ## Existing-table drift reconciliation
 
+ClickHouse key lists may contain expressions such as `ifNull(event_time, '')`.
+Commas inside functions, arrays, or quoted values remain part of the expression
+when dpone compares the declaration with the catalog. An unchanged expression
+must not require a shadow migration. Actual expression or key-order changes
+still follow the migration policy below; malformed key lists stop reconciliation.
+
 `physical_design.reconciliation` controls what happens when an existing target
 table differs from the desired `physical_design` contract.
 
