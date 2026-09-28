@@ -238,3 +238,26 @@ serialization across all callers, disable automatic retry after an ambiguous
 outcome, and verify terminal cleanup before admitting the next invocation. An
 Airflow DAG's `max_active_runs: 1` covers only that DAG, not other DAGs or direct
 callers targeting the same table.
+
+### Replicated candidate readiness before publication
+
+For replicated publication, exact row counts alone do not admit publication:
+background replication or merge work can still leave a candidate unhealthy.
+The runtime polls both counts and replica health before preparing authority,
+then rechecks them immediately before DDL dispatch. Both barriers share a
+300-second polling budget with two-second intervals; database-driver query
+timeouts are separate, so an in-flight query can extend elapsed wall time.
+This does not change external per-member publication or its content proof.
+
+Inventory, Atomic database, and candidate/predecessor generation identities are
+revalidated during polling. Identity drift fails immediately; it is never
+treated as lag. A transient health or count mismatch may recover within the
+budget. Expiry raises `DPONE_CLICKHOUSE_CLUSTER_CANDIDATE_NOT_READY` without
+dispatching publication. Expiry at the first barrier acquires no new authority;
+expiry at the second can retain `PREPARED`, which must be classified through
+the existing recovery protocol before another invocation.
+
+Inspect replication health and the exact owned generation through read-only
+diagnostics. Do not clear the authority or weaken health checks to force
+publication. This pre-dispatch wait does not remove the single-writer requirement
+or change post-dispatch reconciliation and cleanup checks.
