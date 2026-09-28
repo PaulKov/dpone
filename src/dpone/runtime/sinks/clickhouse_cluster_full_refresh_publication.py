@@ -26,6 +26,7 @@ from dpone.runtime.sinks.clickhouse_cluster_publication_identity import operatio
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
 from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
     candidate_readiness_deadline,
+    reconcile_existing,
     require_first_publication_complete,
     require_pre_dispatch_generation,
     settle_prior_publication,
@@ -346,38 +347,4 @@ class ClickHouseClusterFullRefreshPublicationService:
         current: VersionedAuthorityRecord,
         cluster: str,
     ) -> ClusterFullRefreshReceipt:
-        record = current.record
-        inventory = self._catalog.inventory(cluster)
-        _require_inventory(record, inventory)
-        hosts = inventory.hosts
-        entry = require_exact_ddl_entry(
-            self._ddl,
-            cluster,
-            entry_id=record.ddl_entry,
-            token=record.ddl_correlation_token,
-            query_digest=record.ddl_query_digest,
-            error_code="DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN",
-        )
-        queue_state = entry.state_for(hosts)
-        observed = self._catalog.generations(cluster, record.database, record.target, record.candidate, hosts)
-        states = tuple(
-            classify_replica(item, desired=record.desired, predecessor=record.predecessor) for item in observed
-        )
-        aggregate = classify_aggregate(states, queue_state)
-        if aggregate is AggregatePublicationState.PARTIAL_IN_PROGRESS:
-            raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_IN_PROGRESS", "original DDL is active")
-        if aggregate is AggregatePublicationState.PARTIAL_TERMINAL:
-            raise ClusterPublicationError(
-                "DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_PARTIAL_TERMINAL", "manual repair required"
-            )
-        if aggregate is not AggregatePublicationState.COMMITTED:
-            raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_UNKNOWN", "completion is not proven")
-        committed = replace(
-            record,
-            phase=AuthorityPhase.COMMITTED,
-            ddl_entry=entry.entry,
-        )
-        if current.record != committed:
-            result = authority.compare_and_swap(current, committed)
-            current = _require_verified(result, permit=False)
-        return ClusterFullRefreshReceipt.from_authority(current, cluster)
+        return reconcile_existing(self._catalog, self._ddl, authority, current, cluster)

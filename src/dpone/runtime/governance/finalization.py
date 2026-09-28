@@ -5,7 +5,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from dpone.runtime.governance.acceptance_metrics import AcceptanceMetricRun
     from dpone.runtime.governance.ports import SinkSideLineageProjector
     from dpone.runtime.governance.quality_execution import QualityGateExecution
 
@@ -21,6 +20,7 @@ from dpone.runtime.governance.acceptance_metrics import (
     AcceptanceMetricsRecorder,
 )
 from dpone.runtime.governance.finalization_support import (
+    capture_acceptance,
     classify_post_commit_cleanup_failure,
     load_result_details,
     staged_probe_result,
@@ -158,7 +158,9 @@ class LoadGovernanceFinalizationCoordinator:
                     sink=sink,
                     evidence=AcceptanceEvidenceContext(load_record, self._governance_service, "pre_commit"),
                 )
-                self._capture_acceptance(
+                capture_acceptance(
+                    self._metric_recorder,
+                    self._governance_service,
                     acceptance_run,
                     sides=("source", "staged"),
                     boundary="pre_commit",
@@ -210,7 +212,9 @@ class LoadGovernanceFinalizationCoordinator:
                 load_result = on_target_committed(load_result)
             target_state = "target_confirmed"
             try:
-                self._capture_acceptance(
+                capture_acceptance(
+                    self._metric_recorder,
+                    self._governance_service,
                     acceptance_run,
                     sides=("target",),
                     boundary="post_commit",
@@ -320,32 +324,6 @@ class LoadGovernanceFinalizationCoordinator:
             quality_evidence,
             acceptance_run.metrics(load_result),
         )
-
-    def _capture_acceptance(
-        self,
-        run: AcceptanceMetricRun,
-        *,
-        sides: tuple[str, ...],
-        boundary: str,
-        source: Any | None,
-        sink: Any,
-        load_config: Any,
-        extract_result: Any,
-        staged_handle: Any,
-        load_record: Any,
-    ) -> None:
-        for side in sides:
-            self._metric_recorder.capture(
-                run,
-                side=side,
-                load_config=load_config,
-                extract_result=extract_result,
-                payload_schema=staged_handle.payload_schema,
-                source=source,
-                sink=sink,
-                evidence=AcceptanceEvidenceContext(load_record, self._governance_service, boundary),
-                staged_handle=staged_handle,
-            )
 
     def _record(
         self,
