@@ -13,6 +13,7 @@ from dpone.ports.clickhouse_cluster_publication import (
     contracts,
     require_verified_mutation,
 )
+from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import DEFAULT_WAIT_SECONDS
 from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import require_candidate_rows as require_candidate_rows
 
 _Receipt = TypeVar("_Receipt")
@@ -69,6 +70,11 @@ def require_first_publication_complete(
         raise contracts.ClusterPublicationError(
             "DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNSAFE", "first publication is not proven complete"
         )
+
+
+def candidate_readiness_deadline() -> float:
+    """Start one monotonic budget shared by pre-authority and pre-DDL checks."""
+    return time.monotonic() + DEFAULT_WAIT_SECONDS
 
 
 def require_pre_dispatch_generation(

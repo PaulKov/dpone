@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import secrets
-import time
 from collections.abc import Mapping
 from dataclasses import asdict, replace
 from typing import Any
@@ -19,19 +18,19 @@ from dpone.ports.clickhouse_cluster_publication import (
 from dpone.ports.clickhouse_cluster_publication import (
     require_verified_mutation as _require_verified,
 )
-from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import DEFAULT_WAIT_SECONDS
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import cluster_name as _cluster
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import correlation_token as _correlation_token
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import is_cluster_enabled
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import operation_id as _operation_id
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
 from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
-    complete_authority as _complete,
-)
-from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
+    candidate_readiness_deadline,
     require_first_publication_complete,
     require_pre_dispatch_generation,
     settle_prior_publication,
+)
+from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
+    complete_authority as _complete,
 )
 from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
     require_same_operation as _require_same_operation,
@@ -111,7 +110,7 @@ class ClickHouseClusterFullRefreshPublicationService:
             predecessor=predecessor,
             staged_rows=staged_rows,
         )
-        readiness_deadline = time.monotonic() + DEFAULT_WAIT_SECONDS
+        readiness_deadline = candidate_readiness_deadline()
         require_pre_dispatch_generation(self._catalog, cluster, record, deadline=readiness_deadline)
         authority = self._authority_factory(database)
         current = authority.read_versioned(target_key)
