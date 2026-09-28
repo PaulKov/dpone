@@ -18,21 +18,21 @@ from dpone.ports.clickhouse_cluster_publication import (
 from dpone.ports.clickhouse_cluster_publication import (
     require_verified_mutation as _require_verified,
 )
-from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import require_candidate_rows
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import cluster_name as _cluster
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import correlation_token as _correlation_token
+from dpone.runtime.sinks.clickhouse_cluster_publication_identity import is_cluster_enabled
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import operation_id as _operation_id
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
 from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
     complete_authority as _complete,
 )
 from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
+    require_candidate_rows,
     require_first_publication_complete,
     require_pre_dispatch_generation,
     settle_prior_publication,
 )
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import REPLAY_OPTION
-from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 
 AggregatePublicationState = contracts.AggregatePublicationState
@@ -68,7 +68,7 @@ class ClickHouseClusterFullRefreshPublicationService:
 
     @staticmethod
     def is_enabled(load_config: Any) -> bool:
-        return ClickHouseTableDesign.from_options(getattr(load_config, "options", {}) or {}).cluster.on_cluster
+        return is_cluster_enabled(load_config)
 
     def publish(self, load_config: Any, candidate_config: Any, *, staged_rows: int) -> ClusterFullRefreshReceipt:
         cluster = _cluster(load_config)
@@ -174,6 +174,7 @@ class ClickHouseClusterFullRefreshPublicationService:
                 cluster=cluster,
                 inventory=inventory,
                 reconcile=lambda prior: self._reconcile_existing(authority, prior, cluster),
+                receipt_factory=ClusterFullRefreshReceipt.from_authority,
                 cleanup=self.cleanup,
             )
             return load_config

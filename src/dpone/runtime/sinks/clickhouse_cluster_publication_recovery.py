@@ -1,9 +1,10 @@
-"""Fail-closed evidence checks for a retained cluster-publication slot."""
+"""Fail-closed candidate and authority checks for cluster publication."""
 
 from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import replace
+from typing import TypeVar
 
 from dpone.ports.clickhouse_cluster_publication import (
     ClusterPublicationAuthorityPort,
@@ -11,7 +12,9 @@ from dpone.ports.clickhouse_cluster_publication import (
     contracts,
     require_verified_mutation,
 )
-from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
+from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import require_candidate_rows as require_candidate_rows
+
+_Receipt = TypeVar("_Receipt")
 
 
 def settle_prior_publication(
@@ -20,8 +23,9 @@ def settle_prior_publication(
     *,
     cluster: str,
     inventory: contracts.ClusterInventory,
-    reconcile: Callable[[contracts.VersionedAuthorityRecord], ClusterFullRefreshReceipt],
-    cleanup: Callable[[ClusterFullRefreshReceipt], None],
+    reconcile: Callable[[contracts.VersionedAuthorityRecord], _Receipt],
+    receipt_factory: Callable[[contracts.VersionedAuthorityRecord, str], _Receipt],
+    cleanup: Callable[[_Receipt], None],
 ) -> None:
     """Finish only a provable prior operation before new source I/O."""
 
@@ -29,7 +33,7 @@ def settle_prior_publication(
     if current.record.phase is contracts.AuthorityPhase.DISPATCHING:
         receipt = reconcile(current)
     elif current.record.phase in {contracts.AuthorityPhase.COMMITTED, contracts.AuthorityPhase.CLEANUP_DISPATCHING}:
-        receipt = ClusterFullRefreshReceipt.from_authority(current, cluster)
+        receipt = receipt_factory(current, cluster)
     else:
         raise contracts.ClusterPublicationError(
             "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target"

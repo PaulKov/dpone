@@ -28,5 +28,11 @@ def cluster_name(load_config: Any) -> str:
     return name
 
 
+def is_cluster_enabled(load_config: Any) -> bool:
+    """Identify a configured clustered table without side effects."""
+
+    return ClickHouseTableDesign.from_options(getattr(load_config, "options", {}) or {}).cluster.on_cluster
+
+
 def correlation_token(operation_id: str, action: str, epoch: int) -> str:
     return f"dpone-v1-{operation_id[:20]}-{action}-{epoch}-{secrets.token_hex(16)}"
