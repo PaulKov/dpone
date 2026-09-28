@@ -265,7 +265,16 @@ def _single_scan_artifact(
 ) -> Any | None:
     if scan_decision is None or scan_decision.selected_scan != "single_scan_chunks":
         return None
-    if artifact_format == "mssql-delimited":
+    native_contract = None
+    if artifact_format == "mssql-bcp-native":
+        native_contract = build_mssql_bcp_native_contract(
+            schema=artifact_schema,
+            query=query,
+            bcp_version=bcp_options.bcp_path,
+            type_policy=_type_policy(load_config),
+            target_format=str(getattr(bulk_wire_contract, "input_format", "RowBinary")),
+        )
+    if artifact_format in {"mssql-delimited", "mssql-bcp-native"}:
         return BcpSingleScanChunkExporter(factory.connector, factory.logger).artifact(
             query=query,
             columns=tuple(column for column, _ in artifact_schema),
@@ -277,6 +286,7 @@ def _single_scan_artifact(
             bulk_text_codec=artifact_text_codec,
             bulk_wire_contract=bulk_wire_contract,
             source_scan_decision=scan_decision,
+            native_wire_contract=native_contract,
         )
     if policy.mode == "required":
         raise ValueError("physical_chunking_binary_row_boundary_unsupported")
