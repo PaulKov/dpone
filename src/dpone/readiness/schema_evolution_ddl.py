@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dpone.type_system.clickhouse_ddl_types import render_clickhouse_type
+
 
 def add_column_sql(
     dialect: str,
@@ -95,7 +97,7 @@ def render_type(dialect: str, dtype: str) -> str:
         except Exception:
             return dtype
     if dialect == "clickhouse":
-        return _to_clickhouse_type(dtype)
+        return render_clickhouse_type(dtype)
     if dialect == "bigquery":
         return _to_bigquery_type(dtype)
     return dtype
@@ -108,29 +110,6 @@ def _mssql_collation(value: str | None) -> str:
     if not normalized or not all(character.isalnum() or character == "_" for character in normalized):
         raise ValueError("MSSQL schema-evolution collation is invalid")
     return f" COLLATE {normalized}"
-
-
-def _to_clickhouse_type(dtype: str) -> str:
-    normalized = str(dtype).lower()
-    if "bigint" in normalized or normalized in {"int8", "int64"}:
-        return "Int64"
-    if "smallint" in normalized:
-        return "Int16"
-    if "tinyint" in normalized:
-        return "Int8"
-    if "int" in normalized:
-        return "Int32"
-    if "decimal" in normalized or "numeric" in normalized:
-        return "Decimal(38, 10)"
-    if "float" in normalized or "double" in normalized or "real" in normalized:
-        return "Float64"
-    if normalized == "date":
-        return "Date"
-    if "time" in normalized or "date" in normalized:
-        return "DateTime64(6)"
-    if "bool" in normalized or normalized == "bit":
-        return "UInt8"
-    return "String"
 
 
 def _to_bigquery_type(dtype: str) -> str:

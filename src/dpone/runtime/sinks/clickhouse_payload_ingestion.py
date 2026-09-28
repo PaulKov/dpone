@@ -22,6 +22,7 @@ from dpone.runtime.sinks.clickhouse_payload_support import (
     is_object_storage_columnar_chunked_artifact,
     is_object_storage_staging_manifest,
     is_source_native_artifact,
+    native_wire_source_schema,
     native_wire_transcoder,
 )
 from dpone.runtime.sinks.clickhouse_row_values import ClickHouseRowValueCoercer
@@ -178,9 +179,10 @@ class ClickHousePayloadIngestionService:
         schema: Sequence[tuple[str, str]],
     ) -> int:
         if is_source_native_artifact(artifact):
+            source_schema = native_wire_source_schema(artifact, schema)
             stream_artifact = native_wire_transcoder().to_clickhouse_binary(
                 artifact,
-                schema,
+                source_schema,
                 clickhouse_schema=self._clickhouse_schema(load_config, schema),
                 type_policy=self._type_policy(load_config),
             )

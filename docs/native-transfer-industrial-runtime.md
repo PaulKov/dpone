@@ -490,6 +490,14 @@ runtime evidence reports `mssql_source_escaping: true`, or the generated MSSQL
 query contains `REPLACE(`, the route is using the legacy `source_encoded`
 fallback.
 
+Native BCP files are decoded with the physical MSSQL column types sealed into
+their export artifact. A logical payload schema may normalize those types for
+the ClickHouse target, but it must preserve the same column names and order.
+The target mapping continues to use the logical schema; a changed column
+identity fails before decoding with
+`native_wire_source_schema_mismatch:column_identity`. No source-type override
+or runtime import patch is needed.
+
 `dpone plan` writes `native_transfer_bulk_wire` evidence with the selected
 route, ClickHouse input format, delimiter profile, schema hash, source escaping
 flag, acceleration backend decision, fallback reason, warnings, and blockers.
@@ -881,6 +889,20 @@ visible and GitOps-friendly:
 | SSIS | Row and byte buffer sizing. | Dual file-count/file-byte limits with adaptive slice feedback. |
 
 ## Bounded typed rows and atomic windows
+
+Schema evolution preserves ClickHouse physical types already projected by the
+sink, including `Nullable(Date)`, `Nullable(String)`, exact integer widths,
+decimal precision and timestamp precision/timezone. It must not run those types
+through a generic source-type mapper a second time. Existing DDL governance
+still applies: nullable relaxation can require a safe window and an explicit
+table-size budget; this does not authorize arbitrary online DDL.
+
+The reusable type renderer in `dpone.type_system.clickhouse_ddl_types` accepts
+one physical type expression, not a SQL clause. It rejects trailing clauses,
+comments, statement separators and quoted identifiers. This conservative guard
+also rejects enum labels containing those tokens; use a supported type rather
+than disabling validation. Single-quoted timezone and ordinary enum literals
+remain supported.
 
 MSSQL typed row streaming uses the existing `source.options.native_transfer.wire`
 configuration: `mode: typed_binary`, `source_native_format: odbc_row_stream`, and
