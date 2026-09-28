@@ -52,11 +52,17 @@ def test_native_artifact_decodes_with_sealed_physical_schema_and_keeps_logical_t
 
     service = ClickHousePayloadIngestionService(_FakeSink(), sink_factory=lambda _connector: _FakeSink())
     monkeypatch.setattr(ingestion, "native_wire_transcoder", RecordingTranscoder)
-    monkeypatch.setattr(service, "_clickhouse_schema", lambda _config, _schema: (("event_id", "UUID"),))
+
+    def target_schema(_config, schema):
+        captured["logical_schema"] = schema
+        return (("event_id", "UUID"),)
+
+    monkeypatch.setattr(service, "_clickhouse_schema", target_schema)
     monkeypatch.setattr(service, "insert_byte_stream", lambda *_args: 1)
 
     assert service.insert_file(_load_config(), artifact, [("event_id", "string")]) == 1
     assert captured == {
+        "logical_schema": [("event_id", "string")],
         "source_schema": (("event_id", "uniqueidentifier"),),
         "clickhouse_schema": (("event_id", "UUID"),),
     }
