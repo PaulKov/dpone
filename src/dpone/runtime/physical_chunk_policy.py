@@ -48,6 +48,15 @@ class PhysicalChunkLimitExceeded(RuntimeError):
         }
 
 
+class PhysicalRowLimitExceeded(RuntimeError):
+    """Signal an oversized framed row before a writer assigns its chunk."""
+
+    def __init__(self, *, row_bytes: int, max_chunk_bytes: int) -> None:
+        self.row_bytes = row_bytes
+        self.max_chunk_bytes = max_chunk_bytes
+        super().__init__("physical_chunk_row_exceeds_max_bytes")
+
+
 @dataclass(frozen=True, slots=True)
 class PhysicalChunkPolicy:
     """Normalized physical chunking limits for one source scan."""
@@ -128,4 +137,9 @@ def _parse_policy_byte_size(value: Any, error_code: str) -> int:
         raise ValueError(error_code) from None
 
 
-__all__ = ["PHYSICAL_CHUNK_SIZE_LITERAL_PATTERN", "PhysicalChunkLimitExceeded", "PhysicalChunkPolicy"]
+__all__ = [
+    "PHYSICAL_CHUNK_SIZE_LITERAL_PATTERN",
+    "PhysicalChunkLimitExceeded",
+    "PhysicalChunkPolicy",
+    "PhysicalRowLimitExceeded",
+]

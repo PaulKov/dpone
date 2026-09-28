@@ -11,7 +11,11 @@ from pathlib import Path
 from typing import Any
 
 from dpone.runtime.file_artifacts import FileExportArtifact
-from dpone.runtime.physical_chunk_policy import PhysicalChunkLimitExceeded, PhysicalChunkPolicy
+from dpone.runtime.physical_chunk_policy import (
+    PhysicalChunkLimitExceeded,
+    PhysicalChunkPolicy,
+    PhysicalRowLimitExceeded,
+)
 
 
 @dataclass(slots=True)
@@ -107,7 +111,18 @@ class RowBoundaryChunkWriter:
         self.directory.mkdir(parents=True, exist_ok=True)
         state = _OpenChunkState(self.directory, self.format)
         try:
-            for row in rows:
+            iterator = iter(rows)
+            while True:
+                try:
+                    row = next(iterator)
+                except StopIteration:
+                    break
+                except PhysicalRowLimitExceeded as exc:
+                    raise PhysicalChunkLimitExceeded(
+                        chunk_index=state.chunk_index,
+                        row_bytes=exc.row_bytes,
+                        max_chunk_bytes=exc.max_chunk_bytes,
+                    ) from exc
                 if not row:
                     raise ValueError("physical_chunk_empty_row")
                 state, sealed = self._prepare_row(state, row)

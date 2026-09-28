@@ -7,7 +7,7 @@ from collections.abc import Iterable, Iterator
 from dpone.runtime.native_wire_models import SourceNativeWireContract
 from dpone.runtime.native_wire_mssql import validate_mssql_native_contract
 from dpone.runtime.native_wire_mssql_framing import validate_payload_length
-from dpone.runtime.physical_chunk_policy import PhysicalChunkLimitExceeded
+from dpone.runtime.physical_chunk_policy import PhysicalRowLimitExceeded
 
 
 class NativeWireRowFramer:
@@ -50,9 +50,7 @@ class NativeWireRowFramer:
                     assert length is not None
                     row_bytes = position - row_start + length
                     if row_bytes > self.max_row_bytes:
-                        raise PhysicalChunkLimitExceeded(
-                            chunk_index=0, row_bytes=row_bytes, max_chunk_bytes=self.max_row_bytes
-                        )
+                        raise PhysicalRowLimitExceeded(row_bytes=row_bytes, max_chunk_bytes=self.max_row_bytes)
                     pending = length
                 if len(buffer) - position < pending:
                     break

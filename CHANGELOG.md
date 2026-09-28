@@ -8,9 +8,10 @@
   Binary row framing preserves field bytes, rejects oversized or truncated rows,
   and carries the selected ClickHouse Native/RowBinary contract into every chunk.
   Eager cleanup releases each source file after acknowledged staging ingestion.
-  This transport fails closed before source I/O for `snapshot_diff`, `scd2`, and
-  any nonempty `schema_contract`; those route-wide capabilities remain available
-  through transports that support their metadata and contract projections.
+  Required mode fails closed before source I/O for `snapshot_diff`, `scd2`, and
+  any nonempty `schema_contract`; auto mode preserves the existing range or
+  whole-file BCP Native route for those combinations. Route-wide capabilities
+  remain available through transports that support their projections.
 
 ## 0.85.0 - 2026-09-28
 

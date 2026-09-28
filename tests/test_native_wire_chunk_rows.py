@@ -6,7 +6,11 @@ import pytest
 
 from dpone.runtime.native_wire_chunk_rows import NativeWireRowFramer
 from dpone.runtime.native_wire_mssql import MssqlBcpNativeDecoder, build_mssql_bcp_native_contract
-from dpone.runtime.physical_chunk_policy import PhysicalChunkLimitExceeded, PhysicalChunkPolicy
+from dpone.runtime.physical_chunk_policy import (
+    PhysicalChunkLimitExceeded,
+    PhysicalChunkPolicy,
+    PhysicalRowLimitExceeded,
+)
 from dpone.runtime.physical_chunk_writer import RowBoundaryChunkWriter
 from dpone.runtime.physical_chunking import PhysicalChunkedFileExportArtifact
 
@@ -43,8 +47,25 @@ def test_large_declared_field_fails_before_reading_payload():
         yield (2**40).to_bytes(8, "little")
         pytest.fail("must reject declared size before requesting payload")
 
-    with pytest.raises(PhysicalChunkLimitExceeded):
+    with pytest.raises(PhysicalRowLimitExceeded):
         list(NativeWireRowFramer(contract([("v", "varbinary(max)")]), max_row_bytes=64).rows(segments()))
+
+
+def test_writer_assigns_actual_chunk_index_to_late_oversized_native_row(tmp_path):
+    layout = contract([("v", "varbinary(max)")])
+    first = (2).to_bytes(8, "little") + b"ok"
+    oversized_prefix = (64).to_bytes(8, "little")
+    writer = RowBoundaryChunkWriter(
+        policy=PhysicalChunkPolicy(target_chunk_bytes=len(first), max_chunk_bytes=16),
+        columns=["v"],
+        directory=tmp_path,
+        format="mssql-bcp-native",
+    )
+
+    with pytest.raises(PhysicalChunkLimitExceeded) as captured:
+        list(writer.write_rows(NativeWireRowFramer(layout, max_row_bytes=16).rows([first, oversized_prefix])))
+
+    assert captured.value.chunk_index == 1
 
 
 def test_empty_stream():

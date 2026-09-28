@@ -286,6 +286,63 @@ def test_mssql_native_chunks_reject_schema_contract_before_source_io(
     assert connector.bcp_runner_calls == 0
 
 
+@pytest.mark.parametrize("mode", ["off", "auto"])
+def test_mssql_native_optional_chunks_preserve_existing_strategy_routes(tmp_path: Path, mode: str) -> None:
+    connector = _FakeMssqlConnector(table_kind="heap", has_seekable_boundary=False)
+    config = _native_chunk_config(tmp_path)
+    config.load_strategy = LoadStrategy.SNAPSHOT_DIFF
+    config.options["native_transfer"]["snapshot"]["physical_chunking"]["mode"] = mode
+
+    artifact = MSSQLQueryoutArtifactFactory(
+        connector,
+        CapturingLogger(),
+        sink_connector=ClickHouseConnector(),
+    ).artifact_for_query(config, "SELECT [id] FROM [reporting].[orders]", [("id", "int")])
+
+    assert not isinstance(artifact, PhysicalChunkedFileExportArtifact)
+    assert connector.bcp_runner_calls == 1
+
+
+def test_mssql_native_auto_chunks_preserve_schema_contract_fallback(tmp_path: Path) -> None:
+    connector = _FakeMssqlConnector(table_kind="heap", has_seekable_boundary=False)
+    config = _native_chunk_config(tmp_path)
+    config.options["native_transfer"]["snapshot"]["physical_chunking"]["mode"] = "auto"
+    config.options["schema_contract"] = {"enforcement": "strict"}
+
+    artifact = MSSQLQueryoutArtifactFactory(
+        connector,
+        CapturingLogger(),
+        sink_connector=ClickHouseConnector(),
+    ).artifact_for_query(config, "SELECT [id] FROM [reporting].[orders]", [("id", "int")])
+
+    assert not isinstance(artifact, PhysicalChunkedFileExportArtifact)
+    assert connector.bcp_runner_calls == 1
+
+
+def test_mssql_native_auto_chunks_preserve_existing_range_route(tmp_path: Path) -> None:
+    class RangeConnector(_FakeMssqlConnector):
+        def get_records(self, query: str, params=None, as_dict: bool = False):
+            if "dpone_source_shape" in query:
+                return super().get_records(query, params=params, as_dict=as_dict)
+            self.queries.append(query)
+            return [(1, 9, 9, 0)]
+
+    connector = RangeConnector(table_kind="clustered", has_seekable_boundary=True)
+    config = _native_chunk_config(tmp_path)
+    config.load_strategy = LoadStrategy.SCD2
+    config.options["native_transfer"]["snapshot"]["scan"]["mode"] = "auto"
+    config.options["native_transfer"]["snapshot"]["physical_chunking"]["mode"] = "auto"
+
+    artifact = MSSQLQueryoutArtifactFactory(
+        connector,
+        CapturingLogger(),
+        sink_connector=ClickHouseConnector(),
+    ).artifact_for_query(config, "SELECT [id] FROM [reporting].[orders]", [("id", "int")])
+
+    assert artifact.__class__.__name__ == "PartitionedFileExportArtifact"
+    assert connector.bcp_runner_calls == 4
+
+
 def test_late_bcp_failure_drops_stage_and_cleans_fifo_and_chunks(tmp_path: Path) -> None:
     connector = _LateFailingBcpConnector(payload=b"1\n2\n")
     artifact = BcpSingleScanChunkExporter(connector, CapturingLogger()).artifact(
@@ -330,6 +387,12 @@ class _FakeMssqlConnector:
 
     def quote_identifier(self, name: str) -> str:
         return f"[{name}]"
+
+    def bcp_queryout(self, query: str, file_path: str, *, options: object) -> int:
+        del query, options
+        self.bcp_runner_calls += 1
+        Path(file_path).write_bytes((1).to_bytes(4, "little"))
+        return 1
 
     def get_records(self, query: str, params=None, as_dict: bool = False):
         del params, as_dict

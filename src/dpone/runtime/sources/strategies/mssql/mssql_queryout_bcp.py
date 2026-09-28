@@ -10,6 +10,7 @@ if TYPE_CHECKING:
 
 from collections.abc import Callable, Mapping
 from contextlib import nullcontext
+from dataclasses import replace
 from typing import Any
 
 from dpone.runtime.bulk_options import BulkOptionsResolver
@@ -59,7 +60,7 @@ def build_bcp_queryout_artifact(
         if native.blockers:
             raise ValueError("; ".join(native.blockers) + ":use_row_stream_or_nullable_projection")
     physical_chunk_policy = PhysicalChunkPolicy.from_source_options(load_config.options)
-    _guard_native_chunk_admission(
+    physical_chunk_policy = _guard_native_chunk_admission(
         load_config,
         native_wire=wire is not None and wire.selected_route == "typed_binary_bcp_native",
         physical_chunk_policy=physical_chunk_policy,
@@ -256,19 +257,23 @@ def _guard_native_chunk_admission(
     *,
     native_wire: bool,
     physical_chunk_policy: PhysicalChunkPolicy,
-) -> None:
-    """Reject lazy native combinations before source materialization or BCP I/O."""
+) -> PhysicalChunkPolicy:
+    """Fail required chunks closed and disable incompatible optional chunks."""
 
-    if not native_wire:
-        return
+    if not native_wire or physical_chunk_policy.mode == "off":
+        return physical_chunk_policy
     strategy = str(getattr(getattr(load_config, "load_strategy", None), "value", ""))
+    blocker: str | None = None
     if strategy in {"snapshot_diff", "scd2"}:
-        raise ValueError(f"mssql_bcp_native_strategy_metadata_unsupported:{strategy}")
-    if physical_chunk_policy.mode == "off":
-        return
+        blocker = f"mssql_bcp_native_strategy_metadata_unsupported:{strategy}"
     raw_contract = getattr(load_config, "options", {}).get("schema_contract")
-    if isinstance(raw_contract, Mapping) and raw_contract:
-        raise ValueError("mssql_bcp_native_physical_chunks_schema_contract_unsupported")
+    if blocker is None and isinstance(raw_contract, Mapping) and raw_contract:
+        blocker = "mssql_bcp_native_physical_chunks_schema_contract_unsupported"
+    if blocker is None:
+        return physical_chunk_policy
+    if physical_chunk_policy.mode == "required":
+        raise ValueError(blocker)
+    return replace(physical_chunk_policy, mode="off")
 
 
 def _single_scan_artifact(
@@ -286,6 +291,8 @@ def _single_scan_artifact(
     scan_decision: Any,
     policy: PhysicalChunkPolicy,
 ) -> Any | None:
+    if policy.mode == "off":
+        return None
     if scan_decision is None or scan_decision.selected_scan != "single_scan_chunks":
         return None
     native_contract = None
