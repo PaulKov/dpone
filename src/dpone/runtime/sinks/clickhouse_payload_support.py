@@ -180,16 +180,18 @@ def payload_staged_cleanup_owner(payload: Any) -> Any | None:
     return owner() if callable(owner) else None
 
 
-def cleanup_staged_object_owner(owner: Any, *, primary: BaseException | None = None) -> None:
+def cleanup_staged_object_owner(owner: Any, *, primary: BaseException | None = None) -> bool:
     cleanup = getattr(owner, "cleanup_owned_object_storage", None)
     if not callable(cleanup):
-        return
+        return True
     try:
         cleanup()
     except BaseException as error:
         if primary is None:
             raise
         primary.add_note(f"object storage cleanup failed: {type(error).__name__}")
+        return False
+    return True
 
 
 def cleanup_failed_clickhouse_stage(
@@ -197,13 +199,15 @@ def cleanup_failed_clickhouse_stage(
     owner: Any,
     error: BaseException,
     *configs: Any | None,
-) -> None:
+) -> bool:
+    cleanup_succeeded = True
     if any(config is not None for config in configs):
         try:
             drop_configs(*configs)
         except Exception as cleanup_error:
+            cleanup_succeeded = False
             error.add_note(f"raw staging cleanup failed: {type(cleanup_error).__name__}")
-    cleanup_staged_object_owner(owner, primary=error)
+    return cleanup_staged_object_owner(owner, primary=error) and cleanup_succeeded
 
 
 def cleanup_clickhouse_stage(sink: Any, external: Any, drop_configs: Callable[..., None], handle: Any) -> None:
@@ -278,10 +282,16 @@ def _group_planned_range_windows(windows: tuple[Any, ...], *, artifact: Any, pla
 
 def _confirmed_range_rows(artifact: Any, expected: Mapping[int, str]) -> dict[str, int]:
     evidence = getattr(artifact, "range_execution_evidence", None)
+    if isinstance(evidence_ranges := getattr(evidence, "ranges", None), tuple):
+        strict_confirmed = {item.range_id: item.rows for item in evidence_ranges if item.eof_confirmed}
+        if getattr(evidence, "outcome_status", None) != "extracted" or len(strict_confirmed) != len(evidence_ranges):
+            raise ValueError("clickhouse_range_execution_confirmation_invalid")
+        if set(strict_confirmed) != set(expected.values()):
+            raise ValueError("clickhouse_range_execution_confirmation_set_mismatch")
+        return strict_confirmed
     if not isinstance(evidence, Mapping) or evidence.get("all_ranges_confirmed") is not True:
         raise ValueError("clickhouse_range_execution_confirmation_missing")
-    raw_ranges = evidence.get("ranges")
-    if not isinstance(raw_ranges, list | tuple):
+    if not isinstance(raw_ranges := evidence.get("ranges"), list | tuple):
         raise ValueError("clickhouse_range_execution_confirmation_invalid")
     confirmed: dict[str, int] = {}
     for item in raw_ranges:
@@ -342,6 +352,10 @@ def record_range_staging_metric(
     requested_workers: int,
     observed_workers: int,
     groups: Sequence[RangeWindowGroup],
+    stage_configs: Sequence[Any],
+    authoritative_config: Any,
+    assembly_rows: int | None,
+    observed_rows: Mapping[str, int],
 ) -> None:
     recorder = getattr(artifact, "record_range_staging_metric", None)
     if callable(recorder):
@@ -357,13 +371,16 @@ def record_range_staging_metric(
                     {
                         "range_id": group.range_id,
                         "range_ordinal": group.ordinal,
-                        "rows": group.expected_rows,
+                        "rows": observed_rows[group.range_id],
                         "stage_confirmed": True,
                     }
                     for group in groups
                 ],
             }
         )
+    advance = getattr(artifact, "advance_range_staging", None)
+    if callable(advance):
+        advance(groups, stage_configs, observed_workers, assembly_rows, authoritative_config, observed_rows)
 
 
 def rows_per_second(rows: int, seconds: float) -> float | None:

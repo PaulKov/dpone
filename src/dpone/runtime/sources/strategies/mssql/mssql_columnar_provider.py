@@ -29,8 +29,10 @@ from dpone.storage.protocols import ObjectStorageClient
 
 
 class MssqlColumnarSnapshotProvider:
-    """Write MSSQL streaming row batches as Parquet chunks in object storage."""
-
+    # Range evidence remains attempt-local and keyed by the immutable request.
+    # The chunked artifact reads it only after source iteration reaches EOF.
+    # Failed range attempts publish their fail-closed evidence before rethrowing.
+    # Serial attempts keep the pre-existing provider contract unchanged.
     provider_id = "mssql_odbc_arrow_parquet"
 
     def __init__(
@@ -47,7 +49,7 @@ class MssqlColumnarSnapshotProvider:
         self._parquet_writer = parquet_writer or PyArrowParquetChunkWriter()
         self._read_contract = read_contract
         self._temp_dir = Path(temp_dir) if temp_dir else None
-        self._range_evidence: dict[int, dict[str, object]] = {}
+        self._range_evidence: dict[int, object] = {}
 
     def capabilities(self, request: ColumnarSnapshotRequest) -> ColumnarSnapshotCapability:
         blockers: list[str] = []
@@ -274,19 +276,20 @@ class MssqlColumnarSnapshotProvider:
                     active_windows.append(window)
                     yield window
                     active_windows.remove(window)
-        except BaseException:
-            self._object_client.delete_prefix(prefix)
+        except BaseException as error:
+            if (evidence := getattr(error, "_dpone_range_execution_evidence", None)) is None:
+                self._object_client.delete_prefix(prefix)
+            else:
+                self._range_evidence[id(request)] = evidence
             raise
         finally:
             for window in active_windows:
                 window.cleanup()
 
-    def range_execution_evidence(self, request: ColumnarSnapshotRequest) -> dict[str, object] | None:
+    def range_execution_evidence(self, request: ColumnarSnapshotRequest) -> object | None:
         return self._range_evidence.get(id(request))
 
     def cleanup_object_storage_run(self, request: ColumnarSnapshotRequest) -> None:
-        """Delete only the range attempt prefix after its lifecycle releases ownership."""
-
         cleanup_policy = str((request.options or {}).get("cleanup_policy") or "eager")
         if cleanup_policy not in {"eager", "on_success"} or self._object_client is None:
             return
@@ -380,6 +383,3 @@ class MssqlColumnarSnapshotProvider:
         if self._read_contract is not None:
             return self._read_contract
         return read_contract_from_options(columnar_schema.read_contract_options(request))
-
-
-__all__ = ["MssqlColumnarSnapshotProvider"]

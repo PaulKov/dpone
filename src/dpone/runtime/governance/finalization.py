@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from dpone.runtime.governance.ports import SinkSideLineageProjector
@@ -11,9 +11,9 @@ if TYPE_CHECKING:
 
 from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any
 
 from dpone.contracts.quality_failure import QualityGateReceiptError
+from dpone.runtime.columnar_range_quality_bridge import advance_range_governed_quality
 from dpone.runtime.governance.acceptance_metrics import (
     AcceptanceMetricPolicy,
     AcceptanceMetricsRecorder,
@@ -41,8 +41,6 @@ from dpone.runtime.governance.ports import (
 from dpone.runtime.governance.quality_execution import quality_gate_report_evidence
 from dpone.runtime.governance.service import LoadGovernanceService, QualityGateFailure, QualityGateReceipt
 from dpone.runtime.lineage.options import LineageOptions
-
-_UTC = timezone.utc  # noqa: UP017 - keep mypy-compatible timezone alias for current target.
 
 
 class LoadGovernanceFinalizationCoordinator:
@@ -172,6 +170,7 @@ class LoadGovernanceFinalizationCoordinator:
                     receipt=quality_receipt,
                 )
                 assert quality_receipt is not None
+            advance_range_governed_quality(projected.handle, quality_receipt, quality_evidence)
             validation_receipt = validate_staged_load_if_supported(sink, load_config, projected.handle)
             if validation_receipt.validated:
                 _token, lifecycle_load_config, lifecycle_handle = validation_receipt.frozen_inputs(
@@ -360,8 +359,9 @@ class LoadGovernanceFinalizationCoordinator:
             return
 
 
+# Keep timezone.utc until the oldest supported Python typing exposes datetime.UTC.
 def _utc_now() -> datetime:
-    return datetime.now(_UTC)
+    return datetime.now(timezone.utc)  # noqa: UP017 - current Python target lacks datetime.UTC typing.
 
 
 __all__ = ["LoadGovernanceFinalizationCoordinator"]

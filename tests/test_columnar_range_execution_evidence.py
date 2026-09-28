@@ -136,7 +136,10 @@ def test_success_requires_staging_quality_assembly_and_publication_receipts() ->
         assembly_receipt_sha256=_digest("assembly"),
     )
     assert quality_passed.to_dict()["outcome"]["status"] == "quality_passed"
-    complete = quality_passed.complete(
+    published = quality_passed.published(publication_receipt_sha256=_digest("publication"))
+    assert published.to_dict()["outcome"]["status"] == "published"
+    assert published.to_dict()["outcome"]["cleanup"]["status"] == "not_started"
+    complete = published.complete(
         publication_receipt_sha256=_digest("publication"),
         cleanup_status="completed",
     )
@@ -148,6 +151,22 @@ def test_success_requires_staging_quality_assembly_and_publication_receipts() ->
         "publication": _digest("publication"),
     }
     assert payload["consistency"]["authority"] == {"as_of": "synthetic-2026-09-28T00:00:00Z"}
+
+
+def test_published_state_rejects_missing_receipt_or_premature_cleanup() -> None:
+    plan = _plan()
+    quality = _extracted(plan).with_stage_receipts(_shared_stages(plan), observed_load_concurrency=2)
+    quality = quality.with_quality_receipt(quality_receipt_sha256=_digest("quality"))
+
+    with pytest.raises(ValueError, match="publication_receipt_sha256"):
+        replace(quality, outcome_status="published")
+    with pytest.raises(ValueError, match="cleanup must remain pending"):
+        replace(
+            quality,
+            outcome_status="published",
+            publication_receipt_sha256=_digest("publication"),
+            cleanup_status="completed",
+        )
 
 
 def test_partial_or_impossible_measurements_cannot_be_success_evidence() -> None:

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from threading import Event
+from threading import Barrier, Event
 from types import SimpleNamespace
 from typing import Any, cast
 
@@ -9,6 +9,13 @@ import pytest
 
 from dpone.config import LoadConfig
 from dpone.config.load_strategy import LoadStrategy
+from dpone.ports.columnar_range_parallelism import (
+    ColumnarRangeDescriptor,
+    ColumnarRangeExecutionEvidence,
+    ColumnarRangePlan,
+    RangeChunkReceipt,
+    RangeParallelismPolicy,
+)
 from dpone.runtime.columnar_fast_path_models import ObjectStorageChunk
 from dpone.runtime.columnar_object_storage_windows import (
     ObjectStorageChunkWindow,
@@ -120,6 +127,16 @@ class _Connector:
         return [(self.counts.get(table, 0),)]
 
 
+class _ConcurrentConnector(_Connector):
+    def __init__(self, counts: dict[str, int], barrier: Barrier) -> None:
+        super().__init__(counts)
+        self._barrier = barrier
+
+    def execute_query(self, sql: str) -> None:
+        self._barrier.wait(timeout=2)
+        super().execute_query(sql)
+
+
 class _Harness:
     def __init__(self, *, fail_range: int | None = None, fail_assembly: bool = False) -> None:
         self.counts = {"authoritative": 0}
@@ -200,6 +217,32 @@ def test_range_load_failure_cleans_owned_resources_without_assembly(topology: st
     assert harness.assembly_calls == 0
     assert sorted(harness.dropped) == sorted(harness.created)
     assert all(window.cleaned == 0 for window in artifact._windows)
+
+
+def test_shared_topology_honors_parallel_load_workers_and_reconciles_total() -> None:
+    counts = {"authoritative": 0}
+    barrier = Barrier(2)
+    callbacks = ClickHouseRangeStagingCallbacks(
+        clone_connector=lambda _ordinal: _ConcurrentConnector(counts, barrier),
+        plan_partition=lambda config, _ordinal: config,
+        create_partition=lambda _parent, _partition: None,
+        assemble_partitions=lambda _partitions, _target: 0,
+        drop_partition=lambda _partition: None,
+    )
+    loader = ClickHouseColumnarPullLoader(
+        connector=_Connector(counts),
+        table_name=lambda config: cast(_Config, config).table,
+        count_rows=lambda config: counts[cast(_Config, config).table],
+        range_staging=callbacks,
+    )
+    artifact = _Artifact([_Window(0), _Window(1)], topology="shared_per_run", load_workers=2)
+
+    assert loader.load_windowed(cast(Any, _Config("authoritative", {})), artifact, (("id", "Int64"),)) == 2
+    assert artifact.staging_metrics[0]["observed_load_workers"] == 2
+    assert artifact.staging_metrics[0]["range_confirmations"] == [
+        {"range_id": "range-0", "range_ordinal": 0, "rows": 1, "stage_confirmed": True},
+        {"range_id": "range-1", "range_ordinal": 1, "rows": 1, "stage_confirmed": True},
+    ]
 
 
 def test_partition_assembly_failure_drops_every_partition_and_does_not_report_success() -> None:
@@ -317,7 +360,7 @@ def test_first_range_failure_actively_cancels_running_connectors_and_preserves_p
         count_rows=lambda _config: 0,
         range_staging=callbacks,
     )
-    artifact = _Artifact([_Window(0), _Window(1)], topology="shared_per_run", load_workers=2)
+    artifact = _Artifact([_Window(0), _Window(1)], topology="per_partition", load_workers=2)
 
     with pytest.raises(RuntimeError, match="primary-range-failure"):
         loader.load_windowed(cast(Any, _Config("authoritative", {})), artifact, (("id", "Int64"),))
@@ -353,37 +396,52 @@ class _CancellableConnector:
 
 @pytest.mark.parametrize(
     ("failure", "cleaned"),
-    [(None, True), ("stage", True), ("validate", True), ("publish", False)],
+    [(None, True), ("stage", True), ("validate", True), ("publish", False), ("cleanup", False)],
 )
 def test_object_prefix_cleanup_is_owned_by_staged_reconciliation(failure: str | None, cleaned: bool) -> None:
     events: list[object] = []
-    provider = _LifecycleProvider(events)
+    plan = _lifecycle_range_plan()
+    provider = _LifecycleProvider(events, plan, fail_cleanup=failure == "cleanup")
     artifact = ObjectStorageColumnarChunkedArtifact(
         provider=provider,
-        request=SimpleNamespace(range_plan=None, options={"cleanup_policy": "eager"}),
+        request=SimpleNamespace(range_plan=plan, options={"cleanup_policy": "eager"}),
         columns=("id",),
         schema_hash="schema",
         cleanup_policy="eager",
     )
-    sink = _LifecycleSink(provider.objects, events, fail_insert=failure == "stage")
+    sink = _LifecycleSink(
+        provider.objects,
+        events,
+        fail_insert=failure == "stage",
+        fail_validate=failure == "validate",
+    )
     service = _LifecycleService(sink, events, failure=failure)
     payload = LoadPayload(artifact=artifact, schema=(("id", "int"),))
 
     if failure is None:
         result = service.load(_lifecycle_config(), payload)
         assert result.inserted_rows == 1
+        assert artifact.range_execution_evidence is not None
+        assert artifact.range_execution_evidence.outcome_status == "succeeded"
+        assert artifact.to_evidence()["range_execution"]["outcome"]["status"] == "succeeded"
     else:
-        with pytest.raises(RuntimeError, match=f"{failure}-failure") as raised:
+        expected_error = "staged cleanup failed" if failure == "cleanup" else f"{failure}-failure"
+        with pytest.raises(RuntimeError, match=expected_error) as raised:
             service.load(_lifecycle_config(), payload)
         if failure == "publish":
             details = cast(dict[str, object], getattr(raised.value, "details"))
             assert details["target_outcome"] == "commit_unknown"
+            assert artifact.range_execution_evidence is not None
+            assert artifact.range_execution_evidence.outcome_status == "publication_unknown"
+            assert artifact.range_execution_evidence.cleanup_status == "preserved_unknown"
+        elif artifact.range_execution_evidence is not None:
+            assert artifact.range_execution_evidence.outcome_status == "failed"
+            if failure == "stage":
+                assert artifact.range_execution_evidence.cleanup_status == "completed"
 
     assert (not provider.objects) is cleaned
     assert ("insert", "objects_present") in events
     if failure is None:
-        handle_ids = [event[1] for event in events if isinstance(event, tuple) and event[0] in {"validate", "publish"}]
-        assert len(handle_ids) == 2 and len(set(handle_ids)) == 1
         assert [event[0] for event in events if isinstance(event, tuple)] == [
             "insert",
             "validate",
@@ -395,10 +453,79 @@ def test_object_prefix_cleanup_is_owned_by_staged_reconciliation(failure: str | 
         assert not any(isinstance(event, tuple) and event[0] == "object_cleanup" for event in events)
 
 
+def test_governed_split_lifecycle_advances_current_range_evidence() -> None:
+    events: list[object] = []
+    plan = _lifecycle_range_plan()
+    provider = _LifecycleProvider(events, plan)
+    artifact = ObjectStorageColumnarChunkedArtifact(
+        provider=provider,
+        request=SimpleNamespace(range_plan=plan, options={"cleanup_policy": "eager"}),
+        columns=("id",),
+        schema_hash="schema",
+        cleanup_policy="eager",
+    )
+    service = _LifecycleService(
+        _LifecycleSink(provider.objects, events, fail_insert=False, fail_validate=False),
+        events,
+        failure=None,
+    )
+    config = _lifecycle_config()
+    handle = service.stage(config, LoadPayload(artifact=artifact, schema=(("id", "int"),)))
+
+    assert artifact.range_execution_evidence.outcome_status == "staged"
+    token = service.validate(config, handle)
+    assert artifact.range_execution_evidence.outcome_status == "quality_passed"
+    result = service.finalize_validated(config, handle, token)
+    assert artifact.range_execution_evidence.outcome_status == "published"
+    assert artifact.range_execution_evidence.publication_receipt_sha256 is not None
+    service.cleanup(handle)
+
+    assert result.inserted_rows == 1
+    assert artifact.range_execution_evidence.outcome_status == "succeeded"
+    assert artifact.range_execution_evidence.publication_receipt_sha256 is not None
+
+
+def test_publication_prepare_failure_is_not_reported_as_unknown() -> None:
+    events: list[object] = []
+    plan = _lifecycle_range_plan()
+    provider = _LifecycleProvider(events, plan)
+    artifact = ObjectStorageColumnarChunkedArtifact(
+        provider=provider,
+        request=SimpleNamespace(range_plan=plan, options={"cleanup_policy": "eager"}),
+        columns=("id",),
+        schema_hash="schema",
+        cleanup_policy="eager",
+    )
+    sink = _LifecycleSink(provider.objects, events, fail_insert=False, fail_validate=False)
+    sink._prepare_staged_finalization = lambda *_args: (_ for _ in ()).throw(RuntimeError("prepare-failure"))
+    service = _LifecycleService(sink, events, failure=None)
+    config = _lifecycle_config()
+    handle = service.stage(config, LoadPayload(artifact=artifact, schema=(("id", "int"),)))
+    token = service.validate(config, handle)
+
+    with pytest.raises(RuntimeError, match="prepare-failure"):
+        service.finalize_validated(config, handle, token)
+
+    assert artifact.range_execution_evidence.outcome_status == "failed"
+    assert artifact.range_execution_evidence.failure_code == "columnar_range_publication_preparation_failed"
+    assert artifact.range_execution_evidence.publication_receipt_sha256 is None
+
+
 class _LifecycleProvider:
-    def __init__(self, events: list[object]) -> None:
+    def __init__(self, events: list[object], plan: ColumnarRangePlan, *, fail_cleanup: bool = False) -> None:
         self.events = events
+        self.fail_cleanup = fail_cleanup
         self.objects = {"run/_dpone_run.json", "run/range-0/chunk.parquet"}
+        receipt = RangeChunkReceipt(0, "s3://stage/run/range-0/chunk.parquet", "sha256:" + "a" * 64, 1, 8)
+        result = SimpleNamespace(range_id="range-0", rows=1, retained_bytes=8, eof_confirmed=True, chunks=(receipt,))
+        self.evidence = ColumnarRangeExecutionEvidence.from_results(
+            plan=plan,
+            results=(result,),
+            observed_reader_concurrency=1,
+            observed_upload_concurrency=1,
+            rows_high_water=1,
+            bytes_high_water=8,
+        )
 
     def iter_object_storage_windows(self, _request: object):
         yield ObjectStorageChunkWindow(
@@ -408,10 +535,18 @@ class _LifecycleProvider:
             read_contract=SimpleNamespace(mode="named_collection", named_collection="dpone_stage"),
             schema_hash="schema",
             cleanup_policy="eager",
+            range_id="range-0",
+            range_ordinal=0,
+            range_window_ordinal=0,
         )
+
+    def range_execution_evidence(self, _request: object) -> ColumnarRangeExecutionEvidence:
+        return self.evidence
 
     def cleanup_object_storage_run(self, _request: object) -> None:
         self.events.append(("object_cleanup", None))
+        if self.fail_cleanup:
+            raise RuntimeError("cleanup-failure")
         self.objects.clear()
 
 
@@ -429,17 +564,30 @@ class _LifecycleConnector:
 
 
 class _LifecycleSink:
-    def __init__(self, objects: set[str], events: list[object], *, fail_insert: bool) -> None:
+    def __init__(self, objects: set[str], events: list[object], *, fail_insert: bool, fail_validate: bool) -> None:
         self.connector = _LifecycleConnector(objects, events, fail_insert=fail_insert)
         self.events = events
         self._staging_decoder = SimpleNamespace(prepare=lambda *_args: (None, None))
-        self._staging_finalizer = SimpleNamespace()
+        self._staging_finalizer = SimpleNamespace(
+            validate_strategy_staging_key_integrity=self._validate,
+            strategy_staging_validation_receipt=lambda *_args: "sha256:" + "b" * 64,
+            require_strategy_staging_validation=lambda *_args: None,
+        )
+        self.fail_validate = fail_validate
+
+    def _validate(self, _load_config: object, _staging_config: object) -> object:
+        self.events.append(("validate", None))
+        if self.fail_validate:
+            raise RuntimeError("validate-failure")
+        return "token"
 
     def _insert_payload(self, config: LoadConfig, payload: LoadPayload) -> int:
         loader = ClickHouseColumnarPullLoader(
             connector=self.connector,
             table_name=lambda _config: "staging",
-            count_rows=lambda _config: 1,
+            count_rows=lambda _config: sum(
+                1 for event in self.events if isinstance(event, tuple) and event[0] == "insert"
+            ),
         )
         return loader.load_windowed(config, payload.artifact, payload.schema)
 
@@ -454,13 +602,7 @@ class _LifecycleService(ClickHouseStagedLoadService):
     def _create_staging(load_config: LoadConfig, _payload: LoadPayload) -> LoadConfig:
         return load_config
 
-    def validate(self, _load_config: LoadConfig, handle: object) -> object:
-        self.events.append(("validate", id(handle)))
-        if self.failure == "validate":
-            raise RuntimeError("validate-failure")
-        return "token"
-
-    def finalize_validated(self, _config: LoadConfig, handle: object, _token: object) -> LoadResult:
+    def _publish_validated(self, _config: LoadConfig, handle: object, _token: object) -> LoadResult:
         self.events.append(("publish", id(handle)))
         if self.failure == "publish":
             raise RuntimeError("publish-failure")
@@ -479,6 +621,19 @@ def _lifecycle_config() -> LoadConfig:
         target_schema="stage",
         target_table="orders_stage",
         load_strategy=LoadStrategy.INCREMENTAL_APPEND,
+    )
+
+
+def _lifecycle_range_plan() -> ColumnarRangePlan:
+    policy = RangeParallelismPolicy.from_mapping(
+        {"mode": "auto", "staging_topology": "shared_per_run"}, reader_workers=1, load_workers=1
+    )
+    descriptor = ColumnarRangeDescriptor("range-0", 0, "integer", 0, 1, True, True)
+    return ColumnarRangePlan.create(
+        policy=policy,
+        ranges=(descriptor,),
+        query_identity="query",
+        execution_identity="run",
     )
 
 

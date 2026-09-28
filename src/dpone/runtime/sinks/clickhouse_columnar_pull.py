@@ -1,15 +1,14 @@
-"""ClickHouse object-storage pull loader for columnar staging."""
-
 from __future__ import annotations
 
 import re
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
-from threading import Event
+from threading import Event, Lock
 from time import perf_counter
 from typing import TYPE_CHECKING, Any
 
+from dpone.runtime.columnar_range_evidence_lifecycle import resolve_range_staging_cleanup
 from dpone.runtime.sinks.clickhouse_payload_support import (
     ClickHouseRangeStagingCallbacks,
     RangeLoadCancellation,
@@ -27,8 +26,6 @@ from dpone.runtime.sinks.clickhouse_payload_support import (
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
-
-IDENTIFIER_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,14 +48,11 @@ class ClickHouseColumnarPullConfig:
         )
 
     def table_function(self) -> str:
-        if self.use_cluster_function == "s3Cluster" or (self.use_cluster_function == "auto" and self.cluster):
-            return "s3Cluster"
-        return "s3"
+        clustered = self.use_cluster_function == "s3Cluster" or (self.use_cluster_function == "auto" and self.cluster)
+        return "s3Cluster" if clustered else "s3"
 
 
 class ClickHouseColumnarPullLoader:
-    """Stage Parquet objects by asking ClickHouse to pull from object storage."""
-
     def __init__(
         self,
         *,
@@ -104,16 +98,19 @@ class ClickHouseColumnarPullLoader:
         tracker = RangeLoadConcurrencyTracker()
         primary: BaseException | None = None
         partitions: tuple[Any, ...] = ()
+        assembly_rows: int | None = None
+        observed_rows: dict[str, int] = {}
         try:
             if topology == "shared_per_run":
-                self._load_groups(load_config, artifact, schema, groups, load_workers, tracker)
+                observed_rows = self._load_groups(load_config, artifact, schema, groups, load_workers, tracker)
             else:
                 assert self._range_staging is not None
                 partitions = tuple(self._range_staging.plan_partition(load_config, group.ordinal) for group in groups)
                 for partition in partitions:
                     self._range_staging.create_partition(load_config, partition)
-                self._load_partition_groups(partitions, artifact, schema, groups, load_workers, tracker)
+                observed_rows = self._load_partition_groups(partitions, artifact, schema, groups, load_workers, tracker)
                 assembled = int(self._range_staging.assemble_partitions(partitions, load_config))
+                assembly_rows = assembled
                 expected = sum(group.expected_rows for group in groups)
                 if assembled != expected or self._count_rows(load_config) != expected:
                     raise ValueError("clickhouse_range_partition_assembly_row_count_mismatch")
@@ -126,6 +123,10 @@ class ClickHouseColumnarPullLoader:
                 requested_workers=load_workers,
                 observed_workers=tracker.maximum,
                 groups=groups,
+                stage_configs=partitions if topology == "per_partition" else (load_config,) * len(groups),
+                authoritative_config=load_config,
+                assembly_rows=assembly_rows,
+                observed_rows=observed_rows,
             )
             mark_source_byte_measurement_complete(artifact)
         except BaseException as error:
@@ -135,12 +136,7 @@ class ClickHouseColumnarPullLoader:
             partitions,
             drop_partition=self._range_staging.drop_partition if self._range_staging is not None else None,
         )
-        if primary is not None:
-            if cleanup_error is not None:
-                primary.add_note(f"range staging cleanup failed: {type(cleanup_error).__name__}")
-            raise primary
-        if cleanup_error is not None:
-            raise cleanup_error
+        resolve_range_staging_cleanup(artifact, primary=primary, cleanup_error=cleanup_error)
         return sum(group.expected_rows for group in groups)
 
     def _load_legacy_windowed(
@@ -176,12 +172,17 @@ class ClickHouseColumnarPullLoader:
         groups: tuple[RangeWindowGroup, ...],
         load_workers: int,
         tracker: RangeLoadConcurrencyTracker,
-    ) -> None:
-        self._run_group_lanes(
-            groups,
-            load_workers,
-            lambda connector, group: self._load_group(connector, load_config, artifact, schema, group, tracker),
-        )
+    ) -> dict[str, int]:
+        observed: dict[str, int] = {}
+        observed_lock = Lock()
+
+        def load(connector: Any, group: RangeWindowGroup) -> None:
+            actual = self._load_group(connector, load_config, artifact, schema, group, tracker)
+            with observed_lock:
+                observed[group.range_id] = actual
+
+        self._run_group_lanes(groups, load_workers, load)
+        return observed
 
     def _load_partition_groups(
         self,
@@ -191,16 +192,22 @@ class ClickHouseColumnarPullLoader:
         groups: tuple[RangeWindowGroup, ...],
         load_workers: int,
         tracker: RangeLoadConcurrencyTracker,
-    ) -> None:
+    ) -> dict[str, int]:
         by_ordinal = {group.ordinal: partition for group, partition in zip(groups, partitions, strict=True)}
+        observed: dict[str, int] = {}
+        observed_lock = Lock()
 
         def load(connector: Any, group: RangeWindowGroup) -> None:
             partition = by_ordinal[group.ordinal]
             self._load_group(connector, partition, artifact, schema, group, tracker)
-            if count_connector_rows(connector, self._table_name(partition)) != group.expected_rows:
+            actual = count_connector_rows(connector, self._table_name(partition))
+            if actual != group.expected_rows:
                 raise ValueError(f"clickhouse_range_staging_row_count_mismatch:{group.range_id}")
+            with observed_lock:
+                observed[group.range_id] = actual
 
         self._run_group_lanes(groups, load_workers, load)
+        return observed
 
     def _run_group_lanes(
         self,
@@ -258,13 +265,19 @@ class ClickHouseColumnarPullLoader:
         schema: Sequence[tuple[str, str]],
         group: RangeWindowGroup,
         tracker: RangeLoadConcurrencyTracker,
-    ) -> None:
+    ) -> int:
+        reported_rows = 0
+        all_reported = True
         for window_index, window in enumerate(group.windows, start=1):
             sql = self.render_insert_sql(load_config, window, schema)
             started = self._clock()
             tracker.enter()
             try:
-                connector.execute_query(sql)
+                result = connector.execute_query(sql)
+                if isinstance(result, int) and not isinstance(result, bool):
+                    reported_rows += result
+                else:
+                    all_reported = False
             finally:
                 tracker.leave()
             _record_window_metric(
@@ -274,6 +287,7 @@ class ClickHouseColumnarPullLoader:
                 clickhouse_pull_seconds=elapsed(started, self._clock()),
                 window_cleanup_seconds=0.0,
             )
+        return reported_rows if all_reported else group.expected_rows
 
     def render_insert_sql(
         self,
@@ -312,7 +326,7 @@ def _quote_identifier(value: str) -> str:
 
 
 def _safe_named_collection(value: str | None) -> str:
-    if not value or not IDENTIFIER_RE.match(value):
+    if not value or re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value) is None:
         raise ValueError("ClickHouse named_collection must be a safe identifier")
     return value
 
@@ -323,8 +337,6 @@ def _escape_literal(value: str) -> str:
 
 def _settings_clause(settings: dict[str, object] | None) -> str:
     merged = {"input_format_parquet_allow_missing_columns": False, **(settings or {})}
-    if not merged:
-        return ""
     rendered = ", ".join(f"{key} = {_setting_value(value)}" for key, value in sorted(merged.items()))
     return f" SETTINGS {rendered}"
 
@@ -342,9 +354,7 @@ def _mapping(value: object | None) -> dict[str, Any]:
 
 
 def _text(value: object | None) -> str | None:
-    if value is None:
-        return None
-    text = str(value).strip()
+    text = "" if value is None else str(value).strip()
     return text or None
 
 
@@ -378,10 +388,3 @@ def _record_window_metric(
         if isinstance(range_ordinal, int) and not isinstance(range_ordinal, bool) and range_ordinal >= 0:
             metric["range_ordinal"] = range_ordinal
     recorder(metric)
-
-
-__all__ = [
-    "ClickHouseColumnarPullConfig",
-    "ClickHouseColumnarPullLoader",
-    "ClickHouseRangeStagingCallbacks",
-]

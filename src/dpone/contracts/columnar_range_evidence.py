@@ -2,11 +2,31 @@
 
 from __future__ import annotations
 
-import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any
 
+from dpone.contracts.columnar_range_evidence_validation import (
+    nonempty_value as _nonempty_value,
+)
+from dpone.contracts.columnar_range_evidence_validation import (
+    strict_int as _strict_int,
+)
+from dpone.contracts.columnar_range_evidence_validation import (
+    validate_bounded_measurements as _bounded_measurements,
+)
+from dpone.contracts.columnar_range_evidence_validation import (
+    validate_code as _code,
+)
+from dpone.contracts.columnar_range_evidence_validation import (
+    validate_digest as _digest,
+)
+from dpone.contracts.columnar_range_evidence_validation import (
+    validate_nonnegative as _nonnegative,
+)
+from dpone.contracts.columnar_range_evidence_validation import (
+    validate_topology as _validate_topology,
+)
 from dpone.contracts.columnar_range_parallelism import (
     ColumnarRangePlan,
     RangeChunkReceipt,
@@ -15,7 +35,16 @@ from dpone.contracts.columnar_range_parallelism import (
     RangeStageReceipt,
 )
 
-_OUTCOMES = {"extracted", "staged", "quality_passed", "succeeded", "failed", "cancelled", "publication_unknown"}
+_OUTCOMES = {
+    "extracted",
+    "staged",
+    "quality_passed",
+    "published",
+    "succeeded",
+    "failed",
+    "cancelled",
+    "publication_unknown",
+}
 _CLEANUP = {"not_started", "not_required", "completed", "failed", "preserved_unknown"}
 
 
@@ -67,20 +96,22 @@ class ColumnarRangeExecutionEvidence:
             raise ValueError("A cancelled outcome requires a cancellation request.")
         if bool(self.cleanup_failures) != (self.cleanup_status == "failed"):
             raise ValueError("Cleanup failures are required if and only if cleanup status is failed.")
-        nonfailure = {"extracted", "staged", "quality_passed", "succeeded"}
+        nonfailure = {"extracted", "staged", "quality_passed", "published", "succeeded"}
         if self.outcome_status in nonfailure and (
             self.failure_code or self.cancellation_requested or self.cancellation_observed or self.cleanup_failures
         ):
             raise ValueError("Nonfailure evidence cannot contain failure or cancellation fields.")
         if self.outcome_status in {"failed", "cancelled", "publication_unknown"} and not self.failure_code:
             raise ValueError("A non-success outcome requires a stable redacted failure code.")
-        if self.outcome_status in {"staged", "quality_passed", "succeeded", "publication_unknown"} and (
+        if self.outcome_status in {"staged", "quality_passed", "published", "succeeded", "publication_unknown"} and (
             not self._all_staged or not self._all_eof
         ):
             raise ValueError("Staged evidence requires EOF and a reconciled receipt for every planned range.")
         _validate_topology(self)
-        if self.outcome_status in {"quality_passed", "succeeded", "publication_unknown"}:
+        if self.outcome_status in {"quality_passed", "published", "succeeded", "publication_unknown"}:
             self._validate_quality()
+        if self.outcome_status == "published":
+            self._validate_published()
         if self.outcome_status == "succeeded":
             self._validate_success()
         if self.outcome_status == "publication_unknown" and self.cleanup_status != "preserved_unknown":
@@ -175,13 +206,25 @@ class ColumnarRangeExecutionEvidence:
     def complete(
         self, *, publication_receipt_sha256: str, cleanup_status: str = "not_required"
     ) -> ColumnarRangeExecutionEvidence:
-        if self.outcome_status != "quality_passed":
-            raise ValueError("Only quality-passed evidence can cross the publication barrier.")
+        if self.outcome_status not in {"quality_passed", "published"}:
+            raise ValueError("Only quality-passed or published evidence can complete publication.")
+        if self.outcome_status == "published" and publication_receipt_sha256 != self.publication_receipt_sha256:
+            raise ValueError("Completion must preserve the confirmed publication receipt.")
         return replace(
             self,
             outcome_status="succeeded",
             publication_receipt_sha256=publication_receipt_sha256,
             cleanup_status=cleanup_status,
+        )
+
+    def published(self, *, publication_receipt_sha256: str) -> ColumnarRangeExecutionEvidence:
+        if self.outcome_status != "quality_passed":
+            raise ValueError("Only quality-passed evidence can record confirmed publication.")
+        return replace(
+            self,
+            outcome_status="published",
+            publication_receipt_sha256=publication_receipt_sha256,
+            cleanup_status="not_started",
         )
 
     def publication_unknown(self, *, failure_code: str) -> ColumnarRangeExecutionEvidence:
@@ -240,6 +283,11 @@ class ColumnarRangeExecutionEvidence:
         ):
             raise ValueError("Success evidence cannot contain failure, cancellation, or cleanup failure.")
         _digest("publication_receipt_sha256", self.publication_receipt_sha256)
+
+    def _validate_published(self) -> None:
+        _digest("publication_receipt_sha256", self.publication_receipt_sha256)
+        if self.cleanup_status != "not_started":
+            raise ValueError("Published evidence cleanup must remain pending until cleanup completes.")
 
     def _validate_quality(self) -> None:
         _digest("quality_receipt_sha256", self.quality_receipt_sha256)
@@ -325,67 +373,6 @@ def _with_stages(
     if not set(receipts).issubset(item.range_id for item in ranges):
         raise ValueError("Stage receipts must belong to extracted ranges.")
     return tuple(replace(item, stage=receipts.get(item.range_id)) for item in ranges)
-
-
-def _bounded_measurements(evidence: ColumnarRangeExecutionEvidence) -> None:
-    policy = evidence.policy
-    values = (
-        ("observed_reader_concurrency", evidence.observed_reader_concurrency, policy.reader_workers),
-        ("observed_upload_concurrency", evidence.observed_upload_concurrency, policy.upload_workers),
-        ("observed_load_concurrency", evidence.observed_load_concurrency, policy.load_workers),
-        ("rows_high_water", evidence.rows_high_water, policy.max_inflight_rows),
-        ("bytes_high_water", evidence.bytes_high_water, policy.max_inflight_bytes),
-    )
-    for name, value, limit in values:
-        _nonnegative(name, value)
-        if value > limit:
-            raise ValueError(f"{name} exceeds its configured execution bound.")
-    complete = evidence.outcome_status in {"extracted", "staged", "quality_passed", "succeeded", "publication_unknown"}
-    if complete and evidence.observed_reader_concurrency == 0:
-        raise ValueError("Complete extraction requires observed reader concurrency.")
-    if any(item.chunks for item in evidence.ranges) and evidence.observed_upload_concurrency == 0:
-        raise ValueError("Chunk evidence requires observed upload concurrency.")
-    if any(item.stage and item.rows > 0 for item in evidence.ranges) and evidence.observed_load_concurrency == 0:
-        raise ValueError("Nonempty staging requires observed load concurrency.")
-    if any(item.rows > 0 for item in evidence.ranges) and evidence.rows_high_water == 0:
-        raise ValueError("Nonempty extraction requires a nonzero row high-water mark.")
-    if any(item.retained_bytes > 0 for item in evidence.ranges) and evidence.bytes_high_water == 0:
-        raise ValueError("Retained bytes require a nonzero byte high-water mark.")
-
-
-def _validate_topology(evidence: ColumnarRangeExecutionEvidence) -> None:
-    identities = [item.stage.stage_identity for item in evidence.ranges if item.stage]
-    if evidence.policy.staging_topology == "shared_per_run" and len(set(identities)) > 1:
-        raise ValueError("shared_per_run evidence requires one authoritative stage identity.")
-    if evidence.policy.staging_topology == "per_partition" and len(set(identities)) != len(identities):
-        raise ValueError("per_partition evidence requires unique range-owned stage identities.")
-
-
-def _digest(name: str, value: object) -> None:
-    if not isinstance(value, str) or re.fullmatch(r"sha256:[0-9a-f]{64}", value) is None:
-        raise ValueError(f"{name} must be a canonical SHA-256 digest.")
-
-
-def _code(name: str, value: str) -> None:
-    if not value or any(char not in "abcdefghijklmnopqrstuvwxyz0123456789_.-" for char in value):
-        raise ValueError(f"{name} must be a stable redacted code.")
-
-
-def _nonempty_value(name: str, value: object) -> str:
-    if not isinstance(value, str) or not value.strip():
-        raise ValueError(f"{name} must be a nonempty string.")
-    return value
-
-
-def _strict_int(name: str, value: object) -> int:
-    if isinstance(value, bool) or not isinstance(value, int):
-        raise ValueError(f"{name} must be an integer.")
-    return value
-
-
-def _nonnegative(name: str, value: int) -> None:
-    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-        raise ValueError(f"{name} must be a nonnegative integer.")
 
 
 __all__ = ["ColumnarRangeExecutionEvidence", "RangeChunkReceipt", "RangeEvidenceItem", "RangeStageReceipt"]

@@ -28,6 +28,17 @@ from tests.test_clickhouse_production_finalize import FakeSink
 from tests.test_native_load_governance_finalization import _load_record
 
 
+class _RangeQualityOwner:
+    range_execution_evidence = None
+
+    def __init__(self) -> None:
+        self.receipt: dict[str, object] | None = None
+
+    def mark_range_governed_quality_passed(self, *, config: object, quality_receipt: dict[str, object]) -> None:
+        del config
+        self.receipt = quality_receipt
+
+
 @pytest.mark.parametrize("coordinator", ["governance", "nested"])
 def test_composed_publication_cleanup_preserves_receipt_and_fenced_ownership(coordinator: str) -> None:
     """Finalization metadata must reach real cleanup, never generic name-drop."""
@@ -75,3 +86,35 @@ def test_composed_publication_cleanup_preserves_receipt_and_fenced_ownership(coo
     assert ddl.cleanup_dispatches == 1
     assert generic_drops == []
     assert handle.metadata == {}  # Original caller data remains isolated.
+
+
+def test_governance_coordinator_threads_authoritative_quality_receipt_to_range_owner() -> None:
+    config = _config()
+    candidate = replace(config, target_table="candidate")
+    owner = _RangeQualityOwner()
+    handle = StagedLoadHandle(
+        staging_config=candidate,
+        finalization_config=candidate,
+        payload_schema=(("id", "Int64"),),
+        staged_rows=2,
+        sink_state=owner,
+    )
+    backend = FakeSink()
+    facade = object.__new__(ClickHouseSink)
+    facade._staged_load = ClickHouseStagedLoadService(backend)
+    facade.stage_payload = lambda _config, _payload: handle
+    payload = LoadPayload(artifact=InMemoryRowsArtifact([{"id": 1}, {"id": 2}]), schema=[("id", "Int64")])
+
+    LoadGovernanceFinalizationCoordinator().load(
+        sink=facade,
+        load_config=config,
+        payload=payload,
+        extract_result=ExtractResult(artifact=payload.artifact, schema=payload.schema),
+        load_record=_load_record(),
+    )
+
+    assert owner.receipt is not None
+    assert owner.receipt["boundary"] == "pre_commit"
+    report = owner.receipt["report"]
+    assert isinstance(report, dict)
+    assert report["passed"] is True

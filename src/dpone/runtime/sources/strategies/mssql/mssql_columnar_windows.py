@@ -16,6 +16,12 @@ from dpone.runtime.columnar_range_parallelism import (
     RangeExecutionResult,
     RangeSession,
 )
+from dpone.runtime.columnar_range_source_evidence import (
+    RangeSourceObservation,
+    SerialRunCleanup,
+    chunk_receipt,
+    success_evidence,
+)
 from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotRequest
 from dpone.runtime.sources.strategies.mssql import mssql_columnar_chunks as chunks
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_reader import (
@@ -31,7 +37,7 @@ WriteChunkFile = Callable[[Path, ColumnarSnapshotRequest, Sequence[tuple[object,
 @dataclass(frozen=True, slots=True)
 class ParallelWindowResult:
     windows: tuple[ObjectStorageChunkWindow, ...]
-    evidence: dict[str, object]
+    evidence: Any
 
 
 def iter_serial_object_windows(
@@ -45,6 +51,8 @@ def iter_serial_object_windows(
     read_contract: Any,
     tmp_dir: Path,
 ):
+    cleanup_policy = str((request.options or {}).get("cleanup_policy") or "eager")
+    cleanup = SerialRunCleanup(object_client, prefix, enabled=cleanup_policy in {"eager", "on_success"})
     row_target = chunks.initial_chunk_rows(request)
     buffered_rows: list[tuple[object, ...]] = []
     window_index = 0
@@ -67,6 +75,7 @@ def iter_serial_object_windows(
             object_client=object_client,
             write_chunk_file=write_chunk_file,
             read_contract=read_contract,
+            cleanup_callback=cleanup.register(),
         )
         buffered_rows = []
         window_index += 1
@@ -83,9 +92,11 @@ def iter_serial_object_windows(
             object_client=object_client,
             write_chunk_file=write_chunk_file,
             read_contract=read_contract,
+            cleanup_callback=cleanup.register(),
         )
         if window is not None:
             yield window
+    cleanup.finish()
 
 
 def build_parallel_object_windows(
@@ -111,6 +122,7 @@ def build_parallel_object_windows(
     produced_lock = Lock()
     source_sessions: set[int] = set()
     source_sessions_lock = Lock()
+    observation = RangeSourceObservation()
 
     def session_factory(descriptor: Any) -> ColumnarRangeSession:
         session = connector.open_session(application_name=f"dpone-columnar-range-{descriptor.ordinal:06d}")
@@ -129,6 +141,7 @@ def build_parallel_object_windows(
         cancelled: Event,
         budget: AggregateRangeBudget,
     ) -> RangeExecutionResult:
+        observation.enter(budget)
         partition = partitions[descriptor.ordinal]
         windows: list[ObjectStorageChunkWindow] = []
         rows_total = 0
@@ -159,68 +172,61 @@ def build_parallel_object_windows(
                 rows_total += window.row_count
                 bytes_total += window.size_bytes
 
-        batch_size = chunks.batch_size(request)
-        batches = iter(
-            iter_columnar_batches(
-                session,
-                query=request.query,
-                schema=request.schema,
-                batch_size=batch_size,
-                partitioner=partitioner,
-                partition=partition,
+        try:
+            batch_size = chunks.batch_size(request)
+            batches = iter(
+                iter_columnar_batches(
+                    session,
+                    query=request.query,
+                    schema=request.schema,
+                    batch_size=batch_size,
+                    partitioner=partitioner,
+                    partition=partition,
+                )
             )
-        )
-        while True:
-            if cancelled.is_set():
-                raise RuntimeError("Range execution cancelled during source read.")
-            with budget.acquire(rows=batch_size, retained_bytes=0, cancelled=cancelled):
-                try:
-                    rows = next(batches)
-                except StopIteration:
-                    break
-                if len(rows) > batch_size:
-                    raise ValueError("Source batch exceeds its declared row reservation.")
-                with budget.acquire(rows=0, retained_bytes=request.max_chunk_bytes, cancelled=cancelled):
-                    flush(rows)
+            while True:
+                if cancelled.is_set():
+                    raise RuntimeError("Range execution cancelled during source read.")
+                with budget.acquire(rows=batch_size, retained_bytes=0, cancelled=cancelled):
+                    try:
+                        rows = next(batches)
+                    except StopIteration:
+                        break
+                    if len(rows) > batch_size:
+                        raise ValueError("Source batch exceeds its declared row reservation.")
+                    with budget.acquire(rows=0, retained_bytes=request.max_chunk_bytes, cancelled=cancelled):
+                        flush(rows)
+        finally:
+            observation.leave()
         with produced_lock:
             produced[descriptor.ordinal] = tuple(windows)
-        return RangeExecutionResult(descriptor.range_id, rows_total, bytes_total, eof_confirmed=True)
+        receipts = tuple(
+            chunk_receipt(chunk, ordinal=ordinal)
+            for ordinal, chunk in enumerate(chunk for window in windows for chunk in window.chunks)
+        )
+        return RangeExecutionResult(descriptor.range_id, rows_total, bytes_total, eof_confirmed=True, chunks=receipts)
 
     try:
         summary = BoundedRangeExecutor(session_factory=session_factory, worker=worker).execute(plan)
-    except BaseException:
-        upload_lane.close(cancel=True)
+    except BaseException as error:
+        observation.fail(
+            error,
+            plan=plan,
+            produced=produced,
+            upload_lane=upload_lane,
+            object_client=object_client,
+            prefix=prefix,
+        )
         raise
     upload_lane.close(cancel=False)
     ordered_windows = tuple(window for ordinal in range(len(partitions)) for window in produced.get(ordinal, ()))
-    execution = {
-        "schema": "dpone.native_transfer.columnar_range_parallelism.v1",
-        "plan_fingerprint": plan.plan_fingerprint,
-        "policy_fingerprint": plan.policy.fingerprint,
-        "ranges": [
-            {
-                "range_id": item.range_id,
-                "rows": item.rows,
-                "retained_bytes": item.retained_bytes,
-                "eof_confirmed": item.eof_confirmed,
-            }
-            for item in summary.ranges
-        ],
-        "observed_reader_concurrency": summary.observed_reader_concurrency,
-        "rows_high_water": summary.budget.rows_high_water,
-        "bytes_high_water": summary.budget.bytes_high_water,
-        "rows_high_water_kind": "declared_batch_reservation",
-        "bytes_high_water_kind": "configured_max_chunk_reservation",
-        "all_ranges_confirmed": True,
-        "observed_upload_concurrency": upload_lane.observed,
-        "requested_upload_concurrency": plan.policy.upload_workers,
-        "byte_measurement_scope": "preencode_max_chunk_reservation_and_postencode_actual",
-        "byte_reservation_per_item": request.max_chunk_bytes,
-        "row_reservation_per_item": chunks.batch_size(request),
-        "actual_rows": sum(item.rows for item in summary.ranges),
-        "actual_encoded_bytes": sum(item.retained_bytes for item in summary.ranges),
-        "rss_bounded": False,
-    }
+    execution = success_evidence(
+        plan=plan,
+        results=summary.ranges,
+        reader=summary.observed_reader_concurrency,
+        upload=upload_lane.observed,
+        budget=summary.budget,
+    )
     return ParallelWindowResult(ordered_windows, execution)
 
 
@@ -240,6 +246,7 @@ def build_object_window(
     range_id: str | None = None,
     range_ordinal: int = 0,
     upload_guard: BoundedColumnarUploadLane | None = None,
+    cleanup_callback: Callable[[], None] | None = None,
 ) -> tuple[ObjectStorageChunkWindow | None, int]:
     local_path = tmp_dir / f"range-{range_ordinal:06d}-window-{index:06d}-chunk-00000.parquet"
     write_started = _now(clock)
@@ -297,6 +304,7 @@ def build_object_window(
             range_id=range_id,
             range_ordinal=range_ordinal,
             range_window_ordinal=index,
+            cleanup_callback=cleanup_callback,
         ),
         chunks.next_chunk_rows(request, len(rows), row_count, size_bytes),
     )
@@ -367,12 +375,3 @@ def _now(clock: Callable[[], float] | None) -> float:
 
 def _elapsed(started: float, finished: float) -> float:
     return max(0.0, finished - started)
-
-
-__all__ = [
-    "ParallelWindowResult",
-    "build_object_window",
-    "build_parallel_object_windows",
-    "iter_serial_object_windows",
-    "upload_manifest_chunk",
-]

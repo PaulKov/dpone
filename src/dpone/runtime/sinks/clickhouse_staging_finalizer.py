@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
+import secrets
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from threading import Lock
@@ -42,6 +45,7 @@ class _ClickHouseStagedValidationBinding:
     load_config: Any
     staging_config: Any
     staging_identity: tuple[str, str]
+    receipt_sha256: str
 
 
 class ClickHouseStagingKeyError(ValueError):
@@ -211,6 +215,7 @@ class ClickHouseStagingFinalizer:
     ) -> object:
         """Apply key-integrity gates to every strategy with key semantics."""
 
+        unique_key: Sequence[str] = ()
         if load_config.load_strategy in {
             LoadStrategy.INCREMENTAL_MERGE,
             LoadStrategy.SNAPSHOT_DIFF,
@@ -234,10 +239,27 @@ class ClickHouseStagingFinalizer:
             load_config=validated_load_config,
             staging_config=validated_staging_config,
             staging_identity=_staging_identity(staging_config),
+            receipt_sha256=_validation_receipt(load_config, staging_config, unique_key),
         )
         with self._validation_tokens_lock:
             self._validation_tokens[token] = binding
         return token
+
+    def strategy_staging_validation_receipt(
+        self,
+        token: object,
+        load_config: LoadConfig,
+        staging_config: LoadConfig,
+    ) -> str:
+        """Expose only the safe attempt-bound digest for an authoritative token."""
+
+        if not isinstance(token, _ClickHouseStagedValidationToken):
+            raise ValueError(CLICKHOUSE_STAGED_VALIDATION_RECEIPT_INVALID)
+        with self._validation_tokens_lock:
+            binding = self._validation_tokens.get(token)
+        if binding is None or binding.load_config != load_config or binding.staging_config != staging_config:
+            raise ValueError(CLICKHOUSE_STAGED_VALIDATION_RECEIPT_INVALID)
+        return binding.receipt_sha256
 
     def require_strategy_staging_validation(
         self,
@@ -335,6 +357,20 @@ def _staging_identity(staging_config: Any) -> tuple[str, str]:
         str(getattr(staging_config, "target_schema", "")),
         str(getattr(staging_config, "target_table", "")),
     )
+
+
+def _validation_receipt(load_config: Any, staging_config: Any, unique_key: Sequence[str]) -> str:
+    payload = {
+        "schema": "dpone.clickhouse.staged_validation_receipt.v1",
+        "attempt_nonce": secrets.token_hex(16),
+        "load_strategy": load_config.load_strategy.value,
+        "staging_identity": _staging_identity(staging_config),
+        "unique_key": list(unique_key),
+        "duplicate_policy": validate_duplicate_policy(load_config) if unique_key else "not_applicable",
+        "result": "passed",
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return "sha256:" + hashlib.sha256(encoded).hexdigest()
 
 
 __all__ = [

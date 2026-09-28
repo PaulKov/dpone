@@ -9,6 +9,7 @@ from types import SimpleNamespace
 import pytest
 
 from dpone.config.load_config import LoadConfig
+from dpone.runtime.columnar_object_storage_windows import ObjectStorageColumnarChunkedArtifact
 from dpone.runtime.columnar_parquet_writer import PyArrowParquetChunkWriter, mssql_source_type_supported
 from dpone.runtime.columnar_runtime_assembly import MssqlColumnarSnapshotRequestFactory
 from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotRequest
@@ -559,19 +560,17 @@ def test_parallel_windows_use_independent_typed_ranges_and_wait_for_all_eof(tmp_
     evidence = provider.range_execution_evidence(request)
     assert [window.range_ordinal for window in windows] == [0, 1]
     assert evidence is not None
-    assert evidence["all_ranges_confirmed"] is True
-    assert evidence["observed_reader_concurrency"] == 2
-    assert evidence["requested_upload_concurrency"] == 1
-    assert evidence["byte_measurement_scope"] == "preencode_max_chunk_reservation_and_postencode_actual"
-    assert evidence["bytes_high_water"] == 1024
-    assert evidence["byte_reservation_per_item"] == 1024
-    assert evidence["bytes_high_water_kind"] == "configured_max_chunk_reservation"
-    assert evidence["rows_high_water_kind"] == "declared_batch_reservation"
-    assert evidence["row_reservation_per_item"] == 1
-    assert evidence["actual_rows"] == 2
-    assert evidence["actual_encoded_bytes"] < evidence["bytes_high_water"] * 2
-    assert evidence["rows_high_water"] <= 10
-    assert evidence["rss_bounded"] is False
+    payload = evidence.to_dict()
+    assert payload["all_ranges_eof_confirmed"] is True
+    assert payload["outcome"]["status"] == "extracted"
+    assert payload["concurrency"] == {
+        "requested": {"reader": 2, "upload": 1, "load": 1},
+        "observed": {"reader": 2, "upload": 1, "load": 0},
+    }
+    assert payload["resource_high_water"] == {"rows": 2, "bytes": 1024}
+    assert sum(item["rows"] for item in payload["ranges"]) == 2
+    assert all(item["chunks"] for item in payload["ranges"])
+    assert all(chunk["checksum_sha256"].startswith("sha256:") for item in payload["ranges"] for chunk in item["chunks"])
     assert all(session.closed for session in connector.sessions)
     run_prefix = ObjectStorageUri.parse("s3://dpone-stage/msql/run-ranges/")
     assert object_client.list_prefix(run_prefix)
@@ -605,7 +604,7 @@ def test_parallel_upload_workers_run_in_independent_bounded_executor(tmp_path: P
 
     evidence = provider.range_execution_evidence(request)
     assert evidence is not None
-    assert evidence["observed_upload_concurrency"] == 2
+    assert evidence.observed_upload_concurrency == 2
     assert len(set(object_client.thread_names)) == 2
     assert all(name.startswith("dpone-columnar-upload") for name in object_client.thread_names)
 
@@ -630,9 +629,39 @@ def test_parallel_upload_failure_cancels_readers_and_cleans_owned_prefix(tmp_pat
     with pytest.raises(RuntimeError, match="synthetic upload failure"):
         list(provider.iter_object_storage_windows(request))
 
-    assert provider.range_execution_evidence(request) is None
+    _assert_failed_range_evidence(provider, request)
     assert all(session.closed for session in connector.sessions)
     assert object_client.list_prefix(ObjectStorageUri.parse("s3://dpone-stage/msql/run-upload-failed/")) == ()
+
+
+def test_parallel_failure_is_bound_to_consumed_artifact(tmp_path: Path) -> None:
+    config = _load_config()
+    _configure_parallel(config)
+    request = build_columnar_snapshot_request(
+        load_config=config,
+        query="SELECT id, name FROM dbo.orders",
+        schema=[("id", "int"), ("name", "nvarchar(50)")],
+        run_id="run-artifact-failed",
+    )
+    provider = MssqlColumnarSnapshotProvider(
+        connector=_ParallelMssqlConnector(partitions=2, fail_ordinal=0),
+        object_client=LocalObjectStorageClient(tmp_path / "store"),
+        parquet_writer=_FakeParquetWriter(),
+    )
+    artifact = ObjectStorageColumnarChunkedArtifact(
+        provider=provider,
+        request=request,
+        columns=("id", "name"),
+        schema_hash="schema",
+        cleanup_policy="on_success",
+    )
+
+    with pytest.raises(RuntimeError, match="synthetic range failure"):
+        list(artifact.iter_windows())
+
+    assert artifact.range_execution_evidence is not None
+    assert artifact.range_execution_evidence.outcome_status == "failed"
+    assert artifact.to_evidence()["range_execution"]["outcome"]["status"] == "failed"
 
 
 def test_parallel_window_failure_cleans_owned_prefix_and_never_yields(tmp_path: Path) -> None:
@@ -752,7 +781,7 @@ def test_parallel_window_oversized_encoded_item_fails_without_success_evidence(t
     with pytest.raises(RuntimeError, match="columnar_chunk_exceeds_max_bytes"):
         list(provider.iter_object_storage_windows(request))
 
-    assert provider.range_execution_evidence(request) is None
+    _assert_failed_range_evidence(provider, request)
     assert object_client.list_prefix(ObjectStorageUri.parse("s3://dpone-stage/msql/run-oversized-item/")) == ()
 
 
@@ -775,7 +804,7 @@ def test_parallel_window_source_batch_cannot_exceed_row_reservation(tmp_path: Pa
     with pytest.raises(ValueError, match="declared row reservation"):
         list(provider.iter_object_storage_windows(request))
 
-    assert provider.range_execution_evidence(request) is None
+    _assert_failed_range_evidence(provider, request)
 
 
 def test_parallel_window_rejects_same_connector_session_before_range_query(tmp_path: Path) -> None:
@@ -798,6 +827,15 @@ def test_parallel_window_rejects_same_connector_session_before_range_query(tmp_p
         list(provider.iter_object_storage_windows(request))
 
     assert connector.stream_calls == []
+
+
+def _assert_failed_range_evidence(provider: MssqlColumnarSnapshotProvider, request: ColumnarSnapshotRequest) -> None:
+    evidence = provider.range_execution_evidence(request)
+    assert evidence is not None
+    assert evidence.outcome_status == "failed"
+    assert evidence.failure_code == "columnar_range_extraction_failed"
+    assert evidence.cleanup_status == "completed"
+    assert evidence.publication_receipt_sha256 is None
 
 
 def test_mssql_queryout_factory_blocks_required_columnar_without_provider() -> None:
