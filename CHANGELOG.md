@@ -4,6 +4,8 @@
 
 ### Fixed
 
+- ClickHouse schema-evolution DDL preserves projected physical types, including
+  nullable wrappers, integer widths, decimal precision, and timestamp precision.
 - Native MSSQL-to-ClickHouse ingestion preserves the exported physical source
   schema when a logical payload contract normalizes types. Column identity and
   target type validation remain required before decoding.

@@ -890,6 +890,13 @@ visible and GitOps-friendly:
 
 ## Bounded typed rows and atomic windows
 
+Schema evolution preserves ClickHouse physical types already projected by the
+sink, including `Nullable(Date)`, `Nullable(String)`, exact integer widths,
+decimal precision and timestamp precision/timezone. It must not run those types
+through a generic source-type mapper a second time. Existing DDL governance
+still applies: nullable relaxation can require a safe window and an explicit
+table-size budget; this does not authorize arbitrary online DDL.
+
 MSSQL typed row streaming uses the existing `source.options.native_transfer.wire`
 configuration: `mode: typed_binary`, `source_native_format: odbc_row_stream`, and
 `binary_format: rowbinary`. Select `source.options.mssql_export_mode:
