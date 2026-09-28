@@ -131,6 +131,11 @@
                   "type": "object",
                   "additionalProperties": true,
                   "properties": {
+                    "durable_quality_replay": {
+                      "type": "boolean",
+                      "default": false,
+                      "description": "Opt in to durable quality replay for internal replicated ClickHouse full_refresh. Requires strict provisioned authority and a bounded reader for target acceptance; no fallback or historical evidence backfill."
+                    },
                     "physical_design": {"$ref": "#/definitions/physical_design"}
                   }
                 }

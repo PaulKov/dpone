@@ -608,7 +608,9 @@ result. Keep providers small and connector-specific behavior behind ports; the
 planner and processor should not import MSSQL, ClickHouse or Airflow adapters
 directly.
 
-For Python-composed internal replicated ClickHouse full refresh, see
-[quality validation after committed replay](committed-replay-quality.md). Its
-explicit durable store preserves original observations across process restart;
+For internal replicated ClickHouse full refresh, see
+[quality validation after committed replay](committed-replay-quality.md) and
+[configure declarative replay](declarative-replay-quality.md). The default-off
+selector composes the same durable store through Python, CLI and Airflow runtime.
+Required target acceptance completes under an exact-generation reader guard;
 unsupported routes retain the existing non-inert replay guard.

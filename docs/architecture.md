@@ -1815,3 +1815,13 @@ evidence before publication; governance checks exact identity and generation
 under a durable reader guard and issues a fresh local receipt. See
 [ADR 0073](adr/0073-durable-committed-replay-quality.md) for ordering, trust and
 compatibility, and the [user guide](committed-replay-quality.md) for scope.
+
+Declarative selection is validated before hydration and credential resolution.
+The existing composition roots inject the `BoundedTargetAcceptanceReader` port;
+a POSIX native adapter runs generated metadata and aggregate SELECTs in a private
+supervised process. Governance owns the immutable v2 target plan and the
+PREPARED → TARGET_PENDING → COMPLETE/FAILED transitions. Receipt acceptance occurs
+inside the guard; success requires verified guard release. COMPLETE retries verify
+metadata without scanning target rows. See
+[ADR 0074](adr/0074-declarative-replay-target-completion.md) and the
+[configuration tutorial](declarative-replay-quality.md).

@@ -52,7 +52,7 @@ def _contract(path):
 
 
 # Captured from unmodified production sources at 5c9d8ff before extraction.
-# ClickHouseSink adds the approved optional durable replay keyword (ADR 0073).
+# ClickHouseSink adds optional durable replay and reader injection (ADRs 0073/0074).
 BASELINE = {
     "dpone.runtime.connectors.clickhouse_bulk:ClickHouseClientCredentials": {
         "module": "dpone.runtime.connectors.clickhouse_bulk",
@@ -523,7 +523,7 @@ BASELINE = {
         "'Callable[[LoadConfig, "
         "ClickHouseValidatedFilePolicy], "
         "ClickHouseFileStageRunner] | None' = "
-        "None, durable_quality_replay: 'bool' = False)",
+        "None, durable_quality_replay: 'bool' = False, target_acceptance_reader: 'Any | None' = None)",
         "type_hints": {"existing_unresolved_annotation": "name 'ClickHouseConnectorPort' is not defined"},
     },
     "dpone.runtime.sinks.clickhouse_sink:ClickHouseSink.stage_validated_file": {

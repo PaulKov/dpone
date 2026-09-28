@@ -10,10 +10,10 @@ opt-in capability described in the [guide](committed-replay-quality.md).
 | Python selector | `ClickHouseSink(connector, durable_quality_replay=True)`; default `False` |
 | Publication route | Existing bounded internal replicated cluster `full_refresh` only |
 | Gates | `row_count_reconciliation`, `min_rows`, `typed_hash_reconciliation` |
-| Acceptance | Original source/staged observations, including validated explicit warn-only diagnostics |
-| Target acceptance | `UNSUPPORTED` before source extraction; no bounded generation-reader implementation yet |
+| Acceptance | Original source/staged observations and bounded post-commit target observations; required remains blocking |
+| Target acceptance | Row, null and distinct counts on the exact managed generation; shared 60-second observation deadline, at most 256 selected columns |
 | Other routes | No durable store shipped for local, external-replication, MSSQL, or other sinks |
-| CLI/manifest selector | Not implemented; ordinary factory composition is unchanged |
+| CLI/manifest selector | `sink.options.durable_quality_replay`: strict boolean, default false; batch, flow and fragments; same runtime selection for Airflow |
 | Historical evidence | No backfill from reports, target counts, or serialized process-local receipts |
 | Envelope bounds | Canonical finite JSON, at most 256 KiB, immutable core and at most two completion transitions |
 
@@ -21,6 +21,20 @@ Selecting the new sink option on an unsupported publication route fails closed.
 Without that option, existing behavior and the legacy non-inert replay guard
 remain. Empty policies retain their existing inert behavior. The option does not
 change quality thresholds or authorize a fallback to a different publication mode.
+
+## Declarative and Python selection
+
+See the [declarative tutorial](declarative-replay-quality.md) for complete manifests.
+Nulls, strings, numbers, source placement, unknown selector spellings and conflicting
+normalized copies are rejected before credential resolution. Batch defaults merge
+into each process; an explicit process value wins. Unsupported true selections
+fail before source access, DDL or authority mutation. False preserves legacy behavior.
+
+Trusted Python callers may pass a keyword-only `target_acceptance_reader` to
+`ClickHouseSink` with `durable_quality_replay=True`. Source/staged-only callers
+require no subprocess capability. Declarative factories construct the reader from
+the admitted sink connection. Worker requests contain typed plans, never arbitrary
+SQL; credentials travel in private pipes, never argv, files or public reports.
 
 ## Authority preconditions
 
@@ -82,6 +96,30 @@ validation. UUID equality is not a content audit: unmanaged writes, data-changin
 TTL/merges and privileged authority recreation are outside the supported managed
 generation boundary.
 
+## Target completion and historical compatibility
+
+Target obligations use `dpone.quality.replay.v2`; source/staged-only evidence retains
+its v1 encoding. The state path is PREPARED → TARGET_PENDING → COMPLETE or FAILED.
+The original core is immutable. A target observation is added only under an exact
+generation guard, persisted with acknowledged CAS/readback, then consumed through
+a fresh local receipt before verified guard release. COMPLETE retries validate
+current authority and the stored target observation without rescanning.
+
+| Existing evidence | Recovery behavior |
+|---|---|
+| Inert historical policy | Existing inert behavior remains |
+| Valid source/staged-only v1 capsule | Read under unchanged semantics; no conversion |
+| Target v2 TARGET_PENDING | Same invocation may attempt bounded observation after safe guard recovery |
+| Target v2 COMPLETE | Validate original proof and current generation; no target rescan |
+| FAILED, missing original core or corrupt capsule | Block; no reconstruction from reports or current counts |
+
+The worker shares one monotonic 60-second budget across metadata and aggregate
+reads. Counts must be nonnegative integers, never booleans; an empty target must
+return a real zero aggregate. Missing aliases, missing rows, partial results,
+identity drift and late frames cannot become success. One admitted replica is
+scanned; counts are never summed across replicas. All-replica generation/schema/health
+checks surround the scan. Timeout and cancellation are not warn-only outcomes.
+
 ## Failure reference
 
 All selected quality failures block committed-success fallback. The public prefix
@@ -100,3 +138,11 @@ Store preflight and existing publication admission can also return their existin
 publication errors. All remain failures. See the [runbook](committed-replay-quality-runbook.md)
 for diagnosis and recovery, and [ADR 0073](adr/0073-durable-committed-replay-quality.md)
 for trust and concurrency limits.
+
+### Sealed target plan
+
+The v2 core includes an immutable `target_plan`: ordered physical columns and types,
+dataset, requested metrics, acceptance mode, selection/schema digests, and the sorted
+admitted replica list. It supplies the bounded worker request on recovery and is
+covered by the core digest and pre-dispatch completion-size reservation. It cannot
+be replaced using current manifest values or reconstructed from historical reports.

@@ -23,6 +23,11 @@ It is intentionally separate from the full dpone runtime:
 | Airflow scheduler / DAG processor / API server | `apache-airflow-providers-dpone` + `dpone-airflow-pack` | Discover the provider, parse static packs, read bounded cache and build visible KPO/outcome tasks. |
 | KPO runtime pod | `dpone[full,accel]` | Execute manifests, hooks, SQL transforms, transfer, lineage, DQ, audit and cleanup. |
 
+For the default-off internal replicated full-refresh replay capability, follow
+[Configure durable quality replay](declarative-replay-quality.md). The selector
+remains manifest data at parse time. Reader subprocesses and connection resolution
+belong to task runtime; a changed Airflow try number preserves operation identity.
+
 ## Install a supported scheduler image
 
 Use a tested cell from the [Airflow compatibility matrix](compatibility.md#airflow-provider-compatibility).

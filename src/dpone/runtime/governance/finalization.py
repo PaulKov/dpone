@@ -15,14 +15,16 @@ from typing import Any
 
 from dpone.contracts.quality_failure import QualityGateReceiptError
 from dpone.runtime.governance.acceptance_metrics import (
-    AcceptanceEvidenceContext,
     AcceptanceMetricPolicy,
     AcceptanceMetricsRecorder,
 )
 from dpone.runtime.governance.finalization_support import (
     capture_acceptance,
     classify_post_commit_cleanup_failure,
+    completed_acceptance_metrics,
     load_result_details,
+    prepare_acceptance,
+    preserve_completed_replay_truth,
     staged_probe_result,
     validated_staged_rows,
     with_governance_metrics,
@@ -81,6 +83,8 @@ class LoadGovernanceFinalizationCoordinator:
         )
         if quality_execution is not None:
             quality_execution.select_boundary("pre_commit", load_config=load_config)
+        replay_session = getattr(quality_execution, "replay_session", None)
+        replay_evidence = None
         stage_started = _utc_now()
         handle = sink.stage_payload(load_config, payload)
         projected = None
@@ -145,30 +149,16 @@ class LoadGovernanceFinalizationCoordinator:
                 details=quality_evidence,
             )
             try:
-                acceptance_run = self._metric_recorder.start(
-                    policy=acceptance_policy,
-                    physical_sides=("source", "staged", "target"),
-                    payload_schema=projected.handle.payload_schema,
-                    schemas_by_side={
-                        "source": getattr(extract_result, "schema", ()) or (),
-                        "staged": projected.handle.payload_schema,
-                        "target": projected.handle.payload_schema,
-                    },
-                    source=source,
-                    sink=sink,
-                    evidence=AcceptanceEvidenceContext(load_record, self._governance_service, "pre_commit"),
-                )
-                capture_acceptance(
+                acceptance_run = prepare_acceptance(
                     self._metric_recorder,
                     self._governance_service,
-                    acceptance_run,
-                    sides=("source", "staged"),
-                    boundary="pre_commit",
+                    policy=acceptance_policy,
+                    load_config=load_config,
+                    replay_session=replay_session,
+                    staged_handle=projected.handle,
+                    extract_result=extract_result,
                     source=source,
                     sink=sink,
-                    load_config=load_config,
-                    extract_result=extract_result,
-                    staged_handle=projected.handle,
                     load_record=load_record,
                 )
             except Exception:
@@ -191,7 +181,6 @@ class LoadGovernanceFinalizationCoordinator:
             finalize_started = _utc_now()
             if before_target_mutation is not None:
                 before_target_mutation()
-            replay_session = getattr(quality_execution, "replay_session", None)
             if replay_session is not None:
                 replay_session.prepare(
                     config=load_config,
@@ -216,7 +205,7 @@ class LoadGovernanceFinalizationCoordinator:
                     self._metric_recorder,
                     self._governance_service,
                     acceptance_run,
-                    sides=("target",),
+                    sides=() if replay_session is not None else ("target",),
                     boundary="post_commit",
                     source=source,
                     sink=sink,
@@ -231,7 +220,7 @@ class LoadGovernanceFinalizationCoordinator:
             if quality_execution is not None:
                 quality_execution.assert_current(load_config=load_config)
             if replay_session is not None:
-                replay_session.finish_original(load_config)
+                replay_evidence = replay_session.finish_original(load_config, receipt=quality_receipt)
             try:
                 self._record(
                     load_record,
@@ -255,6 +244,7 @@ class LoadGovernanceFinalizationCoordinator:
                 failure_evidence_recorded = True
                 raise
         except Exception as exc:
+            preserve_completed_replay_truth(exc, replay_evidence, quality_execution)
             failure = exc
             failure_details = None
             if target_state == "pre_target":
@@ -306,6 +296,7 @@ class LoadGovernanceFinalizationCoordinator:
                     cleanup(lifecycle_handle)
                 except Exception as cleanup_error:
                     classified = classify_post_commit_cleanup_failure(cleanup_error, lifecycle_handle, failure)
+                    preserve_completed_replay_truth(classified, replay_evidence, quality_execution)
                     self._record_preserving_primary(
                         load_record,
                         "load_governance_failed",
@@ -322,7 +313,7 @@ class LoadGovernanceFinalizationCoordinator:
             projected,
             quality_receipt,
             quality_evidence,
-            acceptance_run.metrics(load_result),
+            completed_acceptance_metrics(acceptance_run, load_result, replay_evidence),
         )
 
     def _record(
