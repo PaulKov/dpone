@@ -264,7 +264,7 @@ jobs:
           echo "/opt/mssql-tools18/bin" >> "$GITHUB_PATH"
 
       - name: Start disposable local services
-        run: docker compose -f docker/docker-compose.integration.yml up -d postgres mysql mssql clickhouse kafka schema-registry minio
+        run: docker compose -f docker/docker-compose.integration.yml up -d --build postgres mysql mssql clickhouse kafka schema-registry minio
 
       - name: Prepare local MSSQL benchmark database
         env:

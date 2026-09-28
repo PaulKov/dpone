@@ -46,11 +46,14 @@ export DPONE_IT_S3_ACCESS_KEY="${DPONE_IT_MINIO_ACCESS_KEY}"
 export DPONE_IT_S3_SECRET_KEY="${DPONE_IT_MINIO_SECRET_KEY}"
 ```
 
-Start every dependency before the first live command. `minio-init` creates
-`dpone-stage`; ClickHouse mounts the matching `dpone_stage` named collection.
+Start every dependency before the first live command. The test-only S3 server
+is built from a pinned upstream source revision; the initial build may take
+extra time. `minio-init` waits for the server with a bounded retry, creates
+`dpone-stage`, and verifies the bucket; ClickHouse mounts the matching
+`dpone_stage` named collection.
 
 ```bash
-docker compose -f docker/docker-compose.integration.yml up -d --wait mssql clickhouse minio
+docker compose -f docker/docker-compose.integration.yml up -d --build --wait mssql clickhouse minio
 docker compose -f docker/docker-compose.integration.yml run --rm mssql-init
 docker compose -f docker/docker-compose.integration.yml run --rm minio-init
 docker compose -f docker/docker-compose.integration.yml ps

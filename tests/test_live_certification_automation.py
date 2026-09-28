@@ -598,7 +598,7 @@ def test_github_actions_has_live_certification_workflow() -> None:
     script = "\n".join(step.get("run", "") for step in job["steps"])
     assert "dpone ops live-certification-plan" in script
     assert (
-        "docker compose -f docker/docker-compose.integration.yml up -d "
+        "docker compose -f docker/docker-compose.integration.yml up -d --build "
         "postgres mysql mssql clickhouse kafka schema-registry minio"
     ) in script
     marker_script = steps_by_name["Run local service markers"]["run"]
