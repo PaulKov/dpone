@@ -19,11 +19,11 @@ from dpone.ports.clickhouse_cluster_publication import (
     require_verified_mutation as _require_verified,
 )
 from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import require_candidate_rows
+from dpone.runtime.sinks.clickhouse_cluster_publication_identity import cluster_name as _cluster
+from dpone.runtime.sinks.clickhouse_cluster_publication_identity import correlation_token as _correlation_token
+from dpone.runtime.sinks.clickhouse_cluster_publication_identity import operation_id as _operation_id
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
-from dpone.runtime.sinks.clickhouse_full_refresh_contract import (
-    publication_invocation_id,
-)
-from dpone.runtime.sinks.clickhouse_full_refresh_publication import REPLAY_OPTION, SCHEDULER_IDENTITY_OPTION
+from dpone.runtime.sinks.clickhouse_full_refresh_publication import REPLAY_OPTION
 from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 
@@ -156,6 +156,10 @@ class ClickHouseClusterFullRefreshPublicationService:
         if current is None:
             return load_config
         if current.record.operation_id != _operation_id(load_config):
+            if current.record.phase is AuthorityPhase.COMPLETED:
+                # Admission grants no ownership. Publication re-reads and CAS-
+                # replaces the completed slot before issuing a dispatch permit.
+                return load_config
             raise ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target"
             )
@@ -348,20 +352,6 @@ class ClickHouseClusterFullRefreshPublicationService:
             )
 
 
-def _operation_id(load_config: Any) -> str:
-    options = getattr(load_config, "options", {}) or {}
-    stable = str(options.get(SCHEDULER_IDENTITY_OPTION) or "") or publication_invocation_id(
-        scheduler_run_id="direct", process_id=str(load_config.target_table)
-    )
-    return digest_payload({"stable": stable, "database": load_config.target_schema, "target": load_config.target_table})
-
-
-def _cluster(load_config: Any) -> str:
-    if not (name := ClickHouseTableDesign.from_options(getattr(load_config, "options", {}) or {}).cluster.name):
-        raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_TOPOLOGY_UNSUPPORTED", "cluster name is missing")
-    return name
-
-
 def _require_same_operation(current: AuthorityRecord, proposed: AuthorityRecord) -> None:
     if current.operation_id != proposed.operation_id or current.plan_digest != proposed.plan_digest:
         raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target")
@@ -372,7 +362,3 @@ def _complete(authority: ClusterPublicationAuthorityPort, current: VersionedAuth
         return
     completed = replace(current.record, phase=AuthorityPhase.COMPLETED)
     _require_verified(authority.compare_and_swap(current, completed), permit=False)
-
-
-def _correlation_token(operation_id: str, action: str, epoch: int) -> str:
-    return f"dpone-v1-{operation_id[:20]}-{action}-{epoch}-{secrets.token_hex(16)}"

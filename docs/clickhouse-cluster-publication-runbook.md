@@ -212,3 +212,21 @@ software version, and certification scope in the escalation package.
 
 Return to the [first-success guide](clickhouse-cluster-publication.md) or consult
 the [exact reference](clickhouse-cluster-publication-reference.md).
+
+### Starting a new replicated full-refresh after completion
+
+A new invocation is admitted when the prior replicated target authority is
+`COMPLETED`. Admission neither deletes nor claims that record: publication
+re-reads it and performs a version-checked transition with a fresh fence.
+Any unfinished prior operation remains a conflict requiring reconciliation.
+Replaying the same completed invocation returns its existing receipt without
+reloading source data. Never remove authority rows to enable another run.
+
+The current SQL authority adapter stores versions in
+`ReplicatedReplacingMergeTree` and verifies each conditional insertion by a
+separate read-back. This is not an atomic compare-and-swap primitive and is not
+certified for overlapping same-target publishers. Enforce external single-writer
+serialization across all callers, disable automatic retry after an ambiguous
+outcome, and verify terminal cleanup before admitting the next invocation. An
+Airflow DAG's `max_active_runs: 1` covers only that DAG, not other DAGs or direct
+callers targeting the same table.

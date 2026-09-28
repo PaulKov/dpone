@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+## 0.84.1 - 2026-09-28
+
+### Fixed
+
+- A new replicated full-refresh is admitted after proven completion, retaining
+  versioned publication ownership, unfinished-operation conflicts, and
+  same-invocation replay.
+
+- Escaped MSSQL-to-ClickHouse text uses binary UTF-8 collation for wire-marker
+  replacement, preserving distinct user strings that resemble markers with
+  different letter case under case-insensitive source collations.
+
+- MSSQL single-scan physical chunks honor `cleanup_policy: eager`: release each
+  chunk after acknowledged staging load and recorded byte/checksum evidence,
+  before producing the next chunk. Failed or ambiguous chunks remain owned by
+  terminal cleanup. Completed source counts and byte-budget admission remain
+  available after release; consumed artifacts cannot be replayed or rebound.
+
 ## 0.84.0 - 2026-09-28
 
 ### Added

@@ -675,7 +675,7 @@ def test_clickhouse_tabseparated_codec_renders_mssql_safe_values() -> None:
     assert "CASE WHEN dpone_src.[comment] IS NULL THEN N'\\N'" in expression
     assert (
         "WHEN DATALENGTH(CONVERT(VARCHAR(MAX), CONVERT(NVARCHAR(MAX), dpone_src.[comment]) "
-        "COLLATE Latin1_General_100_CI_AS_SC_UTF8)) = 0 THEN N'__dpone__tsv__empty'"
+        "COLLATE Latin1_General_100_BIN2_UTF8)) = 0 THEN N'__dpone__tsv__empty'"
     ) in expression
     assert "N'\\\\'" in expression
     assert "N'\\t'" in expression
@@ -810,7 +810,7 @@ def test_mssql_extract_selects_text_codec_and_preserves_space_predicate(tmp_path
             reference = f"dpone_src.{source.quote_identifier(name)}"
             converted = f"CONVERT(NVARCHAR(MAX), {reference})"
             if route == "clickhouse":
-                converted = f"CONVERT(VARCHAR(MAX), {converted} COLLATE Latin1_General_100_CI_AS_SC_UTF8)"
+                converted = f"CONVERT(VARCHAR(MAX), {converted} COLLATE Latin1_General_100_BIN2_UTF8)"
             assert f"WHEN DATALENGTH({converted}) = 0 THEN" in query
             assert f"WHEN {reference} = N''" not in query
             assert f"END AS {source.quote_identifier(name)}" in query

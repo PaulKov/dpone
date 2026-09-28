@@ -190,6 +190,7 @@ def test_mssql_queryout_auto_returns_lazy_chunks_for_heap_before_bounds_scan(tmp
     )
 
     assert isinstance(artifact, PhysicalChunkedFileExportArtifact)
+    assert artifact.cleanup_policy == "eager"
     assert artifact.source_scan_decision.selected_scan == "single_scan_chunks"
     assert not any("dpone_bounds" in query for query in connector.queries)
 
