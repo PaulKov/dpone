@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import pytest
 
@@ -58,7 +58,9 @@ class _Catalog:
     def __init__(self) -> None:
         self.old, self.new = _identity("old"), _identity("new")
         self.committed = False
+        self.candidate_removed = False
         self.target_healthy = True
+        self.target_missing = False
         self.inventory_address = "127.0.0.1"
 
     def inventory(self, cluster):
@@ -79,6 +81,10 @@ class _Catalog:
 
     def generations(self, cluster, database, target, candidate, hosts):
         target_identity, candidate_identity = (self.new, self.old) if self.committed else (self.old, self.new)
+        if self.committed and self.candidate_removed:
+            candidate_identity = None
+        if self.committed and self.target_missing:
+            target_identity = None
         return tuple(
             ReplicaGeneration(
                 host,
@@ -101,6 +107,7 @@ class _Ddl:
         publication_entry_digest="digest",
         drift_after_dispatch=False,
         unhealthy_target_after_dispatch=False,
+        publication_in_progress=False,
     ) -> None:
         self.catalog = catalog
         self.duplicate = duplicate
@@ -108,6 +115,7 @@ class _Ddl:
         self.publication_entry_digest = publication_entry_digest
         self.drift_after_dispatch = drift_after_dispatch
         self.unhealthy_target_after_dispatch = unhealthy_target_after_dispatch
+        self.publication_in_progress = publication_in_progress
         self.last_token = None
         self.cleanup_dispatches = 0
 
@@ -133,8 +141,18 @@ class _Ddl:
             query_digest,
             token,
             (
-                QueueHostResult("node-1", "Finished", 0, ""),
-                QueueHostResult("node-2", "Finished", 0, ""),
+                QueueHostResult(
+                    "node-1",
+                    "Active" if self.publication_in_progress else "Finished",
+                    None if self.publication_in_progress else 0,
+                    None if self.publication_in_progress else "",
+                ),
+                QueueHostResult(
+                    "node-2",
+                    "Active" if self.publication_in_progress else "Finished",
+                    None if self.publication_in_progress else 0,
+                    None if self.publication_in_progress else "",
+                ),
             ),
         )
         return (entry, entry) if self.duplicate else (entry,)
@@ -145,6 +163,7 @@ class _Ddl:
 
     def drop_predecessor(self, record, permit, *, cluster):
         self.cleanup_dispatches += 1
+        self.catalog.candidate_removed = True
 
 
 class _Bootstrap:
@@ -267,6 +286,107 @@ def test_cleanup_revalidates_inventory_and_bound_publication_digest() -> None:
         service.cleanup(receipt)
 
 
+def test_cleanup_completes_when_exact_predecessor_is_already_absent_on_every_replica() -> None:
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    receipt = service.publish(_config(), _Candidate(), staged_rows=2)
+    catalog.candidate_removed = True
+
+    service.cleanup(receipt)
+
+    assert authority.current is not None
+    assert authority.current.record.phase.value == "COMPLETED"
+    assert ddl.cleanup_dispatches == 0
+
+
+def test_next_operation_reconciles_prior_commit_before_source_io() -> None:
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    service.publish(_config(), _Candidate(), staged_rows=2)
+    catalog.candidate_removed = True
+    next_config = replace(
+        _config(),
+        options={**_config().options, SCHEDULER_IDENTITY_OPTION: "next-run"},
+    )
+
+    admitted = service.prepare_admission(next_config)
+
+    assert admitted is next_config
+    assert authority.current is not None
+    assert authority.current.record.phase.value == "COMPLETED"
+    assert ddl.cleanup_dispatches == 0
+
+
+def test_next_operation_cleans_exact_predecessor_before_source_io() -> None:
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    service.publish(_config(), _Candidate(), staged_rows=2)
+    next_config = replace(
+        _config(),
+        options={**_config().options, SCHEDULER_IDENTITY_OPTION: "next-run"},
+    )
+
+    assert service.prepare_admission(next_config) is next_config
+    assert authority.current is not None
+    assert authority.current.record.phase.value == "COMPLETED"
+    assert ddl.cleanup_dispatches == 1
+
+
+def test_next_operation_stays_fenced_when_prior_target_is_unhealthy() -> None:
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    service.publish(_config(), _Candidate(), staged_rows=2)
+    catalog.target_healthy = False
+    next_config = replace(
+        _config(),
+        options={**_config().options, SCHEDULER_IDENTITY_OPTION: "next-run"},
+    )
+
+    with pytest.raises(ClusterPublicationError, match="DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNSAFE"):
+        service.prepare_admission(next_config)
+
+    assert authority.current is not None
+    assert authority.current.record.phase.value == "COMMITTED"
+    assert ddl.cleanup_dispatches == 0
+
+
+@pytest.mark.parametrize("target_problem", ["target_missing", "target_healthy"])
+def test_first_publication_recovery_fences_invalid_target_before_new_source_io(target_problem: str) -> None:
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    catalog.old = None
+    service.publish(_config(), _Candidate(), staged_rows=2)
+    setattr(catalog, target_problem, target_problem != "target_healthy")
+    next_config = replace(_config(), options={**_config().options, SCHEDULER_IDENTITY_OPTION: "next-run"})
+
+    with pytest.raises(ClusterPublicationError, match="DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNSAFE"):
+        service.prepare_admission(next_config)
+
+    assert authority.current is not None
+    assert authority.current.record.phase.value == "COMMITTED"
+
+
+def test_first_publication_recovery_requires_terminal_ddl_before_new_source_io() -> None:
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    catalog.old = None
+    service.publish(_config(), _Candidate(), staged_rows=2)
+    ddl.publication_in_progress = True
+    next_config = replace(_config(), options={**_config().options, SCHEDULER_IDENTITY_OPTION: "next-run"})
+
+    with pytest.raises(ClusterPublicationError, match="DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNSAFE"):
+        service.prepare_admission(next_config)
+
+    assert authority.current is not None
+    assert authority.current.record.phase.value == "COMMITTED"
+
+
 def test_tampered_mapping_receipt_cannot_authorize_predecessor_drop() -> None:
     catalog, authority = _Catalog(), _Authority()
     ddl = _Ddl(catalog)
@@ -328,8 +448,16 @@ def test_new_operation_admitted_after_completed_publication_without_claiming_slo
     assert ddl.dispatches == 1
 
 
-@pytest.mark.parametrize("phase", ["PREPARED", "DISPATCHING", "COMMITTED", "CLEANUP_DISPATCHING"])
-def test_new_operation_cannot_bypass_unfinished_publication(phase: str) -> None:
+@pytest.mark.parametrize(
+    ("phase", "expected_error"),
+    [
+        ("PREPARED", "AUTHORITY_CONFLICT"),
+        ("DISPATCHING", "PUBLICATION_UNKNOWN"),
+        ("COMMITTED", "CLEANUP_UNSAFE"),
+        ("CLEANUP_DISPATCHING", "CLEANUP_UNKNOWN"),
+    ],
+)
+def test_new_operation_cannot_bypass_unresolved_publication(phase: str, expected_error: str) -> None:
     from dataclasses import replace
 
     from dpone.contracts.clickhouse_cluster_publication import AuthorityPhase
@@ -341,9 +469,13 @@ def test_new_operation_cannot_bypass_unfinished_publication(phase: str) -> None:
     authority.current = replace(
         authority.current, record=replace(authority.current.record, phase=AuthorityPhase(phase))
     )
+    if phase == "DISPATCHING":
+        ddl.publication_in_progress = True
+    if phase == "COMMITTED":
+        catalog.target_healthy = False
     previous = authority.current
     config = replace(_config(), options={**_config().options, SCHEDULER_IDENTITY_OPTION: "next-run"})
-    with pytest.raises(ClusterPublicationError, match="AUTHORITY_CONFLICT"):
+    with pytest.raises(ClusterPublicationError, match=expected_error):
         service.prepare_admission(config)
     assert authority.current == previous
     assert ddl.dispatches == 1
