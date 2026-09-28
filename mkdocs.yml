@@ -539,6 +539,7 @@ nav:
       - Feature design - PostgreSQL XMin key reconciliation for MSSQL: feature-design-postgres-xmin-key-reconciliation-mssql-v1.md
       - Feature design - Airflow repair-authority dag_run.conf: feature-design-airflow-repair-authority-dag-run-conf.md
       - Feature design - governed REST bulk delivery V1: feature-design-rest-api-sink-v1.md
+      - Feature design - committed replay quality evidence: feature-design-committed-replay-quality-evidence.md
       - Governed REST bulk-delivery threat model: rest-bulk-delivery-threat-model.md
       - Documentation standard: documentation-standard.md
       - Agent templates:
