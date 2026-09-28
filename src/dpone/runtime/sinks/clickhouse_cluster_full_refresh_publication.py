@@ -32,6 +32,9 @@ from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
     require_pre_dispatch_generation,
     settle_prior_publication,
 )
+from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
+    require_same_operation as _require_same_operation,
+)
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import REPLAY_OPTION
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 
@@ -365,8 +368,3 @@ class ClickHouseClusterFullRefreshPublicationService:
             result = authority.compare_and_swap(current, committed)
             current = _require_verified(result, permit=False)
         return ClusterFullRefreshReceipt.from_authority(current, cluster)
-
-
-def _require_same_operation(current: AuthorityRecord, proposed: AuthorityRecord) -> None:
-    if current.operation_id != proposed.operation_id or current.plan_digest != proposed.plan_digest:
-        raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target")

@@ -96,3 +96,12 @@ def complete_authority(authority: ClusterPublicationAuthorityPort, current: cont
         return
     completed = replace(current.record, phase=contracts.AuthorityPhase.COMPLETED)
     require_verified_mutation(authority.compare_and_swap(current, completed), permit=False)
+
+
+def require_same_operation(current: contracts.AuthorityRecord, proposed: contracts.AuthorityRecord) -> None:
+    """Fence attempts to reuse an authority slot for a different plan."""
+
+    if current.operation_id != proposed.operation_id or current.plan_digest != proposed.plan_digest:
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target"
+        )
