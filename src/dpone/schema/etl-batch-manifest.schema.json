@@ -2084,6 +2084,7 @@
                         "mode": {"type": "string", "enum": ["off", "auto", "required"], "default": "off"},
                         "reader_workers": {"type": "integer", "minimum": 1, "default": 1},
                         "upload_workers": {"type": "integer", "minimum": 1, "default": 1},
+                        "load_workers": {"type": "integer", "minimum": 1, "default": 1},
                         "max_inflight_ranges": {"type": "integer", "minimum": 1, "default": 1},
                         "max_inflight_rows": {"type": "integer", "minimum": 1},
                         "max_inflight_bytes": {"type": "integer", "minimum": 1},
