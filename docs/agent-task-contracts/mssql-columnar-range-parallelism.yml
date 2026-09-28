@@ -3,7 +3,7 @@ task_id: "DPONE-MSSQL-COLUMNAR-RANGE-PARALLELISM-V1"
 title: "Bounded MSSQL columnar range parallelism"
 goal: "Add configurable deterministic range readers and a single governed ClickHouse publication barrier."
 specification: "docs/feature-design-mssql-columnar-range-parallelism-v1.md"
-base_commit: "8b0d38b0"
+base_commit: "043e1078aa1d7184125ea6ba22df89d87e98cd0f"
 integrator: "/root"
 
 acceptance_criteria:
