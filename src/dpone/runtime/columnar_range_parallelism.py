@@ -184,9 +184,7 @@ class BoundedRangeExecutor:
         results: dict[int, RangeExecutionResult] = {}
         pool = self._executor_factory(min(policy.reader_workers, len(plan.ranges)))
         try:
-            futures = {
-                pool.submit(execute_one, item, sessions[item.ordinal]): item.ordinal for item in plan.ranges
-            }
+            futures = {pool.submit(execute_one, item, sessions[item.ordinal]): item.ordinal for item in plan.ranges}
             for future in as_completed(futures):
                 results[futures[future]] = future.result()
         except BaseException:
