@@ -2,11 +2,16 @@
 
 from __future__ import annotations
 
+import json
 import re
 import uuid
+from collections.abc import Callable
+from hashlib import sha256
 from typing import TYPE_CHECKING, Any
 
+from dpone.runtime.columnar_range_parallelism import build_columnar_range_plan
 from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotRequest
+from dpone.runtime.partitioning import RangePartitioner
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
@@ -58,13 +63,21 @@ def build_columnar_snapshot_request(
     query: str,
     schema: list[tuple[str, str]],
     run_id: str | None = None,
+    bounds_resolver: Callable[[str], tuple[Any, ...]] | None = None,
 ) -> ColumnarSnapshotRequest:
     """Build the provider request shared by legacy queryout and route runtime."""
 
     columnar_options = _columnar_fast_path_options(load_config.options)
     if not columnar_options:
         raise RuntimeError("columnar_fast_path_options_missing")
-    return _snapshot_request(load_config, query, schema, columnar_options, run_id=run_id)
+    return _snapshot_request(
+        load_config,
+        query,
+        schema,
+        columnar_options,
+        run_id=run_id,
+        bounds_resolver=bounds_resolver,
+    )
 
 
 def _snapshot_request(
@@ -74,10 +87,17 @@ def _snapshot_request(
     columnar_options: dict[str, Any],
     *,
     run_id: str | None = None,
+    bounds_resolver: Callable[[str], tuple[Any, ...]] | None = None,
 ) -> ColumnarSnapshotRequest:
     request_run_id = str(run_id or load_config.options.get("run_id") or uuid.uuid4().hex)
     object_storage = columnar_options.get("object_storage")
     execution = _execution_options(columnar_options)
+    range_partitioner, range_plan = _range_request(
+        load_config,
+        query=query,
+        schema=schema,
+        bounds_resolver=bounds_resolver,
+    )
     if not isinstance(object_storage, dict):
         return _local_snapshot_request(
             load_config,
@@ -85,6 +105,8 @@ def _snapshot_request(
             schema,
             columnar_options,
             run_id=request_run_id,
+            range_partitioner=range_partitioner,
+            range_plan=range_plan,
         )
     uri_prefix = str(object_storage.get("uri_prefix") or "").strip()
     if not uri_prefix:
@@ -116,6 +138,8 @@ def _snapshot_request(
         format=str(object_storage.get("format") or "parquet"),
         compression=str(object_storage.get("compression") or "zstd"),
         options=request_options,
+        range_partitioner=range_partitioner,
+        range_plan=range_plan,
     )
 
 
@@ -126,6 +150,8 @@ def _local_snapshot_request(
     columnar_options: dict[str, Any],
     *,
     run_id: str,
+    range_partitioner: RangePartitioner | None,
+    range_plan: Any | None,
 ) -> ColumnarSnapshotRequest:
     execution = _execution_options(columnar_options)
     request_options = {
@@ -150,7 +176,30 @@ def _local_snapshot_request(
         format=str(columnar_options.get("format") or "parquet"),
         compression=str(columnar_options.get("compression") or "zstd"),
         options=request_options,
+        range_partitioner=range_partitioner,
+        range_plan=range_plan,
     )
+
+
+def _range_request(
+    load_config: LoadConfig,
+    *,
+    query: str,
+    schema: list[tuple[str, str]],
+    bounds_resolver: Callable[[str], tuple[Any, ...]] | None,
+) -> tuple[RangePartitioner | None, Any | None]:
+    partitioner = RangePartitioner.from_options(load_config.options, bounds_resolver=bounds_resolver)
+    policy = partitioner.range_parallelism
+    mode = str(getattr(policy, "mode", "off"))
+    if mode == "off":
+        return None, None
+    if not partitioner.enabled:
+        raise ValueError("columnar_range_parallelism_requires_multiple_ranges")
+    identity_payload = json.dumps(
+        {"query": query, "schema": schema}, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    )
+    query_identity = f"sha256:{sha256(identity_payload.encode()).hexdigest()}"
+    return partitioner, build_columnar_range_plan(partitioner, query_identity=query_identity)
 
 
 def _columnar_fast_path_options(options: dict[str, Any]) -> dict[str, Any]:

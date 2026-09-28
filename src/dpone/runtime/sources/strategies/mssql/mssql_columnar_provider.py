@@ -17,14 +17,18 @@ from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotCapability,
 from dpone.runtime.object_storage_access_models import ObjectStorageReadContract, read_contract_from_options
 from dpone.runtime.sources.strategies.mssql import mssql_columnar_chunks as chunks
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_markers import write_columnar_run_marker
-from dpone.runtime.sources.strategies.mssql.mssql_columnar_reader import iter_columnar_batches
+from dpone.runtime.sources.strategies.mssql.mssql_columnar_reader import iter_columnar_batches, range_read_blockers
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_schema import (
     read_contract_options as _read_contract_options,
 )
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_schema import (
     schema_blockers as _schema_blockers,
 )
-from dpone.runtime.sources.strategies.mssql.mssql_columnar_windows import build_object_window, upload_manifest_chunk
+from dpone.runtime.sources.strategies.mssql.mssql_columnar_windows import (
+    build_parallel_object_windows,
+    iter_serial_object_windows,
+    upload_manifest_chunk,
+)
 from dpone.storage import ObjectStorageUri
 from dpone.storage.protocols import ObjectStorageClient
 
@@ -48,6 +52,7 @@ class MssqlColumnarSnapshotProvider:
         self._parquet_writer = parquet_writer or PyArrowParquetChunkWriter()
         self._read_contract = read_contract
         self._temp_dir = Path(temp_dir) if temp_dir else None
+        self._range_evidence: dict[int, dict[str, object]] = {}
 
     def capabilities(self, request: ColumnarSnapshotRequest) -> ColumnarSnapshotCapability:
         blockers: list[str] = []
@@ -58,6 +63,7 @@ class MssqlColumnarSnapshotProvider:
         if request.format.lower() != "parquet":
             blockers.append("columnar_format_not_supported")
         blockers.extend(_schema_blockers(request.schema))
+        blockers.extend(range_read_blockers(request, self._connector))
         return ColumnarSnapshotCapability(
             provider_id=self.provider_id,
             certified=not blockers,
@@ -65,6 +71,8 @@ class MssqlColumnarSnapshotProvider:
         )
 
     def snapshot(self, request: ColumnarSnapshotRequest) -> ObjectStorageStagingManifest:
+        if request.range_plan is not None:
+            raise RuntimeError("columnar_range_parallelism_requires_chunked_execution")
         capability = self.capabilities(request)
         if not capability.supports(request):
             raise RuntimeError(", ".join(capability.blockers or ("mssql_columnar_provider_uncertified",)))
@@ -126,6 +134,8 @@ class MssqlColumnarSnapshotProvider:
         )
 
     def snapshot_local(self, request: ColumnarSnapshotRequest) -> LocalColumnarStagingManifest:
+        if request.range_plan is not None:
+            raise RuntimeError("columnar_range_parallelism_requires_object_storage")
         capability = self.capabilities(request)
         if not capability.supports(request):
             raise RuntimeError(", ".join(capability.blockers or ("mssql_columnar_provider_uncertified",)))
@@ -182,6 +192,8 @@ class MssqlColumnarSnapshotProvider:
         )
 
     def iter_local_chunks(self, request: ColumnarSnapshotRequest):
+        if request.range_plan is not None:
+            raise RuntimeError("columnar_range_parallelism_requires_object_storage")
         capability = self.capabilities(request)
         if not capability.supports(request):
             raise RuntimeError(", ".join(capability.blockers or ("mssql_columnar_provider_uncertified",)))
@@ -244,58 +256,42 @@ class MssqlColumnarSnapshotProvider:
 
         prefix = ObjectStorageUri.parse(request.uri_prefix.format(run_id=request.run_id)).prefix()
         schema_hash = chunks.schema_hash(request.schema)
-        row_target = chunks.initial_chunk_rows(request)
-        buffered_rows: list[tuple[object, ...]] = []
-        window_index = 0
         active_windows: list[ObjectStorageChunkWindow] = []
         completed = False
         try:
             write_columnar_run_marker(self._object_client, prefix, request)
             with tempfile.TemporaryDirectory(prefix="dpone-mssql-columnar-", dir=self._temp_dir) as tmp_dir:
-                tmp_path = Path(tmp_dir)
-                for rows in self._iter_batches(request):
-                    buffered_rows.extend(rows)
-                    if len(buffered_rows) < row_target:
-                        continue
-                    window, row_target = build_object_window(
-                        tmp_dir=tmp_path,
-                        index=window_index,
-                        rows=buffered_rows,
-                        request=request,
-                        prefix=prefix,
-                        schema_hash=schema_hash,
-                        object_client=self._object_client,
-                        write_chunk_file=self._write_chunk_file_for_window,
-                        read_contract=self._resolve_read_contract(request),
-                    )
-                    buffered_rows = []
-                    window_index += 1
-                    if window is not None:
-                        active_windows.append(window)
-                        yield window
-                        active_windows.remove(window)
-                if buffered_rows:
-                    window, _ = build_object_window(
-                        tmp_dir=tmp_path,
-                        index=window_index,
-                        rows=buffered_rows,
-                        request=request,
-                        prefix=prefix,
-                        schema_hash=schema_hash,
-                        object_client=self._object_client,
-                        write_chunk_file=self._write_chunk_file_for_window,
-                        read_contract=self._resolve_read_contract(request),
-                    )
-                    if window is not None:
-                        active_windows.append(window)
-                        yield window
-                        active_windows.remove(window)
+                common = {
+                    "request": request,
+                    "prefix": prefix,
+                    "schema_hash": schema_hash,
+                    "object_client": self._object_client,
+                    "write_chunk_file": self._write_chunk_file_for_window,
+                    "read_contract": self._resolve_read_contract(request),
+                    "tmp_dir": Path(tmp_dir),
+                }
+                if request.range_plan is not None:
+                    result = build_parallel_object_windows(connector=self._connector, **common)
+                    windows = result.windows
+                    self._range_evidence[id(request)] = result.evidence
+                else:
+                    windows = iter_serial_object_windows(connector=self._connector, **common)
+                for window in windows:
+                    active_windows.append(window)
+                    yield window
+                    active_windows.remove(window)
                 completed = True
+        except BaseException:
+            self._object_client.delete_prefix(prefix)
+            raise
         finally:
             for window in active_windows:
                 window.cleanup()
             if completed:
                 self._cleanup_object_storage_run_prefix(prefix, request)
+
+    def range_execution_evidence(self, request: ColumnarSnapshotRequest) -> dict[str, object] | None:
+        return self._range_evidence.get(id(request))
 
     def _iter_batches(self, request: ColumnarSnapshotRequest):
         yield from iter_columnar_batches(

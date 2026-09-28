@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, time
 from pathlib import Path
+from threading import Barrier
 
 import pytest
 
@@ -359,6 +360,132 @@ def test_columnar_snapshot_request_uses_canonical_execution_options() -> None:
     assert request.options["cleanup_policy"] == "on_success"
 
 
+def test_columnar_snapshot_request_carries_canonical_range_plan(tmp_path: Path) -> None:
+    config = _load_config()
+    config.options["partitioning"] = {
+        "column": "id",
+        "num_partitions": 2,
+        "export_workers": 2,
+        "load_workers": 1,
+        "bounds": {"lower": 0, "upper": 20},
+        "range_parallelism": {
+            "mode": "required",
+            "upload_workers": 1,
+            "max_inflight_ranges": 2,
+            "max_inflight_rows": 10,
+            "max_inflight_bytes": 1024,
+            "consistency": "immutable",
+        },
+    }
+
+    request = build_columnar_snapshot_request(
+        load_config=config,
+        query="SELECT id, name FROM dbo.orders",
+        schema=[("id", "int"), ("name", "nvarchar(50)")],
+        run_id="run-ranges",
+    )
+
+    assert request.range_partitioner is not None
+    assert request.range_plan is not None
+    assert len(request.range_plan.ranges) == 2
+    assert request.range_plan.policy.reader_workers == 2
+
+    provider = MssqlColumnarSnapshotProvider(
+        connector=_ParallelMssqlConnector(partitions=2),
+        object_client=LocalObjectStorageClient(tmp_path / "store"),
+        parquet_writer=_FakeParquetWriter(),
+    )
+    with pytest.raises(RuntimeError, match="requires_chunked_execution"):
+        provider.snapshot(request)
+
+
+def test_parallel_windows_use_independent_typed_ranges_and_wait_for_all_eof(tmp_path: Path) -> None:
+    config = _load_config()
+    config.options["partitioning"] = _parallel_partitioning()
+    request = build_columnar_snapshot_request(
+        load_config=config,
+        query="SELECT id, name FROM dbo.orders",
+        schema=[("id", "int"), ("name", "nvarchar(50)")],
+        run_id="run-ranges",
+    )
+    connector = _ParallelMssqlConnector(partitions=2)
+    provider = MssqlColumnarSnapshotProvider(
+        connector=connector,
+        object_client=LocalObjectStorageClient(tmp_path / "store"),
+        parquet_writer=_FakeParquetWriter(),
+    )
+
+    iterator = provider.iter_object_storage_windows(request)
+    first = next(iterator)
+
+    assert all(session.eof for session in connector.sessions)
+    assert len(connector.sessions) == 2
+    assert first.range_ordinal == 0
+    assert first.uri_prefix.endswith("range-000000/window-000001")
+    queries = [session.stream_calls[0][0] for session in connector.sessions]
+    assert any("[id] >= 0 AND [id] < 10" in query for query in queries)
+    assert any("[id] >= 10 AND [id] <= 20" in query for query in queries)
+
+    windows = [first, *list(iterator)]
+    evidence = provider.range_execution_evidence(request)
+    assert [window.range_ordinal for window in windows] == [0, 1]
+    assert evidence is not None
+    assert evidence["all_ranges_confirmed"] is True
+    assert evidence["observed_reader_concurrency"] == 2
+    assert evidence["requested_upload_concurrency"] == 1
+    assert evidence["byte_measurement_scope"] == "encoded_parquet_upload_handoff"
+    assert evidence["rss_bounded"] is False
+    assert all(session.closed for session in connector.sessions)
+
+
+def test_parallel_window_failure_cleans_owned_prefix_and_never_yields(tmp_path: Path) -> None:
+    config = _load_config()
+    config.options["partitioning"] = _parallel_partitioning()
+    request = build_columnar_snapshot_request(
+        load_config=config,
+        query="SELECT id, name FROM dbo.orders",
+        schema=[("id", "int"), ("name", "nvarchar(50)")],
+        run_id="run-ranges-failed",
+    )
+    connector = _ParallelMssqlConnector(partitions=2, fail_ordinal=0)
+    object_client = LocalObjectStorageClient(tmp_path / "store")
+    provider = MssqlColumnarSnapshotProvider(
+        connector=connector,
+        object_client=object_client,
+        parquet_writer=_FakeParquetWriter(),
+    )
+
+    with pytest.raises(RuntimeError, match="synthetic range failure"):
+        list(provider.iter_object_storage_windows(request))
+
+    prefix = ObjectStorageUri.parse("s3://dpone-stage/msql/run-ranges-failed/")
+    assert object_client.list_prefix(prefix) == ()
+    assert connector.sessions
+    assert all(session.closed for session in connector.sessions)
+
+
+def test_parallel_window_query_is_blocked_before_source_io(tmp_path: Path) -> None:
+    config = _load_config()
+    config.options["partitioning"] = _parallel_partitioning()
+    request = build_columnar_snapshot_request(
+        load_config=config,
+        query="SELECT id, ROW_NUMBER() OVER (PARTITION BY name ORDER BY id) AS rank FROM dbo.orders",
+        schema=[("id", "int"), ("rank", "bigint")],
+        run_id="run-window",
+    )
+    connector = _ParallelMssqlConnector(partitions=2)
+    provider = MssqlColumnarSnapshotProvider(
+        connector=connector,
+        object_client=LocalObjectStorageClient(tmp_path / "store"),
+        parquet_writer=_FakeParquetWriter(),
+    )
+
+    capability = provider.capabilities(request)
+
+    assert any("machine-checkable" in blocker for blocker in capability.blockers)
+    assert connector.sessions == []
+
+
 def test_mssql_queryout_factory_blocks_required_columnar_without_provider() -> None:
     factory = MSSQLQueryoutArtifactFactory(connector=object(), logger=_FakeLogger())
 
@@ -437,6 +564,66 @@ class _FakeMssqlConnector:
         assert as_dict is False
         self.stream_calls.append((query, batch_size))
         yield from self.batches
+
+
+def _parallel_partitioning() -> dict[str, object]:
+    return {
+        "column": "id",
+        "num_partitions": 2,
+        "export_workers": 2,
+        "load_workers": 1,
+        "bounds": {"lower": 0, "upper": 20},
+        "range_parallelism": {
+            "mode": "required",
+            "reader_workers": 2,
+            "upload_workers": 1,
+            "max_inflight_ranges": 2,
+            "max_inflight_rows": 10,
+            "max_inflight_bytes": 1024,
+            "consistency": "immutable",
+        },
+    }
+
+
+class _ParallelMssqlConnector:
+    def __init__(self, *, partitions: int, fail_ordinal: int | None = None) -> None:
+        self._barrier = Barrier(partitions)
+        self.fail_ordinal = fail_ordinal
+        self.sessions: list[_ParallelMssqlSession] = []
+
+    def get_records_streaming(self, *args, **kwargs):
+        raise AssertionError(f"Root connector must not read range data: {args}, {kwargs}")
+
+    def open_session(self, *, application_name: str):
+        ordinal = int(application_name.rsplit("-", 1)[-1])
+        session = _ParallelMssqlSession(self, ordinal)
+        self.sessions.append(session)
+        return session
+
+
+class _ParallelMssqlSession:
+    def __init__(self, owner: _ParallelMssqlConnector, ordinal: int) -> None:
+        self.owner = owner
+        self.ordinal = ordinal
+        self.stream_calls: list[tuple[str, int]] = []
+        self.eof = False
+        self.closed = False
+        self.cancelled = False
+
+    def get_records_streaming(self, query: str, *, batch_size: int, as_dict: bool = False):
+        assert as_dict is False
+        self.stream_calls.append((query, batch_size))
+        self.owner._barrier.wait(timeout=2)
+        if self.ordinal == self.owner.fail_ordinal:
+            raise RuntimeError("synthetic range failure")
+        yield [(self.ordinal * 10 + 1, f"range-{self.ordinal}")]
+        self.eof = True
+
+    def cancel(self) -> None:
+        self.cancelled = True
+
+    def close(self) -> None:
+        self.closed = True
 
 
 class _WriterCall:
