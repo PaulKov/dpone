@@ -92,14 +92,12 @@ class StagedLoadValidationReceipt:
             raise ValueError("staged_load_validation_receipt_invalid")
 
     def frozen_inputs(self, *, sink: Any, load_config: Any) -> tuple[Any, Any, StagedLoadHandle]:
-        """Return the sink token and isolated copies that passed validation."""
+        """Return one isolated lifecycle snapshot for finalization and cleanup."""
 
         self.assert_bound_to(sink=sink, load_config=load_config)
         if self._validated_inputs is None:
             raise ValueError("staged_load_validation_receipt_invalid")
-        validated_config, validated_handle = snapshot_staged_validation_values(
-            *self._validated_inputs,
-        )
+        validated_config, validated_handle = self._validated_inputs
         return self._validation_token, validated_config, validated_handle
 
 
@@ -124,12 +122,13 @@ def validate_staged_load_if_supported(
     validated = callable(validator)
     validated_inputs = snapshot_staged_validation_values(load_config, handle) if validated else None
     validation_token = validator(*validated_inputs) if validator is not None and validated_inputs is not None else None
+    lifecycle_inputs = snapshot_staged_validation_values(*validated_inputs) if validated_inputs is not None else None
     return StagedLoadValidationReceipt(
         handle=handle,
         validated=validated,
         _sink=sink,
         _load_config=load_config,
-        _validated_inputs=validated_inputs,
+        _validated_inputs=lifecycle_inputs,
         _validation_token=validation_token,
     )
 

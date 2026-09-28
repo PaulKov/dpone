@@ -497,8 +497,11 @@ The following results are intentionally blocking:
 Do not delete the KeeperMap row or candidate after an unknown/partial result.
 Capture the authority payload, exact queue entry, `system.tables`,
 `system.replicas`, and cluster inventory for every member. Restore connectivity
-and retry the same scheduler invocation for read-only reconciliation. A new
-invocation remains fenced until the prior row reaches `COMPLETED`.
+and retry the same scheduler invocation for reconciliation. Before source I/O,
+a later invocation can also settle a prior terminal publication through the
+same UUID- and DDL-bound recovery service. It remains fenced unless the prior
+authority is verified `COMPLETED`; no authority row is deleted or rewritten by
+an operator.
 
 Required grants cover `system.clusters`, `system.databases`, `system.tables`,
 `system.columns`, `system.replicas`, `system.distributed_ddl_queue`, the fixed

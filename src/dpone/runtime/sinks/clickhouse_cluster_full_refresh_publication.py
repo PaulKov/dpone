@@ -18,13 +18,24 @@ from dpone.ports.clickhouse_cluster_publication import (
 from dpone.ports.clickhouse_cluster_publication import (
     require_verified_mutation as _require_verified,
 )
-from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import require_candidate_rows
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import cluster_name as _cluster
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import correlation_token as _correlation_token
+from dpone.runtime.sinks.clickhouse_cluster_publication_identity import is_cluster_enabled
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import operation_id as _operation_id
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
+from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
+    complete_authority as _complete,
+)
+from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
+    require_candidate_rows,
+    require_first_publication_complete,
+    require_pre_dispatch_generation,
+    settle_prior_publication,
+)
+from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
+    require_same_operation as _require_same_operation,
+)
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import REPLAY_OPTION
-from dpone.runtime.sinks.clickhouse_table_ddl import ClickHouseTableDesign
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 
 AggregatePublicationState = contracts.AggregatePublicationState
@@ -58,9 +69,7 @@ class ClickHouseClusterFullRefreshPublicationService:
         self._ddl = ddl
         self._bootstrap = bootstrap
 
-    @staticmethod
-    def is_enabled(load_config: Any) -> bool:
-        return ClickHouseTableDesign.from_options(getattr(load_config, "options", {}) or {}).cluster.on_cluster
+    is_enabled = staticmethod(is_cluster_enabled)
 
     def publish(self, load_config: Any, candidate_config: Any, *, staged_rows: int) -> ClusterFullRefreshReceipt:
         cluster = _cluster(load_config)
@@ -127,7 +136,7 @@ class ClickHouseClusterFullRefreshPublicationService:
             if record.phase is not AuthorityPhase.PREPARED:
                 _require_inventory(record, inventory)
                 return self._reconcile_existing(authority, current, cluster)
-        self._revalidate_pre_dispatch(cluster, record)
+        require_pre_dispatch_generation(self._catalog, cluster, record)
         token = _correlation_token(operation_id, "publish", record.dispatch_epoch + 1)
         dispatching = record.dispatching(
             token=token,
@@ -160,9 +169,16 @@ class ClickHouseClusterFullRefreshPublicationService:
                 # Admission grants no ownership. Publication re-reads and CAS-
                 # replaces the completed slot before issuing a dispatch permit.
                 return load_config
-            raise ClusterPublicationError(
-                "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target"
+            settle_prior_publication(
+                authority,
+                current,
+                cluster=cluster,
+                inventory=inventory,
+                reconcile=lambda prior: self._reconcile_existing(authority, prior, cluster),
+                receipt_factory=ClusterFullRefreshReceipt.from_authority,
+                cleanup=self.cleanup,
             )
+            return load_config
         _require_inventory(current.record, inventory)
         if current.record.phase is AuthorityPhase.COMPLETED:
             receipt = ClusterFullRefreshReceipt.from_authority(current, cluster)
@@ -205,7 +221,7 @@ class ClickHouseClusterFullRefreshPublicationService:
             return
         inventory = self._catalog.inventory(resolved.cluster)
         _require_inventory(current.record, inventory)
-        require_exact_ddl_entry(
+        publication_entry = require_exact_ddl_entry(
             self._ddl,
             resolved.cluster,
             entry_id=current.record.ddl_entry,
@@ -218,6 +234,13 @@ class ClickHouseClusterFullRefreshPublicationService:
                 raise ClusterPublicationError(
                     "DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNSAFE", "authority is not ready for completion"
                 )
+            require_first_publication_complete(
+                self._catalog,
+                current,
+                cluster=resolved.cluster,
+                inventory=inventory,
+                publication_entry=publication_entry,
+            )
             _complete(authority, current)
             return
         facts = self._catalog.generations(
@@ -231,6 +254,14 @@ class ClickHouseClusterFullRefreshPublicationService:
             raise ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNSAFE", "authority is not ready for cleanup"
             )
+        if set(states) == {ReplicaPublicationState.CLEANUP_PENDING}:
+            if publication_entry.state_for(inventory.hosts) not in {
+                QueueState.TERMINAL_SUCCESS,
+                QueueState.TERMINAL_FAILURE,
+            }:
+                raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNSAFE", "publication is not terminal")
+            _complete(authority, current)
+            return
         if set(states) != {ReplicaPublicationState.COMMITTED}:
             raise ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_CLEANUP_UNSAFE", "predecessor identity is not exact"
@@ -335,30 +366,3 @@ class ClickHouseClusterFullRefreshPublicationService:
             result = authority.compare_and_swap(current, committed)
             current = _require_verified(result, permit=False)
         return ClusterFullRefreshReceipt.from_authority(current, cluster)
-
-    def _revalidate_pre_dispatch(self, cluster: str, record: AuthorityRecord) -> None:
-        inventory = self._catalog.inventory(cluster)
-        _require_inventory(record, inventory)
-        self._catalog.require_atomic_database(cluster, record.database, inventory.hosts)
-        facts = self._catalog.generations(cluster, record.database, record.target, record.candidate, inventory.hosts)
-        if (
-            _one_identity(facts, "candidate") != record.desired
-            or _optional_one_identity(facts, "target") != record.predecessor
-            or any(not fact.candidate_healthy or fact.row_count != record.staged_rows for fact in facts)
-        ):
-            raise ClusterPublicationError(
-                "DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED",
-                "generation changed before publication dispatch",
-            )
-
-
-def _require_same_operation(current: AuthorityRecord, proposed: AuthorityRecord) -> None:
-    if current.operation_id != proposed.operation_id or current.plan_digest != proposed.plan_digest:
-        raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target")
-
-
-def _complete(authority: ClusterPublicationAuthorityPort, current: VersionedAuthorityRecord) -> None:
-    if current.record.phase is AuthorityPhase.COMPLETED:
-        return
-    completed = replace(current.record, phase=AuthorityPhase.COMPLETED)
-    _require_verified(authority.compare_and_swap(current, completed), permit=False)

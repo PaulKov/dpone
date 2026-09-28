@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Fixed
+
+- Governed ClickHouse full refresh keeps one validated staged handle through
+  publication and cleanup, so a committed predecessor is not treated as an
+  unpublished staging table.
+- Cluster publication can prove an already-absent predecessor on every replica,
+  complete the retained authority record, and admit the next scheduler operation
+  only after the prior publication is fully reconciled. Unresolved generations
+  remain fenced.
+
 ## 0.84.1 - 2026-09-28
 
 ### Fixed
@@ -19,7 +29,6 @@
   before producing the next chunk. Failed or ambiguous chunks remain owned by
   terminal cleanup. Completed source counts and byte-budget admission remain
   available after release; consumed artifacts cannot be replayed or rebound.
-
 ## 0.84.0 - 2026-09-28
 
 ### Added

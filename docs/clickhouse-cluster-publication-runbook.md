@@ -105,6 +105,7 @@ Do not broaden the table-name or queue-entry predicate, and do not issue
 | Publication queue entry is active and members are mixed | publication in progress | wait or retry observation of the original entry only |
 | Queue entry is terminal but targets are not uniformly desired, including all-predecessor state | terminal publication failure | stop; retain all generations and escalate; do not redispatch |
 | Every target is desired and the receipt is durable | committed | resume exact predecessor cleanup if required |
+| Every target is the exact desired UUID, the bound publication entry is terminal, and every predecessor is already absent | committed cleanup was interrupted after removal | let dpone mark the retained authority `COMPLETED`; do not issue another drop |
 | Cleanup entry is terminal while any predecessor remains, or object identity is unknown | cleanup unknown | retain predecessors; restore evidence and retry observation; do not redispatch |
 | Every target is desired and every predecessor is proven absent | completed | verify the authority reaches `COMPLETED` |
 
@@ -135,6 +136,13 @@ The runtime resumes according to durable authority:
 - `CLEANUP_DISPATCHING`: observes the bound cleanup entry and object absence;
   and
 - `COMPLETED`: returns the already-proven operation result idempotently.
+
+A later scheduler operation first reconciles an earlier `DISPATCHING`,
+`COMMITTED`, or `CLEANUP_DISPATCHING` authority before opening its source. It
+proceeds only after the earlier authority is verified `COMPLETED`; an active,
+partial, unknown, or divergent generation remains fenced. A retained
+`COMPLETED` slot can be reused through a versioned transition after staging.
+The later operation never replays the earlier operation's result as its own.
 
 If a lost Keeper mutation response produced an unknown outcome, the caller has
 no dispatch permit even if a later read shows the requested value. Recovery

@@ -173,6 +173,30 @@ def test_governed_validation_runs_once_before_guard_and_validated_finalize() -> 
     ]
 
 
+def test_governed_cleanup_receives_publication_receipt_from_finalized_handle() -> None:
+    """A confirmed publication must not be cleaned up as an unpublished stage."""
+
+    class PublicationSink(_ValidatedFinalizationSink):
+        def finalize_staged_load(self, load_config, receipt):  # noqa: ANN001
+            _token, _config, handle = receipt.frozen_inputs(sink=self, load_config=load_config)
+            handle.metadata["full_refresh_publication"] = {"marker": {"candidate": "target_fact__stage"}}
+            return LoadResult(inserted_rows=1, updated_rows=0, total_rows=1, staging_rows=1)
+
+        def cleanup_staged_load(self, handle):  # noqa: ANN001
+            assert handle.metadata["full_refresh_publication"]["marker"]["candidate"] == "target_fact__stage"
+
+    result = LoadGovernanceFinalizationCoordinator().load(
+        sink=PublicationSink([]),
+        load_config=_load_config(load_strategy=LoadStrategy.FULL_REFRESH),
+        payload=LoadPayload(artifact=InMemoryRowsArtifact([{"id": 1}]), schema=[("id", "bigint")]),
+        extract_result=ExtractResult(artifact=InMemoryRowsArtifact([{"id": 1}]), schema=[("id", "bigint")]),
+        load_record=_load_record(),
+        projector=_ProjectedTableProjector([]),
+    )
+
+    assert result.total_rows == 1
+
+
 def test_target_invocation_failure_retains_staging_and_records_commit_unknown() -> None:
     events: list[str] = []
     audit = InMemoryLoadStepAuditStorage()
