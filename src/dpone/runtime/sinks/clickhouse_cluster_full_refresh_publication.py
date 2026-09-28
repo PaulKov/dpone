@@ -69,9 +69,7 @@ class ClickHouseClusterFullRefreshPublicationService:
         self._ddl = ddl
         self._bootstrap = bootstrap
 
-    @staticmethod
-    def is_enabled(load_config: Any) -> bool:
-        return is_cluster_enabled(load_config)
+    is_enabled = staticmethod(is_cluster_enabled)
 
     def publish(self, load_config: Any, candidate_config: Any, *, staged_rows: int) -> ClusterFullRefreshReceipt:
         cluster = _cluster(load_config)
