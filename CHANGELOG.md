@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Added
+
+- Required physical chunks now support validated MSSQL BCP Native layouts.
+  Binary row framing preserves field bytes, rejects oversized or truncated rows,
+  and carries the selected ClickHouse Native/RowBinary contract into every chunk.
+  Eager cleanup releases each source file after acknowledged staging ingestion.
+  Required mode fails closed before source I/O for `snapshot_diff`, `scd2`, and
+  any nonempty `schema_contract`; auto mode preserves the existing range or
+  whole-file BCP Native route for those combinations. Route-wide capabilities
+  remain available through transports that support their projections.
+
 ## 0.85.0 - 2026-09-28
 
 ### Added

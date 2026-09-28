@@ -34,6 +34,7 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
         estimated_rows: int | None = None,
         bulk_text_codec: Any | None = None,
         bulk_wire_contract: Any | None = None,
+        native_wire_contract: Any | None = None,
         source_scan_decision: Any | None = None,
         cleanup_policy: str = "on_success",
     ) -> None:
@@ -44,6 +45,7 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
         self.format = format
         self.bulk_text_codec = bulk_text_codec
         self.bulk_wire_contract = bulk_wire_contract
+        self.native_wire_contract = native_wire_contract
         self.source_scan_decision = source_scan_decision
         if cleanup_policy not in {"eager", "on_success", "keep_on_failure"}:
             raise ValueError("physical_chunk_artifact.cleanup_policy_invalid")
@@ -104,6 +106,7 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
                     self.columns,
                     bulk_text_codec=self.bulk_text_codec,
                     bulk_wire_contract=self.bulk_wire_contract,
+                    native_wire_contract=self.native_wire_contract,
                 )
                 try:
                     loaded = int(loader(file_artifact) or 0)

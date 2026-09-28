@@ -2373,3 +2373,63 @@ Attach the replay `route_refresh_execution.json`,
 `sink_route_refresh_snapshot.json`, and `route_refresh_verification.json` to
 route live certification and route release gates whenever a release claims
 production support for the bounded `mssql_clickhouse` refresh executor.
+
+## Bounded BCP Native physical chunks
+
+For a large typed copy, select `wire.mode: typed_binary`,
+`wire.source_native_format: bcp_native`, and `wire.binary_format: native`.
+BCP Native is a source wire format; dpone still converts it to ClickHouse Native.
+The existing acceleration policy applies to each physical file.
+
+The bounded native path additionally accepts the following source options:
+
+```yaml
+native_transfer:
+  wire:
+    mode: typed_binary
+    source_native_format: bcp_native
+    binary_format: native
+    acceleration:
+      mode: required
+  snapshot:
+    scan:
+      mode: single_scan
+      heap_policy: single_scan_chunks
+    physical_chunking:
+      mode: required
+      target_chunk_bytes: 64MiB
+      max_chunk_bytes: 128MiB
+      cleanup_policy: eager
+```
+
+Use `clickhouse_bulk.ingest_contract: typed_binary_staging` at the sink and the
+BCP native source options from the typed binary example above. Do not retain
+`direct_tsv` or `wire.mode: source_encoded` when selecting this route.
+
+The exporter reads a supervised FIFO and frames records using the validated
+native layout. Newlines inside binary fields are ordinary data. The writer
+seals only complete records, loads each file into staging, and eagerly releases
+it after acknowledgement. A row larger than the hard limit fails before its
+claimed payload is buffered. Truncated data and a nonzero producer exit fail
+the entire attempt, including when earlier chunks already reached staging.
+
+When physical chunks are `required`, this transport rejects `snapshot_diff`,
+`scd2`, and every nonempty `schema_contract` before source-shape inspection,
+materialization, or BCP startup. In `auto`, these combinations skip physical
+chunks and preserve the existing range-partitioned or whole-file BCP Native
+path. Use another supported MSSQL -> ClickHouse transport when those route-wide
+strategies or contract projections are required; the route strategy matrix
+above remains unchanged.
+
+A file limit is not a total worker-disk limit: allow space for source chunks,
+transcode artifacts and encoder buffers. `on_success` and `keep_on_failure`
+retention can accumulate files. Eager deletion does not provide resumability;
+resolve the prior staging/publication outcome before rerunning a failed copy.
+This path currently loads chunks sequentially and does not promise parallel
+source extraction. Benchmark extraction, framing, encoding and target ingestion
+separately before deriving a completion-time estimate.
+
+Compatibility: explicit source-encoded TSV remains available. It executes
+SQL-side text conversions and escaping, so it should not be chosen for a large
+typed workload without comparative measurements. Existing `auto` behavior has
+not changed in this additive capability release.
