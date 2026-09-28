@@ -29,6 +29,7 @@ public_contract_impact:
 
 owned_paths:
   - src/dpone/contracts/columnar_range_parallelism.py
+  - src/dpone/contracts/columnar_range_evidence.py
   - src/dpone/ports/columnar_range_parallelism.py
   - src/dpone/runtime/partitioning.py
   - src/dpone/runtime/partitioning_bounds.py
@@ -53,6 +54,7 @@ owned_paths:
   - tests/test_runtime_typed_partitioning.py
   - tests/test_columnar_chunked_source_row_authority.py
   - tests/test_columnar_range_plan_output.py
+  - tests/test_columnar_range_execution_evidence.py
   - tests/test_clickhouse_columnar_range_staging.py
   - tests/test_route_capability_runtime_factory.py
 
