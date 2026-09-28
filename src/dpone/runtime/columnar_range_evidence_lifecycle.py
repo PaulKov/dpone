@@ -389,14 +389,15 @@ class RangeEvidenceTransitions:
         self.validation_failed(owner, True)
 
     def cleaned_clickhouse(self, service: Any, handle: Any, cleanup: Callable[..., None]) -> None:
-        self.cleaned(handle.sink_state, cleanup, service._sink, service._external, service._drop_configs, handle)
+        owner = getattr(handle, "sink_state", handle)
+        self.cleaned(owner, cleanup, service._sink, service._external, service._drop_configs, handle)
 
     def aborted_clickhouse(self, service: Any, handle: Any, cleanup: Callable[..., None]) -> None:
         def operation() -> None:
             if not service._external.cleanup(handle, abort=True):
                 cleanup(service._sink, service._external, service._drop_configs, handle)
 
-        self.aborted(handle.sink_state, operation)
+        self.aborted(getattr(handle, "sink_state", handle), operation)
 
     @staticmethod
     def cleanup_failed(owner: Any) -> None:
