@@ -111,6 +111,16 @@ class StagedLoadPostCommitCleanupError(RuntimeError):
         self.details = staged_load_post_commit_cleanup_details(cleanup_error, handle)
 
 
+class StagedLoadPostCommitEvidenceError(RuntimeError):
+    """Stable non-retryable failure after commit and cleanup were confirmed."""
+
+    code = "range_terminal_evidence_failed"
+
+    def __init__(self, evidence_error: BaseException, handle: Any) -> None:
+        super().__init__("range terminal evidence failed after confirmed target commit and cleanup")
+        self.details = staged_load_post_commit_evidence_details(evidence_error, handle)
+
+
 def validate_staged_load_if_supported(
     sink: Any,
     load_config: Any,
@@ -237,6 +247,22 @@ def staged_load_post_commit_cleanup_details(error: BaseException, handle: Any) -
     }
 
 
+def staged_load_post_commit_evidence_details(error: BaseException, handle: Any) -> dict[str, Any]:
+    """Classify audit failure after target commit and staging cleanup succeeded."""
+
+    return {
+        "failure_boundary": "post_commit",
+        "target_outcome": "committed",
+        "error_code": StagedLoadPostCommitEvidenceError.code,
+        "evidence_error_type": type(error).__name__,
+        "cleanup_attempted": True,
+        "cleanup_status": "succeeded",
+        "cleanup_verification_required": False,
+        "safe_to_retry": False,
+        **staged_load_range_evidence_details(handle),
+    }
+
+
 def abort_staged_load_preserving_primary(sink: Any, handle: Any) -> str:
     """Attempt abort without replacing the primary error."""
 
@@ -281,6 +307,7 @@ __all__ = [
     "SinkSideLineageProjector",
     "StagedLoadHandle",
     "StagedLoadPostCommitCleanupError",
+    "StagedLoadPostCommitEvidenceError",
     "StagedLoadPort",
     "StagedLoadValidationReceipt",
     "StagedLoadValidationPort",
@@ -291,5 +318,6 @@ __all__ = [
     "staged_load_handle_details",
     "staged_load_range_evidence_details",
     "staged_load_post_commit_cleanup_details",
+    "staged_load_post_commit_evidence_details",
     "validate_staged_load_if_supported",
 ]

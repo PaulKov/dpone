@@ -6,10 +6,11 @@ from dataclasses import replace
 
 import pytest
 
-from dpone.governance.hooks import InMemoryLoadStepAuditStorage
+from dpone.contracts.quality_failure import QualityGateReceiptError
+from dpone.governance.hooks import InMemoryLoadStepAuditStorage, LoadStepAuditRecord
 from dpone.runtime.artifacts import InMemoryRowsArtifact
 from dpone.runtime.governance.finalization import LoadGovernanceFinalizationCoordinator
-from dpone.runtime.governance.ports import StagedLoadHandle
+from dpone.runtime.governance.ports import StagedLoadHandle, StagedLoadPostCommitEvidenceError
 from dpone.runtime.governance.service import LoadGovernanceService
 from dpone.runtime.normalization.staged_mutation import NestedPackageStagedMutation
 from dpone.runtime.sinks.clickhouse_cluster_full_refresh_publication import (
@@ -47,6 +48,9 @@ class _RangeQualityOwner:
     def mark_range_cleanup_succeeded(self) -> None:
         self.range_execution_evidence.outcome_status = "succeeded"
 
+    def mark_range_failed(self, **_outcome: object) -> None:
+        self.range_execution_evidence.outcome_status = "failed"
+
 
 class _MutableRangeEvidence:
     def __init__(self) -> None:
@@ -54,6 +58,18 @@ class _MutableRangeEvidence:
 
     def to_dict(self) -> dict[str, object]:
         return {"schema_version": "dpone.columnar_range_execution.v1", "outcome_status": self.outcome_status}
+
+
+class _FailingTerminalAudit(InMemoryLoadStepAuditStorage):
+    def record_step(self, record: LoadStepAuditRecord) -> None:
+        if getattr(record, "step_id", None) == "range_evidence_terminal":
+            raise RuntimeError("audit-unavailable")
+        super().record_step(record)
+
+
+class _ReceiptFailureService(LoadGovernanceService):
+    def validate_quality_gate_receipt(self, **_kwargs: object) -> None:
+        raise QualityGateReceiptError("receipt-invalid")
 
 
 @pytest.mark.parametrize("coordinator", ["governance", "nested"])
@@ -106,23 +122,9 @@ def test_composed_publication_cleanup_preserves_receipt_and_fenced_ownership(coo
 
 
 def test_governance_coordinator_threads_authoritative_quality_receipt_to_range_owner() -> None:
-    config = _config()
-    candidate = replace(config, target_table="candidate")
-    owner = _RangeQualityOwner()
-    handle = StagedLoadHandle(
-        staging_config=candidate,
-        finalization_config=candidate,
-        payload_schema=(("id", "Int64"),),
-        staged_rows=2,
-        sink_state=owner,
-    )
-    backend = FakeSink()
-    facade = object.__new__(ClickHouseSink)
-    facade._staged_load = ClickHouseStagedLoadService(backend)
-    facade.stage_payload = lambda _config, _payload: handle
-    payload = LoadPayload(artifact=InMemoryRowsArtifact([{"id": 1}, {"id": 2}]), schema=[("id", "Int64")])
-
+    config, owner, facade, payload = _range_governance_fixture()
     audit = InMemoryLoadStepAuditStorage()
+
     LoadGovernanceFinalizationCoordinator(LoadGovernanceService(audit_storage=audit)).load(
         sink=facade,
         load_config=config,
@@ -140,3 +142,62 @@ def test_governance_coordinator_threads_authoritative_quality_receipt_to_range_o
     terminal = next(record for record in audit.records if record.step_id == "range_evidence_terminal")
     assert finalized.details["range_execution"]["outcome_status"] == "published"
     assert terminal.details["range_execution"]["outcome_status"] == "succeeded"
+
+
+def test_terminal_audit_failure_is_classified_as_committed_and_non_retryable() -> None:
+    config, _owner, facade, payload = _range_governance_fixture()
+
+    with pytest.raises(StagedLoadPostCommitEvidenceError) as raised:
+        LoadGovernanceFinalizationCoordinator(LoadGovernanceService(audit_storage=_FailingTerminalAudit())).load(
+            sink=facade,
+            load_config=config,
+            payload=payload,
+            extract_result=ExtractResult(artifact=payload.artifact, schema=payload.schema),
+            load_record=_load_record(),
+        )
+
+    assert raised.value.details["target_outcome"] == "committed"
+    assert raised.value.details["cleanup_status"] == "succeeded"
+    assert raised.value.details["safe_to_retry"] is False
+    assert raised.value.details["range_execution"]["outcome_status"] == "succeeded"
+
+
+def test_specialized_receipt_failure_still_records_terminal_range_failure() -> None:
+    config, owner, facade, payload = _range_governance_fixture()
+    audit = InMemoryLoadStepAuditStorage()
+
+    with pytest.raises(QualityGateReceiptError, match="receipt-invalid"):
+        LoadGovernanceFinalizationCoordinator(_ReceiptFailureService(audit_storage=audit)).load(
+            sink=facade,
+            load_config=config,
+            payload=payload,
+            extract_result=ExtractResult(artifact=payload.artifact, schema=payload.schema),
+            load_record=_load_record(),
+        )
+
+    range_failure = next(
+        record
+        for record in audit.records
+        if record.step_id == "load_governance_failed" and "range_execution" in record.details
+    )
+    assert range_failure.details["range_execution"]["outcome_status"] == "failed"
+    assert owner.range_execution_evidence.outcome_status == "failed"
+
+
+def _range_governance_fixture() -> tuple[object, _RangeQualityOwner, object, LoadPayload]:
+    config = _config()
+    candidate = replace(config, target_table="candidate")
+    owner = _RangeQualityOwner()
+    handle = StagedLoadHandle(
+        staging_config=candidate,
+        finalization_config=candidate,
+        payload_schema=(("id", "Int64"),),
+        staged_rows=2,
+        sink_state=owner,
+    )
+    backend = FakeSink()
+    facade = object.__new__(ClickHouseSink)
+    facade._staged_load = ClickHouseStagedLoadService(backend)
+    facade.stage_payload = lambda _config, _payload: handle
+    payload = LoadPayload(artifact=InMemoryRowsArtifact([{"id": 1}, {"id": 2}]), schema=[("id", "Int64")])
+    return config, owner, facade, payload

@@ -13,7 +13,7 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 
 from dpone.contracts.quality_failure import QualityGateReceiptError
-from dpone.runtime import columnar_range_quality_bridge as range_quality
+from dpone.runtime import columnar_range_quality_bridge as range_bridge
 from dpone.runtime.governance.acceptance_metrics import (
     AcceptanceMetricPolicy,
     AcceptanceMetricsRecorder,
@@ -90,8 +90,7 @@ class LoadGovernanceFinalizationCoordinator:
         failure: Exception | None = None
         quality_started: datetime | None = None
         target_state = "pre_target"
-        acceptance_failure_recorded = False
-        failure_evidence_recorded = False
+        specialized_failure_recorded = False
         try:
             validated_staged_rows(handle)
             self._record(
@@ -159,7 +158,7 @@ class LoadGovernanceFinalizationCoordinator:
                     load_record=load_record,
                 )
             except Exception:
-                acceptance_failure_recorded = True
+                specialized_failure_recorded = True
                 raise
             if quality_execution is not None:
                 quality_execution.assert_current(load_config=load_config)
@@ -169,7 +168,7 @@ class LoadGovernanceFinalizationCoordinator:
                     receipt=quality_receipt,
                 )
                 assert quality_receipt is not None
-            range_quality.advance_range_governed_quality(projected.handle, quality_receipt, quality_evidence)
+            range_bridge.advance_range_governed_quality(projected.handle, quality_receipt, quality_evidence)
             validation_receipt = validate_staged_load_if_supported(sink, load_config, projected.handle)
             if validation_receipt.validated:
                 _token, lifecycle_load_config, lifecycle_handle = validation_receipt.frozen_inputs(
@@ -213,7 +212,7 @@ class LoadGovernanceFinalizationCoordinator:
                     load_record=load_record,
                 )
             except Exception:
-                acceptance_failure_recorded = True
+                specialized_failure_recorded = True
                 raise
             if quality_execution is not None:
                 quality_execution.assert_current(load_config=load_config)
@@ -225,7 +224,7 @@ class LoadGovernanceFinalizationCoordinator:
                     "finalized",
                     "succeeded",
                     started_at=finalize_started,
-                    details=range_quality.range_load_result_details(load_result, lifecycle_handle),
+                    details=range_bridge.range_load_result_details(load_result, lifecycle_handle),
                 )
             except Exception:
                 self._record_preserving_primary(
@@ -239,7 +238,7 @@ class LoadGovernanceFinalizationCoordinator:
                         "error_code": "finalized_evidence_failed",
                     },
                 )
-                failure_evidence_recorded = True
+                specialized_failure_recorded = True
                 raise
         except Exception as exc:
             preserve_completed_replay_truth(exc, replay_evidence, quality_execution)
@@ -277,8 +276,8 @@ class LoadGovernanceFinalizationCoordinator:
                         "error_code": exc.code,
                     },
                 )
-                failure_evidence_recorded = True
-            if not acceptance_failure_recorded and not failure_evidence_recorded:
+                specialized_failure_recorded = True
+            if range_bridge.should_record_failure(failure_details, specialized_failure_recorded):
                 self._record_preserving_primary(
                     load_record,
                     "load_governance_failed",
@@ -305,8 +304,8 @@ class LoadGovernanceFinalizationCoordinator:
                     )
                     if failure is None:
                         raise classified from cleanup_error
-                terminal_recorder = self._record if failure is None else None
-                range_quality.record_terminal_range_evidence(terminal_recorder, load_record, lifecycle_handle)
+                terminal_recorder = self._record if failure is None else self._record_preserving_primary
+                range_bridge.record_terminal_range_evidence(terminal_recorder, load_record, lifecycle_handle)
 
         return with_governance_metrics(
             load_result,
