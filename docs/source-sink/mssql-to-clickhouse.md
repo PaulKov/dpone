@@ -295,6 +295,45 @@ when possible, and emits a separate NULL bucket. If the source is a view or
 statistics confidence is low, `dpone plan` records
 `source_stats_low_confidence` and starts with conservative parallelism.
 
+### Bounded columnar range execution
+
+The Parquet/object-storage pull route can opt into deterministic parallel SQL
+Server reads with `source.options.partitioning.range_parallelism`. This does not
+parallelize one cursor: each planned range opens its own MSSQL session, renders
+the canonical typed predicate, writes only range-owned object keys, and records
+EOF even when the range is empty. `num_partitions`, `reader_workers`,
+`upload_workers`, and `load_workers` are independent limits; none is fixed to
+four. Aggregate row, encoded-byte, and inflight-range limits apply across the
+whole attempt.
+
+| Topology | Loading behavior | Failure and replay boundary |
+| --- | --- | --- |
+| `shared_per_run` | Confirmed ranges load into the one run-owned staging table. | An ambiguous or partial range load invalidates and rebuilds the complete staging attempt. |
+| `per_partition` | Each range loads into a run-owned staging table; one assembly writes the authoritative staging table. | Failed range resources are discarded; publication still waits for complete assembly and validation. |
+
+Both topologies use the existing single ClickHouse publication lifecycle. No
+business target is published until every planned range has confirmed EOF, the
+exact range set and row counts are reconciled, and quality gates pass against
+the authoritative staging table. Reader, upload, or load failure cancels the
+group and cleans run-owned resources without reporting success.
+
+Parallel reads require an explicit source consistency contract. Use an immutable
+source, a named database snapshot, a typed temporal `AS OF` authority, or a
+write-exclusion proof. Independent snapshot transactions are not treated as one
+shared snapshot. Raw window-function SQL is rejected because a range boundary
+can split a window/group; dynamic splitting is not performed. SQL Server
+`uniqueidentifier` ranges must be explicit and retain SQL Server comparison
+semantics. See the [configuration reference](../reference/configuration.md) and
+[object-storage staging guide](../object-storage-staging.md) for the full keys,
+recovery rules, and sanitized plan/runtime evidence.
+
+The checked example
+[`mssql_to_clickhouse_columnar_parallel.yml`](../../examples/mssql_to_clickhouse_columnar_parallel.yml)
+uses synthetic names and credentials-by-reference. The route has synthetic
+contract coverage; live throughput, source pressure, and recovery certification
+remain `UNVERIFIED` until executed in an explicitly approved MSSQL, object-store,
+and ClickHouse environment.
+
 `clickhouse_bulk.native_tcp.backend: auto` prefers a certified direct protocol
 provider and otherwise falls back to the v0.30 client wrapper. `backend:
 direct` blocks before source I/O when direct protocol support is missing or
