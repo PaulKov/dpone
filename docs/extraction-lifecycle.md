@@ -58,6 +58,13 @@ Artifacts accept one idempotent terminal decision:
 | `abort` | Load did not commit | cleaned | rollback/close |
 | `retain_commit_unknown` | Target commit acknowledgement is ambiguous | retained | rollback/close |
 
+For explicitly eager physical-chunk transfers, acknowledged chunk payloads may
+already have been released before the terminal decision. The retained evidence
+is their byte/checksum receipts, staging state, and any still-owned failed or
+in-flight files. `retain_commit_unknown` does not recreate released payloads or
+authorize replay. Reconcile the target outcome before starting another attempt.
+
+
 Retention applies only to durable diagnostic evidence. A live cursor or a
 PostgreSQL read-only transaction is never evidence and is always closed. The
 first terminal decision wins; repeated calls return the same

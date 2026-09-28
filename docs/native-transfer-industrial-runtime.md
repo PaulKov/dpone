@@ -57,6 +57,26 @@ files, one staging session, and eager cleanup after each chunk load. Evidence is
 written as `dpone.native_transfer.source_scan_decision.v1` and
 `dpone.native_transfer.physical_chunks.v1`.
 
+With `cleanup_policy: eager`, a chunk is deleted only after the staging loader
+returns successfully and its measured byte/checksum receipt has been recorded.
+Deletion completes before the next chunk is requested. A deletion failure stops
+consumption; a failed or ambiguously acknowledged load retains its current file
+for the terminal owner. Aggregate source-byte admission uses completed receipts,
+not files that have already been released. A producer failure after the last
+chunk still prevents completed-source authority and publication.
+
+The eager disk bound covers chunk payloads; allow additional space for the
+runtime image, logs, FIFO buffers, and evidence. `on_success` and
+`keep_on_failure` preserve the existing terminal-owned file retention behavior.
+Direct Python artifact construction retains that behavior unless `eager` is
+explicitly selected. Already consumed artifacts cannot be loaded or rebound a
+second time, including empty or failed consumption.
+
+Eager cleanup is not resumable local storage. After a worker loss, restart the
+source scan into a new governed staging attempt. After an ambiguous publication,
+reconcile the existing outcome before retrying: staged target data and receipts
+remain relevant, while released source files cannot be reconstructed from them.
+
 The physical target and maximum have different guarantees:
 
 - `target_chunk_bytes` is a soft target. dpone seals after a complete row makes

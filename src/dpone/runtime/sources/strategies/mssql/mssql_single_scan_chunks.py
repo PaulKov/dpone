@@ -57,6 +57,7 @@ class BcpSingleScanChunkExporter:
             bulk_text_codec=bulk_text_codec,
             bulk_wire_contract=bulk_wire_contract,
             source_scan_decision=source_scan_decision,
+            cleanup_policy=policy.cleanup_policy,
         )
 
     def _export_chunks(

@@ -144,6 +144,7 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
         bulk_text_codec: Any | None = None,
         bulk_wire_contract: Any | None = None,
         source_scan_decision: Any | None = None,
+        cleanup_policy: str = "on_success",
     ) -> None:
         super().__init__(estimated_rows=estimated_rows)
         self.chunk_generator = chunk_generator
@@ -153,6 +154,11 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
         self.bulk_text_codec = bulk_text_codec
         self.bulk_wire_contract = bulk_wire_contract
         self.source_scan_decision = source_scan_decision
+        if cleanup_policy not in {"eager", "on_success", "keep_on_failure"}:
+            raise ValueError("physical_chunk_artifact.cleanup_policy_invalid")
+        self.cleanup_policy = cleanup_policy
+        self._consumption_started = False
+        self.rows_exported: int | None = None
         self._events: list[dict[str, Any]] = []
         self._generation_failure: dict[str, Any] | None = None
         self._owned_chunk_paths: set[Path] = set()
@@ -169,7 +175,7 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
         with self._terminal_lock:
             if self.terminal_receipt is not None:
                 raise ValueError("physical_chunk_artifact.already_terminated")
-            if self._owned_chunk_paths:
+            if self._consumption_started:
                 raise ValueError("physical_chunk_artifact.already_materialized")
             self.chunk_generator = chunk_generator
             if columns is not None:
@@ -177,6 +183,12 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
         return self
 
     def load_with(self, loader: Callable[[FileExportArtifact], int]) -> int:
+        with self._terminal_lock:
+            if self.terminal_receipt is not None:
+                raise ValueError("physical_chunk_artifact.already_terminated")
+            if self._consumption_started:
+                raise ValueError("physical_chunk_artifact.already_materialized")
+            self._consumption_started = True
         lifecycle = self.extraction_lifecycle
         if lifecycle is not None and lifecycle.receipt is None:
             lifecycle.acquire()
@@ -209,8 +221,13 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
                 except Exception:
                     self._record(chunk, "failed", error_code="physical_chunk_staging_load_failed")
                     raise
-                finally:
-                    self._record(chunk, "retained_until_terminal")
+                else:
+                    if self.cleanup_policy == "eager":
+                        chunk.cleanup()
+                        self._owned_chunk_paths.discard(Path(chunk.file_path))
+                        self._record(chunk, "released_after_staging_ack")
+                    else:
+                        self._record(chunk, "retained_until_terminal")
         except BaseException as error:
             self._close_chunks(chunks, parent_error=error)
             raise
@@ -218,6 +235,7 @@ class PhysicalChunkedFileExportArtifact(BaseExtractionArtifact):
             self._close_chunks(chunks)
             if lifecycle is not None:
                 lifecycle.complete()
+            self.rows_exported = total_rows
             self.source_byte_measurement_complete = True
             return total_rows
         finally:

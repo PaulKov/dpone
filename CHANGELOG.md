@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.84.1 - 2026-09-28
+
+### Fixed
+
+- MSSQL single-scan physical chunks honor `cleanup_policy: eager`: release each
+  chunk after acknowledged staging load and recorded byte/checksum evidence,
+  before producing the next chunk. Failed or ambiguous chunks remain owned by
+  terminal cleanup. Completed source counts and byte-budget admission remain
+  available after release; consumed artifacts cannot be replayed or rebound.
+
 ## 0.84.0 - 2026-09-28
 
 ### Added
