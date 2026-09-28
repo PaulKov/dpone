@@ -18,6 +18,7 @@ from dpone.ports.clickhouse_cluster_publication import (
 from dpone.ports.clickhouse_cluster_publication import (
     require_verified_mutation as _require_verified,
 )
+from dpone.runtime.quality_replay_contracts import contracts as quality_contracts
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import cluster_name as _cluster
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import correlation_token as _correlation_token
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import is_cluster_enabled
@@ -25,6 +26,7 @@ from dpone.runtime.sinks.clickhouse_cluster_publication_identity import operatio
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
 from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
     candidate_readiness_deadline,
+    reconcile_existing,
     require_first_publication_complete,
     require_pre_dispatch_generation,
     settle_prior_publication,
@@ -54,6 +56,10 @@ _optional_one_identity = contracts.optional_generation_identity
 _require_inventory = contracts.require_inventory
 
 
+ReplayQualityEvidenceError = quality_contracts.ReplayQualityEvidenceError
+require_quality_retired = quality_contracts.require_quality_retired
+
+
 class ClickHouseClusterFullRefreshPublicationService:
     """Fence publication in Keeper and reconcile exact per-replica truth."""
 
@@ -63,11 +69,14 @@ class ClickHouseClusterFullRefreshPublicationService:
         authority_factory: Any,
         ddl: ClusterPublicationDdlPort,
         bootstrap: ClusterPublicationBootstrapPort,
+        *,
+        quality_store: Any | None = None,
     ) -> None:
         self._catalog = catalog
         self._authority_factory = authority_factory
         self._ddl = ddl
         self._bootstrap = bootstrap
+        self._quality_store = quality_store
 
     is_enabled = staticmethod(is_cluster_enabled)
 
@@ -110,6 +119,8 @@ class ClickHouseClusterFullRefreshPublicationService:
             predecessor=predecessor,
             staged_rows=staged_rows,
         )
+        if self._quality_store is not None:
+            record = self._quality_store.seal(record, load_config)
         readiness_deadline = candidate_readiness_deadline()
         require_pre_dispatch_generation(self._catalog, cluster, record, deadline=readiness_deadline)
         authority = self._authority_factory(database)
@@ -118,12 +129,17 @@ class ClickHouseClusterFullRefreshPublicationService:
             created = authority.create_if_absent(record)
             current = _require_verified(created, permit=False)
         elif current.record.phase is AuthorityPhase.COMPLETED and current.record.operation_id != record.operation_id:
+            require_quality_retired(
+                current.record.quality_evidence, current.record.quality_reader, authority_version=current.version
+            )
             # The fixed target slot is intentionally retained. Reuse it through
             # one versioned transition so stale workers cannot resurrect the
             # prior completed operation or create unbounded Keeper rows.
             record = replace(record, dispatch_epoch=current.record.dispatch_epoch + 1)
             current = _require_verified(authority.compare_and_swap(current, record), permit=False)
         else:
+            if current.record.quality_reader is not None:
+                raise ReplayQualityEvidenceError("INCOMPLETE")
             _require_same_operation(current.record, record)
             record = current.record
             if record.phase is not AuthorityPhase.PREPARED:
@@ -158,6 +174,9 @@ class ClickHouseClusterFullRefreshPublicationService:
         if current is None:
             return load_config
         if current.record.operation_id != _operation_id(load_config):
+            require_quality_retired(
+                current.record.quality_evidence, current.record.quality_reader, authority_version=current.version
+            )
             if current.record.phase is AuthorityPhase.COMPLETED:
                 # Admission grants no ownership. Publication re-reads and CAS-
                 # replaces the completed slot before issuing a dispatch permit.
@@ -173,6 +192,8 @@ class ClickHouseClusterFullRefreshPublicationService:
             )
             return load_config
         _require_inventory(current.record, inventory)
+        if current.record.quality_reader is not None:
+            raise ReplayQualityEvidenceError("INCOMPLETE")
         if current.record.phase is AuthorityPhase.COMPLETED:
             receipt = ClusterFullRefreshReceipt.from_authority(current, cluster)
         elif current.record.phase is AuthorityPhase.DISPATCHING:
@@ -210,6 +231,8 @@ class ClickHouseClusterFullRefreshPublicationService:
             raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "authority changed")
         resolved.validate_for_authority(current)
         record = current.record
+        if record.quality_reader is not None:
+            raise ReplayQualityEvidenceError("INCOMPLETE")
         if current.record.phase is AuthorityPhase.COMPLETED:
             return
         inventory = self._catalog.inventory(resolved.cluster)
@@ -324,38 +347,4 @@ class ClickHouseClusterFullRefreshPublicationService:
         current: VersionedAuthorityRecord,
         cluster: str,
     ) -> ClusterFullRefreshReceipt:
-        record = current.record
-        inventory = self._catalog.inventory(cluster)
-        _require_inventory(record, inventory)
-        hosts = inventory.hosts
-        entry = require_exact_ddl_entry(
-            self._ddl,
-            cluster,
-            entry_id=record.ddl_entry,
-            token=record.ddl_correlation_token,
-            query_digest=record.ddl_query_digest,
-            error_code="DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN",
-        )
-        queue_state = entry.state_for(hosts)
-        observed = self._catalog.generations(cluster, record.database, record.target, record.candidate, hosts)
-        states = tuple(
-            classify_replica(item, desired=record.desired, predecessor=record.predecessor) for item in observed
-        )
-        aggregate = classify_aggregate(states, queue_state)
-        if aggregate is AggregatePublicationState.PARTIAL_IN_PROGRESS:
-            raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_IN_PROGRESS", "original DDL is active")
-        if aggregate is AggregatePublicationState.PARTIAL_TERMINAL:
-            raise ClusterPublicationError(
-                "DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_PARTIAL_TERMINAL", "manual repair required"
-            )
-        if aggregate is not AggregatePublicationState.COMMITTED:
-            raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_UNKNOWN", "completion is not proven")
-        committed = replace(
-            record,
-            phase=AuthorityPhase.COMMITTED,
-            ddl_entry=entry.entry,
-        )
-        if current.record != committed:
-            result = authority.compare_and_swap(current, committed)
-            current = _require_verified(result, permit=False)
-        return ClusterFullRefreshReceipt.from_authority(current, cluster)
+        return reconcile_existing(self._catalog, self._ddl, authority, current, cluster)

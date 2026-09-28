@@ -167,6 +167,8 @@ class ETLProcessor(ProcessorPayloadMixin):
                         validation_info=None,
                         reconciliation_metrics=replay_result.reconciliation_metrics,
                     )
+                self._runtime.prepare_replay_quality(runtime_config, quality_execution)
+                if replay_result is not None:
                     runtime.complete_replay_governance(
                         load_config=runtime_config,
                         replay_result=replay_result,

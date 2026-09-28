@@ -10,11 +10,14 @@ from typing import TypeVar
 from dpone.ports.clickhouse_cluster_publication import (
     ClusterPublicationAuthorityPort,
     ClusterPublicationCatalogPort,
+    ClusterPublicationDdlPort,
     contracts,
+    require_exact_ddl_entry,
     require_verified_mutation,
 )
 from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import DEFAULT_WAIT_SECONDS
 from dpone.runtime.sinks.clickhouse_cluster_candidate_readiness import require_candidate_rows as require_candidate_rows
+from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
 
 _Receipt = TypeVar("_Receipt")
 
@@ -143,3 +146,52 @@ def require_same_operation(current: contracts.AuthorityRecord, proposed: contrac
         raise contracts.ClusterPublicationError(
             "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target"
         )
+
+
+def reconcile_existing(
+    catalog: ClusterPublicationCatalogPort,
+    ddl: ClusterPublicationDdlPort,
+    authority: ClusterPublicationAuthorityPort,
+    current: contracts.VersionedAuthorityRecord,
+    cluster: str,
+) -> ClusterFullRefreshReceipt:
+    """Reconcile the retained one-shot DDL against exact per-replica truth."""
+    record = current.record
+    inventory = catalog.inventory(cluster)
+    contracts.require_inventory(record, inventory)
+    hosts = inventory.hosts
+    entry = require_exact_ddl_entry(
+        ddl,
+        cluster,
+        entry_id=record.ddl_entry,
+        token=record.ddl_correlation_token,
+        query_digest=record.ddl_query_digest,
+        error_code="DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN",
+    )
+    queue_state = entry.state_for(hosts)
+    observed = catalog.generations(cluster, record.database, record.target, record.candidate, hosts)
+    states = tuple(
+        contracts.classify_replica(item, desired=record.desired, predecessor=record.predecessor) for item in observed
+    )
+    aggregate = contracts.classify_aggregate(states, queue_state)
+    if aggregate is contracts.AggregatePublicationState.PARTIAL_IN_PROGRESS:
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_IN_PROGRESS", "original DDL is active"
+        )
+    if aggregate is contracts.AggregatePublicationState.PARTIAL_TERMINAL:
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_PARTIAL_TERMINAL", "manual repair required"
+        )
+    if aggregate is not contracts.AggregatePublicationState.COMMITTED:
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_UNKNOWN", "completion is not proven"
+        )
+    committed = replace(
+        record,
+        phase=contracts.AuthorityPhase.COMMITTED,
+        ddl_entry=entry.entry,
+    )
+    if current.record != committed:
+        result = authority.compare_and_swap(current, committed)
+        current = require_verified_mutation(result, permit=False)
+    return ClusterFullRefreshReceipt.from_authority(current, cluster)

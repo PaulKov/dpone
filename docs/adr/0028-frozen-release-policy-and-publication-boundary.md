@@ -9,6 +9,12 @@ approval of the linked feature design. Live provider, controller, evidence-store
 and Trusted Publisher inventories remain `UNVERIFIED` activation blockers; they
 do not reopen this decision.
 
+Operational scope clarification (2026-09-28): these inventories describe the
+historical v2 activation design, not an additional gate on the active ordinary
+OIDC publisher. Current releases follow [Release](../release.md), whose operating
+policy does not require manual PyPI Trusted Publisher inspection or browser login
+for every release. The historical observations below remain unchanged.
+
 ## Context
 
 The v0.73.1 release remediation introduced exact annotated-tag, package,

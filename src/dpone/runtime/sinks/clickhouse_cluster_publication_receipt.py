@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from typing import Any
 
 from dpone.ports.clickhouse_cluster_publication import contracts
+from dpone.runtime.quality_replay_contracts import contracts as quality_contracts
 from dpone.runtime.sinks.clickhouse_full_refresh_contract import FullRefreshPublicationMarker
 
 CLUSTER_RECEIPT_VERSION = "dpone.clickhouse.cluster-full-refresh-receipt.v1"
@@ -97,6 +98,9 @@ class ClusterFullRefreshReceipt:
         )
 
 
+QualityReplayCapsule = quality_contracts.QualityReplayCapsule
+
+
 def authority_from_mapping(value: dict[str, Any]) -> contracts.AuthorityRecord:
     value["phase"] = contracts.AuthorityPhase(value["phase"])
     value["desired"] = contracts.GenerationIdentity(**_mapping(value["desired"]))
@@ -119,6 +123,7 @@ def _immutable_authority_identity(record: contracts.AuthorityRecord) -> tuple[An
         record.desired,
         record.predecessor,
         record.staged_rows,
+        QualityReplayCapsule.parse(record.quality_evidence).core_digest if record.quality_evidence else None,
     )
 
 

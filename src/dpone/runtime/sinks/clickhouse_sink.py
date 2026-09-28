@@ -66,8 +66,11 @@ class ClickHouseSink(
         physical_type_resolver: ClickHousePhysicalColumnTypeResolver | None = None,
         validated_file_runner_factory: Callable[[LoadConfig, ClickHouseValidatedFilePolicy], ClickHouseFileStageRunner]
         | None = None,
+        durable_quality_replay: bool = False,
     ):
         self.connector = connector
+        self.durable_quality_replay = durable_quality_replay
+        self.quality_replay_store: Any | None = None
         self.state_storage = state_storage
         self.logger = logger or _default_etl_logger()
         self.acceptance_metric_probe = _default_acceptance_metric_probe(connector)

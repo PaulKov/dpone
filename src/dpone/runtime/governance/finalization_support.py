@@ -1,12 +1,17 @@
-"""Value helpers for governed staged-load finalization."""
+"""Value and observation helpers for governed staged-load finalization."""
 
 from __future__ import annotations
 
 from dataclasses import replace
 from typing import Any
 
+from dpone.runtime.governance.acceptance_metrics import (
+    AcceptanceEvidenceContext,
+    AcceptanceMetricRun,
+    AcceptanceMetricsRecorder,
+)
 from dpone.runtime.governance.ports import StagedLoadPostCommitCleanupError
-from dpone.runtime.governance.service import QualityGateReceipt
+from dpone.runtime.governance.service import LoadGovernanceService, QualityGateReceipt
 from dpone.runtime.process_io import add_exception_note
 from dpone.runtime.sinks.load_result import LoadResult
 
@@ -82,7 +87,37 @@ def classify_post_commit_cleanup_failure(
     return classified
 
 
+def capture_acceptance(
+    recorder: AcceptanceMetricsRecorder,
+    governance_service: LoadGovernanceService,
+    run: AcceptanceMetricRun,
+    *,
+    sides: tuple[str, ...],
+    boundary: str,
+    source: Any | None,
+    sink: Any,
+    load_config: Any,
+    extract_result: Any,
+    staged_handle: Any,
+    load_record: Any,
+) -> None:
+    """Capture requested physical sides with the same evidence boundary."""
+    for side in sides:
+        recorder.capture(
+            run,
+            side=side,
+            load_config=load_config,
+            extract_result=extract_result,
+            payload_schema=staged_handle.payload_schema,
+            source=source,
+            sink=sink,
+            evidence=AcceptanceEvidenceContext(load_record, governance_service, boundary),
+            staged_handle=staged_handle,
+        )
+
+
 __all__ = [
+    "capture_acceptance",
     "classify_post_commit_cleanup_failure",
     "load_result_details",
     "staged_probe_result",

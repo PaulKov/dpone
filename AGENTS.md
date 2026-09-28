@@ -77,7 +77,11 @@ alternative upload path. A readiness GO or documentation request does not
 authorize publication, retagging, or provider changes. Do not republish an
 existing version to obtain verification evidence. Classify R1–R9 applicability
 without weakening source PR checks or promoting unrelated CI-shadow backlog
-into a release blocker. Preserve unfinished backlog truthfully.
+into a release blocker. Preserve unfinished backlog truthfully. Ordinary releases
+do not require manual PyPI Trusted Publisher inspection, browser login, or a
+provider-settings attestation. Verify publication through the actual controller
+result and exact public archive hashes; do not claim unobserved settings were
+verified or change provider authority without explicit authorization.
 
 ### Feature design
 

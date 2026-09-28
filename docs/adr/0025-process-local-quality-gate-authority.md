@@ -60,3 +60,7 @@ claims require durable or cryptographic authority and a separate design.
 - [Quality acceptance fail-closed feature design](../feature-design-quality-acceptance-fail-closed-v0731.md)
 - [ADR 0011: Canonical fingerprints](0011-canonical-fingerprints.md)
 - [ADR 0022: Durable target commit journal and fence](0022-target-commit-terminal-failures.md)
+
+The optional durable producer and fresh-receipt extension is defined in
+[ADR 0073](0073-durable-committed-replay-quality.md). It preserves this receipt
+authority boundary and does not authenticate serialized receipts.
