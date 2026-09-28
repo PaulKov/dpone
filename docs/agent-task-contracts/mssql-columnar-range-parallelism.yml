@@ -35,17 +35,25 @@ owned_paths:
   - src/dpone/runtime/partitioning_options.py
   - src/dpone/runtime/partitioning_predicates.py
   - src/dpone/runtime/columnar_range_parallelism.py
+  - src/dpone/runtime/columnar_object_storage_windows.py
   - src/dpone/runtime/columnar_snapshot_provider.py
   - src/dpone/runtime/columnar_fast_path_models.py
   - src/dpone/runtime/columnar_fast_path_planner.py
   - src/dpone/runtime/columnar_runtime_assembly.py
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_provider.py
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_reader.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_windows.py
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_queryout_bridge.py
   - src/dpone/runtime/sinks/clickhouse_columnar_pull.py
+  - src/dpone/runtime/sinks/clickhouse_payload_support.py
   - src/dpone/runtime/sinks/clickhouse_staged_load.py
   - tests/test_mssql_columnar_range_parallelism.py
+  - tests/test_mssql_columnar_snapshot_provider.py
   - tests/test_runtime_typed_partitioning.py
+  - tests/test_columnar_chunked_source_row_authority.py
+  - tests/test_columnar_range_plan_output.py
+  - tests/test_clickhouse_columnar_range_staging.py
+  - tests/test_route_capability_runtime_factory.py
 
 integrator_owned_paths:
   - src/dpone/schema/etl-config.schema.json
@@ -58,6 +66,7 @@ integrator_owned_paths:
   - CHANGELOG.md
   - mkdocs.yml
   - docs/adr-index.md
+  - docs/module_size_baseline.json
 
 read_only_paths:
   - src/dpone/runtime/sinks/clickhouse_sink.py
@@ -81,6 +90,7 @@ forbidden_paths:
   - docs/source-sink-matrix.md
   - examples/mssql_to_clickhouse_columnar_parallel.yml
   - docs/adr-index.md
+  - docs/module_size_baseline.json
   - dpone-release-controller
   - any version or tag metadata for 0.85.0
 
