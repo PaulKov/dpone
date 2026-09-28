@@ -3,7 +3,7 @@ task_id: "PR-225-INTEGRATION"
 title: "Rebase and certify bounded BCP native physical chunks"
 goal: "Rebase PR #225 onto current master, preserve its approved additive contract, resolve code/test regressions, and produce exact-head review evidence."
 specification: "docs/feature-specs/bounded-bcp-native-stream.md"
-base_commit: "2938ff3784cd8ca3e522cc34a37aac7c3ab68226"
+base_commit: "8b0d38b08c349671cb739966aafa9322826a0c18"
 integrator: "/root"
 
 acceptance_criteria:
