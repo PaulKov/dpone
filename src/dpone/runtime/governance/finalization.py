@@ -189,6 +189,15 @@ class LoadGovernanceFinalizationCoordinator:
             finalize_started = _utc_now()
             if before_target_mutation is not None:
                 before_target_mutation()
+            replay_session = getattr(quality_execution, "replay_session", None)
+            if replay_session is not None:
+                replay_session.prepare(
+                    config=load_config,
+                    handle=projected.handle,
+                    extract_result=extract_result,
+                    receipt=quality_receipt,
+                    acceptance=acceptance_run,
+                )
             target_state = "target_invoked"
             load_result = finalize_staged_load_after_validation(
                 sink,
@@ -217,6 +226,8 @@ class LoadGovernanceFinalizationCoordinator:
                 raise
             if quality_execution is not None:
                 quality_execution.assert_current(load_config=load_config)
+            if replay_session is not None:
+                replay_session.finish_original(load_config)
             try:
                 self._record(
                     load_record,

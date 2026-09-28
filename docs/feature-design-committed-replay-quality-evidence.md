@@ -1,16 +1,32 @@
 # Feature design: quality evidence for committed replay
 
-- Status: RESEARCHED
+- Status: APPROVED
 - Owner: maintainers
 - Issue: independent open-source recovery work; no external incident reference
 - Target release: TBD after implementation and review
 - Last verified: 2026-09-28
 - Inspected source: `202310035a2eda90f91783275f1d62de9d3e1991`
-- Implementation gate: maintainer approval of this specification is required.
+- Implementation gate: maintainer approved implementation on 2026-09-28.
 
-This proposal is for runtime maintainers and operators. It does **not** describe
-an implemented capability. Start with the [feature design standard](feature-design-standard.md)
-and [existing quality governance](load-governance.md).
+This approved design is for runtime maintainers and operators. The bounded
+Python opt-in is implemented as described in the [user guide](committed-replay-quality.md).
+The protocol below also describes deferred target-capture and additional-backend
+work; approval is not a claim that every planned capability has shipped.
+Start with the [feature design standard](feature-design-standard.md) and
+[existing quality governance](load-governance.md).
+
+## Implementation disposition
+
+The initial implementation supports explicitly composed internal replicated
+ClickHouse full refresh, row/hash gates, source/staged acceptance, strict externally
+provisioned KeeperMap authority and source-free replay. Target capture is rejected
+before source access because no enforceably bounded reader is composed. External
+replication, the MSSQL adapter, CLI/manifest selection and the optional Code 999
+DDL observation retry remain deferred. The retry evaluation found no absolute
+deadline in the stock driver path; no generic or mutation retry was added.
+See [ADR 0073](adr/0073-durable-committed-replay-quality.md) and the
+[reference](committed-replay-quality-reference.md) for the shipped boundary.
+Live certification remains UNVERIFIED.
 
 ## Executive summary
 
@@ -516,8 +532,8 @@ workflow changes are implied by this design.
 - [x] Compatibility, migration, docs and synthetic validation are specified.
 - [x] Current official comparison sources and limited measurable target are recorded.
 - [x] Shared-file ownership and fresh-context review are specified.
-- [ ] Maintainer changed status to `APPROVED`.
+- [x] Maintainer approved this specification in the implementation chat.
 
-Next step: approve or revise this design, then implement the exact semantic-field
-registry, authority prerequisite and synthetic red-green tests. No production code
-has changed under this proposal.
+Implementation is approved. The initial bounded subset, its deferred capabilities
+and verification limits are recorded in the implementation disposition above.
+Review the integrated source, synthetic evidence and ADR 0073 before merge.

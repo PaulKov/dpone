@@ -91,6 +91,8 @@ class QualityGateExecution:
         self._state = "OPEN"
         self._boundary: QualityFailureBoundary | None = None
         self._issued_receipt: QualityGateReceipt | None = None
+        self._replay_probes: tuple[QualityProbeSnapshot, QualityProbeSnapshot] | None = None
+        self.replay_session: Any | None = None
 
     def select_boundary(self, boundary: str, *, load_config: Any) -> None:
         """Bind the path-owned mutation boundary before quality evaluation."""
@@ -166,6 +168,7 @@ class QualityGateExecution:
                     self._state = "FAILED"
                     raise QualityGateFailure(safe_report)
                 self._issued_receipt = receipt
+                self._replay_probes = (source_snapshot, target_snapshot)
                 self._state = "ISSUED"
                 return receipt
             except QualityGateFailure:
@@ -189,6 +192,20 @@ class QualityGateExecution:
                 expected_state="ISSUED",
             )
             return quality_gate_report_evidence(authoritative.report, self.snapshot.gate_policy)
+
+    def replay_probe_projection(self, receipt: object, *, load_config: Any) -> tuple[dict[str, Any], ...]:
+        """Export only authoritative row/hash observations before dispatch.
+
+        The durable adapter supplies authenticity after restart. This method
+        deliberately does not serialize the process-local authority token.
+        """
+        with self._lock:
+            self._require_receipt_locked(receipt, load_config=load_config, expected_state="ISSUED")
+            if self._replay_probes is None:
+                raise QualityGateReceiptInvalid
+            return tuple(
+                {"row_count": probe.row_count, "typed_hash": probe.typed_hash} for probe in self._replay_probes
+            )
 
     def receipt_for_report(
         self,

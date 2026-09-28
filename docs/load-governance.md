@@ -607,3 +607,8 @@ manifest definition, evaluate snapshots/probes, and return a blocking or warning
 result. Keep providers small and connector-specific behavior behind ports; the
 planner and processor should not import MSSQL, ClickHouse or Airflow adapters
 directly.
+
+For Python-composed internal replicated ClickHouse full refresh, see
+[quality validation after committed replay](committed-replay-quality.md). Its
+explicit durable store preserves original observations across process restart;
+unsupported routes retain the existing non-inert replay guard.

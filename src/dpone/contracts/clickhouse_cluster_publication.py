@@ -13,6 +13,7 @@ from typing import Any
 from dpone._compat import StrEnum
 
 SCHEMA_VERSION = "dpone.clickhouse.cluster-full-refresh.v1"
+QUALITY_SCHEMA_VERSION = "dpone.clickhouse.cluster-full-refresh.v2"
 AUTHORITY_TABLE = "__dpone_cluster_publication_authority"
 _SAFE_QUOTED_IDENTIFIER = re.compile(r"`([A-Za-z_][A-Za-z0-9_]*)`")
 
@@ -206,10 +207,17 @@ class AuthorityRecord:
     cleanup_entry: str | None = None
     cleanup_query_digest: str | None = None
     schema_version: str = SCHEMA_VERSION
+    quality_evidence: str | None = None
+    quality_reader: str | None = None
+    authority_write_id: str | None = None
 
     @property
     def payload(self) -> str:
-        return canonical_json(asdict(self))
+        values = asdict(self)
+        for field in ("quality_evidence", "quality_reader", "authority_write_id"):
+            if values[field] is None:
+                del values[field]
+        return canonical_json(values)
 
     @property
     def payload_sha256(self) -> str:

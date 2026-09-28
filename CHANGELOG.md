@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Opt-in durable quality replay for Python-composed bounded internal replicated
+  ClickHouse full refresh. Trusted original row/hash and source/staged acceptance
+  observations are bound to strict publication authority and revalidated without
+  source reads or publication redispatch. Incomplete governance fences slot reuse.
+  Target capture, external replication and CLI/manifest selection remain unsupported.
+
+
 ## 0.84.4 - 2026-09-28
 
 ### Fixed

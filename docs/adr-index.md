@@ -92,3 +92,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0071: Deployment-owned credential projection (Accepted)](adr/0071-deployment-owned-credential-projection.md)
 
 - [ADR 0072: MSSQL native writers expose explicit proof capabilities (Accepted)](adr/0072-mssql-native-writer-proof-capabilities.md)
+
+- [ADR 0073: Durable evidence reissues process-local quality authority (Accepted for bounded opt-in)](adr/0073-durable-committed-replay-quality.md)

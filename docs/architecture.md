@@ -1806,3 +1806,12 @@ on the runtime port, while the service owns staging/count/cleanup decisions.
 Source terminal authority and target finalization remain with existing owners.
 See the [data-flow and state diagrams](developer-validated-clickhouse-file-staging.md)
 and [ADR 0064](adr/0064-validated-file-clickhouse-staging.md).
+
+## Durable committed replay quality
+
+The optional `QualityReplayStore` port separates durable original observations
+from process-local quality receipts. The initial strict KeeperMap adapter seals
+evidence before publication; governance checks exact identity and generation
+under a durable reader guard and issues a fresh local receipt. See
+[ADR 0073](adr/0073-durable-committed-replay-quality.md) for ordering, trust and
+compatibility, and the [user guide](committed-replay-quality.md) for scope.

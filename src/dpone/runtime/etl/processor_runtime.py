@@ -24,6 +24,7 @@ from dpone.runtime.etl.result_metrics import (
     staged_quality_gate_report,
 )
 from dpone.runtime.etl.source_extraction_lifecycle import SourceExtractionLifecycleService
+from dpone.runtime.governance.quality_replay import prepare_quality_replay
 from dpone.runtime.runtime_throughput import enrich_run_result_with_throughput
 from dpone.security_redaction import redact_public_context, redact_public_text
 
@@ -98,6 +99,9 @@ class ProcessorRuntimeServices:
             return result
         sink_replay = getattr(self.sink, "replay_result", None)
         return sink_replay(load_config) if callable(sink_replay) else None
+
+    def prepare_replay_quality(self, load_config: Any, quality_execution: Any) -> None:
+        prepare_quality_replay(self.sink, load_config, quality_execution)
 
     def preflight_before_extract(self, load_config: Any, load_record: Any) -> None:
         self.source_extraction_lifecycle_service.assert_supported(self.source, load_config)
@@ -204,12 +208,18 @@ def complete_replay_governance(
     """Complete a source-free replay without accepting missing quality proof."""
 
     if not quality_snapshot.is_inert():
-        raise MssqlReplayQualityEvidenceRequired
-    staged_quality_gate_report(replay_result, load_config=load_config)
-    quality_execution.accept_state(
-        getattr(replay_result, "quality_gate_receipt", None),
-        load_config=load_config,
-    )
+        session = quality_execution.replay_session
+        if session is None:
+            raise MssqlReplayQualityEvidenceRequired
+        _receipt, evidence = session.replay(load_config)
+        if replay_result.reconciliation_metrics is not None:
+            replay_result.reconciliation_metrics["quality_replay"] = evidence
+    else:
+        staged_quality_gate_report(replay_result, load_config=load_config)
+        quality_execution.accept_state(
+            getattr(replay_result, "quality_gate_receipt", None),
+            load_config=load_config,
+        )
     load_governance_service.run_post_hooks(
         load_config=load_config,
         source=source,

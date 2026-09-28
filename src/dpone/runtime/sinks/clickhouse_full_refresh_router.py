@@ -14,10 +14,14 @@ from dpone.ports.clickhouse_cluster_publication import (
 from dpone.ports.clickhouse_external_replication import EXTERNAL_RECEIPT_SCHEMA_VERSION
 from dpone.runtime.clickhouse_cluster_publication_composition import (
     build_clickhouse_cluster_publication,
+    build_clickhouse_quality_publication,
 )
 from dpone.runtime.decision_audit import publish_runtime_decision
+from dpone.runtime.quality_replay_contracts import contracts as quality_contracts
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import CLUSTER_RECEIPT_VERSION
 from dpone.runtime.sinks.clickhouse_full_refresh_publication import ClickHouseFullRefreshPublicationService
+
+ReplayQualityEvidenceError = quality_contracts.ReplayQualityEvidenceError
 
 
 class ClickHouseFullRefreshPublicationRouter:
@@ -32,6 +36,7 @@ class ClickHouseFullRefreshPublicationRouter:
         self._local = local
         self._cluster = cluster
         self._external = external
+        self._durable_quality = False
 
     @classmethod
     def from_connector(cls, connector: Any) -> ClickHouseFullRefreshPublicationRouter:
@@ -49,6 +54,9 @@ class ClickHouseFullRefreshPublicationRouter:
         )
 
         router = cls.from_connector(sink.connector)
+        if getattr(sink, "durable_quality_replay", False):
+            router._cluster, sink.quality_replay_store = build_clickhouse_quality_publication(sink.connector)
+            router._durable_quality = True
         router._external = build_clickhouse_external_replication(sink)
         return router
 
@@ -117,6 +125,8 @@ class ClickHouseFullRefreshPublicationRouter:
 
     def _service(self, load_config: Any) -> Any:
         decision = evaluate_clickhouse_cluster_admission(_admission_input(load_config))
+        if self._durable_quality and decision.mode != "cluster":
+            raise ReplayQualityEvidenceError("UNSUPPORTED")
         if not self._local.is_enabled(load_config) and not decision.requested:
             return self._local
         publish_runtime_decision(

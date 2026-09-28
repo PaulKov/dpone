@@ -261,3 +261,7 @@ Inspect replication health and the exact owned generation through read-only
 diagnostics. Do not clear the authority or weaken health checks to force
 publication. This pre-dispatch wait does not remove the single-writer requirement
 or change post-dispatch reconciliation and cleanup checks.
+
+When the explicit durable quality store is selected, also follow the
+[committed replay quality runbook](committed-replay-quality-runbook.md). Publication
+completion alone cannot retire unfinished quality or a held reader guard.
