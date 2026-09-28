@@ -93,7 +93,7 @@ class ClickHouseColumnarPullLoader:
         if policy is None:
             return self._load_legacy_windowed(load_config, artifact, schema)
         windows = tuple(artifact.iter_windows())
-        groups = group_range_windows(windows)
+        groups = group_range_windows(windows, artifact=artifact)
         if not groups:
             mark_source_byte_measurement_complete(artifact)
             return 0

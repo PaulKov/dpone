@@ -40,13 +40,39 @@ class _Window:
 
 
 class _Artifact:
-    def __init__(self, windows: list[_Window], *, topology: str, load_workers: int) -> None:
+    def __init__(
+        self,
+        windows: list[_Window],
+        *,
+        topology: str,
+        load_workers: int,
+        planned_count: int | None = None,
+    ) -> None:
         self._windows = windows
         self.range_parallelism_policy = SimpleNamespace(
             staging_topology=topology,
             load_workers=load_workers,
         )
+        count = planned_count if planned_count is not None else len({window.range_ordinal for window in windows})
+        ranges = tuple(SimpleNamespace(range_id=f"range-{ordinal}", ordinal=ordinal) for ordinal in range(count))
+        self.request = SimpleNamespace(range_plan=SimpleNamespace(policy=self.range_parallelism_policy, ranges=ranges))
+        rows_by_ordinal = {
+            ordinal: sum(window.row_count for window in windows if window.range_ordinal == ordinal)
+            for ordinal in range(count)
+        }
+        self.range_execution_evidence = {
+            "all_ranges_confirmed": True,
+            "ranges": [
+                {
+                    "range_id": descriptor.range_id,
+                    "rows": rows_by_ordinal[descriptor.ordinal],
+                    "eof_confirmed": True,
+                }
+                for descriptor in ranges
+            ],
+        }
         self.metrics: list[dict[str, object]] = []
+        self.staging_metrics: list[dict[str, object]] = []
         self.measurement_complete = False
 
     def iter_windows(self):
@@ -57,6 +83,9 @@ class _Artifact:
 
     def mark_source_byte_measurement_complete(self) -> None:
         self.measurement_complete = True
+
+    def record_range_staging_metric(self, metric: dict[str, object]) -> None:
+        self.staging_metrics.append(metric)
 
 
 class _Connector:
@@ -192,6 +221,66 @@ def test_sink_callbacks_use_cluster_ddl_and_one_partition_assembly_statement() -
     assembly = [sql for sql in connector.queries if " UNION ALL " in sql]
     assert len(assembly) == 1
     assert assembly[0].startswith("INSERT INTO authoritative SELECT * FROM authoritative__range_000000")
+
+
+@pytest.mark.parametrize("topology", ["shared_per_run", "per_partition"])
+def test_authoritative_plan_preserves_mixed_empty_ranges(topology: str) -> None:
+    harness = _Harness()
+    artifact = _Artifact([_Window(1)], topology=topology, load_workers=2, planned_count=3)
+
+    loaded = harness.loader().load_windowed(cast(Any, _Config("authoritative", {})), artifact, (("id", "Int64"),))
+
+    assert loaded == 1
+    if topology == "per_partition":
+        assert len(harness.created) == 3
+    assert artifact.staging_metrics[0]["range_count"] == 3
+    assert artifact.staging_metrics[0]["rows"] == 1
+
+
+@pytest.mark.parametrize("topology", ["shared_per_run", "per_partition"])
+def test_authoritative_plan_records_all_empty_ranges(topology: str) -> None:
+    harness = _Harness()
+    artifact = _Artifact([], topology=topology, load_workers=2, planned_count=4)
+
+    loaded = harness.loader().load_windowed(cast(Any, _Config("authoritative", {})), artifact, (("id", "Int64"),))
+
+    assert loaded == 0
+    if topology == "per_partition":
+        assert len(harness.created) == 4
+    assert harness.counts["authoritative"] == 0
+    assert artifact.measurement_complete is True
+    assert artifact.staging_metrics[0]["range_count"] == 4
+    assert artifact.staging_metrics[0]["rows"] == 0
+
+
+@pytest.mark.parametrize(
+    ("window", "error"),
+    [
+        (_Window(1), "clickhouse_range_window_not_planned"),
+        (_Window(0), "clickhouse_range_window_identity_mismatch"),
+    ],
+)
+def test_authoritative_plan_rejects_unexpected_or_mismatched_window_identity(
+    window: _Window,
+    error: str,
+) -> None:
+    if window.range_ordinal == 0:
+        window.range_id = "wrong-range"
+    artifact = _Artifact([window], topology="shared_per_run", load_workers=1, planned_count=1)
+
+    with pytest.raises(ValueError, match=error):
+        _Harness().loader().load_windowed(cast(Any, _Config("authoritative", {})), artifact, (("id", "Int64"),))
+
+    assert window.cleaned == 1
+
+
+def test_authoritative_plan_rejects_missing_range_confirmation() -> None:
+    artifact = _Artifact([], topology="shared_per_run", load_workers=1, planned_count=2)
+    confirmations = cast(list[dict[str, object]], artifact.range_execution_evidence["ranges"])
+    artifact.range_execution_evidence["ranges"] = confirmations[:1]
+
+    with pytest.raises(ValueError, match="clickhouse_range_execution_confirmation_set_mismatch"):
+        _Harness().loader().load_windowed(cast(Any, _Config("authoritative", {})), artifact, (("id", "Int64"),))
 
 
 class _SqlConnector:

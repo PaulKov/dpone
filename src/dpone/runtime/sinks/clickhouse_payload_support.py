@@ -137,7 +137,20 @@ def range_staging_policy(artifact: Any) -> tuple[str, int] | None:
     return str(topology), workers
 
 
-def group_range_windows(windows: tuple[Any, ...]) -> tuple[RangeWindowGroup, ...]:
+def group_range_windows(windows: tuple[Any, ...], *, artifact: Any | None = None) -> tuple[RangeWindowGroup, ...]:
+    plan = getattr(getattr(artifact, "request", None), "range_plan", None)
+    try:
+        if plan is not None:
+            return _group_planned_range_windows(windows, artifact=artifact, plan=plan)
+        return _group_emitted_range_windows(windows)
+    except BaseException as error:
+        cleanup_error = cleanup_range_resources(windows, (), drop_partition=None)
+        if cleanup_error is not None:
+            error.add_note(f"range window cleanup failed: {type(cleanup_error).__name__}")
+        raise
+
+
+def _group_emitted_range_windows(windows: tuple[Any, ...]) -> tuple[RangeWindowGroup, ...]:
     grouped: dict[int, list[Any]] = defaultdict(list)
     identities: dict[int, str] = {}
     for window in windows:
@@ -153,6 +166,62 @@ def group_range_windows(windows: tuple[Any, ...]) -> tuple[RangeWindowGroup, ...
     if ordinals != tuple(range(len(ordinals))) or len(set(identities.values())) != len(identities):
         raise ValueError("clickhouse_range_window_ordinals_invalid")
     return tuple(RangeWindowGroup(identities[ordinal], ordinal, tuple(grouped[ordinal])) for ordinal in ordinals)
+
+
+def _group_planned_range_windows(windows: tuple[Any, ...], *, artifact: Any, plan: Any) -> tuple[RangeWindowGroup, ...]:
+    descriptors = tuple(getattr(plan, "ranges", ()) or ())
+    expected: dict[int, str] = {}
+    for descriptor in descriptors:
+        ordinal = getattr(descriptor, "ordinal", None)
+        range_id = getattr(descriptor, "range_id", None)
+        if isinstance(ordinal, bool) or not isinstance(ordinal, int) or not isinstance(range_id, str) or not range_id:
+            raise ValueError("clickhouse_range_plan_invalid")
+        expected[ordinal] = range_id
+    if (
+        not descriptors
+        or tuple(sorted(expected)) != tuple(range(len(descriptors)))
+        or len(expected) != len(descriptors)
+        or len(set(expected.values())) != len(expected)
+    ):
+        raise ValueError("clickhouse_range_plan_invalid")
+    grouped: dict[int, list[Any]] = {ordinal: [] for ordinal in expected}
+    for window in windows:
+        ordinal = getattr(window, "range_ordinal", None)
+        range_id = getattr(window, "range_id", None)
+        if isinstance(ordinal, bool) or not isinstance(ordinal, int) or ordinal not in expected:
+            raise ValueError("clickhouse_range_window_not_planned")
+        if range_id != expected[ordinal]:
+            raise ValueError("clickhouse_range_window_identity_mismatch")
+        grouped[ordinal].append(window)
+    confirmed_rows = _confirmed_range_rows(artifact, expected)
+    groups = tuple(RangeWindowGroup(expected[ordinal], ordinal, tuple(grouped[ordinal])) for ordinal in expected)
+    for group in groups:
+        if group.expected_rows != confirmed_rows[group.range_id]:
+            raise ValueError(f"clickhouse_range_confirmation_row_count_mismatch:{group.range_id}")
+    return groups
+
+
+def _confirmed_range_rows(artifact: Any, expected: Mapping[int, str]) -> dict[str, int]:
+    evidence = getattr(artifact, "range_execution_evidence", None)
+    if not isinstance(evidence, Mapping) or evidence.get("all_ranges_confirmed") is not True:
+        raise ValueError("clickhouse_range_execution_confirmation_missing")
+    raw_ranges = evidence.get("ranges")
+    if not isinstance(raw_ranges, list | tuple):
+        raise ValueError("clickhouse_range_execution_confirmation_invalid")
+    confirmed: dict[str, int] = {}
+    for item in raw_ranges:
+        if not isinstance(item, Mapping) or item.get("eof_confirmed") is not True:
+            raise ValueError("clickhouse_range_execution_confirmation_invalid")
+        range_id = item.get("range_id")
+        rows = item.get("rows")
+        if not isinstance(range_id, str) or isinstance(rows, bool) or not isinstance(rows, int) or rows < 0:
+            raise ValueError("clickhouse_range_execution_confirmation_invalid")
+        if range_id in confirmed:
+            raise ValueError("clickhouse_range_execution_confirmation_invalid")
+        confirmed[range_id] = rows
+    if set(confirmed) != set(expected.values()):
+        raise ValueError("clickhouse_range_execution_confirmation_set_mismatch")
+    return confirmed
 
 
 def count_connector_rows(connector: Any, table_name: str) -> int:
