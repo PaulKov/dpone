@@ -124,8 +124,7 @@ class ClickHouseColumnarPullLoader:
                 topology=topology,
                 requested_workers=load_workers,
                 observed_workers=tracker.maximum,
-                range_count=len(groups),
-                rows=expected_rows,
+                groups=groups,
             )
             mark_source_byte_measurement_complete(artifact)
         except BaseException as error:

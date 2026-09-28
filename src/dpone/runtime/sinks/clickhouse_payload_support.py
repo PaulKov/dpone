@@ -266,8 +266,7 @@ def record_range_staging_metric(
     topology: str,
     requested_workers: int,
     observed_workers: int,
-    range_count: int,
-    rows: int,
+    groups: Sequence[RangeWindowGroup],
 ) -> None:
     recorder = getattr(artifact, "record_range_staging_metric", None)
     if callable(recorder):
@@ -277,8 +276,17 @@ def record_range_staging_metric(
                 "staging_topology": topology,
                 "requested_load_workers": requested_workers,
                 "observed_load_workers": observed_workers,
-                "range_count": range_count,
-                "rows": rows,
+                "range_count": len(groups),
+                "rows": sum(group.expected_rows for group in groups),
+                "range_confirmations": [
+                    {
+                        "range_id": group.range_id,
+                        "range_ordinal": group.ordinal,
+                        "rows": group.expected_rows,
+                        "stage_confirmed": True,
+                    }
+                    for group in groups
+                ],
             }
         )
 

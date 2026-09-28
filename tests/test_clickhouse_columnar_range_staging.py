@@ -235,6 +235,11 @@ def test_authoritative_plan_preserves_mixed_empty_ranges(topology: str) -> None:
         assert len(harness.created) == 3
     assert artifact.staging_metrics[0]["range_count"] == 3
     assert artifact.staging_metrics[0]["rows"] == 1
+    assert artifact.staging_metrics[0]["range_confirmations"] == [
+        {"range_id": "range-0", "range_ordinal": 0, "rows": 0, "stage_confirmed": True},
+        {"range_id": "range-1", "range_ordinal": 1, "rows": 1, "stage_confirmed": True},
+        {"range_id": "range-2", "range_ordinal": 2, "rows": 0, "stage_confirmed": True},
+    ]
 
 
 @pytest.mark.parametrize("topology", ["shared_per_run", "per_partition"])
@@ -251,6 +256,7 @@ def test_authoritative_plan_records_all_empty_ranges(topology: str) -> None:
     assert artifact.measurement_complete is True
     assert artifact.staging_metrics[0]["range_count"] == 4
     assert artifact.staging_metrics[0]["rows"] == 0
+    assert all(item["stage_confirmed"] is True for item in artifact.staging_metrics[0]["range_confirmations"])
 
 
 @pytest.mark.parametrize(
