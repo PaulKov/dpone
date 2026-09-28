@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-## 0.84.1 - 2026-09-28
+## 0.84.2 - 2026-09-28
 
 ### Fixed
 
@@ -16,6 +16,11 @@
   complete the retained authority record, and admit the next scheduler operation
   only after the prior publication is fully reconciled. Unresolved generations
   remain fenced.
+
+## 0.84.1 - 2026-09-28
+
+### Fixed
+
 - A new replicated full-refresh is admitted after proven completion, retaining
   versioned publication ownership, unfinished-operation conflicts, and
   same-invocation replay.
