@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.86.0 - 2026-09-29
+
 ### Added
 
 - Declarative `sink.options.durable_quality_replay` opt-in for bounded internal
