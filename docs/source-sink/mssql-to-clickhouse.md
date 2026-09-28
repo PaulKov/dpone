@@ -2413,6 +2413,12 @@ it after acknowledgement. A row larger than the hard limit fails before its
 claimed payload is buffered. Truncated data and a nonzero producer exit fail
 the entire attempt, including when earlier chunks already reached staging.
 
+This physical-chunk transport rejects `snapshot_diff`, `scd2`, and every
+nonempty `schema_contract` before source-shape inspection, materialization, or
+BCP startup. Use another supported MSSQL -> ClickHouse transport when those
+route-wide strategies or contract projections are required; the route strategy
+matrix above remains unchanged.
+
 A file limit is not a total worker-disk limit: allow space for source chunks,
 transcode artifacts and encoder buffers. `on_success` and `keep_on_failure`
 retention can accumulate files. Eager deletion does not provide resumability;

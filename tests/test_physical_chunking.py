@@ -259,10 +259,21 @@ def test_mssql_native_chunks_reject_strategy_metadata_before_source_io(
     assert connector.bcp_runner_calls == 0
 
 
-def test_mssql_native_chunks_reject_schema_contract_before_source_io(tmp_path: Path) -> None:
+@pytest.mark.parametrize(
+    "schema_contract",
+    [
+        {"enforcement": "strict"},
+        {"columns": {}},
+        {"columns": {"id": {"nullable": False}}},
+    ],
+)
+def test_mssql_native_chunks_reject_schema_contract_before_source_io(
+    tmp_path: Path,
+    schema_contract: dict[str, object],
+) -> None:
     connector = _FakeMssqlConnector(table_kind="heap", has_seekable_boundary=False)
     config = _native_chunk_config(tmp_path)
-    config.options["schema_contract"] = {"columns": {"id": {"nullable": False}}}
+    config.options["schema_contract"] = schema_contract
 
     with pytest.raises(ValueError, match="mssql_bcp_native_physical_chunks_schema_contract_unsupported"):
         MSSQLQueryoutArtifactFactory(

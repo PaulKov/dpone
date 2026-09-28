@@ -32,6 +32,12 @@ Eager cleanup bounds retained source chunks; retention modes still retain files
 and are not advertised as bounding total disk. Source and transcoded files plus
 encoder buffers must fit the configured worker budget.
 
+The `mssql-bcp-native` physical-chunk transport fails closed before source I/O
+for `snapshot_diff`, `scd2`, or any nonempty `schema_contract`. Those strategies
+remain route-wide capabilities through transports that can apply their metadata
+and contract projections; this specification does not add those projections to
+the opaque BCP Native chunk wire.
+
 ## Algorithm and failure semantics
 
 1. Build and validate the native layout before spawning BCP.

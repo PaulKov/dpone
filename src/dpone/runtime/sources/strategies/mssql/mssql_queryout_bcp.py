@@ -267,8 +267,7 @@ def _guard_native_chunk_admission(
     if physical_chunk_policy.mode == "off":
         return
     raw_contract = getattr(load_config, "options", {}).get("schema_contract")
-    columns = raw_contract.get("columns") if isinstance(raw_contract, Mapping) else None
-    if isinstance(columns, Mapping) and columns:
+    if isinstance(raw_contract, Mapping) and raw_contract:
         raise ValueError("mssql_bcp_native_physical_chunks_schema_contract_unsupported")
 
 
