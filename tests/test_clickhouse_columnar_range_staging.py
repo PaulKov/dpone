@@ -123,6 +123,9 @@ class _Connector:
             self.counts[target] = self.counts.get(target, 0) + 1
 
     def get_records(self, sql: str):
+        for ordinal in range(16):
+            if sql.startswith("SELECT count() FROM s3") and f"range-{ordinal}" in sql:
+                return [(1,)]
         table = sql.rsplit(" ", 1)[-1]
         return [(self.counts.get(table, 0),)]
 
@@ -132,9 +135,10 @@ class _ConcurrentConnector(_Connector):
         super().__init__(counts)
         self._barrier = barrier
 
-    def execute_query(self, sql: str) -> None:
+    def execute_query(self, sql: str) -> int:
         self._barrier.wait(timeout=2)
         super().execute_query(sql)
+        return 0
 
 
 class _Harness:
@@ -386,6 +390,9 @@ class _CancellableConnector:
         assert self.started.wait(timeout=5)
         raise RuntimeError("primary-range-failure")
 
+    def get_records(self, _sql: str):
+        return [(1,)]
+
     def cancel(self) -> None:
         self.cancel_calls += 1
         self.cancelled.set()
@@ -561,6 +568,9 @@ class _LifecycleConnector:
         self.events.append(("insert", "objects_present"))
         if self.fail_insert:
             raise RuntimeError("stage-failure")
+
+    def get_records(self, _sql: str):
+        return [(1,)]
 
 
 class _LifecycleSink:

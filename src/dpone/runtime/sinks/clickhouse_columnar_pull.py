@@ -178,6 +178,8 @@ class ClickHouseColumnarPullLoader:
 
         def load(connector: Any, group: RangeWindowGroup) -> None:
             actual = self._load_group(connector, load_config, artifact, schema, group, tracker)
+            if actual != group.expected_rows:
+                raise ValueError(f"clickhouse_range_staging_row_count_mismatch:{group.range_id}")
             with observed_lock:
                 observed[group.range_id] = actual
 
@@ -267,17 +269,15 @@ class ClickHouseColumnarPullLoader:
         tracker: RangeLoadConcurrencyTracker,
     ) -> int:
         reported_rows = 0
-        all_reported = True
         for window_index, window in enumerate(group.windows, start=1):
             sql = self.render_insert_sql(load_config, window, schema)
             started = self._clock()
             tracker.enter()
             try:
-                result = connector.execute_query(sql)
-                if isinstance(result, int) and not isinstance(result, bool):
-                    reported_rows += result
-                else:
-                    all_reported = False
+                config = ClickHouseColumnarPullConfig.from_load_config(load_config)
+                source = self._table_function_sql(config, window) + _settings_clause(config.settings)
+                reported_rows += count_connector_rows(connector, source)
+                connector.execute_query(sql)
             finally:
                 tracker.leave()
             _record_window_metric(
@@ -287,7 +287,7 @@ class ClickHouseColumnarPullLoader:
                 clickhouse_pull_seconds=elapsed(started, self._clock()),
                 window_cleanup_seconds=0.0,
             )
-        return reported_rows if all_reported else group.expected_rows
+        return reported_rows
 
     def render_insert_sql(
         self,
