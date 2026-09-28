@@ -1,0 +1,124 @@
+schema_version: 1
+task_id: "DPONE-MSSQL-COLUMNAR-RANGE-PARALLELISM-V1"
+title: "Bounded MSSQL columnar range parallelism"
+goal: "Add configurable deterministic range readers and a single governed ClickHouse publication barrier."
+specification: "docs/feature-design-mssql-columnar-range-parallelism-v1.md"
+base_commit: "8b0d38b0"
+integrator: "/root"
+
+acceptance_criteria:
+  - "Existing serial manifests retain their behavior and defaults."
+  - "Typed non-overlapping ranges use independent MSSQL sessions and configurable concurrency."
+  - "Aggregate row, byte, and inflight budgets apply across all readers."
+  - "Window/group splits and unsafe source consistency fail before source I/O."
+  - "Both shared_per_run and per_partition staging topologies use one publication barrier."
+  - "Partial failure cancels all work, cleans owned resources, and cannot report success."
+  - "Plan, pack, runtime evidence, tests, docs, and changelog expose the actual policy."
+  - "No version, tag, release-controller, PyPI, or 0.85.0 artifact is changed."
+
+public_contract_impact:
+  level: compatible
+  surfaces:
+    - manifest/schema
+    - CLI plan JSON/text/Markdown
+    - runtime evidence
+    - object-storage artifact layout
+    - ClickHouse staging lifecycle
+    - documentation and examples
+  migration_required: false
+
+owned_paths:
+  - src/dpone/contracts/columnar_range_parallelism.py
+  - src/dpone/runtime/partitioning.py
+  - src/dpone/runtime/partitioning_bounds.py
+  - src/dpone/runtime/partitioning_options.py
+  - src/dpone/runtime/partitioning_predicates.py
+  - src/dpone/runtime/columnar_range_parallelism.py
+  - src/dpone/runtime/columnar_snapshot_provider.py
+  - src/dpone/runtime/columnar_fast_path_models.py
+  - src/dpone/runtime/columnar_fast_path_planner.py
+  - src/dpone/runtime/columnar_runtime_assembly.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_provider.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_reader.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_queryout_bridge.py
+  - src/dpone/runtime/sinks/clickhouse_columnar_pull.py
+  - src/dpone/runtime/sinks/clickhouse_staged_load.py
+  - tests/test_mssql_columnar_range_parallelism.py
+  - tests/test_runtime_typed_partitioning.py
+
+integrator_owned_paths:
+  - src/dpone/schema/etl-config.schema.json
+  - src/dpone/schema/etl-batch-manifest.schema.json
+  - docs/reference/configuration.md
+  - docs/source-sink/mssql-to-clickhouse.md
+  - docs/object-storage-staging.md
+  - docs/source-sink-matrix.md
+  - examples/mssql_to_clickhouse_columnar_parallel.yml
+  - CHANGELOG.md
+  - mkdocs.yml
+  - docs/adr-index.md
+
+read_only_paths:
+  - src/dpone/runtime/sinks/clickhouse_sink.py
+  - src/dpone/runtime/sinks/clickhouse_staging_finalizer.py
+  - docs/architecture.md
+  - docs/engineering-standards.md
+  - docs/testing/index.md
+  - docs/release.md
+
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - src/dpone/schema/etl-config.schema.json
+  - src/dpone/schema/etl-batch-manifest.schema.json
+  - docs/reference/configuration.md
+  - docs/source-sink/mssql-to-clickhouse.md
+  - docs/object-storage-staging.md
+  - docs/source-sink-matrix.md
+  - examples/mssql_to_clickhouse_columnar_parallel.yml
+  - docs/adr-index.md
+  - dpone-release-controller
+  - any version or tag metadata for 0.85.0
+
+shared_file_owner: "/root"
+
+dependencies:
+  - "ADR 0057 ClickHouse staged publication"
+  - "canonical RangePartitioner and MSSQL predicate renderer"
+
+required_checks:
+  focused:
+    - "uv run pytest tests/test_mssql_columnar_range_parallelism.py tests/test_runtime_typed_partitioning.py -q"
+  broad:
+    - "uv run python tools/agent_policy/select_checks.py --base-ref origin/master"
+    - "uv run ruff check ."
+    - "uv run ruff format --check ."
+    - "uv run mypy --config-file mypy.ini"
+    - "uv run dpone docs check-import-rules"
+    - "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json"
+    - "uv run pytest -m 'not integration_live' -n auto --dist loadfile"
+  live:
+    - "SKIP unless an explicitly approved synthetic MSSQL/ClickHouse/object-store environment is supplied"
+
+required_outputs:
+  - implementation
+  - tests
+  - documentation_impact
+  - completion_report
+
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "Another writer owns the same semantic contract."
+  - "Required edit conflicts with another active writer."
+  - "Runtime cannot enforce a public option it accepts."
+  - "A topology cannot preserve one publication barrier."
+  - "A byte-bound claim lacks measured retained bytes."
+  - "A live check requires unapproved credentials or environment."
