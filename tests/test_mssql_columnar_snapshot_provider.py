@@ -577,9 +577,7 @@ def test_parallel_windows_use_independent_typed_ranges_and_wait_for_all_eof(tmp_
     assert object_client.list_prefix(run_prefix)
     for window in windows:
         window.cleanup()
-    assert object_client.list_prefix(run_prefix) == (
-        "s3://dpone-stage/msql/run-ranges/__dpone_run_marker.json",
-    )
+    assert object_client.list_prefix(run_prefix) == ("s3://dpone-stage/msql/run-ranges/__dpone_run_marker.json",)
     provider.cleanup_object_storage_run(request)
     assert object_client.list_prefix(run_prefix) == ()
 

@@ -386,4 +386,5 @@ class MssqlColumnarSnapshotProvider:
             return self._read_contract
         return read_contract_from_options(_read_contract_options(request))
 
+
 __all__ = ["MssqlColumnarSnapshotProvider"]
