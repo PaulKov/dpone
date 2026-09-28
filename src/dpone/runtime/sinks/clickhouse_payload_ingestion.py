@@ -22,6 +22,7 @@ from dpone.runtime.sinks.clickhouse_payload_support import (
     is_object_storage_columnar_chunked_artifact,
     is_object_storage_staging_manifest,
     is_source_native_artifact,
+    native_wire_source_schema,
     native_wire_transcoder,
 )
 from dpone.runtime.sinks.clickhouse_row_values import ClickHouseRowValueCoercer
@@ -178,12 +179,7 @@ class ClickHousePayloadIngestionService:
         schema: Sequence[tuple[str, str]],
     ) -> int:
         if is_source_native_artifact(artifact):
-            # Payload types may be normalized; only the export contract describes BCP framing.
-            contract = getattr(artifact, "native_wire_contract")
-            source_schema = tuple((column.name, column.source_type) for column in contract.columns)
-            source_columns = tuple(column for column, _ in source_schema)
-            if source_columns != tuple(artifact.columns) or source_columns != tuple(column for column, _ in schema):
-                raise ValueError("native_wire_source_schema_mismatch:column_identity")
+            source_schema = native_wire_source_schema(artifact, schema)
             stream_artifact = native_wire_transcoder().to_clickhouse_binary(
                 artifact,
                 source_schema,
