@@ -244,3 +244,114 @@ def _args(*, output_format: str) -> argparse.Namespace:
         selectors="selectors.yaml",
         max_selected=10,
     )
+
+
+@pytest.mark.parametrize("target_commit", ["proven", "unknown", "not_started"])
+def test_replay_failure_preserves_commit_truth_with_bounded_safe_diagnostic(capsys, target_commit):
+    from dpone.contracts.quality_replay import ReplayQualityEvidenceError
+
+    error = ReplayQualityEvidenceError("INCOMPLETE")
+    error.args = ("SELECT private FROM private_table password=private-secret " + "x" * 10000,)
+    error.replay_details = {
+        "target_commit": target_commit,
+        "governance": "blocked",
+        "current_run_id": "run_1",
+        "original_run_id": "original",
+        "quality_state": "TARGET_PENDING",
+        "password": "private-secret",
+        "sql": "SELECT private FROM private_table",
+    }
+    run_cmd._write_run_failure(_args(output_format="json"), error)
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert payload["passed"] is False
+    assert payload["result"]["inserted_rows"] == 0
+    assert payload["result"]["replay_details"] == {
+        "target_commit": target_commit,
+        "governance": "blocked",
+        "current_run_id": "run_1",
+        "original_run_id": "original",
+        "quality_state": "TARGET_PENDING",
+        "error_code": "DPONE_REPLAY_QUALITY_EVIDENCE_INCOMPLETE",
+    }
+    assert "DPONE_REPLAY_QUALITY_EVIDENCE_INCOMPLETE" in captured.err
+    assert len(captured.err.encode()) <= 1024
+    assert "private-secret" not in captured.err + captured.out
+    assert "private_table" not in captured.err + captured.out
+
+
+def test_replay_failure_without_metadata_does_not_infer_commit(capsys):
+    from dpone.contracts.quality_replay import ReplayQualityEvidenceError
+
+    run_cmd._write_run_failure(_args(output_format="json"), ReplayQualityEvidenceError("REQUIRED"))
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert "replay_details" not in payload["result"]
+    assert "proven" not in captured.err
+    assert "DPONE_REPLAY_QUALITY_EVIDENCE_REQUIRED" in captured.err
+
+
+def test_run_id_help_describes_manual_identity():
+    parser = argparse.ArgumentParser()
+    run_parser = run_cmd.register_parser(parser.add_subparsers())
+    help_text = run_parser.format_help()
+    assert "fresh manual UUID" in help_text
+    assert "defaults to process name" not in help_text
+
+
+@pytest.mark.parametrize("output_format", ["text", "md"])
+def test_replay_text_reports_only_safe_explicit_commit_state(capsys, output_format):
+    from dpone.contracts.quality_replay import ReplayQualityEvidenceError
+
+    error = ReplayQualityEvidenceError("INCOMPLETE")
+    error.args = ("SELECT sensitive FROM private_table",)
+    error.replay_details = {"target_commit": "proven", "governance": "blocked"}
+    run_cmd._write_run_failure(_args(output_format=output_format), error)
+    captured = capsys.readouterr()
+    assert "target_commit=proven" in captured.out
+    assert "governance=blocked" in captured.out
+    assert "private_table" not in captured.out
+
+
+@pytest.mark.parametrize("output_format", ["json", "text", "md"])
+def test_generic_postcompletion_error_preserves_validated_replay_metadata(capsys, output_format):
+    error = RuntimeError("SELECT sensitive FROM private_table password=private-secret")
+    error.replay_details = {
+        "error_code": "DPONE_REPLAY_QUALITY_EVIDENCE_INCOMPLETE",
+        "target_commit": "proven",
+        "governance": "blocked",
+        "quality_state": "COMPLETE",
+        "original_run_id": "original",
+        "current_run_id": "retry",
+        "password": "private-secret",
+    }
+    run_cmd._write_run_failure(_args(output_format=output_format), error)
+    captured = capsys.readouterr()
+    if output_format == "json":
+        payload = json.loads(captured.out)
+        assert payload["passed"] is False
+        assert payload["result"]["error_code"] == "DPONE_REPLAY_QUALITY_EVIDENCE_INCOMPLETE"
+        assert payload["result"]["replay_details"] == {
+            key: value for key, value in error.replay_details.items() if key != "password"
+        }
+        diagnostic = captured.err
+        assert len(diagnostic.encode()) <= 1024
+    else:
+        diagnostic = captured.out
+    assert "target_commit=proven" in diagnostic
+    assert "governance=blocked" in diagnostic
+    assert "private_table" not in captured.out + captured.err
+    assert "private-secret" not in captured.out + captured.err
+
+
+@pytest.mark.parametrize("code", [None, [], {}, "UNREGISTERED", "DPONE_REPLAY_QUALITY_EVIDENCE_UNKNOWN"])
+def test_generic_error_rejects_unregistered_replay_metadata_code(capsys, code):
+    error = RuntimeError("bookkeeping failed")
+    error.replay_details = {"error_code": code, "target_commit": "proven", "governance": "blocked"}
+    run_cmd._write_run_failure(_args(output_format="json"), error)
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert "replay_details" not in payload["result"]
+    assert "error_code" not in payload["result"]
+    assert captured.err == ""

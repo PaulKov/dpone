@@ -33,9 +33,13 @@ _WARNINGS = frozenset(
 )
 
 
-def validate_replay_acceptance(policy: AcceptanceMetricPolicy, observations: dict[str, Any]) -> None:
+def validate_replay_acceptance(
+    policy: AcceptanceMetricPolicy, observations: dict[str, Any], *, before_target: bool = False
+) -> None:
     """Missing fields never become implicit warn-only observations."""
     expected = set(policy.requested_sides) if policy.enabled else set()
+    if before_target:
+        expected.discard("target")
     if set(observations) != expected:
         raise contracts.ReplayQualityEvidenceError("INCOMPLETE")
     for side, record in observations.items():
@@ -65,6 +69,8 @@ def validate_replay_acceptance(policy: AcceptanceMetricPolicy, observations: dic
             raise contracts.ReplayQualityEvidenceError("INVALID")
         if policy.row_count and count is None and not unavailable:
             raise contracts.ReplayQualityEvidenceError("INCOMPLETE")
+        if before_target and count is not None and count > 2**64 - 1:
+            raise contracts.ReplayQualityEvidenceError("INVALID")
         if not policy.row_count and count is not None:
             raise contracts.ReplayQualityEvidenceError("INVALID")
         for field, selection in (("null_counts", policy.null_counts), ("distinct_counts", policy.distinct_counts)):
@@ -73,6 +79,8 @@ def validate_replay_acceptance(policy: AcceptanceMetricPolicy, observations: dic
                     raise contracts.ReplayQualityEvidenceError("INCOMPLETE")
             metrics = record[field]
             if not isinstance(metrics, dict) or any(type(v) is not int or v < 0 for v in metrics.values()):
+                raise contracts.ReplayQualityEvidenceError("INVALID")
+            if before_target and any(value > 2**64 - 1 for value in metrics.values()):
                 raise contracts.ReplayQualityEvidenceError("INVALID")
             requested = set(selected_columns(selection, columns))
             if set(metrics) - requested or (set(metrics) != requested and not unavailable):

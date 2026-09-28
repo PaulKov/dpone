@@ -41,13 +41,36 @@ command. The platform owner must quiesce all participating writers, prove that t
 reader cannot resume, and obtain a reviewed recovery procedure for the specific
 operation. Do not manually clear the field while workers might still be active.
 
+## Target observation interruption
+
+`TARGET_PENDING` means publication may be proven while target quality remains
+unfinished. Inspect safe `replay_details` when available: `target_commit=proven`
+does not imply `governance=complete`. A missing metadata field is not evidence of
+either outcome. Preserve both original and current run/load IDs.
+
+A deadline revokes the result channel and initiates bounded worker termination and
+reaping. After verified pending persistence, local termination, channel revocation
+and exact owner CAS, the guard may be released. The remote SELECT may still exist;
+remote termination is **UNVERIFIED**. No KILL permission or automatic scan retry is
+assumed. A later identical invocation may observe again while pending governance
+continues to block successors.
+
+If pending persistence, worker shutdown or guard release is uncertain, the outcome
+is INCOMPLETE and the fence or its unknown outcome must remain. Parent death can
+retain a non-expiring reader token. Apply the quiescence procedure above rather
+than force-clearing it. Malformed proof or a terminal quality failure cannot be
+retried into a passing observation. Required quality never degrades to a warning.
+
 ## Upgrade, restore and retention
 
 Quiesce old and new writers before switching authority implementations. Preserve
 unfinished operations and their original authority. Provision/verify storage via
-the platform's controlled procedure, then enable the explicit Python composition.
+the platform's controlled procedure, then enable the explicit Python or
+[declarative composition](declarative-replay-quality.md).
 There is no automatic conversion, deletion or backfill. Older writers must not
 share a slot with v2 quality records unless their compatibility has been established.
+Do not downgrade to an incompatible reader or disable quality while target completion
+is pending. A valid v1 source/staged capsule remains readable without conversion.
 
 A completion version greater than the observed Keeper row version is rejected.
 That detects an observed version rollback; it does not authenticate a Keeper
@@ -66,8 +89,9 @@ an operational record of that boundary. Archival report files do not extend it.
 A read-only retry for structured ClickHouse Code 999 with
 `Coordination::Exception: No node` was evaluated separately. It is not enabled in
 this implementation: the stock driver path does not supply an enforceable absolute
-read deadline. A future bounded reader must distinguish that exact structured
-failure, limit attempts and elapsed time, and preserve cancellation. No retry may
+read deadline. The bounded target reader adds no Code 999 retry policy. Any separately approved
+retry would need exact structured classification, bounded attempts and elapsed
+time, and cancellation preservation. No retry may
 include publication, cleanup or authority mutations. An observation failure today
 retains the operation for normal reconciliation; it never authorizes redispatch.
 

@@ -43,6 +43,9 @@ if TYPE_CHECKING:
     from dpone.ports.clickhouse_connector import ClickHouseConnectorPort
 
 
+from dpone.runtime.quality_replay_contracts import ReplaySelectionError, require_replay_boolean
+
+
 class ClickHouseSink(
     ClickHouseFullRefreshPublicationMixin,
     ClickHouseTargetCatalogMixin,
@@ -67,8 +70,13 @@ class ClickHouseSink(
         validated_file_runner_factory: Callable[[LoadConfig, ClickHouseValidatedFilePolicy], ClickHouseFileStageRunner]
         | None = None,
         durable_quality_replay: bool = False,
+        target_acceptance_reader: Any | None = None,
     ):
+        require_replay_boolean(durable_quality_replay, sink_type="clickhouse")
+        if target_acceptance_reader is not None and not durable_quality_replay:
+            raise ReplaySelectionError("target reader requires durable quality replay")
         self.connector = connector
+        self.target_acceptance_reader = target_acceptance_reader
         self.durable_quality_replay = durable_quality_replay
         self.quality_replay_store: Any | None = None
         self.state_storage = state_storage
@@ -278,6 +286,8 @@ class ClickHouseSink(
             logger=self.logger,
             client_runner_cls=self._client_runner_cls,
             http_runner_cls=self._http_runner_cls,
+            durable_quality_replay=self.durable_quality_replay,
+            target_acceptance_reader=self.target_acceptance_reader if connector is self.connector else None,
         )
 
     def _execute_insert(self, load_config: LoadConfig, columns: Sequence[str], rows: Sequence[tuple[Any, ...]]) -> int:

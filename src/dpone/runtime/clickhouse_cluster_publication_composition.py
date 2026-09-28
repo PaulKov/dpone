@@ -30,7 +30,9 @@ def _runtime_type(module: str, name: str) -> Any:
     return getattr(import_module(f"dpone.runtime.sinks.{module}"), name)
 
 
-def build_clickhouse_quality_publication(connector: Any) -> tuple[Any, Any]:
+def build_clickhouse_quality_publication(
+    connector: Any, *, target_acceptance_reader: Any | None = None
+) -> tuple[Any, Any]:
     """Explicit opt-in to externally provisioned strict authority; no bootstrap DDL."""
     catalog = _runtime_type("clickhouse_cluster_publication_catalog", "ClickHouseClusterPublicationCatalog")(connector)
     authority_type = _runtime_type("clickhouse_quality_authority", "ClickHouseQualityKeeperMapAuthority")
@@ -41,7 +43,10 @@ def build_clickhouse_quality_publication(connector: Any) -> tuple[Any, Any]:
             authorities[database] = authority_type(connector, database)
         return authorities[database]
 
-    store = _runtime_type("clickhouse_replay_quality", "ClickHouseReplayQualityStore")(catalog, authority)
+    reader = target_acceptance_reader if target_acceptance_reader is not None else _target_reader(connector)
+    store = _runtime_type("clickhouse_replay_quality", "ClickHouseReplayQualityStore")(
+        catalog, authority, target_acceptance_reader=reader
+    )
     service = _runtime_type(
         "clickhouse_cluster_full_refresh_publication", "ClickHouseClusterFullRefreshPublicationService"
     )(
@@ -52,3 +57,14 @@ def build_clickhouse_quality_publication(connector: Any) -> tuple[Any, Any]:
         quality_store=store,
     )
     return service, store
+
+
+def _target_reader(connector: Any) -> Any | None:
+    """Compose only the declared native adapter; target admission performs I/O later."""
+    from dpone.runtime.connectors.clickhouse import ClickHouseConnector
+
+    if not isinstance(connector, ClickHouseConnector) or connector.driver != "native":
+        return None
+    from dpone.adapters.target_acceptance.reader import BoundedClickHouseTargetAcceptanceReader
+
+    return BoundedClickHouseTargetAcceptanceReader.from_connector(connector)

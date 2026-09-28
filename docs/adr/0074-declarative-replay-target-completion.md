@@ -1,6 +1,6 @@
 # ADR 0074: Declarative replay uses guarded target completion
 
-- Status: Proposed; implementation requires an APPROVED feature specification
+- Status: Accepted for implementation under the approved feature specification
 - Date: 2026-09-28
 
 This proposal is for runtime maintainers and platform engineers. It extends the

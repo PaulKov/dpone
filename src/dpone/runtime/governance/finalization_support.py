@@ -7,6 +7,7 @@ from typing import Any
 
 from dpone.runtime.governance.acceptance_metrics import (
     AcceptanceEvidenceContext,
+    AcceptanceMetricPolicy,
     AcceptanceMetricRun,
     AcceptanceMetricsRecorder,
 )
@@ -87,6 +88,68 @@ def classify_post_commit_cleanup_failure(
     return classified
 
 
+def prepare_acceptance(
+    recorder: AcceptanceMetricsRecorder,
+    governance_service: LoadGovernanceService,
+    *,
+    policy: AcceptanceMetricPolicy,
+    load_config: Any,
+    replay_session: Any,
+    staged_handle: Any,
+    extract_result: Any,
+    source: Any,
+    sink: Any,
+    load_record: Any,
+) -> AcceptanceMetricRun:
+    """Plan physical observations while reserving durable target capture for replay.
+
+    The legacy recorder owns source/staged observations and unselected target
+    behavior. A bounded replay session owns its target observation exclusively.
+    Both paths use the same original schemas and pre-commit evidence context.
+    """
+    recorder_policy = (
+        replace(policy, capture_target=False)
+        if replay_session is not None and replay_session.target_requested
+        else policy
+    )
+    schema = staged_handle.payload_schema
+    run = recorder.start(
+        policy=recorder_policy,
+        physical_sides=("source", "staged", "target"),
+        payload_schema=schema,
+        schemas_by_side={"source": getattr(extract_result, "schema", ()) or (), "staged": schema, "target": schema},
+        source=source,
+        sink=sink,
+        evidence=AcceptanceEvidenceContext(load_record, governance_service, "pre_commit"),
+    )
+    capture_acceptance(
+        recorder,
+        governance_service,
+        run,
+        sides=("source", "staged"),
+        boundary="pre_commit",
+        source=source,
+        sink=sink,
+        load_config=load_config,
+        extract_result=extract_result,
+        staged_handle=staged_handle,
+        load_record=load_record,
+    )
+    return run
+
+
+def completed_acceptance_metrics(
+    run: AcceptanceMetricRun, load_result: Any, replay_evidence: dict[str, Any] | None
+) -> dict[str, Any]:
+    """Project completed replay observations without relabeling their capture boundary."""
+    metrics = run.metrics(load_result)
+    if replay_evidence is not None:
+        metrics["quality_replay"] = replay_evidence
+        if run.policy.enabled:
+            metrics["acceptance_metrics"]["snapshots"] = replay_evidence["acceptance"]
+    return metrics
+
+
 def capture_acceptance(
     recorder: AcceptanceMetricsRecorder,
     governance_service: LoadGovernanceService,
@@ -118,9 +181,33 @@ def capture_acceptance(
 
 __all__ = [
     "capture_acceptance",
+    "completed_acceptance_metrics",
+    "prepare_acceptance",
     "classify_post_commit_cleanup_failure",
     "load_result_details",
     "staged_probe_result",
     "validated_staged_rows",
     "with_governance_metrics",
 ]
+
+
+def preserve_completed_replay_truth(error: Exception, evidence: dict[str, Any] | None, execution: Any) -> None:
+    """Keep a proven durable completion visible when later bookkeeping fails."""
+    if evidence is None or execution is None:
+        return
+    from dpone.runtime.governance.quality_replay import safe_replay_error_code
+
+    origin = evidence["replayed_from"]
+    setattr(
+        error,
+        "replay_details",
+        {
+            "target_commit": "proven",
+            "governance": "blocked",
+            "error_code": safe_replay_error_code(error),
+            "original_run_id": origin["run_id"],
+            "original_load_id": origin["load_id"],
+            "current_run_id": execution.run_id,
+            "current_load_id": execution.load_id,
+        },
+    )

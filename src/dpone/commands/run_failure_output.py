@@ -7,6 +7,11 @@ import sys
 from contextlib import redirect_stdout
 from typing import Any
 
+from dpone.commands.run_failure_messages import (
+    replay_failure_code,
+    replay_failure_details,
+    replay_failure_diagnostic,
+)
 from dpone.commands.run_output import write_json, write_text
 from dpone.contracts.commit_unknown import CommitUnknownOutcome
 from dpone.contracts.quality_failure import QualityGateFailureOutcome
@@ -22,19 +27,23 @@ def write_run_failure(args: argparse.Namespace, exc: Exception) -> None:
             _render_run_failure(args, exc)
         return
     _render_run_failure(args, exc)
+    diagnostic = replay_failure_diagnostic(exc)
+    if diagnostic is not None and args.format == "json":
+        print(diagnostic, file=sys.stderr)
 
 
 def _render_run_failure(args: argparse.Namespace, exc: Exception) -> None:
     """Render to the caller-selected stream without changing the envelope."""
 
-    stable_code = getattr(exc, "code", None)
+    stable_code = replay_failure_code(exc) or getattr(exc, "code", None)
     detail = str(exc)
     raw_message = (
         (detail if isinstance(stable_code, str) and detail.startswith(stable_code) else f"{stable_code}: {detail}")
         if isinstance(stable_code, str)
         else f"{exc.__class__.__name__}: {detail}"
     )
-    message = redact_absolute_paths(redact_text(raw_message))
+    replay_diagnostic = replay_failure_diagnostic(exc)
+    message = str(stable_code) if replay_diagnostic is not None else redact_absolute_paths(redact_text(raw_message))
     if args.format == "json":
         result: dict[str, Any] = {
             "status": "error",
@@ -45,6 +54,9 @@ def _render_run_failure(args: argparse.Namespace, exc: Exception) -> None:
             "duration_seconds": 0.0,
             "errors": [message],
         }
+        replay_details = replay_failure_details(exc)
+        if replay_details is not None:
+            result["replay_details"] = replay_details
         quality_report = getattr(exc, "report", None)
         to_jsonable = getattr(quality_report, "to_jsonable", None)
         if callable(to_jsonable):
@@ -76,10 +88,11 @@ def _render_run_failure(args: argparse.Namespace, exc: Exception) -> None:
         }
         write_json(redact_value(payload))
         return
+    detail_lines = [f"- replay: {replay_diagnostic}"] if replay_diagnostic is not None else []
     if args.format == "md":
-        write_text("\n".join(["# dpone run failed", "", f"- error: `{message}`", ""]))
+        write_text("\n".join(["# dpone run failed", "", f"- error: `{message}`", *detail_lines, ""]))
         return
-    write_text("\n".join(["dpone run failed", f"- error: {message}", ""]))
+    write_text("\n".join(["dpone run failed", f"- error: {message}", *detail_lines, ""]))
 
 
 __all__ = ["write_run_failure"]

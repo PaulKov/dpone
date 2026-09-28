@@ -34,6 +34,7 @@ from dpone.runtime.postgres_xmin_execution import (
     PostgresXminExecutionMode,
     postgres_xmin_execution_policy,
 )
+from dpone.runtime.quality_replay_contracts import validate_replay_configuration
 from dpone.runtime.source_materialization_location import bind_source_materialization_location
 from dpone.runtime.storage_policy import RuntimeStoragePolicy
 
@@ -62,6 +63,7 @@ class DefaultRuntimeHydrator:
         config: Mapping[str, Any],
         load_config: LoadConfig,
     ) -> RuntimeBindings:
+        validate_replay_configuration(config)
         require_postgres_xmin_execution_route(load_config)
         sink_cfg = _canonical_endpoint_config(mapping_or_empty(config.get("sink")))
         source_cfg = _canonical_endpoint_config(mapping_or_empty(config.get("source")))

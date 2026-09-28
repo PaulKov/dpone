@@ -13,7 +13,14 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any
 
+from dpone.contracts.target_acceptance import (
+    TargetAcceptanceError,
+    TargetAcceptanceRequest,
+    validate_target_observation,
+)
+
 VERSION = "dpone.quality.replay.v1"
+TARGET_VERSION = "dpone.quality.replay.v2"
 MAX_CAPSULE_BYTES = 256 * 1024
 _CORE_FIELDS = frozenset(
     {
@@ -41,6 +48,7 @@ class ReplayQualityEvidenceError(RuntimeError):
         if reason not in _REASONS:
             reason = "INVALID"
         self.code = f"DPONE_REPLAY_QUALITY_EVIDENCE_{reason}"
+        self.replay_details: dict[str, Any] = {}
         super().__init__(self.code)
 
 
@@ -88,7 +96,7 @@ class QualityReplayCapsule:
         return cls(
             canonical_quality_json(
                 {
-                    "kind": VERSION,
+                    "kind": TARGET_VERSION if "target_plan" in core else VERSION,
                     "core": dict(core),
                     "core_digest": quality_digest(core),
                     "completion": [],
@@ -99,6 +107,15 @@ class QualityReplayCapsule:
     @classmethod
     def parse(cls, raw: str) -> QualityReplayCapsule:
         return cls(raw)
+
+    @property
+    def version(self) -> str:
+        return str(self._validated()["kind"])
+
+    @property
+    def target(self) -> dict[str, Any]:
+        records = self._validated()["completion"]
+        return records[-1]["target"] if records else {}
 
     @property
     def core(self) -> dict[str, Any]:
@@ -145,10 +162,11 @@ class QualityReplayCapsule:
             value = json.loads(self.payload, object_pairs_hook=_unique_object)
             if not isinstance(value, dict) or set(value) != {"kind", "core", "core_digest", "completion"}:
                 raise ReplayQualityEvidenceError
-            if value["kind"] != VERSION or canonical_quality_json(value) != self.payload:
+            if value["kind"] not in {VERSION, TARGET_VERSION} or canonical_quality_json(value) != self.payload:
                 raise ReplayQualityEvidenceError
             core = value["core"]
-            if not isinstance(core, dict) or set(core) != _CORE_FIELDS:
+            fields = _CORE_FIELDS | ({"target_plan"} if value["kind"] == TARGET_VERSION else set())
+            if not isinstance(core, dict) or set(core) != fields:
                 raise ReplayQualityEvidenceError
             if value["core_digest"] != quality_digest(core):
                 raise ReplayQualityEvidenceError
@@ -158,7 +176,7 @@ class QualityReplayCapsule:
             for field in ("run_id", "load_id"):
                 if not isinstance(core[field], str) or not 1 <= len(core[field]) <= 1024:
                     raise ReplayQualityEvidenceError
-            for field in _CORE_FIELDS - {"policy_snapshot_id", "admission_digest", "run_id", "load_id"}:
+            for field in fields - {"policy_snapshot_id", "admission_digest", "run_id", "load_id"}:
                 if not isinstance(core[field], dict):
                     raise ReplayQualityEvidenceError
             for field in ("source_probe", "target_probe"):
@@ -171,6 +189,8 @@ class QualityReplayCapsule:
                 if typed_hash is not None and (not isinstance(typed_hash, str) or not typed_hash):
                     raise ReplayQualityEvidenceError
             self._validate_completion(value)
+            if value["kind"] == TARGET_VERSION:
+                self._validate_target(value)
             return value
         except (TypeError, ValueError, KeyError, OverflowError, RecursionError):
             raise ReplayQualityEvidenceError from None
@@ -193,12 +213,46 @@ class QualityReplayCapsule:
                 raise ReplayQualityEvidenceError
             if state == "TARGET_PENDING" and record["state"] == "TARGET_PENDING":
                 raise ReplayQualityEvidenceError
+            if value["kind"] == TARGET_VERSION:
+                if record["state"] == "COMPLETE":
+                    if state != "TARGET_PENDING" or not record["target"]:
+                        raise ReplayQualityEvidenceError
+                elif record["target"]:
+                    raise ReplayQualityEvidenceError
             next_version = record["authority_version"]
             if type(next_version) is not int or next_version <= version or not isinstance(record["target"], dict):
+                raise ReplayQualityEvidenceError
+            if value["kind"] == TARGET_VERSION and next_version > 2**64 - 1:
                 raise ReplayQualityEvidenceError
             if record["previous_digest"] != previous_digest:
                 raise ReplayQualityEvidenceError
             state, version, previous_digest = record["state"], next_version, quality_digest(record)
+
+    @staticmethod
+    def _validate_target(value: dict[str, Any]) -> None:
+        """Terminal v2 evidence remains strict even when inspected for retirement."""
+        records = value["completion"]
+        if not records or records[-1]["state"] != "COMPLETE":
+            return
+        try:
+            core = value["core"]
+            plan = dict(core["target_plan"])
+            replicas = plan.pop("replicas")
+            mode = plan.pop("mode")
+            if mode not in {"required", "warn_only"} or not isinstance(replicas, list) or not replicas:
+                raise ReplayQualityEvidenceError
+            plan["columns"] = tuple(tuple(pair) for pair in plan["columns"])
+            plan["null_columns"] = tuple(plan["null_columns"])
+            plan["distinct_columns"] = tuple(plan["distinct_columns"])
+            request = TargetAcceptanceRequest(
+                **plan, binding=core["binding"], core_digest=value["core_digest"], reader_token="sealed-record"
+            )
+            target = records[-1]["target"]
+            validate_target_observation(request, target, allow_unavailable=mode == "warn_only")
+            if target["replica"] != sorted(replicas)[0]:
+                raise ReplayQualityEvidenceError("MISMATCH")
+        except (TargetAcceptanceError, KeyError, TypeError, ValueError):
+            raise ReplayQualityEvidenceError from None
 
 
 def require_quality_retired(payload: str | None, reader: str | None, *, authority_version: int) -> None:

@@ -88,6 +88,8 @@ class Rig:
         acceptance = AcceptanceMetricRun(execution.snapshot.acceptance_policy)
         if acceptance.policy.enabled:
             for side in acceptance.policy.requested_sides:
+                if side == "target" and self.session.target_requested:
+                    continue
                 acceptance.add(
                     AcceptanceMetricSnapshot(
                         side,

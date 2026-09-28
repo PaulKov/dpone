@@ -1,12 +1,12 @@
 # Feature design: declarative committed replay and target acceptance
 
-- Status: RESEARCHED
+- Status: APPROVED
 - Owner: maintainers; one integrator owns shared contracts and composition
 - Issue: independent open-source follow-up to PR #224
 - Target release: TBD after approval, implementation and validation
 - Last verified: 2026-09-28
 - Inspected source: `8b0d38b08c349671cb739966aafa9322826a0c18` (`0.85.0`)
-- Implementation gate: this extension has not been approved or implemented.
+- Implementation gate: maintainer approved this specification on 2026-09-28; implementation is in progress.
 
 This proposal is for pipeline authors, Airflow operators and runtime maintainers.
 It extends the [committed replay design](feature-design-committed-replay-quality-evidence.md)
@@ -171,7 +171,13 @@ existing v1 capsules under their unchanged semantics; keep source/staged-only wr
 v1. The surrounding strict authority remains v2. Old consumers reject unknown capsule
 versions; mixed old/new writers are unsupported while new obligations are active.
 
-V2 preserves the immutable prepared core and its digest. Its core acceptance map
+V2 preserves the immutable prepared core and its digest. The additive `target_plan`
+contains the ordered physical column/type pairs, selected row/null/distinct metrics,
+dataset, acceptance mode, selection/schema digests and sorted admitted replica list.
+This supplies replay inputs that v1's digest-only effective plan cannot reconstruct.
+The plan is sealed before dispatch and included in completion capacity checks.
+
+Its core acceptance map
 contains exactly requested source/staged observations. A terminal completion record
 contains the requested target observation and a hash-chain link to the prior record.
 Validate required sides according to state; absent target evidence is allowed only
@@ -500,7 +506,7 @@ do not authorize edits to the newly affected manifest and factory paths.
 - [x] Independent design review findings are resolved: guarded receipt ordering,
   pre-dispatch completion capacity, and exact warn-only unavailable representation.
   Final verdict: RESEARCHED review-ready; retained in task review evidence.
-- [ ] Maintainer changed status to `APPROVED`.
+- [x] Maintainer changed status to `APPROVED` on 2026-09-28.
 
-This specification is ready for design review. Production implementation, route
-certification, merge and release readiness are not implied by RESEARCHED status.
+This specification is approved for implementation. Route certification, merge and
+release readiness still require their respective evidence.

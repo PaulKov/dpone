@@ -12,6 +12,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import asdict, replace
 from threading import Lock
+from time import monotonic
 from typing import Any
 
 from dpone.ports.clickhouse_cluster_publication import contracts, require_verified_mutation
@@ -29,12 +30,34 @@ canonical_quality_json = quality_contracts.canonical_quality_json
 class ClickHouseReplayQualityStore(QualityReplayStore):
     """Bind producer evidence to one exact candidate and publication record."""
 
-    def __init__(self, catalog: Any, authority_factory: Any) -> None:
+    def __init__(self, catalog: Any, authority_factory: Any, *, target_acceptance_reader: Any = None) -> None:
+        self._target_reader = target_acceptance_reader
+        self._retained: set[str] = set()
         self._catalog = catalog
         self._authority_factory = authority_factory
         self._pending: dict[tuple[str, str], dict[str, Any]] = {}
         self._lock = Lock()
         self._guards: dict[str, str] = {}
+
+    @property
+    def target_reader(self) -> Any:
+        return self._target_reader
+
+    def reader_token(self, load_config: Any) -> str:
+        _, current = self._read(load_config)
+        with self._lock:
+            token = self._guards.get(current.record.target_key)
+        if token is None or current.record.quality_reader != token:
+            raise ReplayQualityEvidenceError("MISMATCH")
+        return token
+
+    def retain_guard(self, load_config: Any) -> None:
+        # Do not attempt further authority I/O to decide whether to retain a
+        # guard after an unknown outcome. The local owner is sufficient.
+        with self._lock:
+            key = _target_key(load_config)
+            if key in self._guards:
+                self._retained.add(key)
 
     def require_ready(self, load_config: Any) -> None:
         cluster = cluster_name(load_config)
@@ -69,7 +92,23 @@ class ClickHouseReplayQualityStore(QualityReplayStore):
         ).policy_snapshot_id or core["effective_plan"].get("effective_config_digest") != admission_digest(load_config):
             raise ReplayQualityEvidenceError("MISMATCH")
         core["binding"] = _binding(record)
+        if "target_plan" in core:
+            from dpone.runtime.sinks.clickhouse_replay_target import seal_target_plan
+
+            seal_target_plan(core, self._catalog.inventory(cluster_name(load_config)).hosts)
         capsule = QualityReplayCapsule.prepare(core)
+        if capsule.version == quality_contracts.TARGET_VERSION:
+            from dpone.runtime.sinks.clickhouse_replay_target import reserve_target_completion
+
+            reserve_target_completion(capsule, self._catalog.inventory(cluster_name(load_config)).hosts)
+            from dpone.runtime.governance.quality_target_plan import target_request
+
+            request = target_request(capsule.core, capsule.core_digest, "f" * 32)
+            self.target_reader.validate_plan(request)
+            deadline = monotonic() + 60.0
+            self.target_reader.verify_generation(replace(request, table=record.candidate), deadline=deadline)
+            if monotonic() >= deadline:
+                raise ReplayQualityEvidenceError("INCOMPLETE")
         return replace(record, quality_evidence=capsule.payload, schema_version=contracts.QUALITY_SCHEMA_VERSION)
 
     @contextmanager
@@ -81,63 +120,89 @@ class ClickHouseReplayQualityStore(QualityReplayStore):
         except ReplayQualityEvidenceError:
             raise
         except Exception as error:
-            raise ReplayQualityEvidenceError("INCOMPLETE") from error
+            if getattr(error, "blocks_committed_success", False):
+                raise
+            classified = ReplayQualityEvidenceError("INCOMPLETE")
+            classified.replay_details = getattr(error, "replay_details", {})
+            raise classified from error
 
     @contextmanager
     def _committed(self, load_config: Any) -> Iterator[QualityReplayCapsule]:
         authority, current = self._read(load_config)
-        capsule = self._capsule(current)
-        if current.record.quality_reader is not None:
-            raise ReplayQualityEvidenceError("INCOMPLETE")
+        try:
+            capsule = self._capsule(current)
+        except ReplayQualityEvidenceError as error:
+            error.replay_details = {"target_commit": "proven"}
+            raise
         token = secrets.token_hex(16)
-        locked = require_verified_mutation(
-            authority.compare_and_swap(current, replace(current.record, quality_reader=token)),
-            permit=False,
-        )
+        try:
+            if current.record.quality_reader is not None:
+                raise ReplayQualityEvidenceError("INCOMPLETE")
+            locked = require_verified_mutation(
+                authority.compare_and_swap(current, replace(current.record, quality_reader=token)),
+                permit=False,
+            )
+        except BaseException as error:
+            setattr(error, "replay_details", {"target_commit": "proven"})
+            raise
         key = current.record.target_key
         with self._lock:
             self._guards[key] = token
         try:
-            self._require_generation(load_config, locked.record)
+            if capsule.version == quality_contracts.VERSION:
+                self._require_generation(load_config, locked.record)
             yield capsule
+            with self._lock:
+                if key in self._retained:
+                    raise ReplayQualityEvidenceError("INCOMPLETE")
             _, after = self._read(load_config)
             if after.record.quality_reader != token:
                 raise ReplayQualityEvidenceError("MISMATCH")
-            self._require_generation(load_config, after.record)
+            if capsule.version == quality_contracts.VERSION:
+                self._require_generation(load_config, after.record)
         finally:
             with self._lock:
                 self._guards.pop(key, None)
-            # An unknown release must remain blocking; it must never silently
-            # relabel the operation as successful or clear somebody else's guard.
-            observed = authority.read_versioned(key)
-            if observed is None or observed.record.quality_reader != token:
-                raise ReplayQualityEvidenceError("MISMATCH")
-            require_verified_mutation(
-                authority.compare_and_swap(observed, replace(observed.record, quality_reader=None)),
-                permit=False,
-            )
+                retained = key in self._retained
+                self._retained.discard(key)
+            if not retained:
+                # Never retry an uncertain release or clear another owner.
+                observed = authority.read_versioned(key)
+                if observed is None or observed.record.quality_reader != token:
+                    raise ReplayQualityEvidenceError("MISMATCH")
+                require_verified_mutation(
+                    authority.compare_and_swap(observed, replace(observed.record, quality_reader=None)),
+                    permit=False,
+                )
 
     def complete(self, load_config: Any, capsule: QualityReplayCapsule) -> QualityReplayCapsule:
+        return self.transition(load_config, capsule, "COMPLETE")
+
+    def transition(
+        self, load_config: Any, capsule: QualityReplayCapsule, state: str, *, target: dict[str, Any] | None = None
+    ) -> QualityReplayCapsule:
         authority, current = self._read(load_config)
-        with self._lock:
-            token = self._guards.get(current.record.target_key)
-        if token is None or current.record.quality_reader != token:
-            raise ReplayQualityEvidenceError("INVALID")
+        self.reader_token(load_config)
         actual = self._capsule(current)
         if actual != capsule:
             raise ReplayQualityEvidenceError("MISMATCH")
-        complete = capsule.advance("COMPLETE", authority_version=current.version + 1)
-        result = require_verified_mutation(
-            authority.compare_and_swap(current, replace(current.record, quality_evidence=complete.payload)),
-            permit=False,
-        )
-        return self._capsule(result)
+        advanced = capsule.advance(state, authority_version=current.version + 1, target=target)
+        try:
+            result = require_verified_mutation(
+                authority.compare_and_swap(current, replace(current.record, quality_evidence=advanced.payload)),
+                permit=False,
+            )
+            verified = self._capsule(result)
+            if verified != advanced:
+                raise ReplayQualityEvidenceError("MISMATCH")
+            return verified
+        except BaseException:
+            self.retain_guard(load_config)
+            raise
 
     def _read(self, config: Any) -> tuple[Any, contracts.VersionedAuthorityRecord]:
-        cluster = cluster_name(config)
-        database, target = str(config.target_schema), str(config.target_table)
-        key = contracts.digest_payload({"cluster": cluster, "database": database, "target": target})
-        authority = self._authority_factory(database)
+        key = _target_key(config)
+        authority = self._authority_factory(str(config.target_schema))
         current = authority.read_versioned(key)
         if current is None:
             raise ReplayQualityEvidenceError("REQUIRED")
@@ -193,3 +258,9 @@ def _binding(record: contracts.AuthorityRecord) -> dict[str, Any]:
     }
     canonical_quality_json(value)
     return value
+
+
+def _target_key(config: Any) -> str:
+    return contracts.digest_payload(
+        {"cluster": cluster_name(config), "database": str(config.target_schema), "target": str(config.target_table)}
+    )

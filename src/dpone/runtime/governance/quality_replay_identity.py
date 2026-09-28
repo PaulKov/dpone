@@ -24,7 +24,7 @@ from typing import cast
 
 from dpone.config.load_config import LoadConfig
 from dpone.config.load_strategy import LoadStrategy
-from dpone.runtime.quality_replay_contracts import canonical_json_bytes
+from dpone.runtime.quality_replay_contracts import canonical_json_bytes, validate_normalized_replay_selection
 
 CONTRACT_VERSION = "dpone.quality.replay.identity.v1"
 _MAX_BYTES = 256 * 1024
@@ -49,6 +49,10 @@ EXCLUDED_OPTIONS = MappingProxyType(
     }
 )
 
+EXCLUDED_COMPOSITION_OPTIONS = MappingProxyType(
+    {"durable_quality_replay": "strict boolean composition selector; original Python selector was outside identity"}
+)
+
 _LOAD_FIELDS = frozenset(
     "source_conn_id target_conn_id source_schema source_table target_schema target_table "
     "source_database target_database staging_schema staging_database staging_table load_strategy "
@@ -68,7 +72,7 @@ _SEMANTIC_OPTIONS = frozenset(
     "profile incremental_column date_column date_from date_to partition_by order_by ttl table_ttl "
     "clickhouse_engine clickhouse_partition_by clickhouse_order_by clickhouse_ttl clickhouse_bulk "
     "clickhouse_max_insert_block_size source_byte_budget max_source_bytes __dpone_source_byte_budget_v1 "
-    "manifest_dir repo_root "
+    "manifest_dir repo_root interval "
     "export_to_gcs gcs_format gcs_chunk_rows".split()
 )
 _RECORD_FIELDS = frozenset(
@@ -113,6 +117,7 @@ def admission_digest(load_config: LoadConfig) -> str:
         raise QualityReplayIdentityError()
     projection = {name: getattr(load_config, name) for name in _LOAD_FIELDS if name != "options"}
     projection["load_strategy"] = load_config.load_strategy.value
+    validate_normalized_replay_selection(load_config.options)
     projection["options"] = _options(load_config.options)
     return _digest({"contract_version": CONTRACT_VERSION, "configuration": _json_value(projection)})
 
@@ -197,26 +202,65 @@ def validate_effective_plan(admission_config: LoadConfig, record: Mapping[str, o
     return expected
 
 
-def _options(options: object, depth: int = 0) -> dict[str, object]:
+def _options(options: object, depth: int = 0, *, location: str = "root") -> dict[str, object]:
     if type(options) is not dict or depth > _MAX_DEPTH:
         raise QualityReplayIdentityError()
     projection: dict[str, object] = {}
     for key, value in options.items():
         if type(key) is not str:
             raise QualityReplayIdentityError()
+        if key in EXCLUDED_COMPOSITION_OPTIONS:
+            if location not in {"root", "sink_options"} or type(value) is not bool:
+                raise QualityReplayIdentityError()
+            continue
         if key in EXCLUDED_OPTIONS:
             continue
         if key not in _SEMANTIC_OPTIONS:
             raise QualityReplayIdentityError()
         if key in {"query", "sql", "source_query", "custom_query"}:
             _validate_query(value)
-        if key in {"source_options", "sink_options"}:
-            projection[key] = _options(value, depth + 1)
+        if key == "interval":
+            projection[key] = _interval_identity(value)
+        elif key in {"source_options", "sink_options"}:
+            projection[key] = _options(value, depth + 1, location=key if depth == 0 else "nested")
         else:
             projection[key] = _json_value(value)
         if key == "normalization" and (not isinstance(value, dict) or value.get("enabled", False)):
             raise QualityReplayIdentityError()
     return projection
+
+
+def _interval_identity(value: object) -> dict[str, object]:
+    """Bind every known interval semantic; only the scheduler attempt may vary."""
+    semantic = frozenset(
+        {
+            "interval_start",
+            "interval_end",
+            "logical_date",
+            "dag_id",
+            "dag_run_id",
+            "partition_key",
+            "partition_dimension",
+            "partition_mode",
+        }
+    )
+    if type(value) is not dict or set(value) - semantic - {"try_number"}:
+        raise QualityReplayIdentityError()
+    attempt = value.get("try_number")
+    if attempt is not None and not (
+        (type(attempt) is int and attempt > 0)
+        or (
+            type(attempt) is str
+            and attempt.isascii()
+            and attempt.isdecimal()
+            and 0 < len(attempt) <= 10
+            and int(attempt) > 0
+        )
+    ):
+        raise QualityReplayIdentityError()
+    if any(item is not None and type(item) is not str for key, item in value.items() if key in semantic):
+        raise QualityReplayIdentityError()
+    return {key: value[key] for key in sorted(semantic) if key in value}
 
 
 def _validate_query(value: object) -> None:

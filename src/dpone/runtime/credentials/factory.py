@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from dpone.runtime.connector_logging import etl_logger
 from dpone.runtime.credentials.config import ConnectionType, CredentialsSource
 from dpone.runtime.credentials.connector_factory import BaseFactory
+from dpone.runtime.quality_replay_contracts import require_replay_boolean
 
 if TYPE_CHECKING:
     from dpone.contracts.runtime_connection import ResolvedBindingConnection
@@ -146,6 +147,7 @@ class SinkFactory(BaseFactory):
         autocommit: bool = True,
         proxy_connection: ResolvedBindingConnection | None = None,
         runtime_storage_policy: RuntimeStoragePolicy | None = None,
+        durable_quality_replay: bool = False,
     ) -> Any:
         """Create a sink without consulting ambient credential providers."""
 
@@ -153,12 +155,16 @@ class SinkFactory(BaseFactory):
             ResolvedEndpointFactory,
         )
 
+        require_replay_boolean(
+            durable_quality_replay, sink_type=connection.descriptor.connection_type if connection.descriptor else ""
+        )
         return ResolvedEndpointFactory.create_sink(
             connection,
             state_storage,
             autocommit=autocommit,
             proxy_connection=proxy_connection,
             runtime_storage_policy=runtime_storage_policy,
+            **({"durable_quality_replay": True} if durable_quality_replay else {}),
         )
 
     @classmethod
@@ -175,7 +181,9 @@ class SinkFactory(BaseFactory):
         proxy_mount_point: str | None = None,
         proxy_path: str = "network/proxy/gcp/current",
         runtime_storage_policy: RuntimeStoragePolicy | None = None,
+        durable_quality_replay: bool = False,
     ):
+        require_replay_boolean(durable_quality_replay, sink_type=connection_type)
         source_enum = CredentialsSource(credentials_source)
         type_enum = ConnectionType(connection_type)
 
@@ -243,6 +251,7 @@ class SinkFactory(BaseFactory):
                 connector=clickhouse_connector,
                 state_storage=state_storage,
                 logger=etl_logger,
+                **({"durable_quality_replay": True} if durable_quality_replay else {}),
             )
 
         if type_enum == ConnectionType.KAFKA:
