@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from pathlib import Path
+from uuid import UUID
+
+import pytest
 
 from dpone.config import LoadConfig, LoadStrategy
 from dpone.runtime.artifacts import PartitionedFileExportArtifact
@@ -167,6 +170,188 @@ def test_partitioning_options_resolver_exposes_typed_planner_options() -> None:
     assert resolved.planner.temporal_granularity == "day"
     assert resolved.planner.low_confidence_policy == "single_partition"
     assert resolved.planner.null_bucket == "separate"
+
+
+def test_explicit_numeric_ranges_validate_gap_overlap_and_null_routing() -> None:
+    options = {
+        "partitioning": {
+            "column": "record_id",
+            "num_partitions": 2,
+            "planner": {"boundary_type": "numeric", "null_bucket": "separate"},
+            "range_parallelism": {"mode": "required", "gap_policy": "reject", "consistency": "immutable"},
+            "ranges": [
+                {"lower": 0, "upper": 10, "include_lower": True, "include_upper": False, "null": True},
+                {"lower": 10, "upper": 20, "include_lower": True, "include_upper": True},
+            ],
+        }
+    }
+
+    partitions = RangePartitioner.from_options(options).partitions()
+
+    assert len(partitions) == 3
+    assert partitions[0].is_null_partition
+    assert [(item.lower_bound, item.upper_bound, item.include_upper) for item in partitions[1:]] == [
+        (0, 10, False),
+        (10, 20, True),
+    ]
+
+    broken = options["partitioning"].copy()
+    broken["ranges"] = [
+        {"lower": 0, "upper": 11},
+        {"lower": 10, "upper": 20, "include_upper": True},
+    ]
+    with pytest.raises(ValueError, match="overlap"):
+        RangePartitioner.from_options({"partitioning": broken})
+
+    broken["ranges"] = [{"lower": 0, "upper": 9}, {"lower": 10, "upper": 20, "include_upper": True}]
+    with pytest.raises(ValueError, match="gap"):
+        RangePartitioner.from_options({"partitioning": broken})
+
+
+def test_explicit_gap_may_be_declared_but_not_silently_inferred() -> None:
+    partitioner = RangePartitioner.from_options(
+        {
+            "partitioning": {
+                "column": "record_id",
+                "num_partitions": 2,
+                "planner": {"boundary_type": "numeric"},
+                "range_parallelism": {
+                    "mode": "required",
+                    "gap_policy": "allow_explicit",
+                    "consistency": "immutable",
+                },
+                "ranges": [{"lower": 0, "upper": 5}, {"lower": 10, "upper": 20, "include_upper": True}],
+            }
+        }
+    )
+
+    assert len(partitioner.partitions()) == 2
+
+
+def test_include_first_null_policy_renders_null_once_with_first_range() -> None:
+    partitioner = RangePartitioner.from_options(
+        {
+            "partitioning": {
+                "column": "record_id",
+                "num_partitions": 2,
+                "planner": {"boundary_type": "numeric", "null_bucket": "include_first"},
+                "range_parallelism": {"mode": "required", "consistency": "immutable"},
+                "ranges": [
+                    {"lower": 0, "upper": 10, "null": True},
+                    {"lower": 10, "upper": 20, "include_upper": True},
+                ],
+            }
+        }
+    )
+
+    predicates = [
+        item.predicate("[record_id]", renderer=MssqlPartitionPredicateRenderer()) for item in partitioner.partitions()
+    ]
+
+    assert predicates[0] == "([record_id] IS NULL OR ([record_id] >= 0 AND [record_id] < 10))"
+    assert all("IS NULL" not in predicate for predicate in predicates[1:])
+
+
+def test_mssql_uuid_ranges_are_explicit_only_and_use_source_ordering() -> None:
+    with pytest.raises(ValueError, match="explicit ranges"):
+        RangePartitioner.from_options(
+            {
+                "partitioning": {
+                    "column": "record_id",
+                    "bounds": {
+                        "lower": "00000000-0000-0000-0000-000000000001",
+                        "upper": "ffffffff-ffff-ffff-ffff-ffffffffffff",
+                    },
+                    "num_partitions": 2,
+                    "planner": {"boundary_type": "uniqueidentifier"},
+                }
+            }
+        )
+
+    partitioner = RangePartitioner.from_options(
+        {
+            "partitioning": {
+                "column": "record_id",
+                "num_partitions": 2,
+                "planner": {"boundary_type": "uniqueidentifier"},
+                "range_parallelism": {"mode": "required", "consistency": "immutable"},
+                "ranges": [
+                    {
+                        "lower": "ffffffff-ffff-ffff-ffff-000000000000",
+                        "upper": "00000000-0000-0000-0000-000000000001",
+                    },
+                    {
+                        "lower": "00000000-0000-0000-0000-000000000001",
+                        "upper": "00000000-0000-0000-0000-000000000002",
+                        "include_upper": True,
+                    },
+                ],
+            }
+        }
+    )
+    partitions = partitioner.partitions()
+    predicate = partitions[0].predicate("[record_id]", renderer=MssqlPartitionPredicateRenderer())
+
+    assert partitions[0].lower_bound == UUID("ffffffff-ffff-ffff-ffff-000000000000")
+    assert "CONVERT(uniqueidentifier, 'ffffffff-ffff-ffff-ffff-000000000000')" in predicate
+    assert "CONVERT(uniqueidentifier, '00000000-0000-0000-0000-000000000001')" in predicate
+
+
+def test_range_parallelism_options_are_configurable_and_validate_positive_budgets() -> None:
+    resolved = PartitioningOptionsResolver.resolve(
+        {
+            "partitioning": {
+                "column": "record_id",
+                "num_partitions": 7,
+                "export_workers": 3,
+                "load_workers": 2,
+                "range_parallelism": {
+                    "mode": "required",
+                    "upload_workers": 5,
+                    "max_inflight_ranges": 6,
+                    "max_inflight_rows": 123,
+                    "max_inflight_bytes": 456,
+                    "consistency": "write_exclusion",
+                    "consistency_authority": {"write_exclusion_ref": "synthetic_write_exclusion"},
+                    "staging_topology": "per_partition",
+                },
+            }
+        }
+    )
+
+    assert resolved.range_parallelism.reader_workers == 3
+    assert resolved.range_parallelism.upload_workers == 5
+    assert resolved.range_parallelism.load_workers == 2
+    assert resolved.range_parallelism.max_inflight_ranges == 6
+    assert resolved.range_parallelism.max_inflight_rows == 123
+    assert resolved.range_parallelism.max_inflight_bytes == 456
+    assert resolved.range_parallelism.staging_topology == "per_partition"
+
+    with pytest.raises(ValueError, match="max_inflight_bytes"):
+        PartitioningOptionsResolver.resolve(
+            {
+                "partitioning": {
+                    "range_parallelism": {"mode": "required", "max_inflight_bytes": 0},
+                }
+            }
+        )
+
+
+def test_route_local_reader_worker_conflict_and_boolean_values_fail_closed() -> None:
+    with pytest.raises(ValueError, match="conflicts"):
+        PartitioningOptionsResolver.resolve(
+            {
+                "partitioning": {
+                    "export_workers": 2,
+                    "range_parallelism": {"mode": "required", "reader_workers": 3},
+                }
+            }
+        )
+
+    with pytest.raises(ValueError, match="integer"):
+        PartitioningOptionsResolver.resolve(
+            {"partitioning": {"range_parallelism": {"mode": "required", "reader_workers": True}}}
+        )
 
 
 def test_mssql_full_extract_uses_typed_date_partition_predicates_for_auto_bounds(tmp_path: Path) -> None:
