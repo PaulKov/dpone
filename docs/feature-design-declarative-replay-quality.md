@@ -1,17 +1,17 @@
 # Feature design: declarative committed replay and target acceptance
 
-- Status: APPROVED
+- Status: IMPLEMENTED
 - Owner: maintainers; one integrator owns shared contracts and composition
 - Issue: independent open-source follow-up to PR #224
-- Target release: TBD after approval, implementation and validation
+- Target release: unreleased; publication remains separately scoped
 - Last verified: 2026-09-28
 - Inspected source: `8b0d38b08c349671cb739966aafa9322826a0c18` (`0.85.0`)
-- Implementation gate: maintainer approved this specification on 2026-09-28; implementation is in progress.
+- Implementation: approved on 2026-09-28 and implemented at `09428775b0a332dcc466dec14fee95603c0a27bb`.
 
-This proposal is for pipeline authors, Airflow operators and runtime maintainers.
+This feature is for pipeline authors, Airflow operators and runtime maintainers.
 It extends the [committed replay design](feature-design-committed-replay-quality-evidence.md)
-and [shipped reference](committed-replay-quality-reference.md). Proposed fields and
-behavior below are not available in 0.85.0. See the
+and [shipped reference](committed-replay-quality-reference.md). The implemented fields and
+behavior below are not available in the published 0.85.0 release. See the
 [design standard](feature-design-standard.md) for approval rules.
 
 ## Executive summary
@@ -81,14 +81,14 @@ before source extraction. Merely installing a driver does not prove this capabil
 
 ### Manifest/schema and composition
 
-Proposed selector: `sink.options.durable_quality_replay: true`, strictly boolean,
+Selector: `sink.options.durable_quality_replay: true`, strictly boolean,
 with omitted/false preserving current behavior. Use existing sink-option inheritance:
 batch defaults are merged into each expanded process; an explicit process value wins.
 Flow and fragment options must declare the same type. Reject null, strings, numbers,
 source placement, conflicting normalized copies and unknown selector spellings.
 Do not invent a second quality mode, top-level alias or CLI flag.
 
-The following is a proposed option/policy patch for an otherwise admitted internal
+The following is an option/policy patch for an otherwise admitted internal
 replicated full-refresh process, not an executable 0.85.0 manifest:
 
 ```yaml
@@ -508,5 +508,9 @@ do not authorize edits to the newly affected manifest and factory paths.
   Final verdict: RESEARCHED review-ready; retained in task review evidence.
 - [x] Maintainer changed status to `APPROVED` on 2026-09-28.
 
-This specification is approved for implementation. Route certification, merge and
-release readiness still require their respective evidence.
+Implementation and independent review are complete. The frozen-source suite passed
+26485 tests with 577 explicit skips; architecture, static, documentation and package
+checks passed. See the [implementation evidence](../test_artifacts/declarative-replay-quality/implementation-report.md)
+and [independent review](../test_artifacts/declarative-replay-quality/independent-review.md).
+Live route certification remains UNVERIFIED. Merge and release readiness retain
+their separate exact-head CI and authorization requirements.

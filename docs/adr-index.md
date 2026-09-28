@@ -95,4 +95,4 @@ New ADRs should include status, context, decision, consequences, and links to re
 
 - [ADR 0073: Durable evidence reissues process-local quality authority (Accepted for bounded opt-in)](adr/0073-durable-committed-replay-quality.md)
 
-- [ADR 0074: Declarative replay uses guarded target completion (Accepted for implementation)](adr/0074-declarative-replay-target-completion.md)
+- [ADR 0074: Declarative replay uses guarded target completion (Accepted)](adr/0074-declarative-replay-target-completion.md)
