@@ -9,9 +9,10 @@ from collections.abc import Callable
 from hashlib import sha256
 from typing import TYPE_CHECKING, Any
 
-from dpone.runtime.columnar_range_parallelism import build_columnar_range_plan
+from dpone.runtime.columnar_range_parallelism import RangeParallelismPreflight, build_columnar_range_plan
 from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotRequest
 from dpone.runtime.partitioning import RangePartitioner
+from dpone.runtime.partitioning_options import PartitioningOptionsResolver
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
@@ -188,6 +189,15 @@ def _range_request(
     schema: list[tuple[str, str]],
     bounds_resolver: Callable[[str], tuple[Any, ...]] | None,
 ) -> tuple[RangePartitioner | None, Any | None]:
+    resolved = PartitioningOptionsResolver.resolve(load_config.options)
+    policy = resolved.range_parallelism
+    if policy.mode != "off":
+        RangeParallelismPreflight.validate(
+            policy,
+            partition_column=str(resolved.column or ""),
+            query_has_window_functions=bool(re.search(r"\bover\s*\(", query, flags=re.IGNORECASE)),
+            supported_topologies={"shared_per_run", "per_partition"},
+        )
     partitioner = RangePartitioner.from_options(load_config.options, bounds_resolver=bounds_resolver)
     policy = partitioner.range_parallelism
     mode = str(getattr(policy, "mode", "off"))

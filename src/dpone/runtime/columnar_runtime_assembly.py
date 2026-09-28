@@ -17,6 +17,7 @@ from dpone.runtime.object_storage_access_models import ObjectStorageAccessEviden
 from dpone.runtime.object_storage_clickhouse_probe import ClickHouseObjectStorageReadinessProbe
 from dpone.runtime.object_storage_connection_resolver import ObjectStorageConnectionResolver
 from dpone.runtime.object_storage_fast_path_preflight import ObjectStorageAccessPreflightService
+from dpone.runtime.partitioning_options import PartitioningOptionsResolver
 from dpone.runtime.sinks.clickhouse_capabilities import ClickHouseColumnarCapabilityProbe
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_provider import MssqlColumnarSnapshotProvider
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_queryout_bridge import build_columnar_snapshot_request
@@ -105,6 +106,9 @@ class MssqlColumnarSnapshotRequestFactory:
     def __call__(self, *, load_config: LoadConfig, source: Any, sink: Any, state: Any, load_record: Any) -> Any:
         del sink, state
         connector = getattr(source, "connector", None)
+        partitioning = PartitioningOptionsResolver.resolve(load_config.options)
+        if partitioning.range_parallelism.mode != "off" and not callable(getattr(connector, "open_session", None)):
+            raise RuntimeError("mssql_independent_range_sessions_unavailable")
         schema = _fetch_schema(connector, load_config)
         query = _select_query(connector, load_config, [column for column, _ in schema])
         return build_columnar_snapshot_request(
@@ -112,6 +116,7 @@ class MssqlColumnarSnapshotRequestFactory:
             query=query,
             schema=schema,
             run_id=str(getattr(load_record, "run_id", "") or _configured_run_id(load_config)),
+            bounds_resolver=lambda column: _resolve_partition_bounds(connector, query, column),
         )
 
 
@@ -260,6 +265,28 @@ def _select_query(connector: Any, load_config: LoadConfig, columns: list[str]) -
         )
     predicate = load_config.options.get("source_custom_predicate") or load_config.custom_predicate
     return f"{query} WHERE {predicate}" if predicate else query
+
+
+def _resolve_partition_bounds(connector: Any, query: str, column: str) -> tuple[Any, Any, int | None, int]:
+    """Resolve canonical range bounds through the selected source connector."""
+
+    quoted_column = connector.quote_identifier(column)
+    bounds_query = (
+        "SELECT "
+        f"MIN({quoted_column}) AS dpone_min_value, "
+        f"MAX({quoted_column}) AS dpone_max_value, "
+        "COUNT_BIG(1) AS dpone_row_count, "
+        f"SUM(CASE WHEN {quoted_column} IS NULL THEN 1 ELSE 0 END) AS dpone_null_count "
+        f"FROM ({query}) AS dpone_bounds"
+    )
+    rows = connector.get_records(bounds_query)
+    if not rows:
+        raise ValueError(f"Unable to resolve MSSQL partition bounds for column {column!r}.")
+    lower, upper, row_count, *rest = rows[0]
+    if lower is None or upper is None:
+        raise ValueError(f"MSSQL partition column {column!r} has no non-null bounds.")
+    null_count = rest[0] if rest else None
+    return lower, upper, int(row_count) if row_count is not None else None, int(null_count or 0)
 
 
 def _columnar_mode(load_config: LoadConfig) -> str:

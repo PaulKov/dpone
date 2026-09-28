@@ -467,22 +467,16 @@ def test_parallel_window_failure_cleans_owned_prefix_and_never_yields(tmp_path: 
 def test_parallel_window_query_is_blocked_before_source_io(tmp_path: Path) -> None:
     config = _load_config()
     config.options["partitioning"] = _parallel_partitioning()
-    request = build_columnar_snapshot_request(
-        load_config=config,
-        query="SELECT id, ROW_NUMBER() OVER (PARTITION BY name ORDER BY id) AS rank FROM dbo.orders",
-        schema=[("id", "int"), ("rank", "bigint")],
-        run_id="run-window",
-    )
     connector = _ParallelMssqlConnector(partitions=2)
-    provider = MssqlColumnarSnapshotProvider(
-        connector=connector,
-        object_client=LocalObjectStorageClient(tmp_path / "store"),
-        parquet_writer=_FakeParquetWriter(),
-    )
 
-    capability = provider.capabilities(request)
+    with pytest.raises(ValueError, match="machine-checkable"):
+        build_columnar_snapshot_request(
+            load_config=config,
+            query="SELECT id, ROW_NUMBER() OVER (PARTITION BY name ORDER BY id) AS rank FROM dbo.orders",
+            schema=[("id", "int"), ("rank", "bigint")],
+            run_id="run-window",
+        )
 
-    assert any("machine-checkable" in blocker for blocker in capability.blockers)
     assert connector.sessions == []
 
 

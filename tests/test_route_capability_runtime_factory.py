@@ -62,6 +62,70 @@ def test_runtime_factory_builds_columnar_orchestrator_for_enabled_fast_path(tmp_
     assert context.evidence["details"]["execution_mode"] == "chunked"
 
 
+def test_columnar_request_factory_resolves_auto_range_bounds() -> None:
+    from dpone.runtime.columnar_runtime_assembly import MssqlColumnarSnapshotRequestFactory
+
+    config = _cfg()
+    config.options["partitioning"] = {
+        "column": "id",
+        "bounds": "auto",
+        "num_partitions": 2,
+        "range_parallelism": {
+            "mode": "required",
+            "reader_workers": 2,
+            "upload_workers": 1,
+            "load_workers": 1,
+            "max_inflight_ranges": 2,
+            "max_inflight_rows": 100,
+            "max_inflight_bytes": 1048576,
+            "consistency": "immutable",
+        },
+    }
+    source = _MssqlSource()
+    source.connector = _RangeMssqlConnector()
+
+    request = MssqlColumnarSnapshotRequestFactory()(
+        load_config=config,
+        source=source,
+        sink=_Sink(),
+        state=None,
+        load_record=SimpleNamespace(run_id="range-run"),
+    )
+
+    assert request.range_plan is not None
+    assert len(request.range_plan.ranges) == 2
+    assert source.connector.bounds_queries == [
+        "SELECT MIN([id]) AS dpone_min_value, MAX([id]) AS dpone_max_value, "
+        "COUNT_BIG(1) AS dpone_row_count, SUM(CASE WHEN [id] IS NULL THEN 1 ELSE 0 END) "
+        "AS dpone_null_count FROM (SELECT id, name FROM dbo.orders) AS dpone_bounds"
+    ]
+
+
+def test_columnar_request_factory_rejects_missing_independent_sessions_before_metadata_io() -> None:
+    from dpone.runtime.columnar_runtime_assembly import MssqlColumnarSnapshotRequestFactory
+
+    config = _cfg()
+    config.options["partitioning"] = {
+        "column": "id",
+        "ranges": [
+            {"lower": 0, "upper": 10, "include_lower": True, "include_upper": True},
+        ],
+        "range_parallelism": {"mode": "required", "consistency": "immutable"},
+    }
+    source = _MssqlSource()
+
+    with pytest.raises(RuntimeError, match="mssql_independent_range_sessions_unavailable"):
+        MssqlColumnarSnapshotRequestFactory()(
+            load_config=config,
+            source=source,
+            sink=_Sink(),
+            state=None,
+            load_record=SimpleNamespace(run_id="range-run"),
+        )
+
+    assert source.connector.fetch_schema_calls == 0
+
+
 def test_runtime_factory_auto_falls_back_to_single_node_s3_when_s3cluster_probe_fails(tmp_path) -> None:
     sink = _Sink(fail_s3cluster=True)
     source = _MssqlSource()
@@ -367,9 +431,11 @@ class _MssqlSource:
 class _MssqlConnector:
     def __init__(self) -> None:
         self.stream_calls: list[tuple[str, int]] = []
+        self.fetch_schema_calls = 0
 
     def fetch_schema(self, schema, table, *, database=None):
         del schema, table, database
+        self.fetch_schema_calls += 1
         return [("id", "int"), ("name", "nvarchar(50)")]
 
     def build_select_query(self, schema, table, columns, *, database=None):
@@ -383,6 +449,20 @@ class _MssqlConnector:
         assert as_dict is False
         self.stream_calls.append((query, batch_size))
         yield [(1, "alpha"), (2, "beta")]
+
+
+class _RangeMssqlConnector(_MssqlConnector):
+    def __init__(self) -> None:
+        super().__init__()
+        self.bounds_queries: list[str] = []
+
+    def open_session(self, *, application_name):
+        del application_name
+        return _RangeMssqlConnector()
+
+    def get_records(self, query):
+        self.bounds_queries.append(query)
+        return [(0, 99, 100, 0)]
 
 
 class _Sink:
