@@ -18,6 +18,7 @@ from dpone.runtime.clickhouse_file_stage_contract import (
 )
 from dpone.runtime.connectors.clickhouse_file_stage_client import build_file_client_runner
 from dpone.runtime.connectors.clickhouse_file_stage_http import build_file_http_runner
+from dpone.runtime.quality_replay_contracts import ReplaySelectionError, require_replay_boolean
 from dpone.runtime.sinks.clickhouse_full_refresh_router import ClickHouseFullRefreshPublicationRouter
 from dpone.runtime.sinks.clickhouse_physical_types import ClickHousePhysicalColumnTypeResolver
 from dpone.runtime.sinks.clickhouse_staging_decoder import ClickHouseStagingDecoder
@@ -126,6 +127,20 @@ def build_clickhouse_staging_components(
     )
     full_refresh_publication = ClickHouseFullRefreshPublicationRouter.from_connector(connector)
     return ClickHouseStagingComponents(validated_file, decoder, finalizer, full_refresh_publication)
+
+
+def configure_quality_replay(sink: Any, *, durable_quality_replay: bool, target_acceptance_reader: Any | None) -> None:
+    """Validate and bind explicit replay capabilities before constructing collaborators.
+
+    Boolean selection and reader pairing retain the public constructor's failure
+    behavior. Store construction remains deferred to the admitted router path.
+    """
+    require_replay_boolean(durable_quality_replay, sink_type="clickhouse")
+    if target_acceptance_reader is not None and not durable_quality_replay:
+        raise ReplaySelectionError("target reader requires durable quality replay")
+    sink.target_acceptance_reader = target_acceptance_reader
+    sink.durable_quality_replay = durable_quality_replay
+    sink.quality_replay_store = None
 
 
 def build_full_refresh_publication_router(sink: Any) -> ClickHouseFullRefreshPublicationRouter:

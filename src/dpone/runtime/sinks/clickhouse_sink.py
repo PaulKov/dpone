@@ -18,6 +18,7 @@ from dpone.runtime.clickhouse_staging_composition import (
     ClickHouseFullRefreshPublicationMixin,
     build_clickhouse_staging_components,
     build_full_refresh_publication_router,
+    configure_quality_replay,
 )
 from dpone.runtime.clickhouse_staging_composition import (
     build_file_runner as build_file_runner,
@@ -43,9 +44,6 @@ if TYPE_CHECKING:
     from dpone.ports.clickhouse_connector import ClickHouseConnectorPort
 
 
-from dpone.runtime.quality_replay_contracts import ReplaySelectionError, require_replay_boolean
-
-
 class ClickHouseSink(
     ClickHouseFullRefreshPublicationMixin,
     ClickHouseTargetCatalogMixin,
@@ -57,6 +55,9 @@ class ClickHouseSink(
     """ClickHouse sink optimized for MSSQL/Postgres exported files and row streams."""
 
     supports_staged_validation_receipts = True
+    target_acceptance_reader: Any | None
+    durable_quality_replay: bool
+    quality_replay_store: Any | None
 
     def __init__(
         self,
@@ -72,13 +73,10 @@ class ClickHouseSink(
         durable_quality_replay: bool = False,
         target_acceptance_reader: Any | None = None,
     ):
-        require_replay_boolean(durable_quality_replay, sink_type="clickhouse")
-        if target_acceptance_reader is not None and not durable_quality_replay:
-            raise ReplaySelectionError("target reader requires durable quality replay")
+        configure_quality_replay(
+            self, durable_quality_replay=durable_quality_replay, target_acceptance_reader=target_acceptance_reader
+        )
         self.connector = connector
-        self.target_acceptance_reader = target_acceptance_reader
-        self.durable_quality_replay = durable_quality_replay
-        self.quality_replay_store: Any | None = None
         self.state_storage = state_storage
         self.logger = logger or _default_etl_logger()
         self.acceptance_metric_probe = _default_acceptance_metric_probe(connector)

@@ -6,11 +6,10 @@ from dataclasses import asdict, replace
 import pytest
 
 from dpone.adapters.target_acceptance import worker
-from dpone.adapters.target_acceptance.native import NativeSession, require_binding
-from dpone.adapters.target_acceptance.queries import metric_plan, parse_metrics
+from dpone.adapters.target_acceptance.native import NativeSession, metric_plan, parse_metrics, require_binding
 from dpone.adapters.target_acceptance.reader import BoundedClickHouseTargetAcceptanceReader
 from dpone.contracts.clickhouse_cluster_publication import ClusterInventory, ClusterReplica
-from dpone.contracts.target_acceptance import (
+from dpone.contracts.quality_replay import (
     MAX_UINT64,
     TargetAcceptanceError,
     TargetAcceptanceRequest,

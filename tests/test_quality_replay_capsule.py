@@ -65,7 +65,7 @@ def test_bounded_capsule_rejects_oversize_before_storage():
 
 
 def test_v2_requires_pending_before_target_complete_and_preserves_core():
-    from dpone.contracts.target_acceptance import TargetAcceptanceRequest, unavailable_observation
+    from dpone.contracts.quality_replay import TargetAcceptanceRequest, unavailable_observation
 
     value = core()
     plan = {

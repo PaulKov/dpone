@@ -5,8 +5,7 @@ from dataclasses import replace
 import pytest
 
 from dpone.contracts.clickhouse_cluster_publication import AuthorityMutationResult, AuthorityMutationStatus
-from dpone.contracts.quality_replay import ReplayQualityEvidenceError
-from dpone.contracts.target_acceptance import TargetAcceptanceError, unavailable_observation
+from dpone.contracts.quality_replay import ReplayQualityEvidenceError, TargetAcceptanceError, unavailable_observation
 from dpone.ports.target_acceptance import BoundedTargetAcceptanceReader
 from dpone.runtime.governance.quality_replay import receipt_already_accepted
 from dpone.runtime.sinks.clickhouse_replay_quality import ClickHouseReplayQualityStore
@@ -200,7 +199,7 @@ def test_late_result_is_not_complete_even_if_reader_returns_metrics(monkeypatch)
     rig = TargetRig()
     rig.publish()
     times = iter([100, 161])
-    monkeypatch.setattr("dpone.runtime.governance.quality_replay_target.monotonic", lambda: next(times))
+    monkeypatch.setattr("dpone.runtime.governance.quality_replay.monotonic", lambda: next(times))
     with pytest.raises(TargetAcceptanceError, match="INCOMPLETE"):
         rig.fresh_session().replay(rig.config)
     assert rig.capsule().state == "TARGET_PENDING"

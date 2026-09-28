@@ -7,11 +7,11 @@ from contextlib import AbstractContextManager
 from typing import Any
 
 from dpone.contracts import quality_replay as contracts
-from dpone.contracts import quality_replay_selection, target_acceptance
+from dpone.contracts import quality_replay_selection
 from dpone.contracts.strict_json import canonical_json_bytes as canonical_json_bytes
 
 selection_contracts = quality_replay_selection
-target_contracts = target_acceptance
+target_contracts = contracts
 QualityReplayCapsule = contracts.QualityReplayCapsule
 
 

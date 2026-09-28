@@ -95,8 +95,7 @@ def test_real_native_target_reader_exact_metrics(native_reader_candidate: Any, w
     """Read actual nullable rows once from one replica; never sum replicas."""
     from dpone.adapters.target_acceptance.native import inspect_replicas
     from dpone.adapters.target_acceptance.reader import BoundedClickHouseTargetAcceptanceReader
-    from dpone.contracts.quality_replay import quality_digest
-    from dpone.contracts.target_acceptance import TargetAcceptanceRequest, validate_target_observation
+    from dpone.contracts.quality_replay import TargetAcceptanceRequest, quality_digest, validate_target_observation
     from dpone.runtime.governance.quality_replay_identity import schema_digest
 
     connector, connection, cluster, database = native_reader_candidate

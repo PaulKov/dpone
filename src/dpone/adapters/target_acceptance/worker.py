@@ -10,16 +10,21 @@ import sys
 import time
 from typing import Any
 
-from dpone.adapters.target_acceptance.native import NativeSession, inspect_replicas, require_binding
-from dpone.adapters.target_acceptance.queries import metric_plan, parse_metrics
-from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
-from dpone.contracts.target_acceptance import (
+from dpone.adapters.target_acceptance.native import (
+    NativeSession,
+    inspect_replicas,
+    metric_plan,
+    parse_metrics,
+    require_binding,
+)
+from dpone.contracts.quality_replay import (
     MAX_FRAME_BYTES,
     TargetAcceptanceError,
     TargetAcceptanceRequest,
     unavailable_observation,
     validate_target_observation,
 )
+from dpone.contracts.strict_json import canonical_json_bytes, strict_json_object
 
 
 def execute(message: dict[str, Any]) -> dict[str, Any]:

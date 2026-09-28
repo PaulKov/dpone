@@ -1,9 +1,12 @@
 """Explicit bounded read capability; authority ownership remains with the caller."""
 
-from abc import ABC, abstractmethod
-from typing import Any
+from __future__ import annotations
 
-from dpone.contracts.target_acceptance import TargetAcceptanceRequest
+from abc import ABC, abstractmethod
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from dpone.contracts.quality_replay import TargetAcceptanceRequest
 
 
 class BoundedTargetAcceptanceReader(ABC):

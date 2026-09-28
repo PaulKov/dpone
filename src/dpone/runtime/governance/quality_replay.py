@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from time import monotonic
 from typing import Any
 
 from dpone.governance.quality import QualityProbeSnapshot
@@ -13,10 +14,14 @@ from dpone.runtime.governance.quality_replay_identity import (
     prepare_effective_plan,
     validate_effective_plan,
 )
-from dpone.runtime.governance.quality_replay_target import complete_target
 from dpone.runtime.governance.quality_target_plan import prepare_target_plan, target_request, validate_target_plan
 from dpone.runtime.governance.validation_snapshot import snapshot_staged_validation_values
-from dpone.runtime.quality_replay_contracts import QualityReplayStore
+from dpone.runtime.quality_replay_contracts import (
+    UNAVAILABLE_WARNING,
+    QualityReplayStore,
+    TargetAcceptanceError,
+    validate_target_observation,
+)
 from dpone.runtime.quality_replay_contracts import contracts as quality_contracts
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import cluster_name
 
@@ -215,3 +220,45 @@ def safe_replay_error_code(error: BaseException) -> str:
         for reason in ("REQUIRED", "MISMATCH", "INVALID", "FAILED", "INCOMPLETE", "UNSUPPORTED")
     }
     return code if isinstance(code, str) and code in allowed else "DPONE_REPLAY_QUALITY_EVIDENCE_INCOMPLETE"
+
+
+def complete_target(
+    store: QualityReplayStore, config: Any, capsule: quality_contracts.QualityReplayCapsule, policy: Any
+) -> quality_contracts.QualityReplayCapsule:
+    """Never rescan COMPLETE and never release a worker of uncertain lifetime."""
+    if capsule.state == "FAILED":
+        raise quality_contracts.ReplayQualityEvidenceError("FAILED")
+    request = target_request(capsule.core, capsule.core_digest, store.reader_token(config))
+    reader = store.target_reader
+    if capsule.state == "PREPARED":
+        capsule = store.transition(config, capsule, "TARGET_PENDING")
+    deadline = monotonic() + 60.0
+    try:
+        if capsule.state == "COMPLETE":
+            observation = capsule.target
+        else:
+            observation = reader.collect(request, deadline=deadline)
+        validate_target_observation(request, observation, allow_unavailable=True)
+        if observation["warnings"] == [UNAVAILABLE_WARNING] and policy.mode != "warn_only":
+            raise TargetAcceptanceError("INCOMPLETE")
+        if observation["replica"] != capsule.core["target_plan"]["replicas"][0]:
+            raise TargetAcceptanceError("MISMATCH")
+        if monotonic() >= deadline:
+            raise TargetAcceptanceError("INCOMPLETE")
+        reader.verify_generation(request, deadline=deadline)
+        if monotonic() >= deadline:
+            raise TargetAcceptanceError("INCOMPLETE")
+        store.reader_token(config)
+        if capsule.state != "COMPLETE":
+            capsule = store.transition(config, capsule, "COMPLETE", target=observation)
+        return capsule
+    except TargetAcceptanceError as error:
+        if not error.quiescent or not error.output_revoked:
+            store.retain_guard(config)
+        elif capsule.state != "COMPLETE" and error.code.endswith(("_INVALID", "_MISMATCH", "_FAILED")):
+            store.transition(config, capsule, "FAILED")
+        raise
+    except BaseException:
+        # Cancellation or unexpected adapter failure cannot assert quiescence.
+        store.retain_guard(config)
+        raise

@@ -220,7 +220,7 @@ def test_cli_target_completion_and_replay_never_rescan_or_redispatch(monkeypatch
 
 
 def test_cli_target_timeout_preserves_commit_truth_and_retry_finishes_without_source(monkeypatch, tmp_path, capsys):
-    from dpone.contracts.target_acceptance import TargetAcceptanceError
+    from dpone.contracts.quality_replay import TargetAcceptanceError
 
     runtime = install_replay_runtime(monkeypatch, target=True, initial_complete=False)
     runtime.rig.reader.failure = TargetAcceptanceError("INCOMPLETE", quiescent=True)

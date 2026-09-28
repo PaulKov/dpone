@@ -5,8 +5,8 @@ import time
 
 import pytest
 
-from dpone.adapters.target_acceptance.supervisor import supervise
-from dpone.contracts.target_acceptance import TargetAcceptanceError
+from dpone.adapters.target_acceptance.reader import supervise
+from dpone.contracts.quality_replay import TargetAcceptanceError
 
 
 @pytest.mark.parametrize("mode", ["hang", "trickle", "frame_without_eos"])
@@ -39,7 +39,7 @@ def test_real_worker_clean_frame():
 
 
 def test_uncertain_reap_is_explicit_and_output_is_revoked(monkeypatch):
-    from dpone.adapters.target_acceptance import supervisor
+    from dpone.adapters.target_acceptance import reader as supervisor
 
     real_stop = supervisor._stop
 
@@ -59,7 +59,7 @@ def test_uncertain_reap_is_explicit_and_output_is_revoked(monkeypatch):
 
 
 def test_cancellation_propagates_after_real_child_reaped(monkeypatch):
-    from dpone.adapters.target_acceptance import supervisor
+    from dpone.adapters.target_acceptance import reader as supervisor
 
     def cancel(*args):
         raise KeyboardInterrupt()
@@ -74,7 +74,7 @@ def test_cancellation_propagates_after_real_child_reaped(monkeypatch):
 
 
 def test_delayed_spawn_never_accepts_late_result(monkeypatch):
-    from dpone.adapters.target_acceptance import supervisor
+    from dpone.adapters.target_acceptance import reader as supervisor
 
     real_spawn = supervisor.subprocess.Popen
 

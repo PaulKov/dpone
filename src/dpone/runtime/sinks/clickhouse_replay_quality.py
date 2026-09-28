@@ -7,6 +7,7 @@ unmanaged writes remain outside the managed-publication contract.
 
 from __future__ import annotations
 
+import json
 import secrets
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -18,7 +19,13 @@ from typing import Any
 from dpone.ports.clickhouse_cluster_publication import contracts, require_verified_mutation
 from dpone.runtime.governance.quality_execution import QualityExecutionSnapshot
 from dpone.runtime.governance.quality_replay_identity import admission_digest
-from dpone.runtime.quality_replay_contracts import QualityReplayStore
+from dpone.runtime.governance.quality_target_plan import target_request
+from dpone.runtime.quality_replay_contracts import (
+    MAX_FRAME_BYTES,
+    MAX_UINT64,
+    QualityReplayStore,
+    unavailable_observation,
+)
 from dpone.runtime.quality_replay_contracts import contracts as quality_contracts
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import cluster_name, operation_id
 
@@ -93,16 +100,10 @@ class ClickHouseReplayQualityStore(QualityReplayStore):
             raise ReplayQualityEvidenceError("MISMATCH")
         core["binding"] = _binding(record)
         if "target_plan" in core:
-            from dpone.runtime.sinks.clickhouse_replay_target import seal_target_plan
-
             seal_target_plan(core, self._catalog.inventory(cluster_name(load_config)).hosts)
         capsule = QualityReplayCapsule.prepare(core)
         if capsule.version == quality_contracts.TARGET_VERSION:
-            from dpone.runtime.sinks.clickhouse_replay_target import reserve_target_completion
-
             reserve_target_completion(capsule, self._catalog.inventory(cluster_name(load_config)).hosts)
-            from dpone.runtime.governance.quality_target_plan import target_request
-
             request = target_request(capsule.core, capsule.core_digest, "f" * 32)
             self.target_reader.validate_plan(request)
             deadline = monotonic() + 60.0
@@ -264,3 +265,38 @@ def _target_key(config: Any) -> str:
     return contracts.digest_payload(
         {"cluster": cluster_name(config), "database": str(config.target_schema), "target": str(config.target_table)}
     )
+
+
+def seal_target_plan(core: dict[str, Any], hosts: tuple[str, ...]) -> None:
+    """Bind the original admitted replicas before the immutable core is sealed."""
+    core["target_plan"]["replicas"] = list(sorted(hosts))
+
+
+def reserve_target_completion(capsule: quality_contracts.QualityReplayCapsule, hosts: tuple[str, ...]) -> None:
+    """Fit both transitions, longest replica and all worst-case UInt64 counts.
+
+    The fixed framing allowance includes nonce, envelope keys, transport status,
+    and bound lifecycle metadata. Every variable request/observation string is
+    included in full; no truncation or selector reduction is allowed.
+    """
+    request = target_request(capsule.core, capsule.core_digest, "f" * 32)
+    replica = max(hosts, key=lambda host: len(json.dumps(host).encode("utf-8")))
+    warning = unavailable_observation(request, replica=replica, attempt_id="f" * 32)
+    successful = {
+        **warning,
+        "warnings": [],
+        "row_count": MAX_UINT64 if request.row_count else None,
+        "null_counts": dict.fromkeys(request.null_columns, MAX_UINT64),
+        "distinct_counts": dict.fromkeys(request.distinct_columns, MAX_UINT64),
+    }
+    variants = (warning, successful) if capsule.core["target_plan"]["mode"] == "warn_only" else (successful,)
+    for observation in variants:
+        pending = capsule.advance("TARGET_PENDING", authority_version=MAX_UINT64 - 1)
+        pending.advance("COMPLETE", authority_version=MAX_UINT64, target=observation)
+        encoded = quality_contracts.canonical_quality_json(observation).encode("utf-8")
+        if len(encoded) + 4096 > MAX_FRAME_BYTES:
+            raise quality_contracts.ReplayQualityEvidenceError("INVALID")
+    # The worker receives its own framed request as well as returning evidence.
+    request_payload = replace(request, binding=dict(request.binding))
+    if len(quality_contracts.canonical_quality_json(asdict(request_payload)).encode("utf-8")) + 4096 > MAX_FRAME_BYTES:
+        raise quality_contracts.ReplayQualityEvidenceError("INVALID")
