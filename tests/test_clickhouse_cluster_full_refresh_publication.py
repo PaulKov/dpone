@@ -295,3 +295,104 @@ def test_replicated_publication_accepts_a_cluster_without_distributed_internal_r
     inventory.validate()
 
     assert inventory.hosts == ("node-1", "node-2")
+
+
+def test_new_operation_admitted_after_completed_publication_without_claiming_slot() -> None:
+    from dataclasses import replace
+
+    from dpone.contracts.clickhouse_cluster_publication import AuthorityPhase
+    from dpone.runtime.sinks.clickhouse_full_refresh_publication import REPLAY_OPTION
+
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    service.publish(_config(), _Candidate(), staged_rows=2)
+    authority.current = replace(
+        authority.current, record=replace(authority.current.record, phase=AuthorityPhase.COMPLETED)
+    )
+    previous = authority.current
+    config = replace(_config(), options={**_config().options, SCHEDULER_IDENTITY_OPTION: "next-run"})
+
+    assert service.prepare_admission(config) is config
+    assert REPLAY_OPTION not in config.options
+    assert authority.current == previous
+    assert ddl.dispatches == 1
+
+    # A different contender can win after admission; publication must still fence
+    # the stale attempt, not treat admission as a reservation or mutate its slot.
+    authority.current = replace(
+        previous, record=replace(previous.record, phase=AuthorityPhase.PREPARED, operation_id="contender")
+    )
+    with pytest.raises(ClusterPublicationError, match="AUTHORITY_CONFLICT"):
+        service.publish(config, _Candidate(), staged_rows=2)
+    assert ddl.dispatches == 1
+
+
+@pytest.mark.parametrize("phase", ["PREPARED", "DISPATCHING", "COMMITTED", "CLEANUP_DISPATCHING"])
+def test_new_operation_cannot_bypass_unfinished_publication(phase: str) -> None:
+    from dataclasses import replace
+
+    from dpone.contracts.clickhouse_cluster_publication import AuthorityPhase
+
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    service.publish(_config(), _Candidate(), staged_rows=2)
+    authority.current = replace(
+        authority.current, record=replace(authority.current.record, phase=AuthorityPhase(phase))
+    )
+    previous = authority.current
+    config = replace(_config(), options={**_config().options, SCHEDULER_IDENTITY_OPTION: "next-run"})
+    with pytest.raises(ClusterPublicationError, match="AUTHORITY_CONFLICT"):
+        service.prepare_admission(config)
+    assert authority.current == previous
+    assert ddl.dispatches == 1
+
+
+def test_same_completed_operation_replays_without_source_scan_or_redispatch() -> None:
+    from dataclasses import replace
+
+    from dpone.contracts.clickhouse_cluster_publication import AuthorityPhase
+    from dpone.runtime.sinks.clickhouse_full_refresh_publication import REPLAY_OPTION
+
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    service.publish(_config(), _Candidate(), staged_rows=2)
+    authority.current = replace(
+        authority.current, record=replace(authority.current.record, phase=AuthorityPhase.COMPLETED)
+    )
+    admitted = service.prepare_admission(_config())
+    assert admitted.options[REPLAY_OPTION].total_rows == 2
+    assert ddl.dispatches == 1
+
+
+def test_completed_slot_reuse_fences_stale_cleanup_and_preserves_new_inventory() -> None:
+    from dataclasses import replace
+
+    from dpone.contracts.clickhouse_cluster_publication import AuthorityPhase
+
+    catalog, authority = _Catalog(), _Authority()
+    ddl = _Ddl(catalog)
+    service = ClickHouseClusterFullRefreshPublicationService(catalog, lambda database: authority, ddl, _Bootstrap())
+    old_receipt = service.publish(_config(), _Candidate(), staged_rows=2)
+    authority.current = replace(
+        authority.current, record=replace(authority.current.record, phase=AuthorityPhase.COMPLETED)
+    )
+    previous = authority.current
+    catalog.inventory_address = "127.0.0.9"
+    with pytest.raises(ClusterPublicationError, match="INVENTORY_DRIFT"):
+        service.prepare_admission(_config())
+    config = replace(_config(), options={**_config().options, SCHEDULER_IDENTITY_OPTION: "next-run"})
+    assert service.prepare_admission(config) is config
+    # Model the current target and a distinct new candidate after prior cleanup.
+    catalog.old, catalog.new, catalog.committed = catalog.new, _identity("next"), False
+    new_receipt = service.publish(config, _Candidate(), staged_rows=2)
+    assert new_receipt.authority.operation_id != old_receipt.authority.operation_id
+    assert new_receipt.authority.fence_token != old_receipt.authority.fence_token
+    assert new_receipt.authority.dispatch_epoch > previous.record.dispatch_epoch
+    assert new_receipt.authority.inventory_digest == catalog.inventory("one_shard").digest
+    assert ddl.dispatches == 2
+    with pytest.raises(ClusterPublicationError, match="RECEIPT_INVALID"):
+        service.cleanup(old_receipt)
+    assert ddl.cleanup_dispatches == 0

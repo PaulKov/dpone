@@ -6,6 +6,10 @@
 
 ### Fixed
 
+- A new replicated full-refresh is admitted after proven completion, retaining
+  versioned publication ownership, unfinished-operation conflicts, and
+  same-invocation replay.
+
 - Escaped MSSQL-to-ClickHouse text uses binary UTF-8 collation for wire-marker
   replacement, preserving distinct user strings that resemble markers with
   different letter case under case-insensitive source collations.

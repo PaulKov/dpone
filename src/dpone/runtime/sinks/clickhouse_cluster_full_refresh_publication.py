@@ -156,6 +156,10 @@ class ClickHouseClusterFullRefreshPublicationService:
         if current is None:
             return load_config
         if current.record.operation_id != _operation_id(load_config):
+            if current.record.phase is AuthorityPhase.COMPLETED:
+                # Admission grants no ownership. Publication re-reads and CAS-
+                # replaces the completed slot before issuing a dispatch permit.
+                return load_config
             raise ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "another operation owns target"
             )
