@@ -5,8 +5,8 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
-from dpone.contracts.airflow_deployment import canonical_fingerprint
 from dpone.readiness.managed_utils import _source_columns
+from dpone.readiness.migration_control import stable_fingerprint
 from dpone.readiness.native_snapshot_planning import build_native_transfer_snapshot_optimization
 from dpone.runtime.bulk_wire import BulkWirePlanner
 from dpone.runtime.columnar_fast_path_planner import ColumnarFastPathPlanner
@@ -114,7 +114,7 @@ def _columnar_range_parallelism_plan(
                 "policy_fingerprint": policy.fingerprint,
                 "planned_range_count": 1,
             }
-        identity = canonical_fingerprint(
+        identity = stable_fingerprint(
             {
                 "source": _source_identity(raw),
                 "columns": source_options.get("columns", ()),

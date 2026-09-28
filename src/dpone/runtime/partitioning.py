@@ -26,6 +26,7 @@ from dpone.runtime.partitioning_predicates import (
     DefaultPartitionPredicateRenderer,
     PartitionPredicateRenderer,
 )
+from dpone.runtime.partitioning_support import unpack_bounds, validate_explicit_coverage
 
 
 @dataclass(frozen=True)
@@ -119,7 +120,7 @@ class RangePartitioner:
         if resolved.bounds == "auto":
             if bounds_resolver is None:
                 raise ValueError("partitioning.bounds=auto requires a bounds resolver.")
-            lower, upper, row_count, null_count = _unpack_bounds(bounds_resolver(str(column)))
+            lower, upper, row_count, null_count = unpack_bounds(bounds_resolver(str(column)))
             if target_rows:
                 calculated = math.ceil((row_count or 0) / int(target_rows)) if row_count else 1
                 num_partitions = max(1, min(max_partitions, calculated))
@@ -210,7 +211,7 @@ class RangePartitioner:
             )
         if not partitions:
             raise ValueError("Explicit partitioning requires at least one non-NULL range.")
-        _validate_explicit_coverage(partitions, gap_policy=resolved.range_parallelism.gap_policy)
+        validate_explicit_coverage(partitions, gap_policy=resolved.range_parallelism.gap_policy)
         if null_seen and resolved.planner.null_bucket == "fail":
             raise ValueError(f"Partition column {resolved.column!r} declares a NULL range but null_bucket=fail.")
         if null_seen and resolved.planner.null_bucket == "include_first":
@@ -373,25 +374,3 @@ def _normalize_bound(value: Any, *, strategy: str, boundary: PartitionBoundaryRe
             return datetime.combine(value, datetime.min.time())
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     return normalize_partition_bound(value, boundary or PartitionBoundaryResolution(PartitionBoundKind.NUMERIC))
-
-
-def _unpack_bounds(value: tuple[Any, ...]) -> tuple[Any, Any, int | None, int | None]:
-    lower, upper, row_count, *rest = value
-    null_count = rest[0] if rest else None
-    return (
-        lower,
-        upper,
-        int(row_count) if row_count is not None else None,
-        int(null_count) if null_count is not None else None,
-    )
-
-
-def _validate_explicit_coverage(partitions: list[RangePartition], *, gap_policy: str) -> None:
-    for previous, current in zip(partitions, partitions[1:], strict=False):
-        comparison = compare_partition_bounds(previous.upper_bound, current.lower_bound, previous.boundary)
-        overlapping_boundary = comparison == 0 and previous.include_upper and current.include_lower
-        missing_boundary = comparison == 0 and not previous.include_upper and not current.include_lower
-        if comparison > 0 or overlapping_boundary:
-            raise ValueError("Explicit partition ranges overlap under source comparison semantics.")
-        if (comparison < 0 or missing_boundary) and gap_policy != "allow_explicit":
-            raise ValueError("Explicit partition ranges contain a gap; set gap_policy=allow_explicit to accept it.")

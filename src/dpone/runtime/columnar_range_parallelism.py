@@ -13,12 +13,8 @@ from threading import Condition, Event, Lock
 from typing import Any, Protocol
 from uuid import UUID
 
+import dpone.contracts.columnar_range_parallelism as range_contracts
 from dpone.contracts.airflow_deployment import canonical_fingerprint
-from dpone.contracts.columnar_range_parallelism import (
-    ColumnarRangeDescriptor,
-    ColumnarRangePlan,
-    RangeParallelismPolicy,
-)
 from dpone.runtime.partitioning import RangePartition, RangePartitioner
 
 
@@ -130,15 +126,17 @@ class BoundedRangeExecutor:
     def __init__(
         self,
         *,
-        session_factory: Callable[[ColumnarRangeDescriptor], RangeSession],
-        worker: Callable[[RangeSession, ColumnarRangeDescriptor, Event, AggregateRangeBudget], RangeExecutionResult],
+        session_factory: Callable[[range_contracts.ColumnarRangeDescriptor], RangeSession],
+        worker: Callable[
+            [RangeSession, range_contracts.ColumnarRangeDescriptor, Event, AggregateRangeBudget], RangeExecutionResult
+        ],
         executor_factory: Callable[[int], ThreadPoolExecutor] = ThreadPoolExecutor,
     ) -> None:
         self._session_factory = session_factory
         self._worker = worker
         self._executor_factory = executor_factory
 
-    def execute(self, plan: ColumnarRangePlan) -> RangeExecutionSummary:
+    def execute(self, plan: range_contracts.ColumnarRangePlan) -> RangeExecutionSummary:
         policy = plan.policy
         cancelled = Event()
         budget = AggregateRangeBudget(
@@ -151,7 +149,7 @@ class BoundedRangeExecutor:
         active = 0
         observed = 0
 
-        def execute_one(item: ColumnarRangeDescriptor) -> RangeExecutionResult:
+        def execute_one(item: range_contracts.ColumnarRangeDescriptor) -> RangeExecutionResult:
             nonlocal active, observed
             if cancelled.is_set():
                 raise RuntimeError("Range execution cancelled before session creation.")
@@ -212,7 +210,7 @@ class RangeParallelismPreflight:
 
     @staticmethod
     def validate(
-        policy: RangeParallelismPolicy,
+        policy: range_contracts.RangeParallelismPolicy,
         *,
         partition_column: str,
         query_has_window_functions: bool,
@@ -232,19 +230,21 @@ class RangeParallelismPreflight:
             raise ValueError("group_key must equal the complete window partition key.")
 
 
-def build_columnar_range_plan(partitioner: RangePartitioner, *, query_identity: str) -> ColumnarRangePlan:
+def build_columnar_range_plan(
+    partitioner: RangePartitioner, *, query_identity: str
+) -> range_contracts.ColumnarRangePlan:
     """Project the canonical partitioner into a sanitized immutable plan."""
 
     policy = partitioner.range_parallelism
-    if not isinstance(policy, RangeParallelismPolicy):
-        policy = RangeParallelismPolicy.from_mapping(
+    if not isinstance(policy, range_contracts.RangeParallelismPolicy):
+        policy = range_contracts.RangeParallelismPolicy.from_mapping(
             {}, reader_workers=partitioner.max_workers, load_workers=partitioner.load_workers
         )
-    descriptors: list[ColumnarRangeDescriptor] = []
+    descriptors: list[range_contracts.ColumnarRangeDescriptor] = []
     for ordinal, partition in enumerate(partitioner.partitions()):
         payload = _range_payload(partition, ordinal=ordinal)
         descriptors.append(
-            ColumnarRangeDescriptor(
+            range_contracts.ColumnarRangeDescriptor(
                 range_id=canonical_fingerprint(payload),
                 ordinal=ordinal,
                 boundary_family=partition.boundary.kind.value,
@@ -255,7 +255,7 @@ def build_columnar_range_plan(partitioner: RangePartitioner, *, query_identity: 
                 is_null=partition.is_null_partition,
             )
         )
-    return ColumnarRangePlan.create(policy=policy, ranges=descriptors, query_identity=query_identity)
+    return range_contracts.ColumnarRangePlan.create(policy=policy, ranges=descriptors, query_identity=query_identity)
 
 
 def _range_payload(partition: RangePartition, *, ordinal: int) -> dict[str, Any]:

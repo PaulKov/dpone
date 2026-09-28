@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
-from dpone.contracts.columnar_range_parallelism import RangeParallelismPolicy
+import dpone.contracts.columnar_range_parallelism as range_contracts
 
 
 @dataclass(frozen=True, slots=True)
@@ -99,7 +99,9 @@ class PartitioningOptions:
     export_workers: int = 1
     load_workers: int = 1
     ranges: tuple[Mapping[str, Any], ...] = ()
-    range_parallelism: RangeParallelismPolicy = field(default_factory=RangeParallelismPolicy)
+    range_parallelism: range_contracts.RangeParallelismPolicy = field(
+        default_factory=range_contracts.RangeParallelismPolicy
+    )
     deprecated_aliases: tuple[str, ...] = ()
     warnings: tuple[str, ...] = ()
 
@@ -175,7 +177,7 @@ class PartitioningOptionsResolver:
         parallelism = dict(parallelism_raw or {})
         _reject_worker_conflict(nested, parallelism, outer_key="export_workers", route_key="reader_workers")
         _reject_worker_conflict(nested, parallelism, outer_key="load_workers", route_key="load_workers")
-        range_parallelism = RangeParallelismPolicy.from_mapping(
+        range_parallelism = range_contracts.RangeParallelismPolicy.from_mapping(
             parallelism,
             reader_workers=int(nested.get("export_workers") or 1),
             load_workers=int(nested.get("load_workers") or 1),
