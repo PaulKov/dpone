@@ -2,13 +2,18 @@
 
 ## Unreleased
 
+## 0.85.0 - 2026-09-28
+
 ### Added
 
 - Opt-in durable quality replay for Python-composed bounded internal replicated
   ClickHouse full refresh. Trusted original row/hash and source/staged acceptance
   observations are bound to strict publication authority and revalidated without
   source reads or publication redispatch. Incomplete governance fences slot reuse.
-  Target capture, external replication and CLI/manifest selection remain unsupported.
+  Target capture, external replication, other load strategies and CLI/manifest
+  selection remain unsupported by this opt-in. Existing load strategies keep their
+  prior behavior. Synthetic checks cover the capability; live certification is
+  unverified.
 
 
 ## 0.84.4 - 2026-09-28
