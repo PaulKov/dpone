@@ -897,6 +897,13 @@ through a generic source-type mapper a second time. Existing DDL governance
 still applies: nullable relaxation can require a safe window and an explicit
 table-size budget; this does not authorize arbitrary online DDL.
 
+The reusable type renderer in `dpone.type_system.clickhouse_ddl_types` accepts
+one physical type expression, not a SQL clause. It rejects trailing clauses,
+comments, statement separators and quoted identifiers. This conservative guard
+also rejects enum labels containing those tokens; use a supported type rather
+than disabling validation. Single-quoted timezone and ordinary enum literals
+remain supported.
+
 MSSQL typed row streaming uses the existing `source.options.native_transfer.wire`
 configuration: `mode: typed_binary`, `source_native_format: odbc_row_stream`, and
 `binary_format: rowbinary`. Select `source.options.mssql_export_mode:
