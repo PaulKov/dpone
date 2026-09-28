@@ -1,17 +1,12 @@
-"""Immutable contracts for bounded columnar range execution.
-
-The models are connector-neutral and contain no credentials, sessions, SQL, or
-vendor objects.  Runtime adapters consume the normalized values and report what
-actually ran through the evidence model.
-"""
+"""Connector-neutral contracts for bounded range plans and execution evidence."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import asdict, dataclass, replace
 from typing import Any
 
-from dpone.contracts.airflow_deployment import canonical_fingerprint
+from dpone.contracts.airflow_deployment import canonical_fingerprint, is_canonical_sha256_digest
 
 DEFAULT_MAX_INFLIGHT_ROWS = 100_000
 DEFAULT_MAX_INFLIGHT_BYTES = 256 * 1024 * 1024
@@ -42,20 +37,13 @@ class RangeParallelismPolicy:
 
     @classmethod
     def from_mapping(
-        cls,
-        value: Mapping[str, Any] | None,
-        *,
-        reader_workers: int,
-        load_workers: int,
+        cls, value: Mapping[str, Any] | None, *, reader_workers: int, load_workers: int
     ) -> RangeParallelismPolicy:
         raw = dict(value or {})
         requested_reader_workers = raw.get("reader_workers", reader_workers)
         requested_load_workers = raw.get("load_workers", load_workers)
         consistency = _choice(
-            raw,
-            "consistency",
-            {"immutable", "database_snapshot", "temporal_as_of", "write_exclusion"},
-            "immutable",
+            raw, "consistency", {"immutable", "database_snapshot", "temporal_as_of", "write_exclusion"}, "immutable"
         )
         policy = cls(
             mode=_choice(raw, "mode", {"off", "auto", "required"}, "off"),
@@ -82,20 +70,10 @@ class RangeParallelismPolicy:
         return policy
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "mode": self.mode,
-            "reader_workers": self.reader_workers,
-            "upload_workers": self.upload_workers,
-            "load_workers": self.load_workers,
-            "max_inflight_ranges": self.max_inflight_ranges,
-            "max_inflight_rows": self.max_inflight_rows,
-            "max_inflight_bytes": self.max_inflight_bytes,
-            "gap_policy": self.gap_policy,
-            "consistency": self.consistency,
-            "staging_topology": self.staging_topology,
-            "group_key": list(self.group_key),
-            "consistency_authority": dict(self.consistency_authority),
-        }
+        payload = asdict(self)
+        payload["group_key"] = list(self.group_key)
+        payload["consistency_authority"] = dict(self.consistency_authority)
+        return payload
 
     @property
     def fingerprint(self) -> str:
@@ -116,16 +94,7 @@ class ColumnarRangeDescriptor:
     is_null: bool = False
 
     def to_dict(self) -> dict[str, Any]:
-        return {
-            "range_id": self.range_id,
-            "ordinal": self.ordinal,
-            "boundary_family": self.boundary_family,
-            "lower": self.lower,
-            "upper": self.upper,
-            "include_lower": self.include_lower,
-            "include_upper": self.include_upper,
-            "is_null": self.is_null,
-        }
+        return asdict(self)
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,7 +104,10 @@ class ColumnarRangePlan:
     policy: RangeParallelismPolicy
     ranges: tuple[ColumnarRangeDescriptor, ...]
     query_identity: str
+    execution_identity: str | None
     plan_fingerprint: str
+    range_set_fingerprint: str
+    execution_plan_fingerprint: str | None
 
     @classmethod
     def create(
@@ -144,37 +116,130 @@ class ColumnarRangePlan:
         policy: RangeParallelismPolicy,
         ranges: Sequence[ColumnarRangeDescriptor],
         query_identity: str,
+        execution_identity: str | None = None,
     ) -> ColumnarRangePlan:
         ordered = tuple(ranges)
         if not ordered or tuple(item.ordinal for item in ordered) != tuple(range(len(ordered))):
             raise ValueError("Columnar range ordinals must be contiguous and start at zero.")
         if len({item.range_id for item in ordered}) != len(ordered):
             raise ValueError("Columnar range identifiers must be unique.")
-        payload = {
+        logical_payload = {
             "schema": "dpone.native_transfer.columnar_range_plan.v1",
             "policy": policy.to_dict(),
             "ranges": [item.to_dict() for item in ordered],
-            "query_identity": query_identity,
+            "logical_identity": query_identity,
         }
-        return cls(policy, ordered, query_identity, canonical_fingerprint(payload))
+        range_set = {"schema": "dpone.native_transfer.columnar_range_set.v1", "ranges": logical_payload["ranges"]}
+        range_set_fingerprint = canonical_fingerprint(range_set)
+        plan_fingerprint = canonical_fingerprint(logical_payload)
+        execution_fingerprint = None
+        if execution_identity is not None:
+            execution_fingerprint = canonical_fingerprint(
+                {
+                    "schema": "dpone.native_transfer.columnar_range_execution_plan.v1",
+                    "plan": plan_fingerprint,
+                    "execution_identity": execution_identity,
+                }
+            )
+        return cls(
+            policy,
+            ordered,
+            query_identity,
+            execution_identity,
+            plan_fingerprint,
+            range_set_fingerprint,
+            execution_fingerprint,
+        )
 
     def to_dict(self) -> dict[str, Any]:
-        return {
+        payload: dict[str, Any] = {
             "schema": "dpone.native_transfer.columnar_range_plan.v1",
             "policy": self.policy.to_dict(),
             "policy_fingerprint": self.policy.fingerprint,
             "ranges": [item.to_dict() for item in self.ranges],
             "query_identity": self.query_identity,
+            "range_set_fingerprint": self.range_set_fingerprint,
             "plan_fingerprint": self.plan_fingerprint,
         }
+        if self.execution_identity is not None:
+            payload["execution_identity"] = self.execution_identity
+            payload["execution_plan_fingerprint"] = self.execution_plan_fingerprint
+        return payload
+
+
+@dataclass(frozen=True, slots=True)
+class RangeChunkReceipt:
+    """One immutable object/chunk owned by a source range."""
+
+    ordinal: int
+    object_identity: str
+    checksum_sha256: str
+    rows: int
+    bytes: int
+
+    def __post_init__(self) -> None:
+        _nonnegative("chunk.ordinal", self.ordinal)
+        _nonnegative("chunk.rows", self.rows)
+        _nonnegative("chunk.bytes", self.bytes)
+        _nonempty("chunk.object_identity", self.object_identity)
+        if not is_canonical_sha256_digest(self.checksum_sha256):
+            raise ValueError("chunk.checksum_sha256 must be a canonical SHA-256 digest.")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True, slots=True)
+class RangeStageReceipt:
+    """Authoritative sink confirmation linked to one extracted range."""
+
+    range_id: str
+    stage_identity: str
+    receipt_sha256: str
+    staged_rows: int
+
+    def __post_init__(self) -> None:
+        _nonempty("stage.range_id", self.range_id)
+        _nonempty("stage.stage_identity", self.stage_identity)
+        _nonnegative("stage.staged_rows", self.staged_rows)
+        if not is_canonical_sha256_digest(self.receipt_sha256):
+            raise ValueError("stage.receipt_sha256 must be a canonical SHA-256 digest.")
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
 
 
 @dataclass(frozen=True, slots=True)
 class RangeEvidenceItem:
+    """Measured extraction and optional staging facts for one range."""
+
     range_id: str
     rows: int
     retained_bytes: int
     eof_confirmed: bool
+    chunks: tuple[RangeChunkReceipt, ...]
+    stage: RangeStageReceipt | None = None
+
+    def __post_init__(self) -> None:
+        _nonempty("range_id", self.range_id)
+        _nonnegative("range.rows", self.rows)
+        _nonnegative("range.retained_bytes", self.retained_bytes)
+        if not isinstance(self.eof_confirmed, bool):
+            raise ValueError("range.eof_confirmed must be a boolean.")
+        if not isinstance(self.chunks, tuple) or any(not isinstance(chunk, RangeChunkReceipt) for chunk in self.chunks):
+            raise ValueError("range.chunks must be a tuple of RangeChunkReceipt values.")
+        if self.stage is not None and not isinstance(self.stage, RangeStageReceipt):
+            raise ValueError("range.stage must be a RangeStageReceipt when supplied.")
+        if tuple(chunk.ordinal for chunk in self.chunks) != tuple(range(len(self.chunks))):
+            raise ValueError("Chunk ordinals must be unique, contiguous, and start at zero.")
+        if self.rows > 0 and not self.chunks:
+            raise ValueError("A nonempty range requires at least one chunk receipt.")
+        if sum(chunk.rows for chunk in self.chunks) != self.rows:
+            raise ValueError("Chunk row counts must reconcile to the extracted range row count.")
+        if len({chunk.object_identity for chunk in self.chunks}) != len(self.chunks):
+            raise ValueError("Chunk object identities must be unique within a range.")
+        if self.stage and (self.stage.range_id != self.range_id or self.stage.staged_rows != self.rows):
+            raise ValueError("Stage receipt identity and row count must reconcile to its extracted range.")
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -182,66 +247,8 @@ class RangeEvidenceItem:
             "rows": self.rows,
             "retained_bytes": self.retained_bytes,
             "eof_confirmed": self.eof_confirmed,
-        }
-
-
-@dataclass(frozen=True, slots=True)
-class ColumnarRangeExecutionEvidence:
-    """Actual bounded execution facts; construction fails on partial success."""
-
-    plan_fingerprint: str
-    policy_fingerprint: str
-    ranges: tuple[RangeEvidenceItem, ...]
-    observed_reader_concurrency: int
-    rows_high_water: int
-    bytes_high_water: int
-    all_ranges_confirmed: bool = True
-    schema: str = "dpone.native_transfer.columnar_range_parallelism.v1"
-
-    @classmethod
-    def from_results(
-        cls,
-        *,
-        plan: ColumnarRangePlan,
-        results: Sequence[Any],
-        observed_reader_concurrency: int,
-        rows_high_water: int,
-        bytes_high_water: int,
-    ) -> ColumnarRangeExecutionEvidence:
-        by_id = {str(item.range_id): item for item in results}
-        expected = tuple(item.range_id for item in plan.ranges)
-        if len(results) != len(expected) or set(by_id) != set(expected):
-            raise ValueError("Range results must cover every planned range exactly once.")
-        ordered = tuple(
-            RangeEvidenceItem(
-                range_id=range_id,
-                rows=int(by_id[range_id].rows),
-                retained_bytes=int(by_id[range_id].retained_bytes),
-                eof_confirmed=bool(by_id[range_id].eof_confirmed),
-            )
-            for range_id in expected
-        )
-        if not all(item.eof_confirmed for item in ordered):
-            raise ValueError("Every planned range must confirm EOF before success evidence.")
-        return cls(
-            plan.plan_fingerprint,
-            plan.policy.fingerprint,
-            ordered,
-            int(observed_reader_concurrency),
-            int(rows_high_water),
-            int(bytes_high_water),
-        )
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema": self.schema,
-            "plan_fingerprint": self.plan_fingerprint,
-            "policy_fingerprint": self.policy_fingerprint,
-            "ranges": [item.to_dict() for item in self.ranges],
-            "observed_reader_concurrency": self.observed_reader_concurrency,
-            "rows_high_water": self.rows_high_water,
-            "bytes_high_water": self.bytes_high_water,
-            "all_ranges_confirmed": self.all_ranges_confirmed,
+            "chunks": [chunk.to_dict() for chunk in self.chunks],
+            "stage": self.stage.to_dict() if self.stage else None,
         }
 
 
@@ -250,6 +257,18 @@ def _positive(name: str, value: object) -> int:
         raise ValueError(f"range_parallelism.{name} must be an integer greater than zero.")
     if value <= 0:
         raise ValueError(f"range_parallelism.{name} must be greater than zero.")
+    return value
+
+
+def _nonnegative(name: str, value: object) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ValueError(f"{name} must be a nonnegative integer.")
+    return value
+
+
+def _nonempty(name: str, value: object) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ValueError(f"{name} must be a nonempty string.")
     return value
 
 
@@ -295,9 +314,10 @@ def _authority(value: object, *, consistency: str) -> tuple[tuple[str, str], ...
 
 __all__ = [
     "ColumnarRangeDescriptor",
-    "ColumnarRangeExecutionEvidence",
     "ColumnarRangePlan",
+    "RangeChunkReceipt",
     "RangeEvidenceItem",
     "RangeParallelismPolicy",
     "columnar_range_fingerprint",
+    "RangeStageReceipt",
 ]

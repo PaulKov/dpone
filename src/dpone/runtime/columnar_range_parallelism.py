@@ -29,6 +29,7 @@ class RangeExecutionResult:
     rows: int
     retained_bytes: int
     eof_confirmed: bool
+    chunks: tuple[range_contracts.RangeChunkReceipt, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -230,7 +231,7 @@ class RangeParallelismPreflight:
 
 
 def build_columnar_range_plan(
-    partitioner: RangePartitioner, *, query_identity: str
+    partitioner: RangePartitioner, *, query_identity: str, execution_identity: str | None = None
 ) -> range_contracts.ColumnarRangePlan:
     """Project the canonical partitioner into a sanitized immutable plan."""
 
@@ -254,7 +255,15 @@ def build_columnar_range_plan(
                 is_null=partition.is_null_partition,
             )
         )
-    return range_contracts.ColumnarRangePlan.create(policy=policy, ranges=descriptors, query_identity=query_identity)
+    logical_identity = range_contracts.columnar_range_fingerprint(
+        {"source_schema_identity": query_identity, "partition_column": partitioner.column}
+    )
+    return range_contracts.ColumnarRangePlan.create(
+        policy=policy,
+        ranges=descriptors,
+        query_identity=logical_identity,
+        execution_identity=execution_identity,
+    )
 
 
 def _range_payload(partition: RangePartition, *, ordinal: int) -> dict[str, Any]:

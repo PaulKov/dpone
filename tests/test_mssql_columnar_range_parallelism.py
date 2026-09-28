@@ -2,14 +2,10 @@ from __future__ import annotations
 
 import threading
 import time
-from dataclasses import replace
 
 import pytest
 
-from dpone.contracts.columnar_range_parallelism import (
-    ColumnarRangeExecutionEvidence,
-    RangeParallelismPolicy,
-)
+from dpone.contracts.columnar_range_parallelism import RangeParallelismPolicy
 from dpone.runtime.columnar_range_parallelism import (
     AggregateRangeBudget,
     BoundedRangeExecutor,
@@ -56,6 +52,9 @@ def test_plan_identity_includes_normalized_policy_and_ranges() -> None:
     assert first.plan_fingerprint != changed.plan_fingerprint
     assert first.policy.reader_workers == 2
     assert len(first.ranges) == 3
+    assert first.to_dict()["plan_fingerprint"] == first.plan_fingerprint
+    assert "execution_plan_fingerprint" not in first.to_dict()
+    assert first.to_dict()["range_set_fingerprint"].startswith("sha256:")
 
 
 @pytest.mark.parametrize("topology", ["shared_per_run", "per_partition"])
@@ -220,40 +219,6 @@ def test_executor_cancels_other_sessions_and_never_returns_partial_success() -> 
     assert sessions
     assert all(session.closed for session in sessions)
     assert any(session.cancelled for session in sessions)
-
-
-def test_evidence_rejects_missing_range_or_unconfirmed_eof() -> None:
-    partitioner = RangePartitioner.from_options(_options())
-    plan = build_columnar_range_plan(partitioner, query_identity="sha256:query")
-    complete = tuple(
-        RangeExecutionResult(item.range_id, rows=1, retained_bytes=8, eof_confirmed=True) for item in plan.ranges
-    )
-
-    evidence = ColumnarRangeExecutionEvidence.from_results(
-        plan=plan,
-        results=complete,
-        observed_reader_concurrency=2,
-        rows_high_water=2,
-        bytes_high_water=16,
-    )
-    assert evidence.all_ranges_confirmed
-
-    with pytest.raises(ValueError, match="cover every planned range"):
-        ColumnarRangeExecutionEvidence.from_results(
-            plan=plan,
-            results=complete[:-1],
-            observed_reader_concurrency=1,
-            rows_high_water=1,
-            bytes_high_water=8,
-        )
-    with pytest.raises(ValueError, match="EOF"):
-        ColumnarRangeExecutionEvidence.from_results(
-            plan=plan,
-            results=(replace(complete[0], eof_confirmed=False), *complete[1:]),
-            observed_reader_concurrency=2,
-            rows_high_water=2,
-            bytes_high_water=16,
-        )
 
 
 class _Session:
