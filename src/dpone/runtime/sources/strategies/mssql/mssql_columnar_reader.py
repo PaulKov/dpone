@@ -50,6 +50,14 @@ def range_read_blockers(request: Any, connector: Any) -> tuple[str, ...]:
         return tuple(blockers)
     if partitioner.column.casefold() not in {column.casefold() for column, _ in request.schema}:
         blockers.append("columnar_range_column_not_projected")
+    policy = request.range_plan.policy
+    if request.max_chunk_bytes > policy.max_inflight_bytes:
+        blockers.append("columnar_range_max_chunk_exceeds_inflight_byte_budget")
+    batch_size = dict(request.options or {}).get("batch_size", 10_000)
+    if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size <= 0:
+        blockers.append("columnar_range_batch_size_invalid")
+    elif batch_size > policy.max_inflight_rows:
+        blockers.append("columnar_range_batch_size_exceeds_inflight_row_budget")
     try:
         RangeParallelismPreflight.validate(
             request.range_plan.policy,

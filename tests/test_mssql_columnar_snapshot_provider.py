@@ -362,21 +362,24 @@ def test_columnar_snapshot_request_uses_canonical_execution_options() -> None:
 
 def test_columnar_snapshot_request_carries_canonical_range_plan(tmp_path: Path) -> None:
     config = _load_config()
-    config.options["partitioning"] = {
-        "column": "id",
-        "num_partitions": 2,
-        "export_workers": 2,
-        "load_workers": 1,
-        "bounds": {"lower": 0, "upper": 20},
-        "range_parallelism": {
-            "mode": "required",
-            "upload_workers": 1,
-            "max_inflight_ranges": 2,
-            "max_inflight_rows": 10,
-            "max_inflight_bytes": 1024,
-            "consistency": "immutable",
+    _configure_parallel(
+        config,
+        {
+            "column": "id",
+            "num_partitions": 2,
+            "export_workers": 2,
+            "load_workers": 1,
+            "bounds": {"lower": 0, "upper": 20},
+            "range_parallelism": {
+                "mode": "required",
+                "upload_workers": 1,
+                "max_inflight_ranges": 2,
+                "max_inflight_rows": 10,
+                "max_inflight_bytes": 1024,
+                "consistency": "immutable",
+            },
         },
-    }
+    )
 
     request = build_columnar_snapshot_request(
         load_config=config,
@@ -401,7 +404,7 @@ def test_columnar_snapshot_request_carries_canonical_range_plan(tmp_path: Path) 
 
 def test_parallel_windows_use_independent_typed_ranges_and_wait_for_all_eof(tmp_path: Path) -> None:
     config = _load_config()
-    config.options["partitioning"] = _parallel_partitioning()
+    _configure_parallel(config)
     request = build_columnar_snapshot_request(
         load_config=config,
         query="SELECT id, name FROM dbo.orders",
@@ -433,14 +436,22 @@ def test_parallel_windows_use_independent_typed_ranges_and_wait_for_all_eof(tmp_
     assert evidence["all_ranges_confirmed"] is True
     assert evidence["observed_reader_concurrency"] == 2
     assert evidence["requested_upload_concurrency"] == 1
-    assert evidence["byte_measurement_scope"] == "encoded_parquet_upload_handoff"
+    assert evidence["byte_measurement_scope"] == "preencode_max_chunk_reservation_and_postencode_actual"
+    assert evidence["bytes_high_water"] == 1024
+    assert evidence["byte_reservation_per_item"] == 1024
+    assert evidence["bytes_high_water_kind"] == "configured_max_chunk_reservation"
+    assert evidence["rows_high_water_kind"] == "declared_batch_reservation"
+    assert evidence["row_reservation_per_item"] == 1
+    assert evidence["actual_rows"] == 2
+    assert evidence["actual_encoded_bytes"] < evidence["bytes_high_water"] * 2
+    assert evidence["rows_high_water"] <= 10
     assert evidence["rss_bounded"] is False
     assert all(session.closed for session in connector.sessions)
 
 
 def test_parallel_window_failure_cleans_owned_prefix_and_never_yields(tmp_path: Path) -> None:
     config = _load_config()
-    config.options["partitioning"] = _parallel_partitioning()
+    _configure_parallel(config)
     request = build_columnar_snapshot_request(
         load_config=config,
         query="SELECT id, name FROM dbo.orders",
@@ -466,7 +477,7 @@ def test_parallel_window_failure_cleans_owned_prefix_and_never_yields(tmp_path: 
 
 def test_parallel_window_query_is_blocked_before_source_io(tmp_path: Path) -> None:
     config = _load_config()
-    config.options["partitioning"] = _parallel_partitioning()
+    _configure_parallel(config)
     connector = _ParallelMssqlConnector(partitions=2)
 
     with pytest.raises(ValueError, match="machine-checkable"):
@@ -478,6 +489,82 @@ def test_parallel_window_query_is_blocked_before_source_io(tmp_path: Path) -> No
         )
 
     assert connector.sessions == []
+
+
+def test_parallel_window_budget_contract_blocks_unsafe_declared_items_before_io(tmp_path: Path) -> None:
+    config = _load_config()
+    _configure_parallel(config)
+    execution = config.options["native_transfer"]["snapshot"]["columnar_fast_path"]["execution"]
+    execution["max_chunk_bytes"] = 2048
+    config.options["batch_size"] = 11
+    request = build_columnar_snapshot_request(
+        load_config=config,
+        query="SELECT id, name FROM dbo.orders",
+        schema=[("id", "int"), ("name", "nvarchar(50)")],
+        run_id="run-budget-blocked",
+    )
+    connector = _ParallelMssqlConnector(partitions=2)
+    provider = MssqlColumnarSnapshotProvider(
+        connector=connector,
+        object_client=LocalObjectStorageClient(tmp_path / "store"),
+        parquet_writer=_FakeParquetWriter(),
+    )
+
+    capability = provider.capabilities(request)
+
+    assert "columnar_range_max_chunk_exceeds_inflight_byte_budget" in capability.blockers
+    assert "columnar_range_batch_size_exceeds_inflight_row_budget" in capability.blockers
+    assert connector.sessions == []
+
+
+def test_parallel_window_oversized_encoded_item_fails_without_success_evidence(tmp_path: Path) -> None:
+    config = _load_config()
+    partitioning = _parallel_partitioning()
+    partitioning["range_parallelism"]["max_inflight_bytes"] = 32
+    _configure_parallel(config, partitioning)
+    execution = config.options["native_transfer"]["snapshot"]["columnar_fast_path"]["execution"]
+    execution["max_chunk_bytes"] = 32
+    request = build_columnar_snapshot_request(
+        load_config=config,
+        query="SELECT id, name FROM dbo.orders",
+        schema=[("id", "int"), ("name", "nvarchar(50)")],
+        run_id="run-oversized-item",
+    )
+    connector = _ParallelMssqlConnector(partitions=2)
+    object_client = LocalObjectStorageClient(tmp_path / "store")
+    provider = MssqlColumnarSnapshotProvider(
+        connector=connector,
+        object_client=object_client,
+        parquet_writer=_FakeParquetWriter(payload=b"x" * 128),
+    )
+
+    with pytest.raises(RuntimeError, match="columnar_chunk_exceeds_max_bytes"):
+        list(provider.iter_object_storage_windows(request))
+
+    assert provider.range_execution_evidence(request) is None
+    assert object_client.list_prefix(ObjectStorageUri.parse("s3://dpone-stage/msql/run-oversized-item/")) == ()
+
+
+def test_parallel_window_source_batch_cannot_exceed_row_reservation(tmp_path: Path) -> None:
+    config = _load_config()
+    _configure_parallel(config)
+    request = build_columnar_snapshot_request(
+        load_config=config,
+        query="SELECT id, name FROM dbo.orders",
+        schema=[("id", "int"), ("name", "nvarchar(50)")],
+        run_id="run-oversized-batch",
+    )
+    connector = _ParallelMssqlConnector(partitions=2, rows_per_batch=2)
+    provider = MssqlColumnarSnapshotProvider(
+        connector=connector,
+        object_client=LocalObjectStorageClient(tmp_path / "store"),
+        parquet_writer=_FakeParquetWriter(),
+    )
+
+    with pytest.raises(ValueError, match="declared row reservation"):
+        list(provider.iter_object_storage_windows(request))
+
+    assert provider.range_execution_evidence(request) is None
 
 
 def test_mssql_queryout_factory_blocks_required_columnar_without_provider() -> None:
@@ -579,10 +666,18 @@ def _parallel_partitioning() -> dict[str, object]:
     }
 
 
+def _configure_parallel(config: LoadConfig, partitioning: dict[str, object] | None = None) -> None:
+    config.options["partitioning"] = partitioning or _parallel_partitioning()
+    config.options["batch_size"] = 1
+    execution = config.options["native_transfer"]["snapshot"]["columnar_fast_path"]["execution"]
+    execution["max_chunk_bytes"] = 1024
+
+
 class _ParallelMssqlConnector:
-    def __init__(self, *, partitions: int, fail_ordinal: int | None = None) -> None:
+    def __init__(self, *, partitions: int, fail_ordinal: int | None = None, rows_per_batch: int = 1) -> None:
         self._barrier = Barrier(partitions)
         self.fail_ordinal = fail_ordinal
+        self.rows_per_batch = rows_per_batch
         self.sessions: list[_ParallelMssqlSession] = []
 
     def get_records_streaming(self, *args, **kwargs):
@@ -610,7 +705,7 @@ class _ParallelMssqlSession:
         self.owner._barrier.wait(timeout=2)
         if self.ordinal == self.owner.fail_ordinal:
             raise RuntimeError("synthetic range failure")
-        yield [(self.ordinal * 10 + 1, f"range-{self.ordinal}")]
+        yield [(self.ordinal * 10 + offset + 1, f"range-{self.ordinal}") for offset in range(self.owner.rows_per_batch)]
         self.eof = True
 
     def cancel(self) -> None:

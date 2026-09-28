@@ -65,8 +65,6 @@ def iter_serial_object_windows(
     read_contract: Any,
     tmp_dir: Path,
 ):
-    """Preserve the existing one-session, yield-as-produced window behavior."""
-
     row_target = chunks.initial_chunk_rows(request)
     buffered_rows: list[tuple[object, ...]] = []
     window_index = 0
@@ -121,8 +119,6 @@ def build_parallel_object_windows(
     read_contract: Any,
     tmp_dir: Path,
 ) -> ParallelWindowResult:
-    """Read every planned range independently and expose windows only after all EOFs."""
-
     partitioner = request.range_partitioner
     plan = request.range_plan
     if partitioner is None or plan is None:
@@ -145,20 +141,20 @@ def build_parallel_object_windows(
         budget: AggregateRangeBudget,
     ) -> RangeExecutionResult:
         partition = partitions[descriptor.ordinal]
-        buffered_rows: list[tuple[object, ...]] = []
         windows: list[ObjectStorageChunkWindow] = []
-        row_target = chunks.initial_chunk_rows(request)
         rows_total = 0
         bytes_total = 0
         range_dir = tmp_dir / f"range-{descriptor.ordinal:06d}"
         range_dir.mkdir(parents=True, exist_ok=True)
 
-        def flush() -> None:
-            nonlocal buffered_rows, row_target, rows_total, bytes_total
-            window, row_target = build_object_window(
+        def flush(rows: Sequence[tuple[object, ...]]) -> None:
+            nonlocal rows_total, bytes_total
+            if not rows:
+                return
+            window, _ = build_object_window(
                 tmp_dir=range_dir,
                 index=len(windows),
-                rows=buffered_rows,
+                rows=rows,
                 request=request,
                 prefix=prefix,
                 schema_hash=schema_hash,
@@ -168,30 +164,35 @@ def build_parallel_object_windows(
                 range_id=descriptor.range_id,
                 range_ordinal=descriptor.ordinal,
                 upload_guard=upload_lane,
-                budget=budget,
-                cancelled=cancelled,
             )
-            buffered_rows = []
             if window is not None:
                 windows.append(window)
                 rows_total += window.row_count
                 bytes_total += window.size_bytes
 
-        for rows in iter_columnar_batches(
-            session,
-            query=request.query,
-            schema=request.schema,
-            batch_size=chunks.batch_size(request),
-            partitioner=partitioner,
-            partition=partition,
-        ):
+        batch_size = chunks.batch_size(request)
+        batches = iter(
+            iter_columnar_batches(
+                session,
+                query=request.query,
+                schema=request.schema,
+                batch_size=batch_size,
+                partitioner=partitioner,
+                partition=partition,
+            )
+        )
+        while True:
             if cancelled.is_set():
                 raise RuntimeError("Range execution cancelled during source read.")
-            buffered_rows.extend(rows)
-            if len(buffered_rows) >= row_target:
-                flush()
-        if buffered_rows:
-            flush()
+            with budget.acquire(rows=batch_size, retained_bytes=0, cancelled=cancelled):
+                try:
+                    rows = next(batches)
+                except StopIteration:
+                    break
+                if len(rows) > batch_size:
+                    raise ValueError("Source batch exceeds its declared row reservation.")
+                with budget.acquire(rows=0, retained_bytes=request.max_chunk_bytes, cancelled=cancelled):
+                    flush(rows)
         with produced_lock:
             produced[descriptor.ordinal] = tuple(windows)
         return RangeExecutionResult(descriptor.range_id, rows_total, bytes_total, eof_confirmed=True)
@@ -214,10 +215,16 @@ def build_parallel_object_windows(
         "observed_reader_concurrency": summary.observed_reader_concurrency,
         "rows_high_water": summary.budget.rows_high_water,
         "bytes_high_water": summary.budget.bytes_high_water,
+        "rows_high_water_kind": "declared_batch_reservation",
+        "bytes_high_water_kind": "configured_max_chunk_reservation",
         "all_ranges_confirmed": True,
         "observed_upload_concurrency": upload_lane.observed,
         "requested_upload_concurrency": plan.policy.upload_workers,
-        "byte_measurement_scope": "encoded_parquet_upload_handoff",
+        "byte_measurement_scope": "preencode_max_chunk_reservation_and_postencode_actual",
+        "byte_reservation_per_item": request.max_chunk_bytes,
+        "row_reservation_per_item": chunks.batch_size(request),
+        "actual_rows": sum(item.rows for item in summary.ranges),
+        "actual_encoded_bytes": sum(item.retained_bytes for item in summary.ranges),
         "rss_bounded": False,
     }
     return ParallelWindowResult(ordered_windows, execution)
@@ -239,8 +246,6 @@ def build_object_window(
     range_id: str | None = None,
     range_ordinal: int = 0,
     upload_guard: Any | None = None,
-    budget: AggregateRangeBudget | None = None,
-    cancelled: Event | None = None,
 ) -> tuple[ObjectStorageChunkWindow | None, int]:
     local_path = tmp_dir / f"range-{range_ordinal:06d}-window-{index:06d}-chunk-00000.parquet"
     write_started = _now(clock)
@@ -253,12 +258,7 @@ def build_object_window(
     else:
         window_prefix = prefix.child(f"range-{range_ordinal:06d}").child(f"window-{index + 1:06d}").prefix()
     upload_started = write_finished
-    budget_lease = (
-        budget.acquire(rows=row_count, retained_bytes=size_bytes, cancelled=cancelled)
-        if budget is not None
-        else nullcontext()
-    )
-    with budget_lease, upload_guard or nullcontext():
+    with upload_guard or nullcontext():
         uploaded = object_client.put_file(
             local_path,
             window_prefix.child("chunk-00000.parquet"),
