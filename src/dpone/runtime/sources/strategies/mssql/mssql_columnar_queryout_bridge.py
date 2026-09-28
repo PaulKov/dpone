@@ -66,6 +66,7 @@ def build_columnar_snapshot_request(
     run_id: str | None = None,
     bounds_resolver: Callable[[str], tuple[Any, ...]] | None = None,
     consistency_binding: dict[str, object] | None = None,
+    range_capability_available: bool = True,
 ) -> ColumnarSnapshotRequest:
     """Build the provider request shared by legacy queryout and route runtime."""
 
@@ -80,6 +81,7 @@ def build_columnar_snapshot_request(
         run_id=run_id,
         bounds_resolver=bounds_resolver,
         consistency_binding=consistency_binding,
+        range_capability_available=range_capability_available,
     )
 
 
@@ -92,16 +94,18 @@ def _snapshot_request(
     run_id: str | None = None,
     bounds_resolver: Callable[[str], tuple[Any, ...]] | None = None,
     consistency_binding: dict[str, object] | None = None,
+    range_capability_available: bool = True,
 ) -> ColumnarSnapshotRequest:
     request_run_id = str(run_id or load_config.options.get("run_id") or uuid.uuid4().hex)
     object_storage = columnar_options.get("object_storage")
     execution = _execution_options(columnar_options)
-    range_partitioner, range_plan = _range_request(
+    range_partitioner, range_plan, range_fallback = _range_request(
         load_config,
         query=query,
         schema=schema,
         bounds_resolver=bounds_resolver,
         execution_identity=f"sha256:{sha256(request_run_id.encode()).hexdigest()}",
+        range_capability_available=range_capability_available,
     )
     if not isinstance(object_storage, dict):
         return _local_snapshot_request(
@@ -113,6 +117,7 @@ def _snapshot_request(
             range_partitioner=range_partitioner,
             range_plan=range_plan,
             consistency_binding=consistency_binding,
+            range_fallback=range_fallback,
         )
     uri_prefix = str(object_storage.get("uri_prefix") or "").strip()
     if not uri_prefix:
@@ -125,6 +130,8 @@ def _snapshot_request(
         "cleanup_policy": execution.get("cleanup_policy", object_storage.get("cleanup_policy", "eager")),
         "range_consistency_binding": dict(consistency_binding or {}),
     }
+    if range_fallback is not None:
+        request_options["range_parallelism_fallback_reason"] = range_fallback
     if isinstance(object_storage.get("clickhouse_read_access"), dict):
         request_options["clickhouse_read_access"] = dict(object_storage["clickhouse_read_access"])
     if isinstance(object_storage.get("retention"), dict):
@@ -160,6 +167,7 @@ def _local_snapshot_request(
     range_partitioner: RangePartitioner | None,
     range_plan: Any | None,
     consistency_binding: dict[str, object] | None,
+    range_fallback: str | None,
 ) -> ColumnarSnapshotRequest:
     execution = _execution_options(columnar_options)
     request_options = {
@@ -169,6 +177,8 @@ def _local_snapshot_request(
         "cleanup_policy": execution.get("cleanup_policy", columnar_options.get("cleanup_policy", "eager")),
         "range_consistency_binding": dict(consistency_binding or {}),
     }
+    if range_fallback is not None:
+        request_options["range_parallelism_fallback_reason"] = range_fallback
     return ColumnarSnapshotRequest(
         query=query,
         schema=schema,
@@ -197,7 +207,8 @@ def _range_request(
     schema: list[tuple[str, str]],
     bounds_resolver: Callable[[str], tuple[Any, ...]] | None,
     execution_identity: str,
-) -> tuple[RangePartitioner | None, Any | None]:
+    range_capability_available: bool,
+) -> tuple[RangePartitioner | None, Any | None, str | None]:
     source_options = load_config.options.get("source_options")
     canonical_options = source_options if isinstance(source_options, dict) else load_config.options
     partitioning = canonical_options.get("partitioning")
@@ -209,27 +220,40 @@ def _range_request(
         raise ValueError("columnar_range_parallelism_requires_explicit_consistency")
     resolved = PartitioningOptionsResolver.resolve(canonical_options)
     policy = resolved.range_parallelism
+    if policy.mode != "off" and not range_capability_available:
+        if policy.mode == "required":
+            raise RuntimeError("mssql_independent_range_sessions_unavailable")
+        return None, None, "mssql_independent_range_sessions_unavailable"
     if policy.mode != "off":
-        RangeParallelismPreflight.validate(
-            policy,
-            partition_column=str(resolved.column or ""),
-            query_has_window_functions=bool(re.search(r"\bover\s*\(", query, flags=re.IGNORECASE)),
-            supported_topologies={"shared_per_run", "per_partition"},
-        )
+        try:
+            RangeParallelismPreflight.validate(
+                policy,
+                partition_column=str(resolved.column or ""),
+                query_has_window_functions=bool(re.search(r"\bover\s*\(", query, flags=re.IGNORECASE)),
+                supported_topologies={"shared_per_run", "per_partition"},
+            )
+        except ValueError as exc:
+            if policy.mode == "auto":
+                return None, None, f"columnar_range_preflight:{exc}"
+            raise
     partitioner = RangePartitioner.from_options(canonical_options, bounds_resolver=bounds_resolver)
     mode = str(getattr(policy, "mode", "off"))
     if mode == "off":
-        return None, None
+        return None, None, None
     if not partitioner.enabled:
         raise ValueError("columnar_range_parallelism_requires_multiple_ranges")
     identity_payload = json.dumps(
         {"query": query, "schema": schema}, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     )
     query_identity = f"sha256:{sha256(identity_payload.encode()).hexdigest()}"
-    return partitioner, build_columnar_range_plan(
+    return (
         partitioner,
-        query_identity=query_identity,
-        execution_identity=execution_identity,
+        build_columnar_range_plan(
+            partitioner,
+            query_identity=query_identity,
+            execution_identity=execution_identity,
+        ),
+        None,
     )
 
 

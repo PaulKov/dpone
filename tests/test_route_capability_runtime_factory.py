@@ -126,6 +126,29 @@ def test_columnar_request_factory_rejects_missing_independent_sessions_before_me
     assert source.connector.fetch_schema_calls == 0
 
 
+def test_columnar_request_factory_auto_falls_back_to_serial_without_independent_sessions() -> None:
+    from dpone.runtime.columnar_runtime_assembly import MssqlColumnarSnapshotRequestFactory
+
+    config = _cfg()
+    config.options["partitioning"] = {
+        "column": "id",
+        "ranges": [{"lower": 0, "upper": 10, "include_lower": True, "include_upper": True}],
+        "range_parallelism": {"mode": "auto", "consistency": "immutable"},
+    }
+    source = _MssqlSource()
+
+    request = MssqlColumnarSnapshotRequestFactory()(
+        load_config=config,
+        source=source,
+        sink=_Sink(),
+        state=None,
+        load_record=SimpleNamespace(run_id="range-auto-fallback"),
+    )
+
+    assert request.range_plan is None
+    assert request.options["range_parallelism_fallback_reason"] == "mssql_independent_range_sessions_unavailable"
+
+
 def test_runtime_factory_auto_falls_back_to_single_node_s3_when_s3cluster_probe_fails(tmp_path) -> None:
     sink = _Sink(fail_s3cluster=True)
     source = _MssqlSource()

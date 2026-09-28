@@ -119,7 +119,8 @@ class MssqlColumnarSnapshotRequestFactory:
         del sink, state
         connector = getattr(source, "connector", None)
         partitioning = PartitioningOptionsResolver.resolve(load_config.options)
-        if partitioning.range_parallelism.mode != "off" and not callable(getattr(connector, "open_session", None)):
+        range_sessions_available = callable(getattr(connector, "open_session", None))
+        if partitioning.range_parallelism.mode == "required" and not range_sessions_available:
             raise RuntimeError("mssql_independent_range_sessions_unavailable")
         consistency, authority = resolve_range_consistency(_source_options(load_config))
         if consistency == "temporal_as_of" and not callable(getattr(connector, "build_temporal_select_query", None)):
@@ -158,6 +159,7 @@ class MssqlColumnarSnapshotRequestFactory:
                 source_type=schema_types.get(column.casefold(), ""),
             ),
             consistency_binding=consistency_binding(consistency, authority, database),
+            range_capability_available=range_sessions_available,
         )
 
 

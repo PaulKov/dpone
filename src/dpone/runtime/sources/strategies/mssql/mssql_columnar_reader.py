@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from collections.abc import Callable, Sequence
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 from threading import Lock, Semaphore
 from typing import Any
 
@@ -81,10 +82,17 @@ def resolve_range_consistency(options: dict[str, Any]) -> tuple[str, dict[str, A
     authority = dict(raw_authority) if isinstance(raw_authority, dict) else {}
     if consistency == "temporal_as_of":
         as_of = str(authority.get("as_of") or "").strip()
-        if not re.fullmatch(
-            r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,7})?(?:Z|[+-]\d{2}:\d{2})?",
-            as_of,
-        ):
+        pattern = r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.(\d{1,7}))?(?:Z|[+-]\d{2}:\d{2})?"
+        match = re.fullmatch(pattern, as_of)
+        try:
+            parseable = as_of.replace("Z", "+00:00")
+            fraction = match.group(1) if match is not None else None
+            if fraction and len(fraction) == 7:
+                parseable = parseable.replace(f".{fraction}", f".{fraction[:6]}", 1)
+            datetime.fromisoformat(parseable)
+        except ValueError:
+            match = None
+        if match is None:
             raise ValueError("columnar_temporal_as_of_invalid")
     return consistency, authority
 

@@ -16,6 +16,7 @@ from dpone.runtime.partitioning_bounds import PartitionBoundaryTypeResolver, Par
 from dpone.runtime.partitioning_options import PartitioningOptionsResolver
 from dpone.runtime.partitioning_predicates import MssqlPartitionPredicateRenderer
 from dpone.runtime.sources.strategies.mssql import MSSQLFullExtractStrategy
+from dpone.runtime.sources.strategies.mssql.mssql_columnar_reader import resolve_range_consistency
 
 
 class CapturingLogger:
@@ -27,6 +28,21 @@ class CapturingLogger:
 
     def log_etl_progress(self, event: str, payload: dict[str, object]) -> None:
         self.events.append((event, payload))
+
+
+def test_temporal_as_of_rejects_calendar_invalid_authority() -> None:
+    with pytest.raises(ValueError, match="columnar_temporal_as_of_invalid"):
+        resolve_range_consistency(
+            {
+                "partitioning": {
+                    "range_parallelism": {
+                        "mode": "required",
+                        "consistency": "temporal_as_of",
+                        "consistency_authority": {"as_of": "2026-02-31T25:61:61.1234567Z"},
+                    }
+                }
+            }
+        )
 
 
 def test_range_partitioner_auto_bounds_supports_date_values_without_strategy_override() -> None:
