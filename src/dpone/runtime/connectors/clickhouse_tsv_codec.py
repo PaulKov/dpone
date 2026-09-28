@@ -46,7 +46,7 @@ class ClickHouseTabSeparatedCodec:
             expression = self._mssql_datetimeoffset_expression(value_sql)
         elif text_column:
             expression = (
-                f"CONVERT(VARCHAR(MAX), CONVERT(NVARCHAR(MAX), {value_sql}) COLLATE Latin1_General_100_CI_AS_SC_UTF8)"
+                f"CONVERT(VARCHAR(MAX), CONVERT(NVARCHAR(MAX), {value_sql}) COLLATE Latin1_General_100_BIN2_UTF8)"
             )
         else:
             expression = f"CONVERT(VARCHAR(MAX), {value_sql})"

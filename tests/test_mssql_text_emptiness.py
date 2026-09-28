@@ -32,7 +32,7 @@ def test_tabseparated_encode_measures_pre_escape_utf8_text(source_type: str) -> 
     expression = ClickHouseTabSeparatedCodec().mssql_select_expression(
         value_sql, text_column=True, source_type=source_type
     )
-    converted = f"CONVERT(VARCHAR(MAX), CONVERT(NVARCHAR(MAX), {value_sql}) COLLATE Latin1_General_100_CI_AS_SC_UTF8)"
+    converted = f"CONVERT(VARCHAR(MAX), CONVERT(NVARCHAR(MAX), {value_sql}) COLLATE Latin1_General_100_BIN2_UTF8)"
 
     assert f"WHEN DATALENGTH({converted}) = 0 THEN N'__dpone__tsv__empty'" in expression
     assert f"CASE WHEN {value_sql} IS NULL THEN N'\\N'" in expression

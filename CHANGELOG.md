@@ -6,6 +6,10 @@
 
 ### Fixed
 
+- Escaped MSSQL-to-ClickHouse text uses binary UTF-8 collation for wire-marker
+  replacement, preserving distinct user strings that resemble markers with
+  different letter case under case-insensitive source collations.
+
 - MSSQL single-scan physical chunks honor `cleanup_policy: eager`: release each
   chunk after acknowledged staging load and recorded byte/checksum evidence,
   before producing the next chunk. Failed or ambiguous chunks remain owned by
