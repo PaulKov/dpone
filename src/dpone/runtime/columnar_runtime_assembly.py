@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -21,6 +21,13 @@ from dpone.runtime.partitioning_options import PartitioningOptionsResolver
 from dpone.runtime.sinks.clickhouse_capabilities import ClickHouseColumnarCapabilityProbe
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_provider import MssqlColumnarSnapshotProvider
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_queryout_bridge import build_columnar_snapshot_request
+from dpone.runtime.sources.strategies.mssql.mssql_columnar_reader import (
+    authority_database,
+    consistency_binding,
+    resolve_partition_bounds,
+    resolve_range_consistency,
+    verify_write_exclusion,
+)
 from dpone.storage import ObjectStorageUri
 
 if TYPE_CHECKING:
@@ -47,16 +54,18 @@ class ColumnarRuntimeAssembly:
         object_storage_resolver: ObjectStorageConnectionResolver | None = None,
         parquet_writer: Any | None = None,
         clickhouse_probe_connector: Any | None = None,
+        write_exclusion_verifier: Callable[..., bool] | None = None,
     ) -> None:
         self._object_client = object_client
         self._resolver = object_storage_resolver or ObjectStorageConnectionResolver()
         self._parquet_writer = parquet_writer
         self._clickhouse_probe_connector = clickhouse_probe_connector
+        self._write_exclusion_verifier = write_exclusion_verifier
 
     def build(self, *, load_config: LoadConfig, source: Any, sink: Any) -> RouteRuntimeAssembly | None:
         if _columnar_mode(load_config) in {"off", "benchmark_only", ""}:
             return None
-        request_factory = MssqlColumnarSnapshotRequestFactory()
+        request_factory = MssqlColumnarSnapshotRequestFactory(write_exclusion_verifier=self._write_exclusion_verifier)
         object_client = self._object_client or self._build_object_client(load_config)
         provider = MssqlColumnarSnapshotProvider(
             connector=getattr(source, "connector", None),
@@ -103,20 +112,52 @@ class ColumnarRuntimeAssembly:
 
 
 class MssqlColumnarSnapshotRequestFactory:
+    def __init__(self, *, write_exclusion_verifier: Callable[..., bool] | None = None) -> None:
+        self._write_exclusion_verifier = write_exclusion_verifier
+
     def __call__(self, *, load_config: LoadConfig, source: Any, sink: Any, state: Any, load_record: Any) -> Any:
         del sink, state
         connector = getattr(source, "connector", None)
         partitioning = PartitioningOptionsResolver.resolve(load_config.options)
         if partitioning.range_parallelism.mode != "off" and not callable(getattr(connector, "open_session", None)):
             raise RuntimeError("mssql_independent_range_sessions_unavailable")
-        schema = _fetch_schema(connector, load_config)
-        query = _select_query(connector, load_config, [column for column, _ in schema])
+        consistency, authority = resolve_range_consistency(_source_options(load_config))
+        if consistency == "temporal_as_of" and not callable(getattr(connector, "build_temporal_select_query", None)):
+            raise RuntimeError("columnar_temporal_as_of_query_builder_missing")
+        database = authority_database(
+            consistency,
+            authority,
+            _database(load_config.source_schema, load_config.source_database),
+        )
+        verify_write_exclusion(
+            consistency,
+            authority,
+            verifier=self._write_exclusion_verifier,
+            connector=connector,
+            load_config=load_config,
+        )
+        schema = _fetch_schema(connector, load_config, database=database)
+        query = _select_query(
+            connector,
+            load_config,
+            [column for column, _ in schema],
+            database=database,
+            consistency=consistency,
+            authority=authority,
+        )
+        schema_types = {column.casefold(): source_type for column, source_type in schema}
         return build_columnar_snapshot_request(
             load_config=load_config,
             query=query,
             schema=schema,
             run_id=str(getattr(load_record, "run_id", "") or _configured_run_id(load_config)),
-            bounds_resolver=lambda column: _resolve_partition_bounds(connector, query, column),
+            bounds_resolver=lambda column: resolve_partition_bounds(
+                connector,
+                query=query,
+                column=column,
+                source_type=schema_types.get(column.casefold(), ""),
+            ),
+            consistency_binding=consistency_binding(consistency, authority, database),
         )
 
 
@@ -230,10 +271,10 @@ def _request_from_context(factory: MssqlColumnarSnapshotRequestFactory, context:
     )
 
 
-def _fetch_schema(connector: Any, load_config: LoadConfig) -> list[tuple[str, str]]:
+def _fetch_schema(connector: Any, load_config: LoadConfig, *, database: str | None = None) -> list[tuple[str, str]]:
     if connector is None or not hasattr(connector, "fetch_schema"):
         raise RuntimeError("mssql_source_schema_reader_missing")
-    database = _database(load_config.source_schema, load_config.source_database)
+    database = database or _database(load_config.source_schema, load_config.source_database)
     try:
         return list(connector.fetch_schema(load_config.source_schema, load_config.source_table, database=database))
     except TypeError:
@@ -242,10 +283,33 @@ def _fetch_schema(connector: Any, load_config: LoadConfig) -> list[tuple[str, st
         )
 
 
-def _select_query(connector: Any, load_config: LoadConfig, columns: list[str]) -> str:
+def _select_query(
+    connector: Any,
+    load_config: LoadConfig,
+    columns: list[str],
+    *,
+    database: str | None = None,
+    consistency: str = "immutable",
+    authority: dict[str, Any] | None = None,
+) -> str:
     if connector is None or not hasattr(connector, "build_select_query"):
         raise RuntimeError("mssql_source_query_builder_missing")
-    database = _database(load_config.source_schema, load_config.source_database)
+    database = database or _database(load_config.source_schema, load_config.source_database)
+    if consistency == "temporal_as_of":
+        builder = getattr(connector, "build_temporal_select_query", None)
+        if not callable(builder):
+            raise RuntimeError("columnar_temporal_as_of_query_builder_missing")
+        query = str(
+            builder(
+                load_config.source_schema,
+                load_config.source_table,
+                columns,
+                as_of=str((authority or {})["as_of"]),
+                database=database,
+            )
+        )
+        predicate = load_config.options.get("source_custom_predicate") or load_config.custom_predicate
+        return f"{query} WHERE {predicate}" if predicate else query
     try:
         query = str(
             connector.build_select_query(

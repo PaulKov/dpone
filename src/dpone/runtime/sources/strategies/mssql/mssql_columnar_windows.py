@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Sequence
-from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
-from threading import Event, Lock, Semaphore
+from threading import Event, Lock
 from typing import Any
 
 from dpone.runtime.columnar_fast_path_models import ObjectStorageChunk
@@ -20,6 +19,7 @@ from dpone.runtime.columnar_range_parallelism import (
 from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotRequest
 from dpone.runtime.sources.strategies.mssql import mssql_columnar_chunks as chunks
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_reader import (
+    BoundedColumnarUploadLane,
     ColumnarRangeSession,
     iter_columnar_batches,
 )
@@ -32,26 +32,6 @@ WriteChunkFile = Callable[[Path, ColumnarSnapshotRequest, Sequence[tuple[object,
 class ParallelWindowResult:
     windows: tuple[ObjectStorageChunkWindow, ...]
     evidence: dict[str, object]
-
-
-class _ObservedUploadLane:
-    def __init__(self, workers: int) -> None:
-        self._semaphore = Semaphore(workers)
-        self._lock = Lock()
-        self._active = 0
-        self.observed = 0
-
-    def __enter__(self) -> _ObservedUploadLane:
-        self._semaphore.acquire()
-        with self._lock:
-            self._active += 1
-            self.observed = max(self.observed, self._active)
-        return self
-
-    def __exit__(self, *args: object) -> None:
-        with self._lock:
-            self._active -= 1
-        self._semaphore.release()
 
 
 def iter_serial_object_windows(
@@ -126,12 +106,21 @@ def build_parallel_object_windows(
     partitions = tuple(partitioner.partitions())
     if len(partitions) != len(plan.ranges):
         raise ValueError("Canonical range plan does not match the partitioner.")
-    upload_lane = _ObservedUploadLane(plan.policy.upload_workers)
+    upload_lane = BoundedColumnarUploadLane(plan.policy.upload_workers)
     produced: dict[int, tuple[ObjectStorageChunkWindow, ...]] = {}
     produced_lock = Lock()
+    source_sessions: set[int] = set()
+    source_sessions_lock = Lock()
 
     def session_factory(descriptor: Any) -> ColumnarRangeSession:
         session = connector.open_session(application_name=f"dpone-columnar-range-{descriptor.ordinal:06d}")
+        if session is connector or not callable(getattr(session, "close", None)):
+            raise RuntimeError("mssql_range_session_not_independent")
+        with source_sessions_lock:
+            identity = id(session)
+            if identity in source_sessions:
+                raise RuntimeError("mssql_range_session_reused")
+            source_sessions.add(identity)
         return ColumnarRangeSession(session)
 
     def worker(
@@ -197,7 +186,12 @@ def build_parallel_object_windows(
             produced[descriptor.ordinal] = tuple(windows)
         return RangeExecutionResult(descriptor.range_id, rows_total, bytes_total, eof_confirmed=True)
 
-    summary = BoundedRangeExecutor(session_factory=session_factory, worker=worker).execute(plan)
+    try:
+        summary = BoundedRangeExecutor(session_factory=session_factory, worker=worker).execute(plan)
+    except BaseException:
+        upload_lane.close(cancel=True)
+        raise
+    upload_lane.close(cancel=False)
     ordered_windows = tuple(window for ordinal in range(len(partitions)) for window in produced.get(ordinal, ()))
     execution = {
         "schema": "dpone.native_transfer.columnar_range_parallelism.v1",
@@ -245,7 +239,7 @@ def build_object_window(
     clock: Callable[[], float] | None = None,
     range_id: str | None = None,
     range_ordinal: int = 0,
-    upload_guard: Any | None = None,
+    upload_guard: BoundedColumnarUploadLane | None = None,
 ) -> tuple[ObjectStorageChunkWindow | None, int]:
     local_path = tmp_dir / f"range-{range_ordinal:06d}-window-{index:06d}-chunk-00000.parquet"
     write_started = _now(clock)
@@ -258,12 +252,15 @@ def build_object_window(
     else:
         window_prefix = prefix.child(f"range-{range_ordinal:06d}").child(f"window-{index + 1:06d}").prefix()
     upload_started = write_finished
-    with upload_guard or nullcontext():
-        uploaded = object_client.put_file(
+
+    def upload() -> Any:
+        return object_client.put_file(
             local_path,
             window_prefix.child("chunk-00000.parquet"),
             content_type="application/vnd.apache.parquet",
         )
+
+    uploaded = upload_guard.run(upload) if upload_guard is not None else upload()
     upload_finished = _now(clock)
     cleanup_started = upload_finished
     local_path.unlink(missing_ok=True)

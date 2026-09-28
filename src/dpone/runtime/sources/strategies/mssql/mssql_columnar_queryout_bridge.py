@@ -65,6 +65,7 @@ def build_columnar_snapshot_request(
     schema: list[tuple[str, str]],
     run_id: str | None = None,
     bounds_resolver: Callable[[str], tuple[Any, ...]] | None = None,
+    consistency_binding: dict[str, object] | None = None,
 ) -> ColumnarSnapshotRequest:
     """Build the provider request shared by legacy queryout and route runtime."""
 
@@ -78,6 +79,7 @@ def build_columnar_snapshot_request(
         columnar_options,
         run_id=run_id,
         bounds_resolver=bounds_resolver,
+        consistency_binding=consistency_binding,
     )
 
 
@@ -89,6 +91,7 @@ def _snapshot_request(
     *,
     run_id: str | None = None,
     bounds_resolver: Callable[[str], tuple[Any, ...]] | None = None,
+    consistency_binding: dict[str, object] | None = None,
 ) -> ColumnarSnapshotRequest:
     request_run_id = str(run_id or load_config.options.get("run_id") or uuid.uuid4().hex)
     object_storage = columnar_options.get("object_storage")
@@ -108,6 +111,7 @@ def _snapshot_request(
             run_id=request_run_id,
             range_partitioner=range_partitioner,
             range_plan=range_plan,
+            consistency_binding=consistency_binding,
         )
     uri_prefix = str(object_storage.get("uri_prefix") or "").strip()
     if not uri_prefix:
@@ -118,6 +122,7 @@ def _snapshot_request(
         "object_storage": dict(object_storage),
         "batch_size": load_config.options.get("batch_size", load_config.batch_size),
         "cleanup_policy": execution.get("cleanup_policy", object_storage.get("cleanup_policy", "eager")),
+        "range_consistency_binding": dict(consistency_binding or {}),
     }
     if isinstance(object_storage.get("clickhouse_read_access"), dict):
         request_options["clickhouse_read_access"] = dict(object_storage["clickhouse_read_access"])
@@ -153,6 +158,7 @@ def _local_snapshot_request(
     run_id: str,
     range_partitioner: RangePartitioner | None,
     range_plan: Any | None,
+    consistency_binding: dict[str, object] | None,
 ) -> ColumnarSnapshotRequest:
     execution = _execution_options(columnar_options)
     request_options = {
@@ -160,6 +166,7 @@ def _local_snapshot_request(
         "execution": execution,
         "batch_size": load_config.options.get("batch_size", load_config.batch_size),
         "cleanup_policy": execution.get("cleanup_policy", columnar_options.get("cleanup_policy", "eager")),
+        "range_consistency_binding": dict(consistency_binding or {}),
     }
     return ColumnarSnapshotRequest(
         query=query,
@@ -189,7 +196,16 @@ def _range_request(
     schema: list[tuple[str, str]],
     bounds_resolver: Callable[[str], tuple[Any, ...]] | None,
 ) -> tuple[RangePartitioner | None, Any | None]:
-    resolved = PartitioningOptionsResolver.resolve(load_config.options)
+    source_options = load_config.options.get("source_options")
+    canonical_options = source_options if isinstance(source_options, dict) else load_config.options
+    partitioning = canonical_options.get("partitioning")
+    partitioning = partitioning if isinstance(partitioning, dict) else {}
+    parallelism = partitioning.get("range_parallelism")
+    parallelism = parallelism if isinstance(parallelism, dict) else {}
+    requested_mode = str(parallelism.get("mode") or "off").strip().lower()
+    if requested_mode != "off" and "consistency" not in parallelism:
+        raise ValueError("columnar_range_parallelism_requires_explicit_consistency")
+    resolved = PartitioningOptionsResolver.resolve(canonical_options)
     policy = resolved.range_parallelism
     if policy.mode != "off":
         RangeParallelismPreflight.validate(
@@ -198,8 +214,8 @@ def _range_request(
             query_has_window_functions=bool(re.search(r"\bover\s*\(", query, flags=re.IGNORECASE)),
             supported_topologies={"shared_per_run", "per_partition"},
         )
-    partitioner = RangePartitioner.from_options(load_config.options, bounds_resolver=bounds_resolver)
-    mode = str(getattr(partitioner.range_parallelism, "mode", "off"))
+    partitioner = RangePartitioner.from_options(canonical_options, bounds_resolver=bounds_resolver)
+    mode = str(getattr(policy, "mode", "off"))
     if mode == "off":
         return None, None
     if not partitioner.enabled:

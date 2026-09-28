@@ -8,6 +8,7 @@ import pytest
 
 from dpone.config import LoadConfig, LoadStrategy
 from dpone.runtime.artifacts import PartitionedFileExportArtifact
+from dpone.runtime.columnar_range_parallelism import build_columnar_range_plan
 from dpone.runtime.native_transfer_execution import NativeTransferResourcePolicy
 from dpone.runtime.native_transfer_slicing import RangeSlicePlanner, TransferSlice
 from dpone.runtime.partitioning import RangePartition, RangePartitioner
@@ -140,6 +141,36 @@ def test_mssql_partition_predicate_renders_typed_temporal_literals_without_colum
     assert "[event_ts] <= CONVERT(datetime2(7), '2024-01-02T00:00:00.0000000', 126)" in predicate
     assert "CONVERT(datetime2(7), [event_ts]" not in predicate
     assert "REPLACE(" not in predicate
+
+
+@pytest.mark.parametrize("boundary_type", ["datetime2(7)", "datetimeoffset(7)"])
+def test_mssql_explicit_temporal_ranges_preserve_seventh_fractional_digit(boundary_type: str) -> None:
+    suffix = "+03:00" if boundary_type.startswith("datetimeoffset") else ""
+    partitioner = RangePartitioner.from_options(
+        {
+            "partitioning": {
+                "column": "event_ts",
+                "num_partitions": 1,
+                "planner": {"boundary_type": boundary_type},
+                "range_parallelism": {"mode": "required", "consistency": "immutable"},
+                "ranges": [
+                    {
+                        "lower": f"2026-01-01T00:00:00.1234567{suffix}",
+                        "upper": f"2026-01-01T00:00:00.1234568{suffix}",
+                        "include_upper": True,
+                    }
+                ],
+            }
+        }
+    )
+
+    predicate = partitioner.partitions()[0].predicate("[event_ts]", renderer=MssqlPartitionPredicateRenderer())
+
+    assert f"'2026-01-01T00:00:00.1234567{suffix}'" in predicate
+    assert f"'2026-01-01T00:00:00.1234568{suffix}'" in predicate
+    assert build_columnar_range_plan(partitioner, query_identity="sha256:precise").plan_fingerprint.startswith(
+        "sha256:"
+    )
 
 
 def test_mssql_timestamp_metadata_resolves_to_rowversion_not_temporal() -> None:

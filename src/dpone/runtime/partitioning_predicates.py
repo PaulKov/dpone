@@ -11,6 +11,7 @@ from uuid import UUID
 from dpone.runtime.partitioning_bounds import (
     PartitionBoundaryResolution,
     PartitionBoundKind,
+    PreciseTemporalBound,
     format_datetime_literal,
     format_rowversion_literal,
 )
@@ -70,6 +71,13 @@ class DefaultPartitionPredicateRenderer:
         return predicate
 
     def literal(self, value: object, boundary: PartitionBoundaryResolution) -> str:
+        if isinstance(value, PreciseTemporalBound):
+            dtype = (
+                _mssql_datetimeoffset_type(boundary)
+                if boundary.kind == PartitionBoundKind.DATETIME_OFFSET
+                else _mssql_temporal_type(boundary)
+            )
+            return f"CONVERT({dtype}, '{value.text}', 127)"
         if isinstance(value, bool):
             return "1" if value else "0"
         if isinstance(value, int | float | Decimal):
