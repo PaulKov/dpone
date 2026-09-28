@@ -7,8 +7,12 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
-from dpone.readiness.physical_key_expressions import split_physical_key_expressions
-from dpone.readiness.physical_state import PhysicalColumnState, PhysicalTableState, TableSettingValue
+from dpone.readiness.physical_state import (
+    PhysicalColumnState,
+    PhysicalTableState,
+    TableSettingValue,
+    split_physical_key_expressions,
+)
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
