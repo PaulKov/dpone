@@ -8,17 +8,15 @@ if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
 
 
-import tempfile
 from collections.abc import Callable
 from contextlib import nullcontext
 from typing import Any
 
 from dpone.runtime.bulk_options import BulkOptionsResolver
-from dpone.runtime.file_artifacts import FileExportArtifact
 from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
 from dpone.runtime.physical_chunking import PhysicalChunkPolicy
 from dpone.runtime.source_materialization_preparation import guard_source_materialization_preparation
-from dpone.runtime.sources.strategies.mssql.mssql_bcp_native_artifacts import build_mssql_bcp_native_artifact
+from dpone.runtime.sources.strategies.mssql.mssql_bcp_native_artifacts import build_single_file_bcp_artifact
 from dpone.runtime.sources.strategies.mssql.mssql_queryout_bulk_wire import (
     bulk_wire_field_terminator,
     bulk_wire_row_terminator,
@@ -232,7 +230,7 @@ def _build_queryout_transport(
     )
     if partitioned_artifact is not None:
         return wrap_prepared_source_artifact(partitioned_artifact, materialized)
-    file_artifact = _single_file_artifact(
+    file_artifact = build_single_file_bcp_artifact(
         factory,
         load_config,
         query=query,
@@ -321,55 +319,6 @@ def _partitioned_artifact(
         bulk_text_codec=artifact_text_codec,
         bulk_wire_contract=bulk_wire_contract,
     )
-
-
-def _single_file_artifact(
-    factory: Any,
-    load_config: LoadConfig,
-    *,
-    query: str,
-    artifact_schema: list[tuple[str, str]],
-    artifact_format: str,
-    artifact_text_codec: Any | None,
-    bulk_wire_contract: Any | None,
-    bcp_options: Any,
-    source_table: str,
-    bcp_native_wire: bool,
-    tmp_dir: Any,
-) -> Any:
-    file_path = tempfile.NamedTemporaryFile(
-        prefix="dpone_mssql_queryout_",
-        suffix=".bcp",
-        dir=tmp_dir,
-        delete=False,
-    ).name
-    rows = factory.connector.bcp_queryout(query, file_path, options=bcp_options)
-    factory.logger.log_etl_progress("MSSQL_BCP_QUERYOUT", {"Rows": rows, "File": file_path, "Source": source_table})
-    if bcp_native_wire:
-        artifact = build_mssql_bcp_native_artifact(
-            file_path,
-            artifact_schema,
-            query=query,
-            bcp_version=bcp_options.bcp_path,
-            type_policy=_type_policy(load_config),
-            estimated_rows=rows or None,
-            bulk_wire_contract=bulk_wire_contract,
-        )
-    else:
-        artifact = FileExportArtifact(
-            file_path=file_path,
-            columns=[column for column, _ in artifact_schema],
-            compressed=False,
-            format=artifact_format,
-            estimated_rows=rows or None,
-            rows_exported=rows if isinstance(rows, int) and not isinstance(rows, bool) and rows >= 0 else None,
-            bulk_text_codec=artifact_text_codec,
-        )
-        if bulk_wire_contract is not None:
-            setattr(artifact, "bulk_wire_contract", bulk_wire_contract)
-    if isinstance(rows, int) and not isinstance(rows, bool) and rows >= 0 and artifact.rows_exported is None:
-        artifact.rows_exported = rows
-    return artifact
 
 
 def _artifact_format(*, bcp_native_wire: bool, file_format: str) -> str:
