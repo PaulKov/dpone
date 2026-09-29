@@ -75,6 +75,7 @@ def policy_v3_schema() -> dict[str, Any]:
         _policy_profile(
             _runtime_policy(),
             require_strategy_policy=True,
+            allow_validated_stream=True,
         ),
     )
 
@@ -84,8 +85,9 @@ def _policy_profile(
     *,
     require_strategy_policy: bool,
     require_semantic_refresh: bool = False,
+    allow_validated_stream: bool = False,
 ) -> dict[str, Any]:
-    return object_schema(
+    profile = object_schema(
         (
             "source",
             "sink",
@@ -94,7 +96,7 @@ def _policy_profile(
             *(("refresh",) if require_semantic_refresh else ()),
         ),
         {
-            "source": _endpoint_policy(),
+            "source": _endpoint_policy(allow_validated_stream=allow_validated_stream),
             "sink": _endpoint_policy(sink=True),
             "state": _state_policy(),
             "runtime": runtime,
@@ -130,6 +132,28 @@ def _policy_profile(
             **({"refresh": _semantic_refresh_policy()} if require_semantic_refresh else {}),
         },
     )
+    if allow_validated_stream:
+        profile["allOf"] = [
+            {
+                "if": {
+                    "properties": {
+                        "source": {
+                            "properties": {
+                                "options": {"required": ["mssql_export_mode"]},
+                            },
+                            "required": ["options"],
+                        }
+                    }
+                },
+                "then": {
+                    "properties": {
+                        "source": {"properties": {"type": {"const": "mssql"}}},
+                        "sink": {"properties": {"type": {"const": "clickhouse"}}},
+                    }
+                },
+            }
+        ]
+    return profile
 
 
 def _state_policy() -> dict[str, Any]:
@@ -151,11 +175,11 @@ def _state_policy() -> dict[str, Any]:
     )
 
 
-def _endpoint_policy(*, sink: bool = False) -> dict[str, Any]:
+def _endpoint_policy(*, sink: bool = False, allow_validated_stream: bool = False) -> dict[str, Any]:
     properties = {
         "type": NONBLANK_TOKEN,
         "connection_ref": NONBLANK_TOKEN,
-        "options": _sink_options_policy() if sink else _source_options_policy(),
+        "options": _sink_options_policy() if sink else _source_options_policy(allow_validated_stream),
     }
     if sink:
         properties.update(
@@ -168,14 +192,15 @@ def _endpoint_policy(*, sink: bool = False) -> dict[str, Any]:
     return object_schema(required, properties)
 
 
-def _source_options_policy() -> dict[str, Any]:
+def _source_options_policy(allow_validated_stream: bool = False) -> dict[str, Any]:
     return object_schema(
         (),
         {
             "native_transfer": object_schema(
                 (),
                 {"mode": {"enum": ["auto"]}},
-            )
+            ),
+            **({"mssql_export_mode": {"const": "streaming"}} if allow_validated_stream else {}),
         },
     )
 

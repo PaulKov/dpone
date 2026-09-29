@@ -101,6 +101,46 @@ def test_empty_contract_stream_materializes_explicit_zero_row_boundary() -> None
     assert artifact.validation_summary.accepted_rows == 0
 
 
+def test_strict_stream_rejects_late_bad_row_without_completion_evidence() -> None:
+    source = StreamingRowsArtifact(iter(({"amount": "10.00"}, {"amount": "bad"})), batch_size=1)
+    artifact = ContractEnforcedStreamingArtifact(
+        source,
+        contract=_contract("strict"),
+        run_id="01JSTRICTRUN00000000000",
+        load_id="01JSTRICTLOAD0000000000",
+    )
+    inserted: list[dict] = []
+
+    with pytest.raises(RuntimeError, match="data contract enforcement failed"):
+        artifact.load_with_row_inserter(lambda rows: inserted.extend(rows) or len(rows))
+
+    assert inserted == [{"amount": "10.00"}]
+    assert artifact.enforcement_result is None
+    assert not hasattr(source, "rows_exported")
+
+
+def test_validated_stream_rejects_unconfirmed_sink_row_count() -> None:
+    source = StreamingRowsArtifact(iter(({"amount": "10.00"},)), batch_size=1)
+    artifact = ContractEnforcedStreamingArtifact(
+        source,
+        contract=_contract("strict"),
+        run_id="01JCOUNTMISMATCHRUN00000",
+        load_id="01JCOUNTMISMATCHLOAD0000",
+    )
+
+    with pytest.raises(RuntimeError, match="streaming_rows.insert_count_mismatch"):
+        artifact.load_with_row_inserter(lambda rows: len(rows) - 1)
+
+    assert artifact.enforcement_result is None
+    assert not hasattr(source, "rows_exported")
+
+
+@pytest.mark.parametrize("batch_size", (0, -1))
+def test_streaming_rows_rejects_nonpositive_batch_size(batch_size: int) -> None:
+    with pytest.raises(ValueError, match="streaming_rows.batch_size_positive"):
+        StreamingRowsArtifact(iter(()), batch_size=batch_size)
+
+
 def test_strict_contract_file_artifact_fails_closed_when_file_is_opaque(tmp_path: Path) -> None:
     file_path = tmp_path / "orders.tsv"
     file_path.write_text("1\tbad\n", encoding="utf-8")

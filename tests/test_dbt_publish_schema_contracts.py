@@ -680,6 +680,33 @@ def test_shipped_authoring_and_policy_examples_match_public_schemas() -> None:
     jsonschema.validate(policy, schemas["dpone.dbt-publish-policy.v3"])
 
 
+def test_v3_policy_accepts_only_mssql_to_clickhouse_validated_stream() -> None:
+    policy = yaml.safe_load((DEMO / "dpone" / "dbt-publish-profiles.yml").read_text(encoding="utf-8"))
+    profile = next(iter(policy["profiles"].values()))
+    profile["source"]["options"] = {"mssql_export_mode": "streaming"}
+    schema = dbt_schema_contracts()["dpone.dbt-publish-policy.v3"]
+
+    jsonschema.validate(policy, schema)
+    for source_type, sink_type, mode in (
+        ("postgres", "clickhouse", "streaming"),
+        ("mssql", "postgres", "streaming"),
+        ("mssql", "clickhouse", "streamng"),
+    ):
+        profile["source"]["type"] = source_type
+        profile["sink"]["type"] = sink_type
+        profile["source"]["options"]["mssql_export_mode"] = mode
+        assert tuple(jsonschema.Draft202012Validator(schema).iter_errors(policy))
+
+
+def test_v1_policy_does_not_gain_validated_stream_option() -> None:
+    policy = yaml.safe_load((DEMO / "dpone" / "dbt-publish-profiles.yml").read_text(encoding="utf-8"))
+    policy["schema"] = "dpone.dbt-publish-policy.v1"
+    next(iter(policy["profiles"].values()))["source"]["options"] = {"mssql_export_mode": "streaming"}
+    assert tuple(
+        jsonschema.Draft202012Validator(dbt_schema_contracts()["dpone.dbt-publish-policy.v1"]).iter_errors(policy)
+    )
+
+
 def test_canonical_policy_has_one_toolchain_authority() -> None:
     policy = yaml.safe_load((DEMO / "dpone" / "dbt-publish-profiles.yml").read_text(encoding="utf-8"))
     runtime = next(iter(policy["profiles"].values()))["runtime"]

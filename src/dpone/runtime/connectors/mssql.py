@@ -220,12 +220,19 @@ class MSSQLConnector(MssqlBoundedQueryTimeoutMixin, AbstractConnector):
         try:
             cursor.execute(str(query), tuple(params or ()))
             columns = [column[0] for column in cursor.description or []]
+            if as_dict and len({str(column).lower() for column in columns}) != len(columns):
+                raise RuntimeError("mssql_row_stream.duplicate_column")
             while True:
                 rows = cursor.fetchmany(batch_size)
                 if not rows:
                     break
                 if as_dict:
-                    yield [dict(zip(columns, row)) for row in rows]
+                    batch = []
+                    for row in rows:
+                        if len(row) != len(columns):
+                            raise RuntimeError("mssql_row_stream.column_count_mismatch")
+                        batch.append(dict(zip(columns, row)))
+                    yield batch
                 else:
                     yield [tuple(row) for row in rows]
         finally:

@@ -1,10 +1,11 @@
 # Feature design: validated MSSQL row stream for dbt publish
 
-- Status: RESEARCHED
+- Status: APPROVED
 - Owner: dpone maintainers
 - Issue: dbt publish cannot execute a strict row contract over an opaque BCP file
-- Target release: TBD after maintainer approval
+- Target release: TBD after implementation and certification
 - Last verified: 2026-09-29
+- Approval: user acting as maintainer, 2026-09-29; explicit approval of this specification
 
 ## Executive summary
 
@@ -45,8 +46,8 @@ documentation and evidence. Out of scope: changing the default BCP path,
 claiming prevalidation for file artifacts, skipping dbt tests, weakening
 ClickHouse publication gates, and changing other connectors.
 
-The existing `mssql_export_mode: streaming` runtime option is the candidate
-implementation. Before approval, maintainers must verify its memory bound,
+The existing `mssql_export_mode: streaming` runtime option is the approved
+implementation, subject to verification of its memory bound,
 batching, row count and cancellation behavior against the dbt publish path.
 If it does not satisfy those properties, this spec must be revised rather than
 shipping the option prematurely.
@@ -59,10 +60,11 @@ shipping the option prematurely.
   reject the option for non-MSSQL sources. The compiled manifest must carry
   exactly the selected mode; no hidden environment switch.
 - **Certification:** a row stream must not claim the
-  `native_bcp_to_clickhouse` transport. Either certify an existing accurate
-  row-stream route using current route evidence, or introduce a separate
-  route variant and require its certification. A missing certificate fails
-  closed. The exact route name and evidence are an approval decision.
+  `native_bcp_to_clickhouse` transport. Use the distinct
+  `mssql_validated_row_stream_to_clickhouse` variant and require current
+  production-certified evidence for that exact route before a certified
+  compile. A missing certificate fails closed. This choice does not itself
+  assert that live route evidence already exists.
 - **CLI/Python API:** the existing dbt publish check/compile entry points
   accept the new optional field and return the same output shapes and exit
   codes. No new command or public import is proposed.
@@ -193,5 +195,5 @@ changed by this specification PR.
 - [x] Architecture and alternatives described.
 - [x] Relevant primary-source market comparison and measurable axis included.
 - [x] Test, documentation, rollout and rollback plan included.
-- [ ] Maintainer confirms the row-stream route/certification decision.
-- [ ] Maintainer changes status to `APPROVED` before implementation.
+- [x] Maintainer confirms the row-stream route/certification decision.
+- [x] Maintainer changes status to `APPROVED` before implementation.

@@ -124,7 +124,9 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
         """Enforce the stream into an existing table. Does not create one."""
 
         iterator = self._iterator()
-        batch_size = int(getattr(self._artifact, "_batch_size", 10000) or 10000)
+        batch_size = int(getattr(self._artifact, "_batch_size", 10000))
+        if batch_size <= 0:
+            raise ValueError("streaming_rows.batch_size_positive")
         accepted = rejected = quarantined = 0
         inserted_any = False
         emitted = hashlib.sha256()
@@ -145,7 +147,9 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
             if not result.passed:
                 raise RuntimeError("data contract enforcement failed")
             if result.target_rows:
-                insert_rows(result.target_rows)
+                inserted = insert_rows(result.target_rows)
+                if isinstance(inserted, bool) or not isinstance(inserted, int) or inserted != len(result.target_rows):
+                    raise RuntimeError("streaming_rows.insert_count_mismatch")
                 inserted_any = True
                 for row in result.target_rows:
                     blob = json.dumps(row, sort_keys=True, ensure_ascii=False, default=str).encode()
@@ -158,7 +162,9 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
             dlq_reasons.update(result.dlq_reasons)
             dlq_index_ref = result.dlq_index_ref or dlq_index_ref
         if not inserted_any:
-            insert_rows(())
+            inserted = insert_rows(())
+            if inserted != 0 or isinstance(inserted, bool):
+                raise RuntimeError("streaming_rows.insert_count_mismatch")
         self.validation_summary = ContractValidationSummary(
             accepted_rows=accepted,
             rejected_rows=rejected,
