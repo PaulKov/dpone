@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.87.1 - 2026-09-29
+
+### Changed
+
+- Added a compatibility-preserving, release-only patch with no runtime behavior
+  changes. The `0.87.0` PyPI publication succeeded, while its independent source
+  Release and Runtime image workflows failed closed before creating a GitHub
+  Release or promoting a GHCR image because pre-tag release-candidate evidence
+  was absent. `0.87.1` provides a fresh immutable identity so those channels can
+  run only after valid pre-tag evidence; PyPI remains published exclusively by
+  the external release controller.
+- Preserved the `0.87.0` MSSQL range-parallelism contracts and their explicitly
+  `UNVERIFIED` live MSSQL → Parquet/object-storage → ClickHouse certification
+  boundary.
+
 ## 0.87.0 - 2026-09-29
 
 ### Added
