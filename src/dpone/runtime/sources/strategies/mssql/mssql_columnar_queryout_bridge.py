@@ -13,6 +13,7 @@ from dpone.runtime.columnar_range_parallelism import RangeParallelismPreflight, 
 from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotRequest
 from dpone.runtime.partitioning import RangePartitioner
 from dpone.runtime.partitioning_options import PartitioningOptionsResolver
+from dpone.runtime.sources.strategies.mssql import mssql_columnar_range_admission
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
@@ -107,6 +108,11 @@ def _snapshot_request(
         execution_identity=f"sha256:{sha256(request_run_id.encode()).hexdigest()}",
         range_capability_available=range_capability_available,
     )
+    effective_consistency_binding = _range_consistency_binding(
+        load_config,
+        supplied=consistency_binding,
+        fallback_reason=range_fallback,
+    )
     if not isinstance(object_storage, dict):
         return _local_snapshot_request(
             load_config,
@@ -116,7 +122,7 @@ def _snapshot_request(
             run_id=request_run_id,
             range_partitioner=range_partitioner,
             range_plan=range_plan,
-            consistency_binding=consistency_binding,
+            consistency_binding=effective_consistency_binding,
             range_fallback=range_fallback,
         )
     uri_prefix = str(object_storage.get("uri_prefix") or "").strip()
@@ -128,7 +134,7 @@ def _snapshot_request(
         "object_storage": dict(object_storage),
         "batch_size": load_config.options.get("batch_size", load_config.batch_size),
         "cleanup_policy": execution.get("cleanup_policy", object_storage.get("cleanup_policy", "eager")),
-        "range_consistency_binding": dict(consistency_binding or {}),
+        "range_consistency_binding": effective_consistency_binding,
     }
     if range_fallback is not None:
         request_options["range_parallelism_fallback_reason"] = range_fallback
@@ -200,6 +206,27 @@ def _local_snapshot_request(
     )
 
 
+def _range_consistency_binding(
+    load_config: LoadConfig,
+    *,
+    supplied: dict[str, object] | None,
+    fallback_reason: str | None,
+) -> dict[str, object]:
+    if fallback_reason is None:
+        return dict(supplied or {})
+    source_options = load_config.options.get("source_options")
+    canonical_options = source_options if isinstance(source_options, dict) else load_config.options
+    partitioning = canonical_options.get("partitioning")
+    partitioning = partitioning if isinstance(partitioning, dict) else {}
+    parallelism = partitioning.get("range_parallelism")
+    parallelism = parallelism if isinstance(parallelism, dict) else {}
+    return {
+        "mode": "inactive",
+        "requested_consistency": str(parallelism.get("consistency") or "immutable"),
+        "reason": fallback_reason,
+    }
+
+
 def _range_request(
     load_config: LoadConfig,
     *,
@@ -224,6 +251,10 @@ def _range_request(
         if policy.mode == "required":
             raise RuntimeError("mssql_independent_range_sessions_unavailable")
         return None, None, "mssql_independent_range_sessions_unavailable"
+    if policy.mode != "off" and not mssql_columnar_range_admission.range_byte_admission_available():
+        if policy.mode == "required":
+            raise RuntimeError(mssql_columnar_range_admission.RANGE_BYTE_ADMISSION_BLOCKER)
+        return None, None, mssql_columnar_range_admission.RANGE_BYTE_ADMISSION_BLOCKER
     if policy.mode != "off":
         try:
             RangeParallelismPreflight.validate(

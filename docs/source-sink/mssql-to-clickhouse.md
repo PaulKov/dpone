@@ -297,7 +297,24 @@ statistics confidence is low, `dpone plan` records
 
 ### Bounded columnar range execution
 
-The Parquet/object-storage pull route can opt into deterministic parallel SQL
+> **Temporarily unavailable in 0.87.1.** The 0.87.0 implementation could
+> materialize an ODBC batch before acquiring its byte reservation, so it did not
+> prove a hard memory bound. `mode: required` now fails before source I/O with
+> `columnar_range_pre_read_byte_admission_unavailable`; `mode: auto` records the
+> reason and runs the existing serial columnar route. Do not interpret
+> `max_inflight_bytes` or v1 `resource_high_water.bytes` as RSS evidence.
+
+For service continuity, change `required` to `auto` (audited serial fallback)
+or `off` (explicit serial configuration). Keep `required` only when a deliberate
+fail-closed deployment gate is desired. Reconcile and clean any interrupted
+pre-0.87.1 run-owned staging attempt before retrying. Increasing
+`max_inflight_bytes` cannot restore the missing guarantee, and no 0.87.1 setting
+can safely re-enable parallel reads; reactivation requires a newer runtime with
+certified pre-read admission and live RSS evidence. `dpone plan --format json`
+shows `blocked` for `required` or `serial_fallback` plus the stable reason for
+`auto`.
+
+The approved target contract lets the Parquet/object-storage pull route opt into deterministic parallel SQL
 Server reads with `source.options.partitioning.range_parallelism`. This does not
 parallelize one cursor: each planned range opens its own MSSQL session, renders
 the canonical typed predicate, writes only range-owned object keys, and records
@@ -329,10 +346,11 @@ recovery rules, and sanitized plan/runtime evidence.
 
 The checked example
 [`mssql_to_clickhouse_columnar_parallel.yml`](../../examples/mssql_to_clickhouse_columnar_parallel.yml)
-uses synthetic names and credentials-by-reference. The route has synthetic
-contract coverage; live throughput, source pressure, and recovery certification
-remain `UNVERIFIED` until executed in an explicitly approved MSSQL, object-store,
-and ClickHouse environment.
+uses synthetic names and credentials-by-reference. The target contract has
+synthetic coverage, but runtime activation is suspended in 0.87.1. Live
+throughput, source pressure, memory, and recovery certification remain
+`UNVERIFIED` until executed from an exact commit in an explicitly approved
+MSSQL, object-store, and ClickHouse environment.
 
 `clickhouse_bulk.native_tcp.backend: auto` prefers a certified direct protocol
 provider and otherwise falls back to the v0.30 client wrapper. `backend:

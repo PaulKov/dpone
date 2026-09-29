@@ -17,8 +17,11 @@ from dpone.runtime.object_storage_access_models import ObjectStorageAccessEviden
 from dpone.runtime.object_storage_clickhouse_probe import ClickHouseObjectStorageReadinessProbe
 from dpone.runtime.object_storage_connection_resolver import ObjectStorageConnectionResolver
 from dpone.runtime.object_storage_fast_path_preflight import ObjectStorageAccessPreflightService
-from dpone.runtime.partitioning_options import PartitioningOptionsResolver
 from dpone.runtime.sinks.clickhouse_capabilities import ClickHouseColumnarCapabilityProbe
+from dpone.runtime.sources.strategies.mssql import mssql_columnar_range_admission
+from dpone.runtime.sources.strategies.mssql.mssql_columnar_capability_probe import (
+    MssqlColumnarSourceCapabilityProbe,
+)
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_provider import MssqlColumnarSnapshotProvider
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_queryout_bridge import build_columnar_snapshot_request
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_reader import (
@@ -33,7 +36,7 @@ from dpone.storage import ObjectStorageUri
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
 
-_SECRET_MARKERS = ("password=", "pwd=", "secret=", "token=", "access_key=")
+_SourceCapabilityProbe = MssqlColumnarSourceCapabilityProbe
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,7 +81,10 @@ class ColumnarRuntimeAssembly:
             sink_evidence=_SinkCapabilityProbe(load_config, self._clickhouse_connector(sink)),
         )
         return RouteRuntimeAssembly(
-            candidate_provider=ColumnarRouteCandidateProvider(include_direct_push=True),
+            candidate_provider=ColumnarRouteCandidateProvider(
+                include_direct_push=True,
+                range_admission_available=mssql_columnar_range_admission.range_byte_admission_available,
+            ),
             probe_runner=probe_runner,
             executors=(
                 ColumnarObjectStoragePullExecutor(
@@ -118,11 +124,14 @@ class MssqlColumnarSnapshotRequestFactory:
     def __call__(self, *, load_config: LoadConfig, source: Any, sink: Any, state: Any, load_record: Any) -> Any:
         del sink, state
         connector = getattr(source, "connector", None)
-        partitioning = PartitioningOptionsResolver.resolve(load_config.options)
-        range_sessions_available = callable(getattr(connector, "open_session", None))
-        if partitioning.range_parallelism.mode == "required" and not range_sessions_available:
-            raise RuntimeError("mssql_independent_range_sessions_unavailable")
-        consistency, authority = resolve_range_consistency(_source_options(load_config))
+        source_options = _source_options(load_config)
+        partitioning, range_sessions_available, byte_admission_available = (
+            mssql_columnar_range_admission.validate_range_activation(source_options, connector)
+        )
+        if partitioning.range_parallelism.mode == "auto" and not byte_admission_available:
+            consistency, authority = "immutable", {}
+        else:
+            consistency, authority = resolve_range_consistency(source_options)
         if consistency == "temporal_as_of" and not callable(getattr(connector, "build_temporal_select_query", None)):
             raise RuntimeError("columnar_temporal_as_of_query_builder_missing")
         database = authority_database(
@@ -165,40 +174,23 @@ class MssqlColumnarSnapshotRequestFactory:
 
 class ColumnarRouteDecisionDetailsProvider:
     def __call__(self, *, load_config: LoadConfig, source: Any, sink: Any, load_record: Any) -> dict[str, object]:
-        del source, sink, load_record
+        del sink, load_record
         options = _columnar_fast_path_options(load_config)
         if not options:
             return {}
         policy = resolve_columnar_execution_policy(options)
-        return {
+        details: dict[str, object] = {
             "execution_mode": policy.value,
             "execution_requested": policy.requested,
             "execution_deprecated_alias": policy.deprecated_alias,
             "cleanup_policy": policy.cleanup_policy,
         }
-
-
-class _SourceCapabilityProbe:
-    def __init__(self, request_factory: MssqlColumnarSnapshotRequestFactory, provider: Any) -> None:
-        self._request_factory = request_factory
-        self._provider = provider
-
-    def __call__(self, **context: Any) -> Any:
-        try:
-            request = _request_from_context(self._request_factory, context)
-        except Exception as exc:
-            from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotCapability
-
-            return ColumnarSnapshotCapability(
-                provider_id=getattr(self._provider, "provider_id", "columnar_snapshot_provider"),
-                certified=False,
-                blockers=(f"source.columnar_request_failed:{type(exc).__name__}",),
-                details={
-                    "exception": type(exc).__name__,
-                    "message": _redact_exception_message(exc),
-                },
+        details.update(
+            mssql_columnar_range_admission.range_decision_details(
+                _source_options(load_config), getattr(source, "connector", None)
             )
-        return self._provider.capabilities(request)
+        )
+        return details
 
 
 class _ObjectStorageProbe:
@@ -261,16 +253,6 @@ def _optional_object_storage_access_request(load_config: LoadConfig) -> ObjectSt
     if not object_storage:
         return None
     return ObjectStorageAccessRequest.from_options(object_storage, columnar_pull=_columnar_pull_options(load_config))
-
-
-def _request_from_context(factory: MssqlColumnarSnapshotRequestFactory, context: dict[str, Any]) -> Any:
-    return factory(
-        load_config=context["load_config"],
-        source=context["source"],
-        sink=context["sink"],
-        state=None,
-        load_record=context.get("load_record"),
-    )
 
 
 def _fetch_schema(connector: Any, load_config: LoadConfig, *, database: str | None = None) -> list[tuple[str, str]]:
@@ -387,16 +369,6 @@ def _text(value: object | None) -> str | None:
         return None
     text = str(value).strip()
     return text or None
-
-
-def _redact_exception_message(exc: Exception) -> str:
-    message = str(exc)
-    if not message:
-        return ""
-    lowered = message.lower()
-    if any(marker in lowered for marker in _SECRET_MARKERS):
-        return "***REDACTED***"
-    return message[:500]
 
 
 __all__ = [

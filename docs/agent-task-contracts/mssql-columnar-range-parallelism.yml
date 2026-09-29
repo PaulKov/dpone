@@ -1,7 +1,7 @@
 schema_version: 1
 task_id: "DPONE-MSSQL-COLUMNAR-RANGE-PARALLELISM-V1"
-title: "Bounded MSSQL columnar range parallelism"
-goal: "Add configurable deterministic range readers and a single governed ClickHouse publication barrier."
+title: "Bounded MSSQL columnar range parallelism and 0.87.1 safety suspension"
+goal: "Keep deterministic range-reader contracts while failing closed until pre-read byte admission is certified."
 specification: "docs/feature-design-mssql-columnar-range-parallelism-v1.md"
 base_commit: "043e1078aa1d7184125ea6ba22df89d87e98cd0f"
 integrator: "/root"
@@ -15,9 +15,11 @@ acceptance_criteria:
   - "Partial failure cancels all work, cleans owned resources, and cannot report success."
   - "Plan, pack, runtime evidence, tests, docs, and changelog expose the actual policy."
   - "No version, tag, release-controller, PyPI, or 0.85.0 artifact is changed."
+  - "In 0.87.1, required mode blocks before source I/O, auto records a serial fallback, and off remains serial."
+  - "Migration guidance directs operators to auto for audited serial continuity, off for explicit serial execution, or required for a deliberate fail-closed gate."
 
 public_contract_impact:
-  level: compatible
+  level: breaking
   surfaces:
     - manifest/schema
     - CLI plan JSON/text/Markdown
@@ -25,7 +27,7 @@ public_contract_impact:
     - object-storage artifact layout
     - ClickHouse staging lifecycle
     - documentation and examples
-  migration_required: false
+  migration_required: true
 
 owned_paths:
   - src/dpone/contracts/columnar_range_parallelism.py
@@ -47,10 +49,13 @@ owned_paths:
   - src/dpone/runtime/columnar_fast_path_models.py
   - src/dpone/runtime/columnar_fast_path_planner.py
   - src/dpone/runtime/columnar_runtime_assembly.py
+  - src/dpone/runtime/columnar_route_runtime.py
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_provider.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_capability_probe.py
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_reader.py
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_windows.py
   - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_queryout_bridge.py
+  - src/dpone/runtime/sources/strategies/mssql/mssql_columnar_range_admission.py
   - src/dpone/runtime/governance/finalization.py
   - src/dpone/runtime/governance/ports.py
   - src/dpone/runtime/sinks/clickhouse_columnar_pull.py

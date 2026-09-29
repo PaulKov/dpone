@@ -24,6 +24,7 @@ from dpone.runtime.columnar_range_source_evidence import (
 )
 from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotRequest
 from dpone.runtime.sources.strategies.mssql import mssql_columnar_chunks as chunks
+from dpone.runtime.sources.strategies.mssql import mssql_columnar_range_admission
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_reader import (
     BoundedColumnarUploadLane,
     ColumnarRangeSession,
@@ -110,13 +111,7 @@ def build_parallel_object_windows(
     read_contract: Any,
     tmp_dir: Path,
 ) -> ParallelWindowResult:
-    partitioner = request.range_partitioner
-    plan = request.range_plan
-    if partitioner is None or plan is None:
-        raise ValueError("A canonical range partitioner and plan are required.")
-    partitions = tuple(partitioner.partitions())
-    if len(partitions) != len(plan.ranges):
-        raise ValueError("Canonical range plan does not match the partitioner.")
+    partitioner, plan, partitions = mssql_columnar_range_admission.admitted_range_parts(request)
     upload_lane = BoundedColumnarUploadLane(plan.policy.upload_workers)
     produced: dict[int, tuple[ObjectStorageChunkWindow, ...]] = {}
     produced_lock = Lock()

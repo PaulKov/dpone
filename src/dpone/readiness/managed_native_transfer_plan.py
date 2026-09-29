@@ -16,6 +16,8 @@ from dpone.runtime.native_transfer_capabilities import NativeTransferCapabilityP
 from dpone.runtime.native_transfer_execution import NativeTransferExecutionPolicy
 from dpone.runtime.native_transfer_route_planner import NativeTransferRoutePlanner
 from dpone.runtime.partitioning import RangePartitioner
+from dpone.runtime.partitioning_options import PartitioningOptionsResolver
+from dpone.runtime.sources.strategies.mssql import mssql_columnar_range_admission
 
 
 def native_transfer_execution(raw: Mapping[str, Any]) -> dict[str, Any]:
@@ -104,7 +106,37 @@ def _columnar_range_parallelism_plan(
     partitioning = source_options.get("partitioning")
     if not isinstance(partitioning, Mapping) or not isinstance(partitioning.get("range_parallelism"), Mapping):
         return {}
+    raw_parallelism = partitioning["range_parallelism"]
+    requested_mode = str(raw_parallelism.get("mode") or "off").strip().lower()
+    if requested_mode != "off" and "consistency" not in raw_parallelism:
+        return {
+            "status": "blocked",
+            "blockers": ["columnar_range_parallelism_requires_explicit_consistency"],
+        }
     try:
+        policy = PartitioningOptionsResolver.resolve(source_options).range_parallelism
+        if policy.mode == "off":
+            return {
+                "status": "serial",
+                "policy": policy.to_dict(),
+                "policy_fingerprint": policy.fingerprint,
+                "planned_range_count": 1,
+            }
+        if policy.mode != "off" and not mssql_columnar_range_admission.range_byte_admission_available():
+            if policy.mode == "required":
+                return {
+                    "status": "blocked",
+                    "policy": policy.to_dict(),
+                    "policy_fingerprint": policy.fingerprint,
+                    "blockers": [mssql_columnar_range_admission.RANGE_BYTE_ADMISSION_BLOCKER],
+                }
+            return {
+                "status": "serial_fallback",
+                "policy": policy.to_dict(),
+                "policy_fingerprint": policy.fingerprint,
+                "planned_range_count": 1,
+                "fallback_reason": mssql_columnar_range_admission.RANGE_BYTE_ADMISSION_BLOCKER,
+            }
         partitioner = RangePartitioner.from_options(dict(source_options))
         if not partitioner.enabled:
             policy = partitioner.range_parallelism
