@@ -110,7 +110,7 @@ is a stable plan-time blocker, not an invitation to execute the dormant path:
 | Types | Closed profile table of finite-width SQL Server types, collations/codepages, precision, scale, and nullability | Every type/profile tuple not present in the signed table, including all MAX/LOB/XML/UDT/vector types |
 | Partition planning | Explicit manual numeric half-open ranges, terminal upper inclusion, and `null_bucket: separate` | Automatic/stats bounds, temporal, rowversion and UUID boundaries, alternate NULL policies, and dynamic splitting |
 | Consistency | `temporal_as_of` on one system-versioned base table | Database snapshots, write-exclusion and bare immutable assertions until each has its own live certificate |
-| ClickHouse staging | `shared_per_run` and `per_partition`, both live-certified | Any topology/provider combination not in the certificate |
+| ClickHouse staging | `shared_per_run` and `per_partition` in a local Atomic database with plain MergeTree tables and an authoritative all-writer guard, both live-certified | Distributed/Replicated topology, external unguarded writers, and any combination absent from the certificate |
 
 The certified type table is versioned profile data with golden input/output
 vectors. Server-described result metadata is compared with cursor metadata before
@@ -194,6 +194,8 @@ source:
         consistency: temporal_as_of
         consistency_authority:
           as_of: "2026-09-29T00:00:00Z"
+          receipt_ref: temporal-receipts/synthetic-events/2026-09-29
+          verifier_id: platform_temporal_authority
         staging_topology: per_partition
 ```
 
@@ -204,6 +206,14 @@ manifests retain their exact previous behavior: `off` and `auto` remain serial,
 while legacy `required` remains fail-closed. An older runtime rejects the new
 profile as unsupported.
 
+Execution also requires an explicit stable `operation_key` supplied by the
+Python runtime invocation context. A scheduler supplies the same logical job/
+scheduled-occurrence key across retries; a manual caller must supply and retain
+its key through that context. Missing identity blocks execution. This proposal
+does not invent a manifest field or CLI flag for it: the standard CLI blocks
+until its configured runtime composition supplies this invocation context.
+Live planning remains available without starting an operation.
+
 Decision matrix:
 
 | Mode and request | Result |
@@ -212,14 +222,15 @@ Decision matrix:
 | old or new `auto` without explicit profile | Serial, unchanged |
 | old `required` without explicit profile | Existing fail-closed blocker is preserved; never downgraded to serial |
 | `auto` with profile and all gates passing | Parallel |
-| `auto` with any admission/capability blocker | Serial fallback with stable reason, before payload I/O |
+| `auto` with a parallel admission/capability blocker | Serial fallback with stable reason if the serial provider preserves guarded publication and the temporal boundary; otherwise blocked before payload I/O |
 | `required` with all gates passing | Parallel |
 | `required` with any blocker | Non-zero blocked result, before payload I/O |
 
 `auto` fallback always selects the existing serial
 `mssql_odbc_arrow_parquet/object_storage_pull` provider over the full source
-boundary. Range predicates, range consistency authority, range worker settings,
-and partial range plans become inactive and are listed as such. The serial plan
+boundary. Range predicates, range worker settings, and partial range plans become
+inactive and are listed as such. For explicit-profile v2 requests, the temporal
+source boundary and guarded publication context remain mandatory. The serial plan
 has its own route/plan fingerprint and evidence records `full_source_coverage:
 true`, `fallback_from`, and the blocker. It never reads one planned range as if it
 were the full table.
@@ -256,6 +267,10 @@ must not substitute free text for the code:
 | `columnar_range_operation_fence_stale` | Caller epoch is stale or renewal was lost |
 | `columnar_range_reconciliation_required` | Durable state requires reconciliation before execution |
 | `columnar_range_fenced_unknown` | Publication remains unknown and no new attempt is allowed |
+| `columnar_range_operation_identity_missing` | Invocation context has no stable operation key |
+| `columnar_range_operation_identity_conflict` | Existing operation key is bound to different immutable payload |
+| `columnar_range_target_guard_unavailable` | All-writer target exclusion and mutation fencing cannot be enforced |
+| `columnar_range_snapshot_order_regression` | Requested temporal snapshot precedes the last published snapshot |
 
 ### Artifacts and evidence
 
@@ -401,8 +416,10 @@ effects, and enters reconciliation. A stale epoch is never accepted and a new
 controller cannot take over until authoritative reconciliation transfers the
 fence. Every terminal path releases, in reverse order, batch tickets, range slots,
 sessions/workers, cgroup/run reservation, consistency authority, and operation
-fence. Publication-unknown deliberately keeps the operation fenced under a
-reconciliation owner until the target outcome becomes authoritative.
+fence. Release target ownership last, only after server settlement and a durable
+resolved target-index record. Publication-unknown deliberately keeps operation
+and target exclusion under a reconciliation owner until the target outcome
+becomes authoritative.
 
 `memory.max/current/peak/events` and OOM counters are the authoritative hard proof.
 Sampled process-set RSS and Arrow-pool metrics explain behavior but cannot pass an
@@ -410,6 +427,21 @@ attempt whose kernel accounting failed. Near-boundary golden/live trials prove
 the equation and membership.
 
 ### Consistency authority
+
+`receipt_ref` is an opaque lookup key, never a credential or arbitrary URL.
+`verifier_id` selects a deployment-configured `TemporalAuthorityVerifier` port
+in the composition root. The trusted platform authority issues the receipt;
+dpone never creates its own trust assertion. Deployment configuration binds that
+verifier to an authenticated receipt store and an allowlist of issuer/key IDs.
+The receipt contains a version, issuer, key ID, signature, subject server/database
+and relation IDs, normalized UTC `as_of`, temporal/history relation identities,
+retention authority and validity interval. Verification checks signature, issuer,
+expiry, exact subject/as-of binding and source identity under read-only access.
+Unknown verifier, missing receipt, invalid signature, wrong subject or expired
+authority produces `columnar_range_consistency_invalid` before payload I/O.
+The example is usable only after the platform provisions that receipt/verifier;
+an `as_of` timestamp alone is insufficient. Tests use an independently provisioned
+test issuer; live evidence records issuer/key ID and receipt digest, never keys.
 
 The v2 contract defines these machine-verifiable authority families, but the
 first release capability matrix activates only `temporal_as_of`. The other two
@@ -440,6 +472,13 @@ permissions, a durable CAS journal, S3 conditional create/read/list/delete for
 the attempt prefix, and ClickHouse named-collection/staging permissions. The app
 does not receive host-wide cgroup administration.
 
+Before `run`, configure the invocation-context provider with a stable logical
+operation key, the authoritative target guard, and the temporal receipt verifier
+and store. The stock CLI without that composition fails with the corresponding
+missing-capability reason. Retry reuses the operation key; starting a genuinely
+new snapshot uses a new key after target reconciliation. The commands below assume
+these deployment prerequisites have been met.
+
 ```bash
 dpone plan manifest.yml --preflight live --format json > plan.json
 dpone run manifest.yml --format json
@@ -457,8 +496,61 @@ schema, dependency, controller, authority, or cap requires a new live plan.
 
 ## Detailed algorithm
 
+### Recovery and target ownership before source access
+
+The operation lookup key is `(tenant, project, operation_key)` from the persisted
+invocation context. Source/target identity, boundary, profile, schema and plan
+digests are immutable operation payload, never lookup-key inputs. Reusing a key
+with changed payload is a conflict; recovery uses the stored payload. A new key
+cannot bypass the target's unresolved-operation index.
+
+Before source access, load the operation journal and acquire the separate
+canonical target guard. Its scope is the stable target authority ID plus database
+and relation name, independent of connection aliases, strategy, source boundary,
+operation key and all plan/profile digests. Resolve aliases through the target
+authority. Check the target index for pending publication from any operation.
+Reconcile published/unknown attempts using saved intent and target UUID mapping
+before source metadata, schema admission, profile probes, or receipt verification.
+Proven published operations finish evidence/checkpoint/cleanup without MSSQL.
+Unknown operations preserve resources and block all later operations on that target.
+
+Stored-state dispatch is exhaustive and precedes source access:
+
+| Stored state | Disposition |
+|---|---|
+| Absent | Admit a new operation only after resolving the target index |
+| Active owner | Reject duplicate execution; only that owner may continue |
+| Failed/prepublication without intent | Reconcile owned resources and fence; a new attempt is allowed only after durable cleanup |
+| Intent durable/in flight/unknown | Reconcile UUID mapping and server settlement; no extraction |
+| Published/evidence or checkpoint incomplete | Complete finalization from the stored plan; no source access |
+| Committed/cleanup incomplete | Return committed result and perform cleanup-only recovery |
+| Committed/cleanup complete | Return the persisted result idempotently, without source access or a new attempt |
+| Corrupt, missing required records, or unrecognized state | Fail closed pending journal reconciliation |
+
+Explicit-profile `auto` fallback carries the same operation context, target guard
+epoch, durable intent protocol and publication sequence into the serial provider.
+The serial provider must prove full-source coverage and preserve the declared
+temporal boundary. If it cannot honor these publication/consistency capabilities,
+fallback is blocked before payload I/O; it may not discard the guard and run an
+unguarded refresh. The earlier serial-fallback matrix assumes this compatibility
+check passes. Legacy manifests without the v2 profile retain their existing path.
+
+The target guard is an injected all-writer authority, required by ADR 0057;
+the journal lease alone is insufficient. It is held from before source planning
+through target mutation, server settlement and publication reconciliation. Its
+epoch is enforced at mutation boundaries, including outstanding commands after
+lease loss. Platforms unable to exclude other writers or fence outstanding
+commands fail admission. The authority stores a monotonic publication sequence
+and last published `as_of`; an older temporal snapshot cannot replace a newer one.
+
+Each resource acquisition below is enclosed in a lifecycle scope from its first
+acquisition, including errors during preflight or worker startup. Early fallback
+and errors release acquired resources; unresolved publication retains durable
+target exclusion for the reconciliation owner.
+
 1. Parse and normalize manifest options. Reject unknown profiles and conflicting
-   worker aliases without contacting the source.
+   worker aliases without contacting the source. Resolve the invocation key,
+   recover its journal and acquire target ownership as specified above.
 2. Resolve route capabilities. A concrete admission capability, isolated-worker
    controller, bounded writer/uploader, sampler, and create-or-compare object
    store must match the selected profile. Absence is a blocker, never a boolean
@@ -477,10 +569,9 @@ schema, dependency, controller, authority, or cap requires a new live plan.
 5. Compute `admitted_batch_rows` as the minimum of configured rows, driver/profile
    cap, and the rows fitting one ticket at configured aggregate concurrency.
    Reject before payload I/O when one maximum-width row cannot fit.
-6. Build the typed range plan and fingerprint. Create a stable operation ID from
-   tenant/project, canonical source/target relation identities, logical dataset,
-   load strategy, source boundary, plan/profile/schema digests, and consistency
-   authority subject (never a per-invocation run ID). Acquire the operation CAS
+6. Build the typed range plan and fingerprint. Bind source/target, boundary,
+   plan/profile/schema and consistency digests to the stable invocation key by
+   CAS; never derive a new lookup key from them. Acquire the operation CAS
    fence with owner epoch/lease; concurrent/stale controllers fail. Create a
    random unique attempt ID, immutable journal record, and object/staging prefix.
 7. Reserve persistent run/worker memory, create the cgroup, enroll every producer
@@ -510,7 +601,8 @@ schema, dependency, controller, authority, or cap requires a new live plan.
     contiguity, checksums, counts, consistency receipt validity, and immutable
     inventory. Only then load both supported ClickHouse staging topologies.
 14. Reconcile source, object, stage, and target counts plus typed hashes/schema.
-    Run quality gates, then invoke exactly one governed publication. Advance state
+    Run quality gates, persist fenced publication intent with old/replacement UUIDs
+    before dispatch, then invoke exactly one governed publication. Advance state
     only after the publication receipt and v2 evidence are durable.
 15. A failed prepublication attempt may be retried from a new attempt prefix after
     owned-resource reconciliation; partial ranges are not resumed. A published or
@@ -521,16 +613,28 @@ schema, dependency, controller, authority, or cap requires a new live plan.
 
 ```text
 policy = normalize(manifest)
+operation = identities.lookup_key(invocation.tenant, invocation.project,
+                                  invocation.operation_key)
+stored = journal.lookup_before_source_access(operation)
+target_guard = target_authority.acquire_canonical_target_guard(stored or policy)
+pending = target_authority.inspect_unresolved_operations(target_guard)
+disposition = dispatch_all_stored_states_without_source(stored, pending, target_guard)
+if disposition.is_terminal_or_reconciliation:
+    return disposition.result
+require(disposition.allows_new_operation_or_reconciled_attempt)
 capability = composition.resolve(policy.admission.profile)
 authority = consistency.acquire_and_fence(policy, operation_subject)
 metadata = source.describe_projection_without_payload_rows(authority)
 schema_bound = capability.bound(metadata, exact_runtime_identity)
 plan = planner.plan(policy, metadata, schema_bound, consistency_receipt)
 decision = negotiate(policy.mode, capability, plan)
-if decision is serial or serial_fallback: return serial_route(decision.evidence)
+if decision is serial or serial_fallback:
+    return serial_route_with_guarded_publication(
+        decision.evidence, operation, target_guard, authority,
+        durable_intent_protocol, publication_sequence)
 if decision is blocked: fail_before_payload_io(decision.reasons)
 
-operation = identities.stable_operation(plan, source, target)
+journal.bind_immutable_payload_cas(operation, plan, source, target)
 fence = journal.acquire_operation_cas(operation, owner, epoch, lease)
 attempt = journal.begin_unique_immutable_attempt(fence)
 run_reservation = budget.reserve_persistent_before_processes(plan.P_run)
@@ -558,7 +662,11 @@ try:
     staging = clickhouse.load_and_confirm(attempt.inventory, plan.topology)
     reconciliation = reconcile(source.under(authority), objects, staging, target)
     quality = validate(staging, reconciliation)
-    publication = publish_once_with_idempotency_key(operation, attempt, quality)
+    intent = journal.persist_publication_intent_cas(
+        operation, attempt, target_guard.epoch, quality.digest,
+        old_target_uuid, replacement_uuid, target_authority.next_sequence())
+    journal.require_durable_ack(intent)
+    publication = target_authority.exchange_once_under_guard(intent, target_guard)
     journal.persist_publication_receipt_cas(publication, fence)
     evidence = evidence_v2.persist_create_once(attempt, publication)
     checkpoint.promote_cas(operation, publication, evidence)
@@ -593,16 +701,24 @@ epochs. Attempt records are terminal-immutable. The exact crash reconciliation i
 | Object ACK before chunk journal | List deterministic attempt prefix; compare content digest/size; adopt matching object by CAS or quarantine mismatch |
 | Chunk journal before EOF | Missing EOF means incomplete range; preserve inventory, reconcile, then clean and start a new attempt |
 | Staging mutation before receipt | Query staging identity/count/hash under attempt fence; adopt exact match or discard entire prepublication staging attempt |
-| Publication dispatch before ACK | Query the target publication marker/idempotency key; no cleanup or replay while unknown |
+| Intent durable before dispatch, or dispatch before ACK | Under target exclusion, reconcile saved old/replacement UUID mapping and command settlement; expected replacement at target proves publication, original mapping plus proven absence of an outstanding command permits one dispatch, every other mapping remains unknown |
 | Publication proven, receipt/evidence missing | Persist receipt/evidence/checkpoint idempotently; never re-extract or republish |
 | Evidence durable, checkpoint missing | Promote checkpoint by CAS from publication/evidence identity |
 | Checkpoint durable, cleanup incomplete | Business outcome remains committed; retry owned cleanup independently and report warning/failure evidence |
 
-For publication reconciliation, the governed target marker plus target relation
-identity/count/hash is authoritative. Proven not published permits prepublication
+For publication reconciliation, the saved old/replacement UUID mapping inspected
+under the target guard and proven command settlement are authoritative. Counts
+and hashes are corroborating data checks only. Proven not published permits prepublication
 cleanup and a new attempt. Proven published permits only finalization. Still
 unknown fences the operation, preserves objects/staging, exits `3`, and requires
 operator escalation; no new attempt is admitted.
+
+The marker is the durable pre-dispatch intent, bound to both generation UUIDs,
+target guard epoch, operation/attempt, quality receipt and publication sequence.
+Counts/hashes alone never prove an exchange outcome. A journal state preceding
+dispatch is not proof of nonpublication when intent exists. An absent ACK or
+currently unchanged UUID mapping is also insufficient while a server command can
+still settle. Recovery never blindly repeats `EXCHANGE`.
 
 ### State machine
 
@@ -626,7 +742,9 @@ stateDiagram-v2
     Loading --> StagingConfirmed
     StagingConfirmed --> QualityRunning
     QualityRunning --> QualityPassed
-    QualityPassed --> PublicationInFlight
+    QualityPassed --> PublicationIntentDurable
+    PublicationIntentDurable --> PublicationInFlight
+    PublicationIntentDurable --> ReconciliationOnly: crash before dispatch acknowledgement
     PublicationInFlight --> Published
     PublicationInFlight --> PublicationUnknown
     Published --> EvidenceDurable
@@ -850,6 +968,20 @@ publication-before-ACK, receipt-before-evidence, evidence-before-checkpoint, and
 checkpoint-before-cleanup. They cover same operation/new attempt, duplicate
 controllers, stale epochs, different operations, ACK loss, journal corruption,
 and torn records; only one target publication is permitted.
+
+Regression tests for recovery must disable MSSQL credentials/network after a
+publication ACK loss and after receipt persistence: target reconciliation and
+evidence/checkpoint completion still succeed without source calls. Changing the
+profile, schema, workers or source boundary under the same operation key must
+conflict rather than bypass its fence. Different operation keys and connection
+aliases targeting the same relation must share exclusion; an unresolved intent
+blocks both, and an older `as_of` cannot overwrite a newer publication. Pause a
+controller after its lease check and before server execution to prove mutation
+fencing prevents stale effects through settlement. Kill the process before and
+after durable intent, dispatch and ACK; verify UUID reconciliation never exchanges
+twice. Temporal verifier tests cover valid provisioned receipts and unknown issuer,
+wrong key/signature, expiry, mismatched relation/as-of, missing reference and
+unavailable verifier; invalid authority performs no payload fetch.
 
 Both `shared_per_run` and `per_partition` run against real MSSQL, MinIO, and
 ClickHouse. Fixtures place rows exactly on adjacent lower/upper boundaries, NULL
