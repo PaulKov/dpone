@@ -10,7 +10,9 @@
   ClickHouse columnar route. Canonical typed ranges, independent reader sessions,
   aggregate row/byte/inflight limits, explicit source-consistency authority,
   configurable staging topology, and one all-ranges publication barrier are
-  exposed in plan and runtime evidence. Existing manifests remain serial.
+  exposed in plan and runtime evidence. Existing manifests remain serial. Live
+  certification of this exact MSSQL → Parquet/object-storage → ClickHouse route
+  remains `UNVERIFIED` and is not claimed by this release.
 
 ## 0.86.0 - 2026-09-29
 
