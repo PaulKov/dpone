@@ -15,8 +15,64 @@ from dpone.runtime.columnar_runtime_assembly import MssqlColumnarSnapshotRequest
 from dpone.runtime.columnar_snapshot_provider import ColumnarSnapshotRequest
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_provider import MssqlColumnarSnapshotProvider
 from dpone.runtime.sources.strategies.mssql.mssql_columnar_queryout_bridge import build_columnar_snapshot_request
+from dpone.runtime.sources.strategies.mssql.mssql_columnar_windows import build_parallel_object_windows
 from dpone.runtime.sources.strategies.mssql.mssql_queryout_artifacts import MSSQLQueryoutArtifactFactory
 from dpone.storage import LocalObjectStorageClient, ObjectStorageUri
+
+
+@pytest.fixture
+def enabled_range_byte_admission(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exercise the dormant target implementation without enabling production."""
+
+    from dpone.runtime.sources.strategies.mssql import mssql_columnar_range_admission
+
+    monkeypatch.setattr(mssql_columnar_range_admission, "range_byte_admission_available", lambda: True)
+
+
+def test_parallel_window_builder_has_terminal_admission_guard(tmp_path: Path) -> None:
+    with pytest.raises(RuntimeError, match="columnar_range_pre_read_byte_admission_unavailable"):
+        build_parallel_object_windows(
+            connector=object(),
+            request=object(),
+            prefix=object(),
+            schema_hash="unused",
+            object_client=object(),
+            write_chunk_file=lambda *_args: (0, 0, ""),
+            read_contract=object(),
+            tmp_dir=tmp_path,
+        )
+
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_direct_queryout_auto_fallback_records_inactive_consistency() -> None:
+    config = _load_config()
+    partitioning = _parallel_partitioning()
+    partitioning["range_parallelism"].update(
+        {
+            "mode": "auto",
+            "consistency": "write_exclusion",
+            "consistency_authority": {"write_exclusion_ref": "parallel-only-lease"},
+        }
+    )
+    _configure_parallel(config, partitioning)
+
+    request = build_columnar_snapshot_request(
+        load_config=config,
+        query="SELECT id, name FROM dbo.orders",
+        schema=[("id", "int"), ("name", "nvarchar(50)")],
+        run_id="run-direct-auto-fallback",
+    )
+
+    assert request.range_plan is None
+    assert request.options["range_parallelism_fallback_reason"] == (
+        "columnar_range_pre_read_byte_admission_unavailable"
+    )
+    assert request.options["range_consistency_binding"] == {
+        "mode": "inactive",
+        "requested_consistency": "write_exclusion",
+        "reason": "columnar_range_pre_read_byte_admission_unavailable",
+    }
 
 
 @pytest.mark.parametrize(
@@ -364,6 +420,7 @@ def test_columnar_snapshot_request_uses_canonical_execution_options() -> None:
     assert request.options["cleanup_policy"] == "on_success"
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_columnar_snapshot_request_carries_canonical_range_plan(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(
@@ -423,6 +480,7 @@ def test_columnar_range_request_requires_explicit_consistency() -> None:
         )
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_database_snapshot_consistency_binds_schema_and_query_to_snapshot_database() -> None:
     config = _load_config()
     partitioning = _parallel_partitioning()
@@ -452,6 +510,7 @@ def test_database_snapshot_consistency_binds_schema_and_query_to_snapshot_databa
     }
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 @pytest.mark.parametrize("consistency", ["temporal_as_of", "write_exclusion"])
 def test_unverifiable_mutable_consistency_fails_before_schema_io(consistency: str) -> None:
     config = _load_config()
@@ -475,6 +534,7 @@ def test_unverifiable_mutable_consistency_fails_before_schema_io(consistency: st
     assert connector.schema_databases == []
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_auto_bounds_fail_before_odbc_truncates_datetime2_seven_precision() -> None:
     config = _load_config()
     partitioning = _parallel_partitioning()
@@ -500,6 +560,7 @@ def test_auto_bounds_fail_before_odbc_truncates_datetime2_seven_precision() -> N
     assert connector.bounds_queries == []
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_auto_bounds_project_datetime2_text_before_odbc() -> None:
     config = _load_config()
     partitioning = _parallel_partitioning()
@@ -528,6 +589,7 @@ def test_auto_bounds_project_datetime2_text_before_odbc() -> None:
     assert "MIN(CONVERT(varchar(33), [event_ts], 121))" in connector.bounds_queries[0]
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_windows_use_independent_typed_ranges_and_wait_for_all_eof(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)
@@ -581,6 +643,7 @@ def test_parallel_windows_use_independent_typed_ranges_and_wait_for_all_eof(tmp_
     assert object_client.list_prefix(run_prefix) == ()
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_upload_workers_run_in_independent_bounded_executor(tmp_path: Path) -> None:
     config = _load_config()
     partitioning = _parallel_partitioning()
@@ -609,6 +672,7 @@ def test_parallel_upload_workers_run_in_independent_bounded_executor(tmp_path: P
     assert all(name.startswith("dpone-columnar-upload") for name in object_client.thread_names)
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_upload_failure_cancels_readers_and_cleans_owned_prefix(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)
@@ -634,6 +698,7 @@ def test_parallel_upload_failure_cancels_readers_and_cleans_owned_prefix(tmp_pat
     assert object_client.list_prefix(ObjectStorageUri.parse("s3://dpone-stage/msql/run-upload-failed/")) == ()
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_range_evidence_handoff_is_consumed_and_cleared_before_retry(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)
@@ -661,6 +726,7 @@ def test_range_evidence_handoff_is_consumed_and_cleared_before_retry(tmp_path: P
     assert provider.range_execution_evidence(request) is None
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_failure_is_bound_to_consumed_artifact(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)
@@ -691,6 +757,7 @@ def test_parallel_failure_is_bound_to_consumed_artifact(tmp_path: Path) -> None:
     assert artifact.to_evidence()["range_execution"]["outcome"]["status"] == "failed"
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_window_failure_cleans_owned_prefix_and_never_yields(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)
@@ -717,6 +784,7 @@ def test_parallel_window_failure_cleans_owned_prefix_and_never_yields(tmp_path: 
     assert all(session.closed for session in connector.sessions)
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_window_query_is_blocked_before_source_io(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)
@@ -733,6 +801,7 @@ def test_parallel_window_query_is_blocked_before_source_io(tmp_path: Path) -> No
     assert connector.sessions == []
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_window_budget_contract_blocks_unsafe_declared_items_before_io(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)
@@ -759,6 +828,7 @@ def test_parallel_window_budget_contract_blocks_unsafe_declared_items_before_io(
     assert connector.sessions == []
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_window_requires_run_owned_object_prefix_before_io(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)
@@ -784,6 +854,7 @@ def test_parallel_window_requires_run_owned_object_prefix_before_io(tmp_path: Pa
     assert connector.sessions == []
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_window_oversized_encoded_item_fails_without_success_evidence(tmp_path: Path) -> None:
     config = _load_config()
     partitioning = _parallel_partitioning()
@@ -812,6 +883,7 @@ def test_parallel_window_oversized_encoded_item_fails_without_success_evidence(t
     assert object_client.list_prefix(ObjectStorageUri.parse("s3://dpone-stage/msql/run-oversized-item/")) == ()
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_window_source_batch_cannot_exceed_row_reservation(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)
@@ -834,6 +906,7 @@ def test_parallel_window_source_batch_cannot_exceed_row_reservation(tmp_path: Pa
     _assert_failed_range_evidence(provider, request)
 
 
+@pytest.mark.usefixtures("enabled_range_byte_admission")
 def test_parallel_window_rejects_same_connector_session_before_range_query(tmp_path: Path) -> None:
     config = _load_config()
     _configure_parallel(config)

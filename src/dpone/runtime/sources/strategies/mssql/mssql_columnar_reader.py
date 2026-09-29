@@ -10,6 +10,7 @@ from typing import Any
 from dpone.runtime.columnar_range_parallelism import RangeParallelismPreflight
 from dpone.runtime.partitioning import RangePartition, RangePartitioner
 from dpone.runtime.partitioning_predicates import MssqlPartitionPredicateRenderer
+from dpone.runtime.sources.strategies.mssql import mssql_columnar_range_admission
 
 
 class ColumnarRangeSession:
@@ -166,6 +167,8 @@ def range_read_blockers(request: Any, connector: Any) -> tuple[str, ...]:
     if request.range_plan is None:
         return ()
     blockers: list[str] = []
+    if not mssql_columnar_range_admission.range_byte_admission_available():
+        blockers.append(mssql_columnar_range_admission.RANGE_BYTE_ADMISSION_BLOCKER)
     if not hasattr(connector, "open_session"):
         blockers.append("mssql_independent_range_sessions_unavailable")
     if request.uri_prefix.startswith("local://"):

@@ -84,21 +84,17 @@ def test_columnar_request_factory_resolves_auto_range_bounds() -> None:
     source = _MssqlSource()
     source.connector = _RangeMssqlConnector()
 
-    request = MssqlColumnarSnapshotRequestFactory()(
-        load_config=config,
-        source=source,
-        sink=_Sink(),
-        state=None,
-        load_record=SimpleNamespace(run_id="range-run"),
-    )
+    with pytest.raises(RuntimeError, match="columnar_range_pre_read_byte_admission_unavailable"):
+        MssqlColumnarSnapshotRequestFactory()(
+            load_config=config,
+            source=source,
+            sink=_Sink(),
+            state=None,
+            load_record=SimpleNamespace(run_id="range-run"),
+        )
 
-    assert request.range_plan is not None
-    assert len(request.range_plan.ranges) == 2
-    assert source.connector.bounds_queries == [
-        "SELECT MIN([id]), MAX([id]), COUNT_BIG(1), "
-        "SUM(CASE WHEN [id] IS NULL THEN 1 ELSE 0 END) "
-        "FROM (SELECT id, name FROM dbo.orders) AS dpone_bounds"
-    ]
+    assert source.connector.fetch_schema_calls == 0
+    assert source.connector.bounds_queries == []
 
 
 def test_columnar_request_factory_rejects_missing_independent_sessions_before_metadata_io() -> None:
@@ -127,7 +123,10 @@ def test_columnar_request_factory_rejects_missing_independent_sessions_before_me
 
 
 def test_columnar_request_factory_auto_falls_back_to_serial_without_independent_sessions() -> None:
-    from dpone.runtime.columnar_runtime_assembly import MssqlColumnarSnapshotRequestFactory
+    from dpone.runtime.columnar_runtime_assembly import (
+        ColumnarRouteDecisionDetailsProvider,
+        MssqlColumnarSnapshotRequestFactory,
+    )
 
     config = _cfg()
     config.options["partitioning"] = {
@@ -147,6 +146,252 @@ def test_columnar_request_factory_auto_falls_back_to_serial_without_independent_
 
     assert request.range_plan is None
     assert request.options["range_parallelism_fallback_reason"] == "mssql_independent_range_sessions_unavailable"
+    assert request.options["range_consistency_binding"] == {
+        "mode": "inactive",
+        "requested_consistency": "immutable",
+        "reason": "mssql_independent_range_sessions_unavailable",
+    }
+    details = ColumnarRouteDecisionDetailsProvider()(
+        load_config=config,
+        source=source,
+        sink=_Sink(),
+        load_record=SimpleNamespace(run_id="range-auto-fallback"),
+    )
+    assert details["range_parallelism"] == {
+        "status": "serial_fallback",
+        "fallback_reason": "mssql_independent_range_sessions_unavailable",
+    }
+
+
+def test_columnar_request_factory_required_range_parallelism_fails_before_metadata_io() -> None:
+    from dpone.runtime.columnar_runtime_assembly import MssqlColumnarSnapshotRequestFactory
+
+    config = _cfg()
+    config.options["partitioning"] = {
+        "column": "id",
+        "ranges": [{"lower": 0, "upper": 10, "include_lower": True, "include_upper": True}],
+        "range_parallelism": {"mode": "required", "consistency": "immutable"},
+    }
+    source = _MssqlSource()
+    source.connector = _RangeMssqlConnector()
+
+    with pytest.raises(RuntimeError, match="columnar_range_pre_read_byte_admission_unavailable"):
+        MssqlColumnarSnapshotRequestFactory()(
+            load_config=config,
+            source=source,
+            sink=_Sink(),
+            state=None,
+            load_record=SimpleNamespace(run_id="range-required-byte-admission"),
+        )
+
+    assert source.connector.fetch_schema_calls == 0
+
+
+def test_columnar_request_factory_auto_records_serial_fallback_without_range_io() -> None:
+    from dpone.runtime.columnar_runtime_assembly import MssqlColumnarSnapshotRequestFactory
+
+    config = _cfg()
+    config.options["partitioning"] = {
+        "column": "id",
+        "ranges": [{"lower": 0, "upper": 10, "include_lower": True, "include_upper": True}],
+        "range_parallelism": {"mode": "auto", "consistency": "immutable"},
+    }
+    source = _MssqlSource()
+    source.connector = _RangeMssqlConnector()
+
+    request = MssqlColumnarSnapshotRequestFactory()(
+        load_config=config,
+        source=source,
+        sink=_Sink(),
+        state=None,
+        load_record=SimpleNamespace(run_id="range-auto-byte-admission"),
+    )
+
+    assert request.range_plan is None
+    assert request.options["range_parallelism_fallback_reason"] == (
+        "columnar_range_pre_read_byte_admission_unavailable"
+    )
+    assert source.connector.fetch_schema_calls == 1
+    assert source.connector.bounds_queries == []
+
+
+def test_columnar_request_factory_auto_ignores_parallel_only_write_exclusion() -> None:
+    from dpone.runtime.columnar_runtime_assembly import MssqlColumnarSnapshotRequestFactory
+
+    config = _cfg()
+    config.options["partitioning"] = {
+        "column": "id",
+        "ranges": [{"lower": 0, "upper": 10, "include_lower": True, "include_upper": True}],
+        "range_parallelism": {
+            "mode": "auto",
+            "consistency": "write_exclusion",
+            "consistency_authority": {"write_exclusion_ref": "parallel-only-lease"},
+        },
+    }
+    source = _MssqlSource()
+    source.connector = _RangeMssqlConnector()
+
+    request = MssqlColumnarSnapshotRequestFactory()(
+        load_config=config,
+        source=source,
+        sink=_Sink(),
+        state=None,
+        load_record=SimpleNamespace(run_id="range-auto-write-exclusion"),
+    )
+
+    assert request.range_plan is None
+    assert request.options["range_consistency_binding"] == {
+        "mode": "inactive",
+        "requested_consistency": "write_exclusion",
+        "reason": "columnar_range_pre_read_byte_admission_unavailable",
+    }
+    assert request.options["range_parallelism_fallback_reason"] == (
+        "columnar_range_pre_read_byte_admission_unavailable"
+    )
+    assert source.connector.bounds_queries == []
+
+
+def test_required_range_parallelism_blocks_full_orchestrator_before_source_io(tmp_path) -> None:
+    sink = _Sink()
+    source = _MssqlSource()
+    source.connector = _RangeMssqlConnector()
+    config = _cfg()
+    config.options["partitioning"] = {
+        "column": "id",
+        "ranges": [{"lower": 0, "upper": 10, "include_lower": True, "include_upper": True}],
+        "range_parallelism": {"mode": "required", "consistency": "immutable"},
+    }
+    factory = RouteCapabilityRuntimeFactory(
+        columnar_assembly=_real_columnar_assembly(tmp_path, sink_connector=sink.connector)
+    )
+    orchestrator = factory.build(load_config=config, source=source, sink=sink, logger=_Logger())
+    assert orchestrator is not None
+
+    with pytest.raises(RouteCapabilityBlocked, match="columnar_range_pre_read_byte_admission_unavailable") as blocked:
+        orchestrator.prepare(
+            load_config=config,
+            source=source,
+            sink=sink,
+            load_record=SimpleNamespace(run_id="range-required-full", load_id="load-1"),
+        )
+
+    assert blocked.value.decision.blockers == ("columnar_range_pre_read_byte_admission_unavailable",)
+    assert source.extract_calls == 0
+    assert source.connector.fetch_schema_calls == 0
+    assert source.connector.stream_calls == []
+
+
+def test_required_range_without_sessions_blocks_before_storage_probe(tmp_path) -> None:
+    from dpone.runtime.columnar_runtime_assembly import ColumnarRuntimeAssembly
+
+    class NoStorageIo:
+        def __getattr__(self, name):
+            raise AssertionError(f"storage probe must not call {name}")
+
+    sink = _Sink()
+    source = _MssqlSource()
+    config = _cfg()
+    config.options["partitioning"] = {
+        "column": "id",
+        "ranges": [{"lower": 0, "upper": 10, "include_lower": True, "include_upper": True}],
+        "range_parallelism": {"mode": "required", "consistency": "immutable"},
+    }
+    assembly = ColumnarRuntimeAssembly(
+        object_client=NoStorageIo(),
+        parquet_writer=_FakeParquetWriter(True),
+        clickhouse_probe_connector=sink.connector,
+    )
+    orchestrator = RouteCapabilityRuntimeFactory(columnar_assembly=assembly).build(
+        load_config=config, source=source, sink=sink, logger=_Logger()
+    )
+    assert orchestrator is not None
+
+    with pytest.raises(RouteCapabilityBlocked, match="mssql_independent_range_sessions_unavailable") as blocked:
+        orchestrator.prepare(
+            load_config=config,
+            source=source,
+            sink=sink,
+            load_record=SimpleNamespace(run_id="range-required-no-session", load_id="load-1"),
+        )
+
+    assert blocked.value.decision.blockers == ("mssql_independent_range_sessions_unavailable",)
+    assert source.extract_calls == 0
+    assert source.connector.fetch_schema_calls == 0
+    assert source.connector.stream_calls == []
+
+
+def test_required_range_without_consistency_blocks_before_storage_probe(tmp_path) -> None:
+    from dpone.runtime.columnar_runtime_assembly import ColumnarRuntimeAssembly
+
+    class NoStorageIo:
+        def __getattr__(self, name):
+            raise AssertionError(f"storage probe must not call {name}")
+
+    sink = _Sink()
+    source = _MssqlSource()
+    source.connector = _RangeMssqlConnector()
+    config = _cfg()
+    config.options["partitioning"] = {
+        "column": "id",
+        "ranges": [{"lower": 0, "upper": 10, "include_lower": True, "include_upper": True}],
+        "range_parallelism": {"mode": "required"},
+    }
+    assembly = ColumnarRuntimeAssembly(
+        object_client=NoStorageIo(),
+        parquet_writer=_FakeParquetWriter(True),
+        clickhouse_probe_connector=sink.connector,
+    )
+    orchestrator = RouteCapabilityRuntimeFactory(columnar_assembly=assembly).build(
+        load_config=config, source=source, sink=sink, logger=_Logger()
+    )
+    assert orchestrator is not None
+
+    with pytest.raises(
+        RouteCapabilityBlocked, match="columnar_range_parallelism_requires_explicit_consistency"
+    ) as blocked:
+        orchestrator.prepare(
+            load_config=config,
+            source=source,
+            sink=sink,
+            load_record=SimpleNamespace(run_id="range-required-no-consistency", load_id="load-1"),
+        )
+
+    assert blocked.value.decision.blockers == ("columnar_range_parallelism_requires_explicit_consistency",)
+    assert source.extract_calls == 0
+    assert source.connector.fetch_schema_calls == 0
+    assert source.connector.stream_calls == []
+
+
+def test_auto_range_fallback_is_visible_in_runtime_decision_evidence(tmp_path) -> None:
+    sink = _Sink()
+    source = _MssqlSource()
+    source.connector = _RangeMssqlConnector()
+    config = _cfg()
+    config.options["partitioning"] = {
+        "column": "id",
+        "bounds": "auto",
+        "num_partitions": 2,
+        "range_parallelism": {"mode": "auto", "consistency": "immutable"},
+    }
+    factory = RouteCapabilityRuntimeFactory(
+        columnar_assembly=_real_columnar_assembly(tmp_path, sink_connector=sink.connector)
+    )
+    orchestrator = factory.build(load_config=config, source=source, sink=sink, logger=_Logger())
+    assert orchestrator is not None
+
+    context = orchestrator.prepare(
+        load_config=config,
+        source=source,
+        sink=sink,
+        load_record=SimpleNamespace(run_id="range-auto-evidence", load_id="load-1"),
+    )
+
+    assert context.decision.selected_route_id == "object_storage_pull_s3"
+    assert context.evidence["details"]["range_parallelism"] == {
+        "status": "serial_fallback",
+        "fallback_reason": "columnar_range_pre_read_byte_admission_unavailable",
+    }
+    assert source.connector.bounds_queries == []
 
 
 def test_runtime_factory_auto_falls_back_to_single_node_s3_when_s3cluster_probe_fails(tmp_path) -> None:

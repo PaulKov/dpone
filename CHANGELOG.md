@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+## 0.87.1 - 2026-09-29
+
+### Changed
+
+- Added a safety patch after independent review found that parallel MSSQL range
+  reads reserved `max_inflight_bytes` only after ODBC had materialized a batch;
+  the value therefore did not bound source, Python, Arrow, Parquet, or process
+  memory. `range_parallelism.mode: required` now fails before source metadata or
+  row I/O with `columnar_range_pre_read_byte_admission_unavailable`, while
+  `mode: auto` records that reason and uses the existing serial columnar path.
+  `mode: off` and serial manifests are unchanged.
+- The `0.87.0` PyPI publication succeeded, while its independent source
+  Release and Runtime image workflows failed closed before creating a GitHub
+  Release or promoting a GHCR image because pre-tag release-candidate evidence
+  was absent. `0.87.1` provides a fresh immutable identity so those channels can
+  run only after valid pre-tag evidence; PyPI remains published exclusively by
+  the external release controller.
+- Suspended the `0.87.0` MSSQL parallel range capability until a future design
+  provides pre-read byte admission and exact-commit live RSS evidence. Existing
+  configuration keys remain accepted; no unsafe silent parallel execution is
+  permitted.
+
 ## 0.87.0 - 2026-09-29
 
 ### Added

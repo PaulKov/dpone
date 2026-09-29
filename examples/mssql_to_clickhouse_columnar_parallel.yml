@@ -22,7 +22,9 @@ source:
         bounds_role: filter
         null_bucket: separate
       range_parallelism:
-        mode: required
+        # 0.87.1 records the safety blocker and executes the serial columnar path.
+        # Use required only to verify the fail-closed pre-read admission gate.
+        mode: auto
         reader_workers: 4
         upload_workers: 2
         max_inflight_ranges: 4
