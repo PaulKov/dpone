@@ -359,7 +359,7 @@ source:
         null_bucket: separate
         low_confidence_policy: conservative
       range_parallelism:
-        # 0.87.1 records a safety fallback and keeps this route serial.
+        # Since 0.87.1, including 0.87.2, auto records a safety fallback and stays serial.
         mode: auto
         reader_workers: 4
         upload_workers: 2
@@ -382,12 +382,14 @@ target-table count delta and rejects parallel shared-table loads before source
 I/O. Select `per_partition` when `load_workers` is greater than one.
 All counts are configuration values; examples such as four readers are not
 runtime constants. `max_inflight_rows`, `max_inflight_bytes`, and
-`max_inflight_ranges` describe the approved target contract. In 0.87.1 the
-parallel runtime is suspended because pre-read byte admission is unavailable:
+`max_inflight_ranges` describe the approved target contract. Since 0.87.1, and
+still in 0.87.2, the parallel runtime is suspended because pre-read byte
+admission is unavailable:
 `required` fails before source I/O, `auto` records
 `columnar_range_pre_read_byte_admission_unavailable` and executes serially, and
 `off` is unchanged. Neither `max_inflight_bytes` nor v1
-`resource_high_water.bytes` is process-RSS evidence.
+`resource_high_water.bytes` is process-RSS evidence. No 0.87.2 setting
+re-enables parallel execution.
 
 Parallel readers require an explicit `consistency` authority: an immutable
 source, a database snapshot, a temporal `AS OF` source, or operator-enforced

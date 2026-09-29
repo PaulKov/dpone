@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+## 0.87.2 - 2026-09-29
+
+### Fixed
+
+- Runtime-image release preflight now stages its verifier through the canonical
+  stdlib-only closure producer. This includes the route-live validation module
+  required by the fresh authority check before the first GHCR write. The
+  `0.87.1` runtime workflow failed closed before publishing an image; `0.87.2`
+  uses a new immutable tag and the full pre-tag evidence cycle.
+- Application/runtime behavior and manifest contracts are unchanged from
+  `0.87.1`; existing range-parallelism keys remain readable. MSSQL range
+  parallelism remains suspended: `required` blocks before source I/O, `auto`
+  records the safety reason and uses the serial path, and `off` remains serial.
+  No `0.87.2` setting re-enables parallel execution.
+
 ## 0.87.1 - 2026-09-29
 
 ### Changed
