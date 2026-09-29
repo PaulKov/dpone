@@ -177,7 +177,7 @@ in runtime decision audit.
 ### Bounded range parallelism
 
 Runtime activation has been suspended since 0.87.1 and remains suspended in
-0.87.3 because the ODBC producer cannot reserve a proven retained-byte bound
+0.87.4 because the ODBC producer cannot reserve a proven retained-byte bound
 before materializing a batch. `required`
 fails before source I/O with
 `columnar_range_pre_read_byte_admission_unavailable`; `auto` records that reason
@@ -189,7 +189,7 @@ serial fallback or `off` for an explicitly serial manifest. Keep `required`
 only as a fail-closed deployment gate. Before retrying, reconcile and clean any
 run-owned objects or staging from an interrupted pre-0.87.1 attempt. Raising
 `max_inflight_bytes` does not fix pre-read admission; parallel execution cannot
-be safely re-enabled by configuration. No 0.87.3 setting re-enables it.
+be safely re-enabled by configuration. No 0.87.4 setting re-enables it.
 
 The columnar route can split one synthetic/table snapshot into deterministic
 typed ranges. Configure the canonical `source.options.partitioning` block; do
