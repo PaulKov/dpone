@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.87.4 - 2026-09-29
+
 ### Added
 
 - Policy-v3 dbt publishing can explicitly select a validated MSSQL row stream
@@ -12,8 +14,6 @@
   measures the source-byte budget over all fetched rows before emitting
   successful quality evidence.
 
-## 0.87.4 - 2026-09-29
-
 ### Fixed
 
 - Recover the runtime-image publication after the `0.87.3` GitHub Release and
@@ -22,11 +22,12 @@
   repository explicit GitHub Actions write access; `0.87.4` uses a new
   immutable tag and the complete pre-tag evidence cycle rather than retrying or
   moving `v0.87.3`.
-- Runtime and connector behavior remain unchanged: bounded BCP Native and the
-  serial ODBC routes are available, while MSSQL columnar range parallelism
-  remains suspended. `required` fails before source I/O, `auto` records the
-  safety reason and uses the serial route, and no `0.87.4` setting re-enables
-  the parallel path without certified pre-read byte admission.
+- Existing BCP Native and serial ODBC routes remain available. MSSQL columnar
+  range parallelism remains suspended: `required` fails before source I/O,
+  `auto` records the safety reason and uses the serial route, and no `0.87.4`
+  setting re-enables the parallel path without certified pre-read byte
+  admission. The new validated row-stream route is opt-in and does not change
+  those defaults.
 
 ## 0.87.3 - 2026-09-29
 
