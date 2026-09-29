@@ -297,7 +297,7 @@ statistics confidence is low, `dpone plan` records
 
 ### Bounded columnar range execution
 
-> **Temporarily unavailable since 0.87.1 and still suspended in 0.87.2.** The 0.87.0 implementation could
+> **Temporarily unavailable since 0.87.1 and still suspended in 0.87.3.** The 0.87.0 implementation could
 > materialize an ODBC batch before acquiring its byte reservation, so it did not
 > prove a hard memory bound. `mode: required` now fails before source I/O with
 > `columnar_range_pre_read_byte_admission_unavailable`; `mode: auto` records the
@@ -308,7 +308,7 @@ For service continuity, change `required` to `auto` (audited serial fallback)
 or `off` (explicit serial configuration). Keep `required` only when a deliberate
 fail-closed deployment gate is desired. Reconcile and clean any interrupted
 pre-0.87.1 run-owned staging attempt before retrying. Increasing
-`max_inflight_bytes` cannot restore the missing guarantee, and no 0.87.2 setting
+`max_inflight_bytes` cannot restore the missing guarantee, and no 0.87.3 setting
 can safely re-enable parallel reads; reactivation requires a newer runtime with
 certified pre-read admission and live RSS evidence. `dpone plan --format json`
 shows `blocked` for `required` or `serial_fallback` plus the stable reason for
@@ -348,7 +348,7 @@ The checked example
 [`mssql_to_clickhouse_columnar_parallel.yml`](../../examples/mssql_to_clickhouse_columnar_parallel.yml)
 uses synthetic names and credentials-by-reference. The target contract has
 synthetic coverage, but runtime activation has been suspended since 0.87.1 and
-remains suspended in 0.87.2. Live
+remains suspended in 0.87.3. Live
 throughput, source pressure, memory, and recovery certification remain
 `UNVERIFIED` until executed from an exact commit in an explicitly approved
 MSSQL, object-store, and ClickHouse environment.

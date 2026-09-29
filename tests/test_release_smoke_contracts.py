@@ -606,6 +606,8 @@ def test_runtime_image_workflow_separates_preflight_certification_and_promotion_
         "tools/agent_policy/runtime_image_registry.py",
         "tools/agent_policy/pypi_verifier_closure.py",
         "tools/agent_policy/release_candidate_route_live_validation.py",
+        "tools/pypi_resolver_visibility.py",
+        "tests/test_pypi_resolver_visibility.py",
         "tools/pypi_candidate_inventory.py",
         "tests/agent_policy/test_runtime_image_*.py",
         "docs/schemas/release/runtime-image-*.schema.json",
@@ -707,8 +709,29 @@ def test_runtime_image_candidate_is_digest_only_and_fully_certified_before_promo
     candidate = _run(_step(build, "Build exact runtime candidate distributions"))
     assert "uv build packages/apache-airflow-providers-dpone --out-dir dist" in candidate
     public_identity = _run(_step(build, "Verify exact public wheel and sdist identities"))
+    assert "set -euo pipefail" in public_identity
     assert "pypi_release_smoke_dist.py" in public_identity
     assert "--expected-version" in public_identity
+
+    resolver_visibility_step = _step(build, "Wait for pip resolver visibility")
+    resolver_visibility = _run(resolver_visibility_step)
+    build_steps = [step["name"] for step in build["steps"]]
+    assert build_steps.index("Verify exact public wheel and sdist identities") < build_steps.index(
+        "Wait for pip resolver visibility"
+    )
+    assert build_steps.index("Wait for pip resolver visibility") < build_steps.index(
+        "Build local runtime candidate image and OCI layout"
+    )
+    assert "set -euo pipefail" in resolver_visibility
+    assert "python tools/pypi_resolver_visibility.py" in resolver_visibility
+    assert '--version "${RUNTIME_VERSION}"' in resolver_visibility
+    assert "--attempts 30" in resolver_visibility
+    assert "--interval-seconds 30" in resolver_visibility
+    assert "--attempt-timeout-seconds 120" in resolver_visibility
+    assert "--total-timeout-seconds 1800" in resolver_visibility
+    assert 'pip-resolver-visibility.json"' in resolver_visibility
+    assert resolver_visibility_step["env"]["RUNTIME_VERSION"] == ("${{ needs.release-preflight.outputs.version }}")
+    assert _step(build, "Upload runtime image build evidence")["if"] == "${{ always() }}"
 
     crane_install = _step(push, "Install crane")
     crane_install_run = _run(crane_install)

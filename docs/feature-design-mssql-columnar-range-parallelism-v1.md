@@ -1,20 +1,20 @@
 # Feature design: bounded MSSQL columnar range parallelism v1
 
-- Status: APPROVED; runtime activation suspended in 0.87.1
+- Status: APPROVED; runtime activation suspended since 0.87.1 and still suspended in 0.87.3
 - Owner: dpone maintainers
 - Issue: user-requested follow-up to PR #225/#226
-- Target release: 0.87.0; safety suspension: 0.87.1
+- Target release: 0.87.0; safety suspension: 0.87.1 and later until certified reactivation
 
 Last verified: 2026-09-28
 
-> **0.87.1 safety notice:** independent review found that the shipped producer
+> **0.87.1+ safety notice:** independent review found that the shipped producer
 > acquired its byte reservation after ODBC batch materialization and could also
 > retain Python, Arrow, and Parquet representations outside that reservation.
 > The implementation therefore did not satisfy this approved contract. In
 > 0.87.1, `mode: required` fails before source I/O with
 > `columnar_range_pre_read_byte_admission_unavailable`; `mode: auto` records the
 > same reason and uses the serial columnar path. The algorithm below remains the
-> approved target contract, not an active 0.87.1 capability.
+> approved target contract, not an active 0.87.1-0.87.3 capability.
 
 ## Executive summary
 

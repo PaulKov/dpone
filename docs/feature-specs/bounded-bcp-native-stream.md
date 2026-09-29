@@ -1,10 +1,12 @@
 # Feature design: bounded BCP native physical chunks
 
-- Status: APPROVED
+- Status: APPROVED; implemented in 0.86.0
 - Owner: transport maintainers
 - Issue: bounded source-native transfer
-- Target release: TBD
+- Target release: 0.86.0
 - Last verified: 2026-09-28
+
+User guide: [bounded BCP Native physical chunks](../source-sink/mssql-to-clickhouse.md#bounded-bcp-native-physical-chunks).
 
 ## Problem and journey
 

@@ -300,7 +300,10 @@ def test_dependabot_groups_weekly_minor_patch_updates_with_bounded_open_prs() ->
 def test_release_sensitive_workflow_blobs_match_pr3a_implementation_base() -> None:
     expected_blobs = {
         "release.yml": "49ca44b0ebaa4d834bed510688acbf8f8a706209",
-        "runtime-image.yml": "5fab1a45eed6f159307cd6164dee6b1ce213a310",
+        # v0.87.3 adds a fail-closed pip/Simple visibility barrier before the
+        # immutable Docker candidate build; this intentionally supersedes the
+        # earlier PR3A byte freeze without changing privileged GHCR jobs.
+        "runtime-image.yml": "14e11d4eeb9bfaa1fe6efeb2d19268ea3a2a6d6b",
         "certification-release-summary.yml": "a2454065619ceaa5ea4e75fb04f35c799cc9fb9c",
         "route-certification-release.yml": "c4eae6a78493e8bdbf180a802e94021b82c2f095",
         "route-release-finalize.yml": "7a2a6674ffd59c5fb494b7ab1583f85b90868db8",

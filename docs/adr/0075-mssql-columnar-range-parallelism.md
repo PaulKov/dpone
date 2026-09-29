@@ -7,7 +7,7 @@
 
 ## Context
 
-### 0.87.1 safety correction
+### 0.87.1+ safety correction
 
 The 0.87.0 implementation acquired its byte reservation after ODBC batch
 materialization and did not account for simultaneously retained Python, Arrow,
@@ -16,7 +16,7 @@ configured reservation, not a proven retained-memory or RSS bound. This violates
 decisions 4 and 11 and matches the rejected row-only safety claim below.
 
 Until an amended design supplies pre-read admission plus exact-commit live RSS
-evidence, 0.87.1 suspends runtime activation: `required` fails before source I/O
+evidence, 0.87.1 and later releases through 0.87.3 suspend runtime activation: `required` fails before source I/O
 with `columnar_range_pre_read_byte_admission_unavailable`, `auto` records that
 reason and uses serial execution, and `off` is unchanged. The configuration
 schema remains readable; no existing v1 evidence is reinterpreted.

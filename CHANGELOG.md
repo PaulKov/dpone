@@ -2,6 +2,22 @@
 
 ## Unreleased
 
+## 0.87.3 - 2026-09-29
+
+### Fixed
+
+- Wait for the standard `pip` resolver to observe `dpone[full,accel]` before
+  building the tagged runtime image. The `0.87.2` source release and PyPI
+  publication completed, but PyPI's JSON/file endpoints became visible before
+  the Simple API exposed `dpone-native-accel==0.87.2`; the GHCR workflow failed
+  closed before its first registry write. `0.87.3` uses a bounded, no-cache
+  resolver gate and a new immutable tag with the full pre-tag evidence cycle.
+- Preserve the runtime behavior shipped in `0.87.2`: bounded BCP Native and
+  serial ODBC paths remain available, while MSSQL columnar range parallelism
+  remains suspended. `required` fails before source I/O, `auto` records the
+  safety reason and uses the serial route, and no `0.87.3` setting re-enables
+  the parallel path without certified pre-read byte admission.
+
 ## 0.87.2 - 2026-09-29
 
 ### Fixed
