@@ -129,12 +129,16 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
             raise ValueError("streaming_rows.batch_size_positive")
         accepted = rejected = quarantined = 0
         inserted_any = False
-        emitted = hashlib.sha256()
-        emitted_bytes = 0
+        source_digest = hashlib.sha256()
+        source_bytes = 0
         dlq_record_ids: list[str] = []
         dlq_reasons: Counter[str] = Counter()
         dlq_index_ref: str | None = None
         for chunk in _batched(iterator, batch_size):
+            for row in chunk:
+                blob = json.dumps(row, sort_keys=True, ensure_ascii=False, default=str).encode()
+                source_digest.update(blob)
+                source_bytes += len(blob)
             result = ContractEnforcementService(quarantine=self._quarantine).enforce(
                 rows=chunk,
                 contract=self._contract,
@@ -151,10 +155,6 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
                 if isinstance(inserted, bool) or not isinstance(inserted, int) or inserted != len(result.target_rows):
                     raise RuntimeError("streaming_rows.insert_count_mismatch")
                 inserted_any = True
-                for row in result.target_rows:
-                    blob = json.dumps(row, sort_keys=True, ensure_ascii=False, default=str).encode()
-                    emitted.update(blob)
-                    emitted_bytes += len(blob)
             accepted += len(result.target_rows)
             rejected += result.rejected_rows
             quarantined += result.quarantined_rows
@@ -195,8 +195,8 @@ class ContractEnforcedStreamingArtifact(BaseExtractionArtifact):
             {
                 "status": "loaded_to_staging",
                 "chunk_index": 0,
-                "checksum": emitted.hexdigest(),
-                "bytes": emitted_bytes,
+                "checksum": source_digest.hexdigest(),
+                "bytes": source_bytes,
             }
         ]
         inner.source_byte_measurement_complete = True

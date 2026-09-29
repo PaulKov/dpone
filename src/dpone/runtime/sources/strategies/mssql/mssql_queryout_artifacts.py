@@ -154,9 +154,9 @@ class MSSQLQueryoutArtifactFactory:
         """Create a streaming rows artifact from a connector iterator."""
 
         if params is None:
-            iterator = self.connector.get_records_iterator(query)
+            iterator = self.connector.get_records_iterator(query, batch_size=batch_size)
         else:
-            iterator = self.connector.get_records_iterator(query, params=params)
+            iterator = self.connector.get_records_iterator(query, params=params, batch_size=batch_size)
         return StreamingRowsArtifact(iterator, batch_size=batch_size)
 
     def output_schema(self, load_config: LoadConfig, schema: list[tuple[str, str]]) -> list[tuple[str, str]]:

@@ -16,6 +16,7 @@ from dpone.readiness.schema_contracts import SchemaContract
 from dpone.runtime.artifacts import FileExportArtifact, StreamingRowsArtifact
 from dpone.runtime.etl.contract_artifacts import ContractEnforcedStreamingArtifact, ContractValidatedFileArtifact
 from dpone.runtime.etl.load_config_runtime import LoadConfigRuntimeService
+from dpone.runtime.sinks.clickhouse_staged_evidence import SourceByteBudgetError, enforce_source_byte_budget
 
 
 class _StagingManager:
@@ -78,6 +79,18 @@ def test_streaming_contract_artifact_validates_chunks_without_full_materializati
     assert artifact.validation_summary.accepted_rows == 2
     assert artifact.validation_summary.quarantined_rows == 1
     assert quarantine.export(run_id="01JSTREAMRUN000000000000").total_rows == 1
+    raw_rows = [
+        {"id": 1, "amount": "10.00"},
+        {"id": 2, "amount": "bad"},
+        {"id": 3, "amount": "20.00"},
+    ]
+    raw_bytes = sum(len(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()) for row in raw_rows)
+    evidence = enforce_source_byte_budget(
+        SimpleNamespace(artifact=artifact), maximum_bytes=raw_bytes, full_refresh=True
+    )
+    assert evidence is not None and evidence.observed_bytes == raw_bytes
+    with pytest.raises(SourceByteBudgetError, match="DPONE_SOURCE_BYTE_BUDGET_EXCEEDED"):
+        enforce_source_byte_budget(SimpleNamespace(artifact=artifact), maximum_bytes=raw_bytes - 1, full_refresh=True)
 
 
 def test_empty_contract_stream_materializes_explicit_zero_row_boundary() -> None:

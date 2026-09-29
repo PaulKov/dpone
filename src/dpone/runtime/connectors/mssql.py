@@ -216,6 +216,8 @@ class MSSQLConnector(MssqlBoundedQueryTimeoutMixin, AbstractConnector):
         batch_size: int = 10000,
         as_dict: bool = False,
     ):
+        if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size <= 0:
+            raise ValueError("mssql_row_stream.batch_size_positive")
         cursor = self.connection.cursor()
         try:
             cursor.execute(str(query), tuple(params or ()))
@@ -238,8 +240,14 @@ class MSSQLConnector(MssqlBoundedQueryTimeoutMixin, AbstractConnector):
         finally:
             cursor.close()
 
-    def get_records_iterator(self, query: Any, params: Iterable[Any] | None = None):
-        for batch in self.get_records_streaming(query, params=params, batch_size=10000, as_dict=True):
+    def get_records_iterator(
+        self,
+        query: Any,
+        params: Iterable[Any] | None = None,
+        *,
+        batch_size: int = 10000,
+    ):
+        for batch in self.get_records_streaming(query, params=params, batch_size=batch_size, as_dict=True):
             yield from batch
 
     def begin(self) -> None:

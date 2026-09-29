@@ -85,7 +85,11 @@ shipping the option prematurely.
    attempt identity remain unchanged.
 4. Extract MSSQL rows in bounded batches; for every row, apply the existing
    contract validator before the row is accepted for candidate ingestion.
-5. Validate row count, required fields, types, source/sink schema and the
+5. Compare the reported inserted rows with a physical count of the completed
+   staging table. Measure the source-byte budget over every fetched row,
+   including rejected rows, before the
+   contract transforms or filters it. Validate row count, required fields,
+   types, source/sink schema and the
    existing full-refresh quality gates. Only then may the candidate be
    published through the existing transactional lifecycle.
 6. On extraction, conversion, cancellation, timeout or quality failure,
