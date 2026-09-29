@@ -142,11 +142,10 @@ class MSSQLQueryoutArtifactFactory:
             if artifact is not None:
                 return artifact
         if export_mode == "streaming":
-            sink_type = str(load_config.options.get("sink_type") or "").lower()
             return self.streaming_artifact(
                 query,
                 batch_size=load_config.batch_size,
-                require_bounded=sink_type == "clickhouse",
+                require_bounded=self._sink_matches(load_config, hints=("clickhouse",), type_tokens=("clickhouse",)),
             )
 
         columnar_artifact = columnar_snapshot_artifact(

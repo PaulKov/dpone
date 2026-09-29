@@ -110,6 +110,23 @@ def test_streaming_artifact_preserves_legacy_connector_port() -> None:
         )
 
 
+def test_clickhouse_target_type_requires_bounded_connector() -> None:
+    class LegacyConnector:
+        def get_records_iterator(self, _query: str):
+            return iter(())
+
+    config = SimpleNamespace(
+        source_schema="dbo",
+        source_table="orders",
+        batch_size=2,
+        options={"source_type": "mssql", "target_type": "clickhouse", "mssql_export_mode": "streaming"},
+    )
+    factory = MSSQLQueryoutArtifactFactory(LegacyConnector(), logger=None)
+
+    with pytest.raises(RuntimeError, match="mssql_row_stream.bounded_connector_required"):
+        factory.artifact_for_query(config, "SELECT id FROM dbo.orders", [("id", "int")])
+
+
 def test_mssql_row_iterator_passes_fetch_bound_to_cursor() -> None:
     class Connector:
         def __init__(self) -> None:
