@@ -142,7 +142,12 @@ class MSSQLQueryoutArtifactFactory:
             if artifact is not None:
                 return artifact
         if export_mode == "streaming":
-            return self.streaming_artifact(query, batch_size=load_config.batch_size, require_bounded=True)
+            sink_type = str(load_config.options.get("sink_type") or "").lower()
+            return self.streaming_artifact(
+                query,
+                batch_size=load_config.batch_size,
+                require_bounded=sink_type == "clickhouse",
+            )
 
         columnar_artifact = columnar_snapshot_artifact(
             load_config=load_config,
@@ -177,7 +182,11 @@ class MSSQLQueryoutArtifactFactory:
             # The generic connector port predates the MSSQL bounded-stream
             # capability and accepts only query/params. Preserve injected
             # implementations used by existing incremental workloads.
-            iterator = self.connector.get_records_iterator(query, params=params)
+            iterator = (
+                self.connector.get_records_iterator(query)
+                if params is None
+                else self.connector.get_records_iterator(query, params=params)
+            )
         return StreamingRowsArtifact(iterator, batch_size=batch_size)
 
     def output_schema(self, load_config: LoadConfig, schema: list[tuple[str, str]]) -> list[tuple[str, str]]:
