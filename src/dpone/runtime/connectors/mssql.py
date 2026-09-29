@@ -21,6 +21,7 @@ from dpone.runtime.connectors.mssql_datetimeoffset import (
     decode_datetimeoffset as _decode_datetimeoffset,
 )
 from dpone.runtime.connectors.mssql_query_timeout import MssqlBoundedQueryTimeoutMixin
+from dpone.runtime.connectors.mssql_row_stream import stream_mssql_rows
 from dpone.runtime.connectors.mssql_sql import MSSQLSqlRenderer
 from dpone.runtime.connectors.mssql_support import (
     build_mssql_connection_string,
@@ -216,29 +217,13 @@ class MSSQLConnector(MssqlBoundedQueryTimeoutMixin, AbstractConnector):
         batch_size: int = 10000,
         as_dict: bool = False,
     ):
-        if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size <= 0:
-            raise ValueError("mssql_row_stream.batch_size_positive")
-        cursor = self.connection.cursor()
-        try:
-            cursor.execute(str(query), tuple(params or ()))
-            columns = [column[0] for column in cursor.description or []]
-            if as_dict and len({str(column).lower() for column in columns}) != len(columns):
-                raise RuntimeError("mssql_row_stream.duplicate_column")
-            while True:
-                rows = cursor.fetchmany(batch_size)
-                if not rows:
-                    break
-                if as_dict:
-                    batch = []
-                    for row in rows:
-                        if len(row) != len(columns):
-                            raise RuntimeError("mssql_row_stream.column_count_mismatch")
-                        batch.append(dict(zip(columns, row)))
-                    yield batch
-                else:
-                    yield [tuple(row) for row in rows]
-        finally:
-            cursor.close()
+        yield from stream_mssql_rows(
+            self.connection,
+            query,
+            params=params,
+            batch_size=batch_size,
+            as_dict=as_dict,
+        )
 
     def get_records_iterator(
         self,

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
+from itertools import chain
 from typing import TYPE_CHECKING, Any
 
 from dpone.runtime.bulk_wire import should_use_source_encoded_tsv
@@ -130,7 +131,7 @@ class MSSQLQueryoutArtifactFactory:
             if artifact is not None:
                 return artifact
         if export_mode == "streaming":
-            return self.streaming_artifact(query, batch_size=load_config.batch_size)
+            return self.streaming_artifact(query, batch_size=load_config.batch_size, require_bounded=True)
 
         columnar_artifact = columnar_snapshot_artifact(
             load_config=load_config,
@@ -150,13 +151,20 @@ class MSSQLQueryoutArtifactFactory:
         *,
         batch_size: int,
         params: tuple[Any, ...] | None = None,
+        require_bounded: bool = False,
     ) -> StreamingRowsArtifact:
         """Create a streaming rows artifact from a connector iterator."""
 
-        if params is None:
-            iterator = self.connector.get_records_iterator(query, batch_size=batch_size)
+        bounded_stream = getattr(self.connector, "get_records_streaming", None)
+        if callable(bounded_stream):
+            iterator = chain.from_iterable(bounded_stream(query, params=params, batch_size=batch_size, as_dict=True))
         else:
-            iterator = self.connector.get_records_iterator(query, params=params, batch_size=batch_size)
+            if require_bounded:
+                raise RuntimeError("mssql_row_stream.bounded_connector_required")
+            # The generic connector port predates the MSSQL bounded-stream
+            # capability and accepts only query/params. Preserve injected
+            # implementations used by existing incremental workloads.
+            iterator = self.connector.get_records_iterator(query, params=params)
         return StreamingRowsArtifact(iterator, batch_size=batch_size)
 
     def output_schema(self, load_config: LoadConfig, schema: list[tuple[str, str]]) -> list[tuple[str, str]]:

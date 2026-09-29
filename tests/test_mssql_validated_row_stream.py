@@ -53,18 +53,37 @@ def test_mssql_streaming_artifact_passes_configured_fetch_bound() -> None:
         def __init__(self) -> None:
             self.batch_size: int | None = None
 
-        def get_records_iterator(
-            self, _query: str, params: tuple[object, ...] | None = None, *, batch_size: int = 10000
+        def get_records_streaming(
+            self, _query: str, *, params: tuple[object, ...] | None, batch_size: int, as_dict: bool
         ):
             assert params is None
+            assert as_dict
             self.batch_size = batch_size
-            return iter(({"id": 1},))
+            return iter(([{"id": 1}],))
 
     connector = Connector()
     artifact = MSSQLQueryoutArtifactFactory(connector, logger=None).streaming_artifact("SELECT id", batch_size=2)
 
     assert connector.batch_size == 2
     assert list(artifact._iterator) == [{"id": 1}]
+
+
+def test_streaming_artifact_preserves_legacy_connector_port() -> None:
+    class LegacyConnector:
+        def get_records_iterator(self, _query: str, params: tuple[object, ...] | None = None):
+            assert params == (7,)
+            return iter(({"id": 7},))
+
+    artifact = MSSQLQueryoutArtifactFactory(LegacyConnector(), logger=None).streaming_artifact(
+        "SELECT id WHERE id = ?", params=(7,), batch_size=2
+    )
+
+    assert list(artifact._iterator) == [{"id": 7}]
+
+    with pytest.raises(RuntimeError, match="mssql_row_stream.bounded_connector_required"):
+        MSSQLQueryoutArtifactFactory(LegacyConnector(), logger=None).streaming_artifact(
+            "SELECT id", batch_size=2, require_bounded=True
+        )
 
 
 def test_mssql_row_iterator_passes_fetch_bound_to_cursor() -> None:

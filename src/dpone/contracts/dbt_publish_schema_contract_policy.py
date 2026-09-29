@@ -13,6 +13,7 @@ from dpone.contracts.dbt_publish_schema_contract_common import (
 from dpone.contracts.dbt_publish_schema_semantic_refresh_policy import (
     semantic_refresh_policy as _semantic_refresh_policy,
 )
+from dpone.contracts.dbt_publish_validated_stream_schema import validated_stream_profile_condition
 from dpone.contracts.dbt_sqlserver_policy import (
     DBT_PROCESS_TIMEOUT_MAX_SECONDS,
     DBT_PROCESS_TIMEOUT_MIN_SECONDS,
@@ -133,26 +134,7 @@ def _policy_profile(
         },
     )
     if allow_validated_stream:
-        profile["allOf"] = [
-            {
-                "if": {
-                    "properties": {
-                        "source": {
-                            "properties": {
-                                "options": {"required": ["mssql_export_mode"]},
-                            },
-                            "required": ["options"],
-                        }
-                    }
-                },
-                "then": {
-                    "properties": {
-                        "source": {"properties": {"type": {"const": "mssql"}}},
-                        "sink": {"properties": {"type": {"const": "clickhouse"}}},
-                    }
-                },
-            }
-        ]
+        profile["allOf"] = validated_stream_profile_condition()
     return profile
 
 

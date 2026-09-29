@@ -12,7 +12,7 @@ from dpone.runtime.sources.strategies.mssql import MSSQLFullExtractStrategy
 from dpone.strategy_intelligence.native_transfer import NativeTransferPlanBuilder, NativeTransferRequest
 
 
-def test_plan_describes_validated_mssql_rows_without_claiming_bcp() -> None:
+def test_plan_describes_mssql_rows_without_claiming_validation_or_bcp() -> None:
     plan = NativeTransferPlanBuilder().build(
         NativeTransferRequest(
             source_type="mssql",
@@ -24,8 +24,8 @@ def test_plan_describes_validated_mssql_rows_without_claiming_bcp() -> None:
         )
     )
 
-    assert plan.fast_path_id == "mssql_validated_row_stream_to_clickhouse_staging"
-    assert plan.export_method == "mssql_odbc_validated_rows"
+    assert plan.fast_path_id == "mssql_row_stream_to_clickhouse_staging"
+    assert plan.export_method == "mssql_odbc_rows"
     assert plan.ingest_method == "clickhouse_rows_staging"
 
 
