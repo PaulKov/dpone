@@ -7,6 +7,7 @@ from types import SimpleNamespace
 import pytest
 
 from dpone.runtime.connectors.mssql import MSSQLConnector
+from dpone.runtime.extraction_lifecycle import ArtifactTerminalOutcome
 from dpone.runtime.sources.strategies.mssql.mssql_queryout_artifacts import MSSQLQueryoutArtifactFactory
 
 
@@ -66,6 +67,29 @@ def test_mssql_streaming_artifact_passes_configured_fetch_bound() -> None:
 
     assert connector.batch_size == 2
     assert list(artifact._iterator) == [{"id": 1}]
+
+
+def test_streaming_artifact_abort_closes_bounded_cursor() -> None:
+    closed = False
+
+    class Connector:
+        def get_records_streaming(self, _query: str, *, params, batch_size: int, as_dict: bool):
+            nonlocal closed
+            assert params is None and batch_size == 2 and as_dict
+            try:
+                yield [{"id": 1}, {"id": 2}]
+                yield [{"id": 3}]
+            finally:
+                closed = True
+
+    artifact = MSSQLQueryoutArtifactFactory(Connector(), logger=None).streaming_artifact(
+        "SELECT id", batch_size=2, require_bounded=True
+    )
+    assert next(artifact._iterator) == {"id": 1}
+
+    artifact.terminate(ArtifactTerminalOutcome.ABORT)
+
+    assert closed
 
 
 def test_streaming_artifact_preserves_legacy_connector_port() -> None:
