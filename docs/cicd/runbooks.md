@@ -683,12 +683,15 @@ uv run python tools/pypi_release_smoke.py \
   --package dpone \
   --version X.Y.Z \
   --install-smoke \
+  --install-extra full,accel \
   --timeout-seconds 900
 ```
 
-4. If only `version_json` passes, report index/resolver visibility as
-   incomplete. Do not claim the package is publicly installable based only on
-   matching JSON hashes or an install of retained wheel files.
+4. If only `version_json` passes, or one resolver path passes while the tagged
+   Docker build still cannot resolve the exact composite extra, report
+   index/resolver visibility as incomplete. Do not claim the package is
+   publicly installable based only on matching JSON hashes, one CDN edge, or an
+   install of retained wheel files.
 5. Repeat only read-only verification after propagation or access recovers.
    Do not rerun publication, upload missing files, or create a GitHub Release
    as a substitute for evidence.

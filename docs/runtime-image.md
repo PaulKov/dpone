@@ -66,7 +66,10 @@ docker run --rm --entrypoint python dpone:X.Y.Z -c 'from pathlib import Path; fr
 
 ## Pull from GHCR
 
-Release tags publish the production runtime image to GitHub Container Registry:
+A successful protected Runtime image tag workflow publishes the certified
+production image to GitHub Container Registry. A PyPI release, source tag, or
+GitHub Release does not by itself prove that the corresponding GHCR manifest
+exists:
 
 ```bash
 docker pull ghcr.io/paulkov/dpone-runtime:X.Y.Z
@@ -383,5 +386,13 @@ validated, and never interpolated into Bash source.
 | `pyodbc` cannot find the driver | `docker run --rm --entrypoint odbcinst dpone:X.Y.Z -q -d` |
 | `bcp: command not found` | Confirm `/opt/mssql-tools18/bin` is in `PATH`. |
 | ClickHouse client missing | Rebuild and check the ClickHouse repository step. |
-| `pip install dpone==X.Y.Z` fails during image build | Run `python tools/pypi_release_smoke.py --package dpone --version X.Y.Z --install-smoke` and wait for PyPI simple-index visibility, or build from a direct wheel/private index. |
-| Release tag exists but PyPI/GHCR looks incomplete | Run `dpone ops release-verify --release vX.Y.Z --install-smoke --format json` and use the blocker code to decide whether to wait or use **Re-run failed jobs** on the exact runtime run. Preserve successful phases; never rebuild after a registry write or publish from an arbitrary direct wheel/private index. |
+| `pip install dpone==X.Y.Z` fails during image build | Run `python tools/pypi_release_smoke.py --package dpone --version X.Y.Z --install-smoke --install-extra full,accel` and wait for the complete composite extra to become visible through PyPI's Simple API. |
+| Release tag exists but PyPI/GHCR looks incomplete | Preserve the failed attempt and inspect its mutation evidence. Never rerun publication after a registry write. If workflow bytes must change after a pre-write failure, use a new patch release with the full pre-tag cycle. |
+
+Version-specific JSON may expose the correct files before the Simple API or a
+particular pip/CDN edge is updated. A matching JSON/file receipt, or even one
+successful resolver probe, does not prove every resolver path is current. The
+protected tag workflow therefore performs a bounded, no-cache standard-pip
+visibility gate for `dpone[full,accel]` before the exact Python 3.12 Docker
+build; the Docker build and in-image `pip check` remain the authoritative
+environment checks.
