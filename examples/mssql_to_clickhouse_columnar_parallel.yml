@@ -22,7 +22,7 @@ source:
         bounds_role: filter
         null_bucket: separate
       range_parallelism:
-        # 0.87.1 records the safety blocker and executes the serial columnar path.
+        # Since 0.87.1, including 0.87.2, auto records the blocker and stays serial.
         # Use required only to verify the fail-closed pre-read admission gate.
         mode: auto
         reader_workers: 4

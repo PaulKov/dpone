@@ -331,6 +331,11 @@ def test_ghcr_mutation_jobs_reverify_fresh_provider_boundary_before_write() -> N
     preflight = _job(workflow, "release-preflight")
     assert preflight["if"] == "${{ github.event_name == 'push' && github.ref_type == 'tag' }}"
     assert "Validate runtime release identity" in _step_names(preflight)
+    verifier_stage = _run(_step(preflight, "Stage closed release-candidate verifier bundle"))
+    assert "tools/agent_policy/pypi_verifier_closure.py" in verifier_stage
+    assert "--profile ordinary-release" in verifier_stage
+    assert '--output "${verifier_dir}"' in verifier_stage
+    assert "\n          cp " not in verifier_stage
 
     expected_mutations = {
         "push-attest-runtime-candidate": {

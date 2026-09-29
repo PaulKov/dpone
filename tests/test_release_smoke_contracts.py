@@ -604,6 +604,8 @@ def test_runtime_image_workflow_separates_preflight_certification_and_promotion_
         "tools/agent_policy/runtime_image_certification.py",
         "tools/agent_policy/runtime_image_promotion.py",
         "tools/agent_policy/runtime_image_registry.py",
+        "tools/agent_policy/pypi_verifier_closure.py",
+        "tools/agent_policy/release_candidate_route_live_validation.py",
         "tools/pypi_candidate_inventory.py",
         "tests/agent_policy/test_runtime_image_*.py",
         "docs/schemas/release/runtime-image-*.schema.json",

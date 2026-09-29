@@ -14,6 +14,8 @@ on:
       - "tools/agent_policy/release_identity_gate.py"
       - "tools/agent_policy/release_commit_gate.py"
       - "tools/agent_policy/release_candidate_evidence_*.py"
+      - "tools/agent_policy/pypi_verifier_closure.py"
+      - "tools/agent_policy/release_candidate_route_live_validation.py"
       - "tools/agent_policy/runtime_image_certification.py"
       - "tools/agent_policy/runtime_image_promotion.py"
       - "tools/agent_policy/runtime_image_registry.py"
@@ -293,23 +295,10 @@ jobs:
         run: |
           set -euo pipefail
           verifier_dir="test_artifacts/runtime-image/release-candidate-verifier"
-          mkdir -p "${verifier_dir}"
-          cp \
-            tools/agent_policy/artifact_resource_limits.py \
-            tools/agent_policy/pr_receipt_github_api.py \
-            tools/agent_policy/release_candidate_evidence_archive.py \
-            tools/agent_policy/release_candidate_evidence_builder.py \
-            tools/agent_policy/release_candidate_evidence_codec.py \
-            tools/agent_policy/release_candidate_evidence_contract.py \
-            tools/agent_policy/release_candidate_evidence_gate.py \
-            tools/agent_policy/release_candidate_evidence_github.py \
-            tools/agent_policy/release_candidate_evidence_policy.py \
-            tools/agent_policy/release_candidate_evidence_route_chunks.py \
-            tools/agent_policy/release_candidate_evidence_route_validation.py \
-            tools/agent_policy/release_candidate_evidence_source.py \
-            tools/agent_policy/release_candidate_evidence_stress_validation.py \
-            tools/agent_policy/release_candidate_evidence_validation.py \
-            "${verifier_dir}/"
+          PYTHONDONTWRITEBYTECODE=1 python tools/agent_policy/pypi_verifier_closure.py \
+            --root . \
+            --output "${verifier_dir}" \
+            --profile ordinary-release
 
       - name: Upload runtime image preflight evidence
         id: preflight-upload
