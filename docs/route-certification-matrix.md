@@ -85,6 +85,11 @@ Cartesian product:
 |---|---|---|---|---|---|---|
 | MSSQL | ClickHouse | `incremental_merge` | `native_bcp_to_clickhouse` | `widening` | `kpo` | `experimental` |
 
+The validated row-stream transport is an opt-in policy-v3 authoring contract,
+not a certified catalog row. Its exact variant
+`mssql_validated_row_stream_to_clickhouse` remains `UNVERIFIED` until distinct
+live and production evidence is admitted. A BCP proof cannot certify it.
+
 This row is the self-service safe-sample candidate. Catalog membership is
 credential-free metadata. It does not authorize production reads or writes.
 

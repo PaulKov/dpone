@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Policy-v3 dbt publishing can explicitly select a validated MSSQL row stream
+  for a ClickHouse sink. The default BCP route is unchanged. The new option
+  requires its own exact transport certificate; an existing BCP proof cannot
+  certify it. Runtime rejects malformed stream metadata and unconfirmed sink
+  insertion counts, verifies physical staging count before publication, and
+  measures the source-byte budget over all fetched rows before emitting
+  successful quality evidence.
+
 ## 0.87.4 - 2026-09-29
 
 ### Fixed

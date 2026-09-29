@@ -122,6 +122,17 @@ route and environment before enabling it.
 
 ### Bounded full refresh
 
+For dbt-published models with a strict row contract, a policy-v3 profile may
+explicitly set `source.options.mssql_export_mode: streaming`. This selects
+bounded MSSQL row batches, validates each row before ClickHouse staging, and
+requires `certification.transport: mssql_validated_row_stream_to_clickhouse`.
+It is not a BCP prevalidation claim or an implicit fallback. A certified
+compile remains blocked until current evidence for this exact transport,
+schema evolution, strategy, and Airflow runtime variant is available. The
+default MSSQL export mode is unchanged. See the
+[dbt self-service reference](../dbt-self-service-reference.md) and
+[route certification matrix](../route-certification-matrix.md).
+
 Platform-owned dbt publish profiles authorize `full_refresh` with a positive
 `max_source_bytes`. The compiler preserves that limit as a reserved runtime
 contract; endpoint `options` cannot override it. After the complete source

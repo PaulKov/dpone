@@ -885,6 +885,71 @@ def test_profile_registry_reads_exact_certification_dimensions() -> None:
     assert profile.certification.airflow_runtime_mode == "kpo"
 
 
+def test_validated_row_stream_rejects_bcp_certification() -> None:
+    payload = yaml.safe_load(PROFILES.read_text(encoding="utf-8"))
+    profile = payload["profiles"][PROFILE_NAME]
+    profile["source"]["options"]["mssql_export_mode"] = "streaming"
+
+    registry, issues = DbtPublishProfileRegistry.from_mapping(payload, source_path=PROFILES)
+
+    assert registry is None
+    assert len(issues) == 1
+    assert "mssql_validated_row_stream_to_clickhouse" in issues[0].message
+
+
+def test_validated_row_stream_preserves_exact_source_and_transport() -> None:
+    payload = yaml.safe_load(PROFILES.read_text(encoding="utf-8"))
+    profile = payload["profiles"][PROFILE_NAME]
+    profile["source"]["options"]["mssql_export_mode"] = "streaming"
+    profile["certification"]["transport"] = "mssql_validated_row_stream_to_clickhouse"
+
+    registry, issues = DbtPublishProfileRegistry.from_mapping(payload, source_path=PROFILES)
+
+    assert issues == ()
+    assert registry is not None
+    parsed = registry.profile(PROFILE_NAME)
+    assert parsed is not None
+    assert parsed.source_options["mssql_export_mode"] == "streaming"
+    assert parsed.certification is not None
+    assert parsed.certification.transport == "mssql_validated_row_stream_to_clickhouse"
+
+
+def test_validated_row_stream_cannot_reuse_bcp_route_proof() -> None:
+    bcp_variant = SimpleNamespace(
+        id="bcp-proof",
+        transport="native_bcp_to_clickhouse",
+        schema_evolution="widening",
+        airflow_runtime_mode="kpo",
+        level="production-certified",
+        evidence_status="PASS",
+        evidence_refs=("sha256:" + "a" * 64,),
+        reason_codes=(),
+    )
+    snapshot = SimpleNamespace(
+        snapshot_id="sha256:" + "b" * 64,
+        routes=(
+            SimpleNamespace(
+                id="mssql:clickhouse:full_refresh",
+                support=SimpleNamespace(status="supported"),
+                certification=SimpleNamespace(variants=(bcp_variant,)),
+            ),
+        ),
+    )
+
+    capability, issues = DbtRouteCapabilityPolicy(snapshot, require_certified=True).resolve(
+        source="mssql",
+        sink="clickhouse",
+        strategy="full_refresh",
+        transport="mssql_validated_row_stream_to_clickhouse",
+        schema_evolution="widening",
+        airflow_runtime_mode="kpo",
+        path="models/client_rhythm.sql",
+    )
+
+    assert capability is None
+    assert {issue.code for issue in issues} == {"DPONE_DBT_ROUTE_NOT_CERTIFIED"}
+
+
 def test_route_capability_selects_one_exact_certification_variant() -> None:
     evidence_ref = "sha256:" + "a" * 64
     selected = SimpleNamespace(

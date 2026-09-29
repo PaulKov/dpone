@@ -6,6 +6,44 @@
     "profiles": {
       "additionalProperties": {
         "additionalProperties": false,
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "source": {
+                  "properties": {
+                    "options": {
+                      "required": [
+                        "mssql_export_mode"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "options"
+                  ]
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "sink": {
+                  "properties": {
+                    "type": {
+                      "const": "clickhouse"
+                    }
+                  }
+                },
+                "source": {
+                  "properties": {
+                    "type": {
+                      "const": "mssql"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        ],
         "properties": {
           "certification": {
             "additionalProperties": false,
@@ -296,6 +334,9 @@
               "options": {
                 "additionalProperties": false,
                 "properties": {
+                  "mssql_export_mode": {
+                    "const": "streaming"
+                  },
                   "native_transfer": {
                     "additionalProperties": false,
                     "properties": {
