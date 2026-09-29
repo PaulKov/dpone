@@ -365,6 +365,15 @@ release identity. Missing dimensions are acceptable for local authoring checks
 only; production compile fails closed. Duplicate matching variants return
 `DPONE_DBT_ROUTE_CERTIFICATION_AMBIGUOUS`.
 
+For a strict MSSQL → ClickHouse row contract, a platform owner may opt into
+`source.options.mssql_export_mode: streaming` in a policy-v3 publish profile.
+The source must be MSSQL, the sink ClickHouse, and the certificate must name
+`mssql_validated_row_stream_to_clickhouse`, not the BCP transport. This option
+validates rows before staging and does not change the default BCP route. A
+certified compile still requires current `PASS` evidence for the exact
+transport, schema-evolution and Airflow-runtime variant. Merely selecting the
+option does not certify the route or authorize production publication.
+
 Model metadata must not contain credentials, Vault paths, runtime images,
 namespaces, Kubernetes Secret names, connection URIs, or arbitrary SQL
 expressions. Dev and prod use identical logical database, schema, and model

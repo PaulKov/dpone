@@ -16,6 +16,7 @@ from dpone.readiness.schema_contracts import SchemaContract
 from dpone.runtime.artifacts import FileExportArtifact, StreamingRowsArtifact
 from dpone.runtime.etl.contract_artifacts import ContractEnforcedStreamingArtifact, ContractValidatedFileArtifact
 from dpone.runtime.etl.load_config_runtime import LoadConfigRuntimeService
+from dpone.runtime.sinks.clickhouse_staged_evidence import SourceByteBudgetError, enforce_source_byte_budget
 
 
 class _StagingManager:
@@ -78,6 +79,18 @@ def test_streaming_contract_artifact_validates_chunks_without_full_materializati
     assert artifact.validation_summary.accepted_rows == 2
     assert artifact.validation_summary.quarantined_rows == 1
     assert quarantine.export(run_id="01JSTREAMRUN000000000000").total_rows == 1
+    raw_rows = [
+        {"id": 1, "amount": "10.00"},
+        {"id": 2, "amount": "bad"},
+        {"id": 3, "amount": "20.00"},
+    ]
+    raw_bytes = sum(len(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()) for row in raw_rows)
+    evidence = enforce_source_byte_budget(
+        SimpleNamespace(artifact=artifact), maximum_bytes=raw_bytes, full_refresh=True
+    )
+    assert evidence is not None and evidence.observed_bytes == raw_bytes
+    with pytest.raises(SourceByteBudgetError, match="DPONE_SOURCE_BYTE_BUDGET_EXCEEDED"):
+        enforce_source_byte_budget(SimpleNamespace(artifact=artifact), maximum_bytes=raw_bytes - 1, full_refresh=True)
 
 
 def test_empty_contract_stream_materializes_explicit_zero_row_boundary() -> None:
@@ -99,6 +112,46 @@ def test_empty_contract_stream_materializes_explicit_zero_row_boundary() -> None
     assert handle.row_count == 0
     assert manager.insert_sizes == [0]
     assert artifact.validation_summary.accepted_rows == 0
+
+
+def test_strict_stream_rejects_late_bad_row_without_completion_evidence() -> None:
+    source = StreamingRowsArtifact(iter(({"amount": "10.00"}, {"amount": "bad"})), batch_size=1)
+    artifact = ContractEnforcedStreamingArtifact(
+        source,
+        contract=_contract("strict"),
+        run_id="01JSTRICTRUN00000000000",
+        load_id="01JSTRICTLOAD0000000000",
+    )
+    inserted: list[dict] = []
+
+    with pytest.raises(RuntimeError, match="data contract enforcement failed"):
+        artifact.load_with_row_inserter(lambda rows: inserted.extend(rows) or len(rows))
+
+    assert inserted == [{"amount": "10.00"}]
+    assert artifact.enforcement_result is None
+    assert not hasattr(source, "rows_exported")
+
+
+def test_validated_stream_rejects_unconfirmed_sink_row_count() -> None:
+    source = StreamingRowsArtifact(iter(({"amount": "10.00"},)), batch_size=1)
+    artifact = ContractEnforcedStreamingArtifact(
+        source,
+        contract=_contract("strict"),
+        run_id="01JCOUNTMISMATCHRUN00000",
+        load_id="01JCOUNTMISMATCHLOAD0000",
+    )
+
+    with pytest.raises(RuntimeError, match="streaming_rows.insert_count_mismatch"):
+        artifact.load_with_row_inserter(lambda rows: len(rows) - 1)
+
+    assert artifact.enforcement_result is None
+    assert not hasattr(source, "rows_exported")
+
+
+@pytest.mark.parametrize("batch_size", (0, -1))
+def test_streaming_rows_rejects_nonpositive_batch_size(batch_size: int) -> None:
+    with pytest.raises(ValueError, match="streaming_rows.batch_size_positive"):
+        StreamingRowsArtifact(iter(()), batch_size=batch_size)
 
 
 def test_strict_contract_file_artifact_fails_closed_when_file_is_opaque(tmp_path: Path) -> None:

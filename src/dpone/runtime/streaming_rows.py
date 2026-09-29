@@ -30,6 +30,8 @@ class StreamingRowsArtifact(BaseExtractionArtifact):
         on_abort: Callable[[], None] | None = None,
         cleanup_callback: Callable[[], None] | None = None,
     ):
+        if isinstance(batch_size, bool) or not isinstance(batch_size, int) or batch_size <= 0:
+            raise ValueError("streaming_rows.batch_size_positive")
         super().__init__(estimated_rows=estimated_rows)
         self._iterator = iterator
         self._batch_size = batch_size

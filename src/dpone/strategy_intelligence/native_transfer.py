@@ -104,6 +104,7 @@ class NativeTransferPlanBuilder:
     _MSSQL_CLICKHOUSE_DIRECT_TSV_FAST_PATH = "mssql_bcp_queryout_to_clickhouse_direct_tsv"
     _MSSQL_CLICKHOUSE_TYPED_WIRE_FAST_PATH = "mssql_bcp_queryout_to_clickhouse_typed_wire"
     _MSSQL_CLICKHOUSE_TYPED_BINARY_FAST_PATH = "mssql_odbc_row_stream_to_clickhouse_rowbinary"
+    _MSSQL_CLICKHOUSE_ROWS_FAST_PATH = "mssql_row_stream_to_clickhouse_staging"
     _MSSQL_CLICKHOUSE_BCP_NATIVE_FAST_PATH = "mssql_bcp_native_to_clickhouse_rowbinary"
     _MSSQL_CLICKHOUSE_BCP_NATIVE_COLUMNAR_FAST_PATH = "mssql_bcp_native_to_clickhouse_native"
     _POSTGRES_MSSQL_FAST_PATH = "postgres_copy_to_mssql_bcp"
@@ -126,7 +127,11 @@ class NativeTransferPlanBuilder:
                 source_options=request.source_options,
                 sink_options=request.sink_options,
             )
-            if bulk_wire.selected_route == "typed_binary_bcp_native":
+            if str(request.source_options.get("mssql_export_mode") or "").lower() == "streaming":
+                fast_path_id = self._MSSQL_CLICKHOUSE_ROWS_FAST_PATH
+                export_method = "mssql_odbc_rows"
+                ingest_method = "clickhouse_rows_staging"
+            elif bulk_wire.selected_route == "typed_binary_bcp_native":
                 fast_path_id = (
                     self._MSSQL_CLICKHOUSE_BCP_NATIVE_COLUMNAR_FAST_PATH
                     if bulk_wire.input_format == "Native"

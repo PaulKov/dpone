@@ -37,7 +37,7 @@ class MSSQLConnectorPort(Protocol):
     ) -> list[Any]:
         """Return SQL Server query results."""
 
-    def get_records_iterator(self, query: Any, params: Iterable[Any] | None = None):
+    def get_records_iterator(self, query: Any, params: Iterable[Any] | None = None, *, batch_size: int = 10000):
         """Yield SQL Server rows as dictionaries."""
 
     def build_select_query(

@@ -25,6 +25,7 @@ from dpone.runtime.sinks.clickhouse_payload_support import (
 from dpone.runtime.sinks.clickhouse_production_finalize import ClickHouseProductionFinalizer
 from dpone.runtime.sinks.clickhouse_staged_cleanup import drop_staging_configs
 from dpone.runtime.sinks.clickhouse_staged_evidence import enforce_source_byte_budget, staged_handle_metadata
+from dpone.runtime.sinks.clickhouse_streaming_staging_guard import verify_streaming_staging_count
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.merge_policy import (
     MergePolicy,
@@ -70,6 +71,7 @@ class ClickHouseStagedLoadService:
                     database=str(staging_config.target_schema),
                     table=str(staging_config.target_table),
                 )
+            verify_streaming_staging_count(self._sink, staging_config, payload, staged_rows)
             source_byte_budget = enforce_source_byte_budget(
                 payload,
                 maximum_bytes=(getattr(load_config, "options", {}) or {}).get(SOURCE_BYTE_BUDGET_OPTION),

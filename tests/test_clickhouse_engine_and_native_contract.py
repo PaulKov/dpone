@@ -247,6 +247,27 @@ def test_enforced_stream_loads_into_the_existing_clickhouse_table() -> None:
     assert source_snapshot(SimpleNamespace(artifact=wrapper)).row_count == 2
 
 
+def test_streamed_rows_require_physical_staging_count_before_publication() -> None:
+    from dpone.runtime.etl.contract_artifacts import ContractEnforcedStreamingArtifact
+    from dpone.runtime.streaming_rows import StreamingRowsArtifact
+
+    wrapper = ContractEnforcedStreamingArtifact(
+        StreamingRowsArtifact(iter(({"id": 1}, {"id": 2})), batch_size=2),
+        contract=_contract(nullable=False),
+        run_id="run",
+        load_id="load",
+    )
+    sink = _Sink(inserted=2, table_rows=1, nulls=0)
+
+    with pytest.raises(RuntimeError, match="clickhouse_streaming_staging_count_mismatch"):
+        ClickHouseStagedLoadService(sink).stage(
+            _load_config("MergeTree", contract=_contract(nullable=False)),
+            LoadPayload(artifact=wrapper, schema=[("id", "bigint")]),
+        )
+
+    assert sink.dropped == ["technical.stage"]
+
+
 def test_partitioned_native_with_a_contract_is_refused_before_insert(tmp_path: Path) -> None:
     part = _native(tmp_path, rows=1)
     payload = LoadPayload(
@@ -344,6 +365,10 @@ class _Sink:
     def _drop_table(self, table: str, config: Any) -> None:
         del config
         self.dropped.append(table)
+
+    def _count(self, config: Any) -> int:
+        del config
+        return self.connector.table_rows
 
     @staticmethod
     def _table(config: Any) -> str:

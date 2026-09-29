@@ -166,6 +166,15 @@ def _profile(
     sink = _mapping(raw["sink"])
     runtime = _normalized_runtime(_mapping(raw["runtime"]), legacy=legacy)
     certification = _mapping(raw.get("certification"))
+    source_options = _mapping(source.get("options"))
+    if source_options.get("mssql_export_mode") == "streaming":
+        if _text(source["type"]).lower() != "mssql" or _text(sink["type"]).lower() != "clickhouse":
+            raise ValueError("mssql_export_mode: streaming requires an MSSQL to ClickHouse profile")
+        if certification.get("transport") != "mssql_validated_row_stream_to_clickhouse":
+            raise ValueError(
+                "mssql_export_mode: streaming requires certification.transport "
+                "mssql_validated_row_stream_to_clickhouse; a BCP certificate is not row-stream evidence"
+            )
     return DbtPublishProfile(
         name=name,
         source_type=_text(source["type"]),
@@ -186,7 +195,7 @@ def _profile(
             else None
         ),
         state=_mapping(raw.get("state")),
-        source_options=_mapping(source.get("options")),
+        source_options=source_options,
         sink_options=_mapping(sink.get("options")),
         runtime=runtime,
         physical_design=_mapping(raw.get("physical_design")),

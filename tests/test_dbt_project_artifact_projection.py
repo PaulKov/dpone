@@ -21,7 +21,7 @@ def test_singleton_policy_migration_preserves_all_unaffected_bytes(tmp_path: Pat
     """Pin policy and interval migrations while retaining every unaffected byte.
 
     The a6669cd parent had the old Python-dispatch authority. Its historical
-    57-file baseline remains unchanged: 50 files still match exactly. The policy
+    57-file baseline remains unchanged: 49 files still match exactly. The policy
     migration changes the selection lock and transformation packs; the interval
     repair changes the transfer manifest and packs. Both affect release identity.
     The real writer also emits three newer canonical schemas. Fixed hashes come
@@ -44,7 +44,8 @@ def test_singleton_policy_migration_preserves_all_unaffected_bytes(tmp_path: Pat
         "_dbt/manifests/dbt_competitive_pricing.yaml": "cc74f3df6fdb2963d6d1a9af854f1012cee984e4fbb6b4d572c858986a022e28",
         "packs/dbt_competitive_pricing.airflow-pack.json": "6cd7b95e3536531f8406be45db028302b28c922d979edb3ca20d94f748c1c308",
         "dbt_competitive_pricing/airflow-pack.json": "6cd7b95e3536531f8406be45db028302b28c922d979edb3ca20d94f748c1c308",
-        "release-set.json": "137aeb1fecebcc3a783c1ad2e74fe94b3c13c00d4e31769c0801df3225ee3db6",
+        "release-set.json": "bfb55dc729af479e5ad8cca4ccf39c1cc41441696c773b6b5c87608caf0926b2",
+        "schemas/dbt/dpone.dbt-publish-policy.v3.schema.json": "61f925bd47b7e155008914e36d9c025772a01825a307c9d2465bc545ed868625",
     }
     additional_schemas = {
         "schemas/dbt/dpone.dbt-workspace-compile.v1.schema.json": "009b363d765dbaa20ea5477c7fa1cd498b4f6d8d438f140dc6c240ca110a0640",
@@ -61,7 +62,7 @@ def test_singleton_policy_migration_preserves_all_unaffected_bytes(tmp_path: Pat
     }
     assert len(baseline) == 57 and set(observed) == baseline.keys() | additional_schemas.keys()
     assert len(additional_schemas) == 3 and baseline.keys().isdisjoint(additional_schemas)
-    assert len(migrated) == 7
+    assert len(migrated) == 8
     assert {path for path in baseline if observed[path] != baseline[path]} == set(migrated)
     assert observed == baseline | migrated | additional_schemas
     canonical_pack = (output / "packs/dbt__competitive_pricing.airflow-pack.json").read_bytes()

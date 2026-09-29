@@ -9,6 +9,24 @@ from dpone.config import LoadConfig, LoadStrategy
 from dpone.readiness.managed import ExecutionPlanService
 from dpone.runtime.source_impact import SourceImpactInspector
 from dpone.runtime.sources.strategies.mssql import MSSQLFullExtractStrategy
+from dpone.strategy_intelligence.native_transfer import NativeTransferPlanBuilder, NativeTransferRequest
+
+
+def test_plan_describes_mssql_rows_without_claiming_validation_or_bcp() -> None:
+    plan = NativeTransferPlanBuilder().build(
+        NativeTransferRequest(
+            source_type="mssql",
+            sink_type="clickhouse",
+            source_table="source.orders",
+            target_table="target.orders",
+            strategy="full_refresh",
+            source_options={"mssql_export_mode": "streaming"},
+        )
+    )
+
+    assert plan.fast_path_id == "mssql_row_stream_to_clickhouse_staging"
+    assert plan.export_method == "mssql_odbc_rows"
+    assert plan.ingest_method == "clickhouse_rows_staging"
 
 
 def test_manifest_schemas_expose_runtime_storage_and_native_transfer_options() -> None:
