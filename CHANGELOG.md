@@ -4,6 +4,13 @@
 
 ### Added
 
+- A single-host ClickHouse authority foundation provides create-once SQLite
+  WAL/FULL storage, retained target ownership, strict versioned record encoding,
+  acknowledged one-shot grants, send/close CAS and redacted atomic diagnostics.
+  Process/crash tests cover races and lost acknowledgements. This is not yet a
+  concrete publication backend: SQL transport, independent observation, ownership
+  release and ODBC activation remain unavailable; existing routes are unchanged.
+
 - An unbound, dependency-injected ClickHouse publication kernel selects guarded
   single-partition replacement, whole-table exchange, rename or no-op from frozen
   catalog/content evidence. Its method-specific recovery never redispatches DDL.

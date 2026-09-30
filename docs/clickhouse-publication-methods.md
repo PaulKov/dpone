@@ -19,6 +19,9 @@ For targets written exclusively by dpone, the next binding is described
 in the [dpone-only authority design](feature-design-clickhouse-dpone-only-authority.md).
 Its single-host durable journal and conservative closure profile is APPROVED
 for implementation, not an implemented backend or an enabled route.
+The [authority journal foundation](clickhouse-authority-journal.md) now supplies
+storage/CAS building blocks; transport, protected observation and production
+composition remain separate, unimplemented gates.
 
 ## Selection policy
 

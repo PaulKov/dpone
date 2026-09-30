@@ -1,9 +1,11 @@
 """Real SQLite authority: no replacement journal, expiry, or owner handoff."""
 
+import json
 import os
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
@@ -198,3 +200,152 @@ def test_stale_or_forged_grants_cannot_send(authority):
         with pytest.raises(AuthorityError):
             authority.begin_send(bad)
     assert authority.transport_state("deployment:one") == TransportState.NOT_STARTED
+
+
+def completed_transport(authority):
+    grant = authority.claim(prepared(authority))
+    authority.begin_send(grant)
+    authority.record_terminal(grant, "e" * 64)
+    return grant
+
+
+def test_terminal_requires_original_grant_and_possible_send(authority):
+    grant = authority.claim(prepared(authority))
+    with pytest.raises(AuthorityError):
+        authority.record_terminal(grant, "e" * 64)
+    authority.begin_send(grant)
+    for bad in (replace(grant, epoch=2), replace(grant, secret="forged")):
+        with pytest.raises(AuthorityError):
+            authority.record_terminal(bad, "e" * 64)
+    with pytest.raises(AuthorityError):
+        authority.record_terminal(grant, "invalid")
+    authority.record_terminal(grant, "e" * 64)
+    authority.record_terminal(grant, "e" * 64)
+    with pytest.raises(AuthorityError):
+        authority.record_terminal(grant, "f" * 64)
+    with pytest.raises(AuthorityConflict):
+        authority.begin_send(grant)
+
+
+def test_resolution_requires_closure_and_current_revision(authority):
+    stale = prepared(authority)
+    with pytest.raises(AuthorityError):
+        authority.resolve(stale, PublicationState.NOT_PUBLISHED, stale.record.intent.before)
+    authority.close_without_send("deployment:one")
+    with pytest.raises(AuthorityConflict):
+        authority.resolve(stale, PublicationState.NOT_PUBLISHED, stale.record.intent.before)
+    fresh = authority.read("deployment:one")
+    result = authority.resolve(fresh, PublicationState.NOT_PUBLISHED, fresh.record.intent.before)
+    assert result.record.claim_granted is False
+    assert result.record.intent == stale.record.intent
+
+
+def test_committed_resolution_keeps_target_owned(authority, tmp_path):
+    completed_transport(authority)
+    entry = authority.read("deployment:one")
+    before = entry.record.intent.before
+    desired = replace(before, target=replace(before.candidate, uuid=before.target.uuid))
+    result = authority.resolve(entry, PublicationState.COMMITTED, desired)
+    assert result.record.state == PublicationState.COMMITTED
+    assert result.record.claim_granted and result.record.intent == entry.record.intent
+    reopened = SQLitePublicationAuthority(tmp_path / "authority.db", "deployment")
+    assert reopened.read("deployment:one") == result
+    assert reopened.resolve(result, PublicationState.COMMITTED, desired) == result
+    with pytest.raises(AuthorityConflict):
+        reopened.acquire("deployment:two", subject(), "candidate2")
+    with pytest.raises(AuthorityError):
+        reopened.resolve(result, PublicationState.NOT_PUBLISHED, before)
+
+
+def test_unknown_keeps_claim_history_without_regrant(authority):
+    authority.claim(prepared(authority))
+    authority.close_without_send("deployment:one")
+    entry = authority.read("deployment:one")
+    unknown = authority.resolve(entry, PublicationState.UNKNOWN, entry.record.intent.before)
+    assert unknown.record.claim_granted
+    assert authority.claim(unknown) is None
+
+
+def test_resolution_commit_ack_loss_is_source_free_readback(authority, tmp_path, monkeypatch):
+    completed_transport(authority)
+    entry = authority.read("deployment:one")
+    original = authority._storage.transaction
+
+    @contextmanager
+    def lost_ack():
+        with original() as db:
+            yield db
+        raise AuthorityError("injected resolution ACK loss")
+
+    monkeypatch.setattr(authority._storage, "transaction", lost_ack)
+    with pytest.raises(AuthorityError):
+        authority.resolve(entry, PublicationState.UNKNOWN, entry.record.intent.before)
+    reopened = SQLitePublicationAuthority(tmp_path / "authority.db", "deployment")
+    assert reopened.read("deployment:one").record.state == PublicationState.UNKNOWN
+    assert reopened.claim(reopened.read("deployment:one")) is None
+
+
+def test_diagnostics_are_redacted_atomic_and_not_overwritten(authority, tmp_path):
+    grant = completed_transport(authority)
+    folder = tmp_path / "reports"
+    folder.mkdir()
+    output = folder / "operation.json"
+    authority.write_diagnostics("deployment:one", output)
+    payload = output.read_text()
+    assert json.loads(payload) == authority.diagnostics("deployment:one")
+    assert grant.secret not in payload and "grant_hash" not in payload
+    assert "record" not in json.loads(payload)
+    with pytest.raises(AuthorityError):
+        authority.write_diagnostics("deployment:one", output)
+    assert output.read_text() == payload
+
+
+def test_failed_diagnostic_write_leaves_no_partial_public_file(authority, tmp_path, monkeypatch):
+    prepared(authority)
+    folder = tmp_path / "reports"
+    folder.mkdir()
+    output = folder / "operation.json"
+
+    def fail_link(*args, **kwargs):
+        raise OSError("injected atomic publication failure")
+
+    monkeypatch.setattr(os, "link", fail_link)
+    with pytest.raises(AuthorityError):
+        authority.write_diagnostics("deployment:one", output)
+    assert not output.exists()
+    assert list(folder.iterdir()) == []
+
+
+def test_diagnostics_cannot_occupy_authority_sidecar_path(authority, tmp_path):
+    prepared(authority)
+    with pytest.raises(AuthorityError):
+        authority.write_diagnostics("deployment:one", tmp_path / "authority.db-wal")
+    assert authority.read("deployment:one") is not None
+
+
+def test_aborted_sqlite_write_rolls_back_without_losing_owner(authority):
+    prepared(authority)
+    with pytest.raises(AuthorityError):
+        with authority._storage.transaction() as db:
+            db.execute("UPDATE operations SET revision=99 WHERE operation_id='deployment:one'")
+            db.execute("INSERT INTO missing_table VALUES (1)")
+    assert authority.read("deployment:one").revision == 1
+    assert authority.binding("deployment:one").subject == subject()
+
+
+def test_sqlite_full_rolls_back_without_losing_original_record(authority):
+    entry = prepared(authority)
+    with pytest.raises(AuthorityError) as failure:
+        with authority._storage.transaction() as db:
+            pages = db.execute("PRAGMA page_count").fetchone()[0]
+            db.execute(f"PRAGMA max_page_count={pages}")
+            db.execute("UPDATE operations SET record=zeroblob(1048576)")
+    assert failure.value.__cause__.sqlite_errorcode == sqlite3.SQLITE_FULL
+    assert authority.read("deployment:one") == entry
+    assert authority.binding("deployment:one").subject == subject()
+
+
+def test_documented_first_use_example():
+    guide = Path(__file__).resolve().parents[1] / "docs" / "clickhouse-authority-journal.md"
+    example = guide.read_text().split("```python\n", 1)[1].split("```", 1)[0]
+    exec(compile(example, str(guide), "exec"), {})

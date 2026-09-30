@@ -5,8 +5,11 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import os
+import re
 import secrets
 import sqlite3
+import tempfile
 from dataclasses import asdict, replace
 from pathlib import Path
 
@@ -21,7 +24,12 @@ from dpone.contracts.clickhouse_authority import (
     OperationBinding,
     TransportState,
 )
-from dpone.contracts.clickhouse_publication import PublicationIntent, PublicationRecord, PublicationState
+from dpone.contracts.clickhouse_publication import (
+    PublicationIntent,
+    PublicationObservation,
+    PublicationRecord,
+    PublicationState,
+)
 
 
 class SQLitePublicationAuthority:
@@ -79,14 +87,13 @@ class SQLitePublicationAuthority:
     @staticmethod
     def _row(db: sqlite3.Connection, operation_id: str) -> sqlite3.Row:
         cursor = db.cursor()
-        cursor.row_factory = sqlite3.Row
         try:
-            row = cursor.execute("SELECT * FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
+            values = cursor.execute("SELECT * FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
+            if values is None:
+                raise AuthorityError("Unknown authority operation")
+            return sqlite3.Row(cursor, values)
         finally:
             cursor.close()
-        if row is None:
-            raise AuthorityError("Unknown authority operation")
-        return row
 
     def _entry(self, db: sqlite3.Connection, row: sqlite3.Row) -> JournalEntry | None:
         binding = self._binding(db, row["operation_id"])
@@ -215,3 +222,105 @@ class SQLitePublicationAuthority:
             row = self._row(db, operation_id)
             self._entry(db, row)
             return TransportState(row["transport"])
+
+    def record_terminal(self, grant: DispatchGrant, completion_digest: str) -> None:
+        """Persist a trusted publisher's completion; this store cannot prove EOS."""
+        if type(completion_digest) is not str or not re.fullmatch("[0-9a-f]{64}", completion_digest):
+            raise AuthorityError("Expected canonical completion digest")
+        with self._storage.transaction() as db:
+            row = self._grant_row(db, grant)
+            if row["transport"] == TransportState.CLOSED_TERMINAL and row["completion_digest"] == completion_digest:
+                return
+            if row["transport"] != TransportState.MAY_HAVE_SENT:
+                raise AuthorityConflict("Terminal completion cannot replace closed or unsent history")
+            self._update(
+                db,
+                row,
+                "record_terminal",
+                {"transport": TransportState.CLOSED_TERMINAL, "completion_digest": completion_digest},
+            )
+
+    def resolve(self, entry: JournalEntry, state: PublicationState, observed: PublicationObservation) -> JournalEntry:
+        """Persist trusted backend classification, not an independent observation."""
+        if state not in {PublicationState.COMMITTED, PublicationState.NOT_PUBLISHED, PublicationState.UNKNOWN}:
+            raise AuthorityError("Expected a publication resolution")
+        observed.require_supported()
+        if observed.subject != entry.record.intent.before.subject:
+            raise AuthorityConflict("Foreign resolution subject")
+        observation = json.dumps(asdict(observed), sort_keys=True, separators=(",", ":"), allow_nan=False)
+        resolved = replace(entry.record, state=state)
+        payload = encode_record(resolved)
+        with self._storage.transaction() as db:
+            row = self._row(db, entry.record.intent.operation_id)
+            if self._entry(db, row) != entry:
+                raise AuthorityConflict("Stale resolution revision")
+            if row["transport"] not in {TransportState.CLOSED_WITHOUT_SEND, TransportState.CLOSED_TERMINAL}:
+                raise AuthorityConflict("Publisher closure is not durable")
+            if (
+                state == PublicationState.COMMITTED
+                and row["transport"] == TransportState.CLOSED_WITHOUT_SEND
+                and entry.record.intent.method != "noop"
+            ):
+                raise AuthorityConflict("Unsent mutation cannot be committed")
+            if entry.record.state in {PublicationState.COMMITTED, PublicationState.NOT_PUBLISHED}:
+                if row["record"] != payload or row["observed"] != observation:
+                    raise AuthorityConflict("Terminal resolution is immutable")
+                return entry
+            self._update(db, row, "resolve", {"record": payload, "observed": observation})
+            result = self._entry(db, self._row(db, row["operation_id"]))
+            assert result is not None
+        return result
+
+    def diagnostics(self, operation_id: str) -> dict[str, object]:
+        """Redacted original history, never a dispatch grant or recovery input."""
+        with self._storage.transaction() as db:
+            row = self._row(db, operation_id)
+            binding = self._binding(db, operation_id)
+            entry = self._entry(db, row)
+            history = db.execute(
+                "SELECT revision,event,transport,record_digest FROM history WHERE operation_id=? ORDER BY revision",
+                (operation_id,),
+            ).fetchall()
+            return {
+                "schema_version": "dpone.clickhouse.authority-diagnostics.v1",
+                "binding": asdict(binding),
+                "revision": row["revision"],
+                "state": entry.record.state.value if entry else "registered",
+                "claim_granted": entry.record.claim_granted if entry else False,
+                "method": entry.record.intent.method if entry else None,
+                "reason": entry.record.intent.reason if entry else None,
+                "query_id": row["query_id"],
+                "transport": row["transport"],
+                "completion_digest": row["completion_digest"],
+                "owner_retained": True,
+                "history": [
+                    dict(zip(("revision", "event", "transport", "record_digest"), item, strict=True))
+                    for item in history
+                ],
+            }
+
+    def write_diagnostics(self, operation_id: str, destination: Path) -> None:
+        """Atomically create a new report outside the private authority directory."""
+        temporary = None
+        try:
+            if destination.parent.resolve() == self._storage.path.parent.resolve():
+                raise AuthorityError("Write diagnostics outside the authority directory")
+            payload = json.dumps(self.diagnostics(operation_id), sort_keys=True, indent=2, allow_nan=False)
+            with tempfile.NamedTemporaryFile(
+                mode="w", encoding="utf-8", dir=destination.parent, delete=False
+            ) as stream:
+                temporary = Path(stream.name)
+                stream.write(payload + "\n")
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.link(temporary, destination)
+            descriptor = os.open(destination.parent, os.O_RDONLY | os.O_DIRECTORY)
+            try:
+                os.fsync(descriptor)
+            finally:
+                os.close(descriptor)
+        except OSError as error:
+            raise AuthorityError("Diagnostic output could not be created; existing files preserved") from error
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
