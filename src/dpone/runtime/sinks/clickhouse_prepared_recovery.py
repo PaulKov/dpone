@@ -141,11 +141,15 @@ class PreparedRecoveryService:
             contracts.VersionedAuthorityRecord(plan.record, plan.authority_version), plan.cluster
         )
         original_receipt.validate_for_authority(current)
+        expected_epoch = plan.record.dispatch_epoch + (
+            2 if record.phase is contracts.AuthorityPhase.CLEANUP_DISPATCHING else 1
+        )
         if (
             current.version <= plan.authority_version
             or record.ddl_correlation_token != plan.token
             or record.ddl_query_digest != plan.query_digest
-            or record.dispatch_epoch != plan.record.dispatch_epoch + 1
+            or not record.authority_write_id
+            or record.dispatch_epoch != expected_epoch
         ):
             raise contracts.ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "resumed dispatch identity differs"
@@ -175,6 +179,10 @@ class PreparedRecoveryService:
             or record.desired != plan.candidate_identity
             or record.predecessor != plan.predecessor_identity
             or record.staged_rows != plan.record.staged_rows
+            or not record.authority_write_id
+            or record.ddl_correlation_token != plan.token
+            or record.ddl_query_digest != plan.query_digest
+            or record.dispatch_epoch not in {plan.record.dispatch_epoch + 1, plan.record.dispatch_epoch + 2}
         ):
             raise contracts.ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "completed authority belongs to another plan"
