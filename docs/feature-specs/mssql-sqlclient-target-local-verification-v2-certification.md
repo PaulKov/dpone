@@ -88,11 +88,11 @@ mandatory.
 | Contract | Omitted selector remains BCP; explicit SqlClient has no fallback; v1/v2 journal separation | Hermetic | Contract tests |
 | Contract | Evidence rejects secrets, endpoints, object/query identities, absolute paths, and raw exceptions | Hermetic | Privacy-lint report |
 | Integration | Partial write, lost ACK, worker crash, deadline, digest/schema mutation, EOF boundaries, unknown commit | Mocked target/process | Recovery matrix |
-| Docker live | Real SqlBulkCopy narrow 10k/1m and versioned wide100 10k/1m; existing 200-column profile remains stress coverage | Local Docker Desktop | Versioned synthetic receipt |
-| Docker live | Force-kill real SqlBulkCopy during a batch; prove app-lock/table-lock barrier waits for rollback, repeated digest stability, `UNKNOWN` retention, and no premature drop/retry/prepare | Local Docker Desktop | Quiescence recovery receipt |
+| Docker live | Real SqlBulkCopy narrow 10k/1m and versioned wide100 10k/1m; existing 200-column profile remains stress coverage | Native x86-64 Linux Docker | Versioned synthetic receipt |
+| Docker live | Force-kill real SqlBulkCopy during a batch; prove app-lock/table-lock barrier waits for rollback, repeated digest stability, `UNKNOWN` retention, and no premature drop/retry/prepare | Native x86-64 Linux Docker | Quiescence recovery receipt |
 | Runtime/live | Lose publication acknowledgement after commit and reconcile the exact durable receipt before any replay | Synthetic SQL transaction harness and full runtime live matrix | Receipt-first recovery receipt |
-| Docker live | Differential SQL/Python parity for every generated admitted raw and prepared layout, nullable/fixed/max framing, precision/scale, collation, and boundary value | Local Docker Desktop | Layout matrix receipt |
-| Docker live | Empty interval, duplicates, late change, outside-window invariance, rollback, receipt-first recovery | Local Docker Desktop | Correctness/recovery receipt |
+| Docker live | Differential SQL/Python parity for every generated admitted raw and prepared layout, nullable/fixed/max framing, precision/scale, collation, and boundary value | Native x86-64 Linux Docker | Layout matrix receipt |
+| Docker live | Empty interval, duplicates, late change, outside-window invariance, rollback, receipt-first recovery | Native x86-64 Linux Docker | Correctness/recovery receipt |
 | Performance | Warmup plus three measured narrow and wide100 runs; ten runs before p90 claim | Stable Docker profile | Benchmark receipt |
 | Private live certification | Fixed UTC half-open seven-day technical-load window, rerun idempotency, failure injection, exact commit | Approved private environment | External private receipt only |
 | Compatibility | Released BCP manifests, plans, journals, examples, and import paths | Hermetic and Docker | Compatibility report |
@@ -106,6 +106,15 @@ each container's configured image before start, and binds the seven artifact
 hashes into one runner receipt. The campaign closer accepts this execution
 receipt; a caller-provided image digest or alternate baked identity path is not
 sufficient.
+
+The approved certification environment requires a native x86-64 Linux Docker
+daemon. ARM emulation remains useful for diagnosis but cannot certify this
+route. Runner receipt v4 records the daemon architecture; campaign v3 requires
+`amd64`. The exact-master GitHub workflow runs the seven transport cells and
+five full-route cases in the same immutable image, rejects skipped route tests,
+and retains their receipts. SQL Server uses a 3 GiB engine cap on a host with at
+least 8 GiB available. This changes certification authority only; the selected
+writer and runtime invocation contracts are unchanged.
 
 The versioned runner resource envelope is part of the certification authority:
 48 MiB maximum encoded/IPC frames, one additional pending slot, two encoder

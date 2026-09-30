@@ -15,7 +15,7 @@ from typing import Any
 
 from dpone.services.mssql_native_evidence_privacy import scan_mssql_native_shareable_artifacts
 
-_SCHEMA_VERSION = "dpone.mssql-sqlclient.transport-campaign.v2"
+_SCHEMA_VERSION = "dpone.mssql-sqlclient.transport-campaign.v3"
 _EVIDENCE_VERSION = "dpone.mssql-sqlclient.transport-certification.v2"
 _SHA = re.compile(r"[0-9a-f]{40}\Z")
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
@@ -55,6 +55,7 @@ _RUNNER_FIELDS = {
     "source_tree_oid",
     "runner_image_sha256",
     "runner_platform",
+    "docker_server_architecture",
     "source_mode",
     "worktree_dirty",
     "execution_count",
@@ -168,6 +169,7 @@ def close_campaign(
         "source_tree_oid": runner["source_tree_oid"],
         "runner_image_sha256": runner["runner_image_sha256"],
         "runner_platform": runner["runner_platform"],
+        "docker_server_architecture": runner["docker_server_architecture"],
         "runner_receipt_sha256": hashlib.sha256(runner_receipt.read_bytes()).hexdigest(),
         "package_version": package_version,
         "cell_count": len(entries),
@@ -183,12 +185,13 @@ def close_campaign(
 def _load_runner_receipt(path: Path, source_commit_sha: str) -> dict[str, Any]:
     value = _load_json(path, "sqlclient_campaign.invalid_runner_receipt")
     if set(value) != _RUNNER_FIELDS or (
-        value["schema_version"] != "dpone.mssql-sqlclient.certification-runner.v3"
+        value["schema_version"] != "dpone.mssql-sqlclient.certification-runner.v4"
         or value["status"] != "PASS"
         or value["source_commit_sha"] != source_commit_sha
         or _TREE.fullmatch(str(value["source_tree_oid"])) is None
         or _DIGEST.fullmatch(str(value["runner_image_sha256"])) is None
         or value["runner_platform"] != "linux/amd64"
+        or value["docker_server_architecture"] != "amd64"
         or value["source_mode"] != "exact_git_archive"
         or value["worktree_dirty"] is not False
         or type(value["execution_count"]) is not int

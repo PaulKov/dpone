@@ -123,6 +123,7 @@ def test_locked_sync_occurrences_are_confined_to_declared_workflow_steps() -> No
         ("ci.yml", "bounded-window-smoke", "Install dependencies"),
         ("composition-mssql-component.yml", "control-ledger", "Install locked component dependencies"),
         ("live-certification.yml", "local-live-certification", "Install dependencies"),
+        ("mssql-sqlclient-certification.yml", "certify", "Install certification dependencies"),
         ("pages.yml", "build", "Install docs dependencies"),
         ("pr-gate-shadow.yml", "static", "Run static shadow route"),
         ("pr-gate-shadow.yml", "docs", "Run docs shadow route"),

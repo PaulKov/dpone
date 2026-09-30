@@ -24,7 +24,10 @@ actual server versions with the experiment evidence.
 
 The September 2026 local experiment uses ClickHouse 24.8.14.39, SQL Server
 16.0.4265.3, BCP 18.6 and Python 3.12. SQL Server is amd64 under ARM64 emulation.
-These observations do not establish production x86-64 performance.
+These observations are diagnostic smoke only. The SqlClient certification
+runner rejects ARM Docker daemons even when the image is amd64. Use the native
+x86-64 workflow in [SqlClient certification](../mssql-sqlclient-certification.md)
+for release evidence.
 
 Supply credentials through process environment, without storing passwords in
 manifests, command arguments, evidence or shell history:
@@ -39,7 +42,7 @@ manifests, command arguments, evidence or shell history:
 | `DPONE_IT_MSSQL_USER`, `DPONE_IT_MSSQL_PASSWORD` | Approved target credentials |
 | `DPONE_IT_MSSQL_BCP_PATH` | Installed BCP executable |
 | `DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE` | Disposable self-signed TLS setting |
-| `DPONE_IT_MSSQL_MEMORY_LIMIT_MB` | SQL Server memory cap; defaults to 2048 MiB so the database and bounded wide-route runner fit together in an 8 GiB Docker VM |
+| `DPONE_IT_MSSQL_MEMORY_LIMIT_MB` | SQL Server memory cap; defaults to 3072 MiB; allocate at least 8 GiB to the Docker VM for the database and bounded wide-route runner |
 | `DPONE_DDA_SPOOL_ROOT` | Durable private directory outside both source checkouts |
 
 Install the selected subject's native connector dependencies and keep the

@@ -30,6 +30,10 @@
   work, and container memory; verify Docker applied the requested memory/swap/OOM
   settings, record sampled cache-adjusted usage, and fail on missing resource
   evidence or an OOM kill.
+- Require a native x86-64 Docker daemon for SqlClient certification and record
+  its architecture in runner v4 and campaign v3 receipts. Add an exact-master
+  workflow for the seven transport cells and five full-route cases, with
+  skip rejection and a 3 GiB SQL Server engine cap.
 
 ## 0.87.4 - 2026-09-29
 

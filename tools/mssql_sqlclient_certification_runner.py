@@ -78,6 +78,9 @@ def run_campaign(
     pass_env: tuple[str, ...],
 ) -> dict[str, Any]:
     """Run every cell by immutable image ID and emit a content-bound receipt."""
+    docker_server_architecture = _docker_server_architecture(docker)
+    if docker_server_architecture != "amd64":
+        raise ValueError("sqlclient_runner.native_amd64_docker_server_required")
     receipt = _image_receipt(image_receipt)
     digest = receipt["runner_image_sha256"]
     immutable_image = f"sha256:{digest}"
@@ -133,12 +136,13 @@ def run_campaign(
     if len(artifacts) != 7:
         raise ValueError("sqlclient_runner.evidence_closure_mismatch")
     result = {
-        "schema_version": "dpone.mssql-sqlclient.certification-runner.v3",
+        "schema_version": "dpone.mssql-sqlclient.certification-runner.v4",
         "status": "PASS",
         "source_commit_sha": receipt["source_commit_sha"],
         "source_tree_oid": receipt["source_tree_oid"],
         "runner_image_sha256": digest,
         "runner_platform": "linux/amd64",
+        "docker_server_architecture": docker_server_architecture,
         "source_mode": "exact_git_archive",
         "worktree_dirty": False,
         "execution_count": len(executions),
@@ -302,6 +306,13 @@ def _inspect_image(docker: str, image: str) -> dict[str, Any]:
     if not isinstance(value, list) or len(value) != 1 or not isinstance(value[0], dict):
         raise ValueError("sqlclient_runner.image_inspect_failed")
     return value[0]
+
+
+def _docker_server_architecture(docker: str) -> str:
+    """Return Docker daemon architecture, normalized to its OCI spelling."""
+
+    architecture = _capture((docker, "info", "--format", "{{.Architecture}}")).strip().lower()
+    return "amd64" if architecture == "x86_64" else architecture
 
 
 def _inspect_container(docker: str, container: str) -> dict[str, Any]:
