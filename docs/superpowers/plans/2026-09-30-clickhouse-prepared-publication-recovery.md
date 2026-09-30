@@ -129,4 +129,45 @@
 
 ## Operational handoff after implementation
 
+## Review correction execution ledger (2026-09-30)
+
+The maintainer requested implementation of the reviewed corrections. Execution
+is inline with an independent final review. Existing worktree and PR are reused;
+no competing writer or release is created.
+
+Ruling: implement store-produced operation provenance before relaxing the
+initial-version check. Simply accepting every PREPARED record would turn a
+read-back into evidence it does not provide.
+
+### Correction A: repeated-operation strict provenance
+
+- [ ] Add failing adapter/planner tests for reused slots, forged origins,
+  same-operation phase regression, changed payload, stale plan and residual DDL.
+- [ ] Add optional canonical `prepared_origin` envelope in authority contracts;
+  add a focused pure provenance policy module. Strict acquisition stamps it;
+  normal transitions preserve it; exact CAS binds prior payload digest.
+- [ ] Publisher uses acknowledged authority record for dispatch. Planner
+  validates operation provenance instead of slot-global zero. Old initial
+  strict records retain conservative compatibility; legacy records stay blocked.
+- [ ] Run focused suite, quality/contract regressions, lint/type/architecture
+  gates and fresh-context review; update operator docs and existing PR.
+
+### Correction B: quality and empty-result contracts
+
+- [ ] Compose authenticated original load contract and shared quality validator;
+  prove pre-publication policy/observation equality and final governance outcome.
+- [ ] Define and validate explicit empty-publication permission; do not infer it
+  from missing checks. Keep unsupported combinations fail-closed meanwhile.
+
+### Correction C: environment cutover and legacy adoption
+
+- [ ] Inventory writer scope, existing infrastructure automation, exact Keeper
+  prerequisites and a real multi-replica test environment without exposing secrets.
+- [ ] Implement reviewed hard fencing/drain and immutable legacy adoption
+  evidence through the environment's ordinary infrastructure MR/CI. No manual
+  row rewrite or automatic migration from a runtime recovery command.
+- [ ] Verify concurrent/crashed writers and ambiguous DDL cases on a real
+  cluster, then perform the approved scoped cutover and exact legacy recovery.
+- [ ] Verify controlled business run and per-period DQ; only then report restored.
+
 The current production incident is **not** cleared by publishing this OSS code alone. On the affected environment, first prove the exact authority backend and all-writer admission, then run plan mode for the original operation, execute only if it returns `ready`, verify terminal authority/DDL/replica evidence, and only then permit one controlled workload run plus data-quality and freshness checks. If strict admission cannot be established, keep the operation blocked and escalate the infrastructure migration; do not fabricate a green DAG or mutate authority manually.

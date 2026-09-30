@@ -198,6 +198,45 @@ environment-specific admission and exact physical preflight.
 
 ## Agent execution and approval
 
+### Approved review corrections (2026-09-30)
+
+The maintainer approved correcting the reviewed safety and recovery gaps and
+implementing the resulting approach. This amendment supersedes the initial
+slot-global `dispatch_epoch == 0` assumption above. A target slot is reused;
+its Keeper version and epoch are not the identity of a single operation.
+
+1. The strict adapter stamps an operation-scoped `prepared_origin` only when
+   creating a new PREPARED operation or acquiring a retired COMPLETED slot.
+   It binds the exact prepared Keeper version, epoch and canonical record
+   digest, excluding only the origin itself and per-write nonce. Recovery
+   requires that exact prepared version, epoch and digest. Caller-supplied
+   origin, same-operation regression to PREPARED and origin replacement are
+   rejected. CAS predicates also bind the observed payload digest.
+2. Existing initial-version strict records retain their conservative recovery
+   path. Legacy or noninitial records without provenance remain readable but
+   cannot acquire a recovery permit. Old binaries must not share a strict
+   authority with writers of the extended envelope; coordinate writer rollout.
+3. Quality-bearing recovery must validate the original authenticated policy,
+   admission identity and sealed observations through the existing governance
+   validator. Parsing a capsule or trusting its `passed` flag is insufficient.
+   Until that path is implemented and verified, quality-bearing recovery stays
+   blocked. Empty output similarly needs explicit authored permission; the
+   absence of a minimum-row check is not permission to publish an empty table.
+4. Legacy incident recovery is a separate, explicit cutover operation. A new
+   KeeperMap does not authenticate legacy history. Keep legacy authority and
+   candidate evidence intact. Require externally enforced writer exclusion,
+   drained processes and distributed DDL on every replica, original operation
+   identity, physical generation proof and validated quality before adoption.
+   An ambiguous prior dispatch remains blocked, not reclassified as absent.
+5. Deployment admission must verify the shared Keeper service/path prefix,
+   permissions and all writers for the affected coordination scope. Identical
+   table metadata alone does not prove this. Establish the smallest enforceable
+   scope; do not stop unrelated writers merely because they use ClickHouse.
+
+The implementation is not incident-complete or production-ready until the
+legacy cutover and real multi-replica crash/concurrency acceptance also pass.
+Unit tests, initial-generation success and a published package are insufficient.
+
 One integrator owns the service and shared contracts. A separate reviewer with
 fresh context reviews the final implementation commit for concurrency,
 data-loss, compatibility and evidence before merge. Public documents and
