@@ -67,6 +67,16 @@ _EXECUTION_FIELDS = {
     "row_count",
     "layout_version",
     "import_parallelism",
+    "max_rows",
+    "max_bytes",
+    "max_pending",
+    "max_staging_tables",
+    "encoding_parallelism",
+    "retained_work_capacity",
+    "container_memory_limit_bytes",
+    "container_memory_swap_limit_bytes",
+    "container_oom_kill_disabled",
+    "container_sampled_cache_adjusted_memory_bytes",
     "container_image_sha256",
 }
 _REQUIRED_EXECUTIONS = {
@@ -173,7 +183,7 @@ def close_campaign(
 def _load_runner_receipt(path: Path, source_commit_sha: str) -> dict[str, Any]:
     value = _load_json(path, "sqlclient_campaign.invalid_runner_receipt")
     if set(value) != _RUNNER_FIELDS or (
-        value["schema_version"] != "dpone.mssql-sqlclient.certification-runner.v2"
+        value["schema_version"] != "dpone.mssql-sqlclient.certification-runner.v3"
         or value["status"] != "PASS"
         or value["source_commit_sha"] != source_commit_sha
         or _TREE.fullmatch(str(value["source_tree_oid"])) is None
@@ -199,7 +209,25 @@ def _valid_executions(value: object, image_digest: object) -> bool:
             not isinstance(item, dict)
             or set(item) != _EXECUTION_FIELDS
             or item["container_image_sha256"] != image_digest
-            or any(type(item[field]) is not int for field in ("row_count", "layout_version", "import_parallelism"))
+            or any(
+                type(item[field]) is not int
+                for field in (
+                    "row_count",
+                    "layout_version",
+                    "import_parallelism",
+                    "max_rows",
+                    "max_bytes",
+                    "max_pending",
+                    "max_staging_tables",
+                    "encoding_parallelism",
+                    "retained_work_capacity",
+                    "container_memory_limit_bytes",
+                    "container_memory_swap_limit_bytes",
+                    "container_sampled_cache_adjusted_memory_bytes",
+                )
+            )
+            or type(item["container_oom_kill_disabled"]) is not bool
+            or not _valid_execution_resources(item)
         ):
             return False
         observed.add(
@@ -212,6 +240,29 @@ def _valid_executions(value: object, image_digest: object) -> bool:
             )
         )
     return observed == _REQUIRED_EXECUTIONS
+
+
+def _valid_execution_resources(item: dict[str, Any]) -> bool:
+    expected_rows = (
+        5_000
+        if item["scenario"] == "force_kill_recovery"
+        else 8_192
+        if item["fixture_id"] == "wide100-sqlclient-v1"
+        else 65_536
+    )
+    expected_capacity = max(2, item["import_parallelism"]) + 1
+    return (
+        item["max_rows"] == expected_rows
+        and item["max_bytes"] == 48 << 20
+        and item["max_pending"] == 1
+        and item["max_staging_tables"] == 128
+        and item["encoding_parallelism"] == 2
+        and item["retained_work_capacity"] == expected_capacity
+        and item["container_memory_limit_bytes"] == 2 << 30
+        and item["container_memory_swap_limit_bytes"] == 2 << 30
+        and item["container_oom_kill_disabled"] is False
+        and 0 < item["container_sampled_cache_adjusted_memory_bytes"] <= item["container_memory_limit_bytes"]
+    )
 
 
 def _valid_artifacts(value: object) -> bool:

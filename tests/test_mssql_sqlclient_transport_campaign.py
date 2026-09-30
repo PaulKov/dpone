@@ -103,7 +103,7 @@ def _runner(tmp_path: Path, commit: str, tree: str = "e" * 40, image: str = "f" 
     path.write_text(
         json.dumps(
             {
-                "schema_version": "dpone.mssql-sqlclient.certification-runner.v2",
+                "schema_version": "dpone.mssql-sqlclient.certification-runner.v3",
                 "status": "PASS",
                 "source_commit_sha": commit,
                 "source_tree_oid": tree,
@@ -119,6 +119,22 @@ def _runner(tmp_path: Path, commit: str, tree: str = "e" * 40, image: str = "f" 
                         "row_count": rows,
                         "layout_version": layout,
                         "import_parallelism": parallelism,
+                        "max_rows": (
+                            5_000
+                            if scenario == "force_kill_recovery"
+                            else 8_192
+                            if fixture == "wide100-sqlclient-v1"
+                            else 65_536
+                        ),
+                        "max_bytes": 48 << 20,
+                        "max_pending": 1,
+                        "max_staging_tables": 128,
+                        "encoding_parallelism": 2,
+                        "retained_work_capacity": max(2, parallelism) + 1,
+                        "container_memory_limit_bytes": 2 << 30,
+                        "container_memory_swap_limit_bytes": 2 << 30,
+                        "container_oom_kill_disabled": False,
+                        "container_sampled_cache_adjusted_memory_bytes": 512 << 20,
                         "container_image_sha256": image,
                     }
                     for scenario, fixture, rows, layout, parallelism in (
@@ -157,6 +173,25 @@ def test_campaign_closes_exact_matrix_without_overwrite(tmp_path: Path) -> None:
     assert payload["status"] == "PASS"
     assert payload["cell_count"] == len(module.REQUIRED_CELLS)
     assert len({item["artifact"] for item in payload["cells"]}) == len(module.REQUIRED_CELLS)
+
+
+def test_campaign_rejects_runner_with_untrusted_resource_evidence(tmp_path: Path) -> None:
+    module = _module()
+    commit = "d" * 40
+    root = _complete_dir(tmp_path, module, commit)
+    runner = _runner(tmp_path, commit)
+    payload = json.loads(runner.read_text(encoding="utf-8"))
+    payload["executions"][0]["container_sampled_cache_adjusted_memory_bytes"] = 0
+    runner.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid_runner_receipt"):
+        module.close_campaign(
+            root,
+            source_commit_sha=commit,
+            runner_receipt=runner,
+            package_version="0.88.0",
+            output=tmp_path / "campaign.json",
+        )
 
 
 def test_campaign_rejects_missing_or_wrong_commit_cells(tmp_path: Path) -> None:

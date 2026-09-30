@@ -26,6 +26,10 @@
   dependency so the standard `dpone` wheel keeps CLI startup self-contained.
 - Remove unused localization satellite assemblies from the SqlClient companion
   wheel while retaining neutral runtime assemblies under descriptor integrity.
+- Bound the wide SqlClient certification profile by row, encoded bytes, retained
+  work, and container memory; verify Docker applied the requested memory/swap/OOM
+  settings, record sampled cache-adjusted usage, and fail on missing resource
+  evidence or an OOM kill.
 
 ## 0.87.4 - 2026-09-29
 
