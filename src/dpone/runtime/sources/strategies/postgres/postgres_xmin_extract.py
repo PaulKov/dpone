@@ -39,6 +39,7 @@ from dpone.runtime.sources.strategies.postgres.postgres_xmin_legacy_artifact imp
 from dpone.runtime.sources.strategies.postgres.postgres_xmin_target_probe import PostgresXminTargetProbe
 from dpone.runtime.state import XMinState
 from dpone.runtime.state.mssql_route_preflight import resolve_atomic_mssql_target
+from dpone.runtime.state.mssql_target_coordinates import normalize_mssql_target_coordinates
 from dpone.runtime.streaming_rows import StreamingRowsArtifact
 from dpone.runtime.xmin.manager import XMinStateManager
 from dpone.type_system.source_sink.provenance import SourceRelationDialect
@@ -361,17 +362,11 @@ class PostgresXMinExtractStrategy(PostgresBaseStrategy):
 
     @staticmethod
     def _target_binding(load_config: Any) -> tuple[str, str, str]:
-        binding = tuple(
-            str(value or "").strip()
-            for value in (
-                getattr(load_config, "target_database", None),
-                getattr(load_config, "target_schema", None),
-                getattr(load_config, "target_table", None),
-            )
+        return normalize_mssql_target_coordinates(
+            database=getattr(load_config, "target_database", None),
+            schema=getattr(load_config, "target_schema", None),
+            table=getattr(load_config, "target_table", None),
         )
-        if any(not value for value in binding):
-            raise ValueError("mssql_physical_target_coordinates_incomplete")
-        return binding  # type: ignore[return-value]
 
     def _target_exists(self, load_config) -> bool | None:
         return self._target_probe.exists(load_config)

@@ -323,6 +323,17 @@ the v2 `state_key` digest, target applock, ownership/transfer predicates, CAS,
 and receipt probes. Dpone never applies Python `lower`/`casefold` to object
 names and never creates or mutates registry bindings at runtime.
 
+Compiled MSSQL load configs may carry `target_schema: database.schema` for
+connector compatibility. Native preflight separates that label into the explicit
+database and bare schema before looking up the registry. The equivalent bare
+schema resolves to the same target, checkpoint, lock and receipt identity; no
+state migration or checkpoint reset is needed. An explicit `target_database`
+remains required, even with a qualified schema label. A conflicting database
+prefix or malformed label fails closed with
+`mssql_physical_target_coordinates_invalid`; omitted coordinates retain
+`mssql_physical_target_coordinates_incomplete`. Correct the configured
+coordinates before retrying; do not recreate the registry binding or reset state.
+
 The external state DDL requires `target_identity binary(32) NOT NULL` and a
 unique filtered index (named `uq_dpone_source_state_active_target` in the
 reference DDL) on `(target_identity) WHERE superseded_at_utc IS NULL`. It both supports the
