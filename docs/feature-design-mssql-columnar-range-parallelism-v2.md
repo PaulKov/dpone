@@ -32,6 +32,11 @@ coverage, bounded concurrency, truthful evidence, safe retry identity, and an
 exact-commit live certificate. Reactivation is prohibited until every release
 gate in this document passes.
 
+The maintainer confirmed a dpone-only target writer for the initial deployment.
+The [proposed authority binding](feature-design-clickhouse-dpone-only-authority.md)
+records that requirement separately from its unapproved single-host/no-HA
+deployment tradeoff. Neither confirmation nor the proposal activates this route.
+
 ## Personas and customer journey
 
 | Persona | Goal | Current pain | Success signal |

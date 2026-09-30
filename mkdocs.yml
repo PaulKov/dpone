@@ -547,6 +547,7 @@ nav:
       - Feature design - committed replay quality evidence: feature-design-committed-replay-quality-evidence.md
       - Feature design - declarative replay quality: feature-design-declarative-replay-quality.md
       - Feature design - guarded ClickHouse publication method: feature-design-clickhouse-publication-method.md
+      - Feature design - dpone-only ClickHouse authority: feature-design-clickhouse-dpone-only-authority.md
       - ClickHouse publication methods and recovery: clickhouse-publication-methods.md
       - Governed REST bulk-delivery threat model: rest-bulk-delivery-threat-model.md
       - Documentation standard: documentation-standard.md

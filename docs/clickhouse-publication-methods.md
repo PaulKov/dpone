@@ -15,6 +15,11 @@ still requires pre-read memory admission, worker isolation, durable route
 composition and exact-commit MSSQL/object-storage/ClickHouse certification.
 Do not interpret passing unit tests as a route certificate.
 
+For targets written exclusively by dpone, the proposed next binding is described
+in the [dpone-only authority design](feature-design-clickhouse-dpone-only-authority.md).
+It proposes a single-host durable journal and conservative closure; it is
+RESEARCHED, not an implemented backend or an enabled route.
+
 ## Selection policy
 
 All choices require complete catalog visibility, local Atomic/plain MergeTree,
