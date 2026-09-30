@@ -1,6 +1,6 @@
 # Design: safe recovery of a prepared ClickHouse cluster publication
 
-- Status: RESEARCHED
+- Status: APPROVED
 - Owner: dpone maintainers
 - Issue: prepared full-refresh publication recovery
 - Target release: next compatible minor release after approval
@@ -207,4 +207,4 @@ synthetic tests contain no customer identifiers or production operation IDs.
 - [x] State/failure semantics and compatibility are explicit.
 - [x] Alternatives and primary-source comparison are recorded.
 - [x] Test, evidence, documentation and rollback paths are specified.
-- [ ] Maintainer reviewed this written specification and set `APPROVED`.
+- [x] Maintainer reviewed this written specification and set `APPROVED` (2026-09-30).
