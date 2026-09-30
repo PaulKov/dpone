@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- Normalize compiled MSSQL `database.schema` target labels before native registry
+  preflight and XMin binding checks, preserving checkpoint and receipt identities
+  while rejecting conflicting database prefixes without resetting state.
+
 ## 0.88.0 - 2026-09-30
 
 ### Added

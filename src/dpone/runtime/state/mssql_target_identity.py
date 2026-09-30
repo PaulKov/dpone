@@ -6,6 +6,7 @@ import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Any
 
+from dpone.runtime.state.mssql_target_coordinates import normalize_mssql_target_coordinates
 from dpone.runtime.state.mssql_target_identity_contract import (
     TARGET_IDENTITY_REGISTRY_CONTRACT,
     TARGET_IDENTITY_REGISTRY_INTEGRITY,
@@ -33,10 +34,12 @@ def resolve_mssql_physical_target_identity(
 ) -> MssqlPhysicalTargetIdentity:
     """Resolve an immutable registry row before any PostgreSQL read."""
 
-    requested = tuple(str(value or "").strip() for value in (database, schema, table))
-    if any(not value for value in requested):
-        raise MssqlPhysicalTargetIdentityError("mssql_physical_target_coordinates_incomplete")
-    requested_database, requested_schema, requested_table = requested
+    try:
+        requested_database, requested_schema, requested_table = normalize_mssql_target_coordinates(
+            database=database, schema=schema, table=table
+        )
+    except ValueError as exc:
+        raise MssqlPhysicalTargetIdentityError(str(exc)) from exc
     database_row = _one_row(
         connector.get_records(
             """
