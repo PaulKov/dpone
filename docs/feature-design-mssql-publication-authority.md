@@ -91,6 +91,14 @@ completed, 2 a proven block, 1 operational failure/unknown. Plan files are
 atomic and refuse overwrite by default. These commands remain unavailable
 until implemented; examples must not imply current release support.
 
+The internal plan-file adapter writes bounded owner-private files on a local
+POSIX filesystem: flush the full temporary file, link its final name without
+replacement, then flush the parent directory. A failed final durability
+acknowledgement preserves the completed file for readback; it is not permission
+to overwrite or retry automatically. Reads reject symlinks, non-regular files,
+shared permissions, extra hard links and observed concurrent changes. This
+adapter does not authenticate an operator plan or replace apply-time validation.
+
 ## Algorithm and transaction boundaries
 
 The operator-provisioned `dpone_cluster_publication_authority` slot table and

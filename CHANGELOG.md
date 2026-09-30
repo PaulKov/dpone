@@ -19,6 +19,10 @@
   policies and part provenance to existing target-local identity and EOF
   evidence; recovery validates this evidence before target access and does not
   reopen the source. Existing plain MergeTree defaults remain unchanged.
+- Add the internal owner-private, bounded atomic plan-file adapter for the
+  upcoming publication operator workflow. Concurrent writers cannot overwrite
+  an existing plan; ambiguous directory-sync outcomes preserve completed
+  evidence for readback. Operator commands are not yet activated.
 
 ### Fixed
 
