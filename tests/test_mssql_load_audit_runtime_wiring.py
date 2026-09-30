@@ -23,6 +23,7 @@ from dpone.runtime.errors import RuntimeConfigurationError
 from dpone.runtime.lineage.audit import LoadIdentityService
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 from dpone.runtime.state.factory import StateFactory
+from tests.test_mssql_step_audit_location import _CatalogConnector
 
 
 @pytest.mark.parametrize(
@@ -37,7 +38,7 @@ def test_resolved_mssql_audit_is_preflighted_at_exact_registry_location(
     database: str,
     schema: str,
 ) -> None:
-    connector = object()
+    connector = _CatalogConnector(database=database, schema=schema, table="__dpone__load_steps")
     events: list[tuple[str, object]] = []
     audit_storage = _PreflightAuditStorage(events)
 
@@ -78,6 +79,10 @@ def test_resolved_mssql_audit_is_preflighted_at_exact_registry_location(
     )
 
     assert bindings.load_audit_storage is audit_storage
+    assert bindings.audit_bindings.loads is audit_storage
+    assert bindings.audit_bindings.steps.connector is connector
+    assert len(connector.reads) == 2
+    assert connector.writes == []
     assert bindings.xmin_state_storage.location["run_table"] == "dpone_run_state"
     assert bindings.xmin_state_storage.location["audit_table"] == "dpone_load_audit"
     assert events == [

@@ -207,7 +207,9 @@ def test_production_hydration_uses_only_target_identity_and_generic_four_object_
 def test_key_snapshot_route_keeps_xmin_storage_factory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    state_connector = object()
+    from tests.test_mssql_step_audit_location import _CatalogConnector
+
+    state_connector = _CatalogConnector(database="Example_System", schema="governance", table="__dpone__load_steps")
     xmin_storage = SimpleNamespace(atomicity="target_atomic", provisioning="external")
     calls: list[str] = []
 
@@ -257,6 +259,8 @@ def test_key_snapshot_route_keeps_xmin_storage_factory(
 
     assert calls == ["xmin"]
     assert bindings.xmin_state_storage is xmin_storage
+    assert bindings.audit_bindings.steps.connector is state_connector
+    assert state_connector.writes == []
 
 
 def test_initial_backfill_composes_generic_chunks_and_dedicated_xmin_handoff(

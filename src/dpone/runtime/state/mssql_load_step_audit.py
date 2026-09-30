@@ -118,6 +118,11 @@ class MSSQLLoadStepAuditStorage:
         )
         self._table_created = True
 
+    def record_load_step(self, record: Any) -> None:
+        """Route publisher entrypoint sharing the admitted governance relation."""
+
+        self.record_step(record)
+
     def record_step(self, record: Any) -> None:
         """Persist either governance ``details`` or route ``details_json``."""
 

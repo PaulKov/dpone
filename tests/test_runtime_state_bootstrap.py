@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -247,8 +248,8 @@ def test_resolved_mssql_state_inherits_registry_schema_when_omitted(
         lambda **kwargs: object(),
     )
     monkeypatch.setattr(
-        "dpone.runtime.bootstrap_state.build_mssql_load_audit_storage",
-        lambda *args, **kwargs: object(),
+        "dpone.runtime.bootstrap_state.build_mssql_audit_bindings",
+        lambda *args, **kwargs: SimpleNamespace(loads=object(), steps=object(), connector=args[1]),
     )
 
     RuntimeStateBootstrap().build_resolved(
@@ -300,8 +301,8 @@ def test_resolved_mssql_state_keeps_authored_schema(
         lambda **kwargs: object(),
     )
     monkeypatch.setattr(
-        "dpone.runtime.bootstrap_state.build_mssql_load_audit_storage",
-        lambda *args, **kwargs: object(),
+        "dpone.runtime.bootstrap_state.build_mssql_audit_bindings",
+        lambda *args, **kwargs: SimpleNamespace(loads=object(), steps=object(), connector=args[1]),
     )
 
     RuntimeStateBootstrap().build_resolved(

@@ -21,6 +21,29 @@ from typing import Any, Protocol
 from dpone.contracts import RuntimeConfigurationError
 
 
+@dataclass(frozen=True, slots=True)
+class RuntimeAuditBindings:
+    """One admitted metadata endpoint; ``None`` steps means audit was disabled.
+
+    The connector belongs to this hydration and participates in its normal
+    identity-deduplicated disposal. Consumers must not infer a replacement
+    store from a business endpoint if a selected store is missing.
+    """
+
+    loads: Any
+    steps: Any
+    connector: Any
+
+    def __post_init__(self) -> None:
+        if self.loads is None or self.connector is None:
+            raise RuntimeConfigurationError("Selected runtime audit endpoint is incomplete")
+
+    def require_steps(self) -> Any:
+        if self.steps is None:
+            raise RuntimeConfigurationError("Selected runtime audit step storage is missing")
+        return self.steps
+
+
 @dataclass(slots=True)
 class RuntimeBindings:
     """Runtime-only objects attached to a parsed ETL config."""
@@ -33,6 +56,7 @@ class RuntimeBindings:
     partition_checkpoint_store: Any = None
     load_identity_service: Any = None
     credential_resolution_receipts: tuple[Mapping[str, Any], ...] = ()
+    audit_bindings: RuntimeAuditBindings | None = None
 
 
 class RuntimeHydrator(Protocol):

@@ -194,6 +194,7 @@ class DefaultRuntimeHydrator:
                 etl_logger=etl_logger,
             ),
             credential_resolution_receipts=connections.receipts,
+            audit_bindings=getattr(state_bindings, "audit_bindings", None),
         )
 
     @staticmethod

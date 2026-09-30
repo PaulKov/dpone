@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from dpone.config.state import ResolvedMssqlStateConfig
+    from dpone.ports.runtime_hydrator import RuntimeAuditBindings
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,6 +26,7 @@ class RuntimeStateBindings:
     shared_postgres_state_connector: Any = None
     mssql_state_location: ResolvedMssqlStateConfig | None = None
     load_audit_storage: Any = None
+    audit_bindings: RuntimeAuditBindings | None = None
 
 
 __all__ = ["RuntimeStateBindings"]

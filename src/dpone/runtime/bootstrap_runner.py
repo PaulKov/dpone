@@ -112,6 +112,7 @@ class DefaultProcessRunner:
             source=process.config.source_obj,
             sink=process.config.sink_obj,
             logger=process.config.etl_logger,
+            **_audit_options(process.config),
         )
         load_step_collector = RuntimeLoadStepAuditCollector()
         load_governance_service = LoadGovernanceService(audit_storage=load_step_collector)
@@ -204,6 +205,13 @@ def _runtime_context(context: RunContext | None, process_name: str) -> RunContex
     )
 
 
+def _audit_options(bindings: Any) -> dict[str, Any]:
+    """Keep old extension signatures unchanged only for unselected legacy audit."""
+
+    selected = getattr(bindings, "audit_bindings", None)
+    return {"audit_bindings": selected} if selected is not None else {}
+
+
 def _processor(
     bindings: Any,
     *,
@@ -215,7 +223,7 @@ def _processor(
 ) -> Any:
     from dpone.runtime.etl.processor import ETLProcessor
 
-    options = {}
+    options = _audit_options(bindings)
     if mssql_transaction_admission_service is not None:
         options["mssql_transaction_admission_service"] = mssql_transaction_admission_service
     return ETLProcessor(
@@ -293,6 +301,7 @@ def _worker_chunk_runner_factory(
                 source=bindings.source_obj,
                 sink=bindings.sink_obj,
                 logger=bindings.etl_logger,
+                **_audit_options(bindings),
             )
             processor = _processor(
                 bindings,

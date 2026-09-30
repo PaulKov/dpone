@@ -280,9 +280,37 @@ supplies the server UTC load timestamp explicitly, so an external table's
 default expression cannot determine it. An admission failure is not cached as
 readiness and does not trigger an implicit repair or retry.
 
-This adapter capability alone does **not** redirect a manifest's governance or
-route audit. Paired load/step runtime injection and an independent audit-only
-selection contract remain integration work. Do not enable fictitious source
+For an existing explicit MSSQL state binding (excluding the separate generic
+target-atomic transaction ledger), bootstrap now admits a paired load/step audit
+store. Both use the selected state connector, database, schema and provisioning
+policy. The pair is carried through hydration into ordinary execution and each
+freshly hydrated thread/process lane. Worker disposal closes its own metadata
+connector once, including when it is shared with a business endpoint.
+
+With audit enabled, omitted `load_governance.audit.state_schema` and
+`loads_table` inherit the selected state schema and audit table. Explicit values
+must match; conflicting values fail before audit DDL. `steps_table` defaults to
+`__dpone__load_steps` and must be unqualified and distinct from the selected
+load, run, checkpoint, Kafka-offset and receipt/repair table names, including
+configured checkpoint/offset overrides. Names reserved by state are not reused
+for audit even when that state relation has a separate schema override.
+External provisioning requires both relations to pass their respective catalog
+contracts before any source or sink is built. Failed pair admission closes its
+owned connector and returns no partially usable bindings. It does not roll back
+runtime-provisioned tables or rewrite historical audit records.
+
+Governance preserves the in-process outcome collector while forwarding each
+step once to the selected durable store. Route decisions use that same relation;
+neither consumer derives replacement audit storage from the business sink.
+Missing steps or conflicting injected stores fail closed. Disabled audit does
+not require or create the step relation and does not enable sink fallback; the
+pre-existing state load-ledger behavior is retained. Unselected runtimes retain
+their legacy sink-based composition and extension call signatures. Extensions
+used with selected metadata must explicitly accept `audit_bindings`; unsupported
+extensions are not retried without it.
+
+An independent audit-only selection contract remains integration work.
+Do not enable fictitious source
 state or infer audit credentials from publication authority to select it.
 
 ### One-shot repair authority

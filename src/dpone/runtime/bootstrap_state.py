@@ -30,7 +30,7 @@ from dpone.runtime.bootstrap_mssql_state import (
 )
 from dpone.runtime.bootstrap_state_factories import (
     build_kafka_offset_state_storage,
-    build_mssql_load_audit_storage,
+    build_mssql_audit_bindings,
     build_mssql_state_connector,
     build_postgres_state_connector,
     build_run_state_storage,
@@ -111,6 +111,7 @@ class RuntimeStateBootstrap:
         partition_checkpoint_store = None
         mssql_state_location = None
         load_audit_storage = None
+        audit_bindings = None
         xmin_handoff_state_storage = None
         if state_type == "mssql":
             shared_mssql_state_connector = connector
@@ -131,11 +132,14 @@ class RuntimeStateBootstrap:
                     connector=connector,
                     state_cfg=state_cfg,
                 )
-                load_audit_storage = build_mssql_load_audit_storage(
+                audit_bindings = build_mssql_audit_bindings(
                     StateFactory,
                     connector,
                     mssql_state_location,
+                    load_config,
+                    state_cfg=state_cfg,
                 )
+                load_audit_storage = audit_bindings.loads
         elif state_type == "postgres":
             shared_postgres_state_connector = connector
             xmin_state_storage = StateFactory.create_postgres_xmin_state_storage(
@@ -181,6 +185,7 @@ class RuntimeStateBootstrap:
             shared_postgres_state_connector=shared_postgres_state_connector,
             mssql_state_location=mssql_state_location,
             load_audit_storage=load_audit_storage,
+            audit_bindings=audit_bindings,
         )
 
     def build(
@@ -242,6 +247,7 @@ class RuntimeStateBootstrap:
         partition_checkpoint_store = None
         mssql_state_location = None
         load_audit_storage = None
+        audit_bindings = None
         xmin_handoff_state_storage = None
 
         if state_type == "mssql":
@@ -274,11 +280,14 @@ class RuntimeStateBootstrap:
                     connector=shared_mssql_state_connector,
                     state_cfg=state_cfg,
                 )
-                load_audit_storage = build_mssql_load_audit_storage(
+                audit_bindings = build_mssql_audit_bindings(
                     StateFactory,
                     shared_mssql_state_connector,
                     mssql_state_location,
+                    load_config,
+                    state_cfg=state_cfg,
                 )
+                load_audit_storage = audit_bindings.loads
         elif state_type == "postgres":
             connection_id = legacy_state_connection_id(state_type, state_cfg, sink_cfg)
             shared_postgres_state_connector = build_postgres_state_connector(
@@ -340,6 +349,7 @@ class RuntimeStateBootstrap:
             shared_postgres_state_connector=shared_postgres_state_connector,
             mssql_state_location=mssql_state_location,
             load_audit_storage=load_audit_storage,
+            audit_bindings=audit_bindings,
         )
 
     @staticmethod

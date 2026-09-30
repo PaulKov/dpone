@@ -207,7 +207,10 @@ def _columns():
 
 
 class _CatalogConnector:
-    def __init__(self):
+    def __init__(self, *, database="Example_Metadata", schema="ops", table="step_events"):
+        self.database = database
+        self.schema = schema
+        self.table = table
         self.columns = _columns()
         self.reads = []
         self.writes = []
@@ -219,10 +222,11 @@ class _CatalogConnector:
     def get_records(self, sql, params, *, as_dict):
         assert as_dict
         self.reads.append((sql, params))
-        if "FROM [Example_Metadata].sys.columns AS c" in sql:
+        if f"FROM [{self.database}].sys.columns AS c" in sql:
+            assert params == (self.database, self.schema, self.table)
             return self.columns
-        assert "FROM [Example_Metadata].sys.indexes AS i" in sql
-        assert params == ("ops", "step_events")
+        assert f"FROM [{self.database}].sys.indexes AS i" in sql
+        assert params == (self.schema, self.table)
         return []
 
     def execute_query(self, sql, params=None):

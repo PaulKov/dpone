@@ -24,6 +24,7 @@ from dpone.runtime.process_logging import create_etl_logger
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
+    from dpone.ports.runtime_hydrator import RuntimeAuditBindings
     from dpone.runtime.etl.run_state_tracker import RunStateStoragePort
     from dpone.runtime.process_logging import ETLLogger
     from dpone.runtime.sinks.sink_protocol import AbstractSink
@@ -59,6 +60,7 @@ class ETLProcessor(ProcessorPayloadMixin):
         route_capability_orchestrator: Any | None = None,
         mssql_transaction_admission_service: Any | None = None,
         run_state_tracker_cls: type[RunStateTracker] = RunStateTracker,
+        audit_bindings: RuntimeAuditBindings | None = None,
     ):
         self.source = source
         self.sink = sink
@@ -73,6 +75,7 @@ class ETLProcessor(ProcessorPayloadMixin):
             run_state_storage=run_state_storage,
         )
         self.load_identity_service = load_identity_service or create_load_identity_service()
+        self.audit_bindings = audit_bindings
         self.source_state_service = source_state_service or SourceStateService()
         self.load_governance_service = load_governance_service or create_load_governance_service()
         self.extracted_payload_load_service = extracted_payload_load_service or ExtractedPayloadLoadService(
@@ -133,6 +136,7 @@ class ETLProcessor(ProcessorPayloadMixin):
             load_governance_service=self.load_governance_service,
             load_identity_service=self.load_identity_service,
             logger=self.logger,
+            audit_bindings=self.audit_bindings,
         )
         decision_lifecycle.configure_audit_storage(sink=self.sink, load_config=runtime_config)
         load_record: Any | None = None
