@@ -243,6 +243,11 @@ def test_archive_member_limits_fail_closed(
     assert code in _codes(report)
 
 
+def test_archive_member_budget_covers_native_connector_dependencies() -> None:
+    """Keep release hygiene bounded while admitting supported native wheels."""
+    assert hygiene.MAX_ARCHIVE_MEMBER_BYTES == 64 * 1024**2
+
+
 @pytest.mark.parametrize("kind", ["wheel", "sdist"])
 def test_archive_rejects_excessive_compression(tmp_path: Path, monkeypatch: Any, kind: str) -> None:
     archive = (
