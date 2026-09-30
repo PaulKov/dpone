@@ -14,9 +14,11 @@ from uuid import UUID, uuid4
 
 from dpone.ports.clickhouse_cluster_publication import contracts as c
 from dpone.ports.mssql_publication import (
+    NativePublicationPreparation,
     PublicationAuthorityBinding,
     PublicationCatalogReader,
     PublicationSessionFactory,
+    PublicationSqlCursor,
     native_publication_provenance,
     publication_binding_digest,
     publication_slot_key,
@@ -24,15 +26,19 @@ from dpone.ports.mssql_publication import (
 from dpone.ports.publication_retirement import decode_retirement_plan, retirement_record
 from dpone.runtime.state.mssql_publication_admission import require_publication_catalog
 from dpone.runtime.state.mssql_publication_envelope import decode_envelope, require_transition
+from dpone.runtime.state.mssql_publication_preparation import decode_native_preparation
 from dpone.runtime.state.mssql_publication_queries import (
     mutation_params,
     mutation_statement,
+    native_preparation_statement,
     operation_read_statement,
     read_statement,
 )
 from dpone.runtime.state.mssql_publication_transaction import (
     PublicationTransactionUnknown,
+    execute_publication_statement,
     execute_publication_transaction,
+    run_publication_transaction,
 )
 
 
@@ -123,6 +129,45 @@ class MssqlPublicationAuthority:
         self, current: c.VersionedAuthorityRecord, desired: c.AuthorityRecord
     ) -> c.AuthorityMutationResult:
         return self._mutate(current, desired)
+
+    def read_native_preparation(self, target_key: str, operation_id: str) -> NativePublicationPreparation:
+        """Observe native operation origin under one read transaction, never a permit.
+
+        Current state and immutable origin must agree on the selected endpoint
+        binding and operation. Retired IDs remain prohibited even after a later
+        operation completes. Unknown/partial SQL reads cannot authorize recovery.
+        """
+        if not isinstance(operation_id, str) or not 0 < len(operation_id) <= 128:
+            raise ValueError("invalid publication operation identity")
+        slot = publication_slot_key(self._binding, target_key)
+
+        def observe(cursor: PublicationSqlCursor) -> NativePublicationPreparation | None:
+            rows = execute_publication_statement(
+                cursor, "SET XACT_ABORT ON; SET NOCOUNT ON;\n" + operation_read_statement(self._binding), (slot,)
+            )
+            _, current, root = self._decode_history(rows, target_key)
+            if root.record.phase is c.AuthorityPhase.RETIRED_UNPUBLISHED and root.record.operation_id == operation_id:
+                return None
+            if current.record.operation_id != operation_id:
+                raise ValueError("requested publication is not current")
+            rows = execute_publication_statement(
+                cursor, native_preparation_statement(self._binding), (slot, operation_id)
+            )
+            return decode_native_preparation(
+                rows, current=current, binding_digest=self._digest, decode_receipt=self._decode_receipt
+            )
+
+        try:
+            result = run_publication_transaction(self._session_factory, observe)
+        except PublicationTransactionUnknown:
+            raise c.ClusterPublicationError(
+                "DPONE_MSSQL_PUBLICATION_PREPARATION_UNVERIFIED", "native preparation could not be verified"
+            ) from None
+        if result is None:
+            raise c.ClusterPublicationError(
+                "DPONE_MSSQL_PUBLICATION_RETIRED_OPERATION", "retired operation cannot be admitted again"
+            )
+        return result
 
     def _mutate(
         self, current: c.VersionedAuthorityRecord | None, desired: c.AuthorityRecord

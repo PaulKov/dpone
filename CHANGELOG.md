@@ -20,6 +20,13 @@
   replay and cloned sinks, validates the SQL endpoint on every owned session,
   and rejects unsupported selections before source I/O. Existing manifests
   retain their backend selection.
+- Add internal native-preparation observation from the selected SQL authority's
+  immutable operation history. Current/root, exact earliest preparation and its
+  predecessor are read under one acknowledged transaction; binding, generation,
+  phase/epoch/revision and quality-core substitutions fail closed. The observation
+  contains no dispatch permit or quality/absent-DDL proof and does not activate
+  recovery. SQL Server tests exercise initial, later and post-retirement origins,
+  exact operation IDs and concurrent writer exclusion during the read.
 - Add explicit `exact_raw_rows` source semantics for bounded native delivery
   from ReplacingMergeTree, preserving query-visible versions and duplicates
   without `FINAL`. A pinned native TLS session binds relation, read settings,

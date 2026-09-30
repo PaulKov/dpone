@@ -62,6 +62,35 @@ def operation_read_statement(binding: PublicationAuthorityBinding) -> str:
     )
 
 
+def native_preparation_statement(binding: PublicationAuthorityBinding) -> str:
+    """Earliest event for this operation and its exact preceding native/retired event.
+
+    The current slot is already held by the caller's transaction. The ordered
+    slot/revision key and HOLDLOCK retain the origin range through commit. This
+    returns one bounded receipt; finding it may scan the slot's retained history.
+    """
+    _, events = publication_tables(binding)
+    return f"""
+DECLARE @slot char(64)=?, @operation nvarchar(128)=?;
+SELECT 0,e.revision,e.payload,e.payload_sha256,e.write_id,e.binding_digest,1,
+ CASE WHEN (e.revision=1 AND e.previous_sha256 IS NULL)
+ OR (e.revision>1 AND e.previous_sha256=p.payload_sha256) THEN 1 ELSE 0 END,
+ e.origin,e.provenance,e.provenance_sha256,e.operation_id,e.phase,
+ CASE WHEN p.revision IS NULL THEN NULL ELSE 0 END,
+ p.revision,p.payload,p.payload_sha256,p.write_id,p.binding_digest,
+ CASE WHEN p.revision IS NULL THEN NULL ELSE 1 END,
+ CASE WHEN p.revision IS NULL THEN NULL
+ WHEN (p.revision=1 AND p.previous_sha256 IS NULL)
+ OR (p.revision>1 AND p.previous_sha256=g.payload_sha256) THEN 1 ELSE 0 END,
+ p.origin,p.provenance,p.provenance_sha256,p.operation_id,p.phase,e.created_utc
+FROM (SELECT TOP (1) * FROM {events} WITH (HOLDLOCK)
+ WHERE slot_key=@slot AND operation_id=@operation
+ AND DATALENGTH(operation_id)=DATALENGTH(@operation) ORDER BY revision) e
+LEFT JOIN {events} p WITH (HOLDLOCK) ON p.slot_key=e.slot_key AND p.revision=e.revision-1
+LEFT JOIN {events} g WITH (HOLDLOCK) ON g.slot_key=p.slot_key AND g.revision=p.revision-1;
+"""
+
+
 def mutation_statement(binding: PublicationAuthorityBinding) -> str:
     """A serializable key-range lock handles absent-create and exact CAS alike.
 

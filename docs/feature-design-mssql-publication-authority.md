@@ -169,6 +169,35 @@ overwriting it. Driver errors, credentials and local paths are not printed.
 
 ## Algorithm and transaction boundaries
 
+### Native preparation admission for recovery — implementation refinement
+
+Recovery cannot infer strict origin from a caller-supplied write UUID, a boolean
+capability or a fixed initial revision. The SQL adapter's read-only
+`read_native_preparation(target_key, operation_id)` capability reads the current
+slot/root and the earliest immutable event for that operation in one owned,
+acknowledged transaction. It admits only a native PREPARED event, validates its
+exact predecessor transition (including a completed slot or authenticated
+retirement), and binds it to the current operation, generations and SQL binding.
+An initial preparation has revision one; later preparations need not.
+
+The result carries the admitted binding digest, original versioned preparation,
+current versioned envelope and server-recorded UTC preparation time. These are
+observations, not a dispatch permit, a quality receipt or proof of absent DDL.
+Retired IDs remain prohibited even after a later operation completes. Missing,
+conflicting, malformed or uncertain history yields no admission and no retry;
+reused operation IDs cannot substitute a different generation. Independently
+authenticated quality and complete DDL observations remain recovery gates.
+The capability is internal and unactivated until shared recovery composition
+and end-to-end acceptance are complete; no serialized envelope field changes.
+The query compares operation ID length as well as its binary-collated value;
+SQL trailing-space equivalence must not choose another operation's origin.
+The current revision must allow every mandatory phase transition. Later quality
+capsule updates may advance the revision without changing its original core;
+observing that core is not an authentication of the policy or its acceptance.
+The read returns a bounded receipt, but finding the earliest operation event
+may scan retained history for that target. A concurrent cooperating CAS writer
+waits for the read transaction to release the current-slot lock.
+
 ### Independent audit binding — implementation refinement
 
 The approved system-storage work also requires audit selection without enabling
