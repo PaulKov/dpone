@@ -15,6 +15,7 @@ public_contract_impact:
   migration_required: false
 owned_paths:
   - src/dpone/contracts/clickhouse_raw_snapshot.py
+  - src/dpone/contracts/clickhouse_raw_snapshot_bounds.py
   - src/dpone/manifest/clickhouse_raw_snapshot_policy.py
   - tests/test_clickhouse_raw_snapshot_contracts.py
   - tests/test_clickhouse_raw_snapshot_policy.py
