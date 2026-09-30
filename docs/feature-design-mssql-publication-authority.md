@@ -159,11 +159,16 @@ authority, removes evidence or reactivates an old writer over the new state.
 
 ## Retirement and fresh-load amendment
 
-**Status: scope authorized on 2026-09-30; written amendment pending review.**
+**Status: APPROVED by the maintainer on 2026-09-30.**
 This section extends, but does not activate or weaken, the approved adoption
 contract above. The operator authorized retirement of a proven unpublished
 legacy preparation, preserving history, followed by a new load and new quality
-evaluation. No retirement command or runtime transition is implemented yet.
+evaluation. Pure policy, application orchestration, bounded canonical plan
+decoding and an isolated SQL store are implemented as an unactivated foundation.
+The ordinary authority reader verifies the exact retired event, original plan
+and binding without granting replay or dispatch. Native-origin claims cannot
+label a retired envelope as an ordinary publication. The operator command, trusted
+deployment observer and fresh-operation runtime transition are not enabled yet.
 
 ### Intent and alternatives
 
@@ -232,6 +237,24 @@ plan digest. Versioned redacted results distinguish `retired_unpublished` from
 verified, 2 means a proven block, and 1 means failure or unknown outcome. Local
 plan files use the existing private atomic file adapter. A file digest is not
 deployment evidence or permission to dispatch.
+
+All operator invocations must use the same deployment-pinned, owner-private
+persistent attempt directory. An exclusive fsynced claim precedes the SQL
+attempt; an existing claim permits readback only, including after process
+restart or lost SQL acknowledgement. Its key binds destination, target and
+legacy operation, not the mutable planning observation: replanning cannot
+reset the attempt. Never delete the claim or choose a new
+directory to retry. This journal is not a distributed fence: deployment still
+owns writer exclusion, while SQL owns absent-slot and subsequent CAS ordering.
+A missing/unavailable journal fails closed. Deployment of this composition,
+including its journal persistence, is an activation prerequisite.
+
+An expired plan cannot authorize an insert. Read-only verification may renew the
+deployment freeze and historical coverage while retaining the exact original
+source location, replica bytes/versions, generations, inventory and destination.
+The SQL lookup still compares the originally applied plan/provenance, not a
+newly invented receipt. Renewal changes neither the attempt claim nor authority;
+unavailable or changed original facts keep verification blocked.
 
 Tests must reject mixed replica generations, historical DDL coverage gaps,
 expired/changed freezes, a restart between plan and apply, destination

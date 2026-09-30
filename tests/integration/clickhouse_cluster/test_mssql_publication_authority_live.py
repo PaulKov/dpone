@@ -280,3 +280,137 @@ def test_live_trigger_drift_is_rejected(catalog):
             "ENABLE TRIGGER dbo.dpone_publication_events_immutable ON dbo.dpone_cluster_publication_events"
         )
     require_publication_catalog(connector, binding=binding)
+
+
+def retirement_plan(catalog):
+    """Synthetic CH observations: this suite proves only the real SQL boundary."""
+    from dataclasses import replace
+
+    from dpone.contracts.clickhouse_cluster_publication import VersionedAuthorityRecord
+    from dpone.contracts.publication_authority_binding import publication_binding_digest
+    from dpone.contracts.publication_retirement import plan_retirement
+    from tests.test_publication_retirement import observation
+
+    value = observation()
+    legacy = replace(value.replicas[0].authority.record, target="retire_" + uuid4().hex, operation_id=uuid4().hex)
+    legacy = replace(
+        legacy,
+        target_key=digest_payload(
+            {
+                "cluster": value.inventory.cluster,
+                "database": legacy.database,
+                "target": legacy.target,
+            }
+        ),
+    )
+    binding_digest = publication_binding_digest(catalog[1], endpoint_identity=catalog[2])
+    value = replace(
+        value,
+        binding_digest=binding_digest,
+        freeze=replace(value.freeze, target_key=legacy.target_key, binding_digest=binding_digest),
+        replicas=tuple(
+            replace(item, authority=VersionedAuthorityRecord(legacy, 1), original_payload=legacy.payload.encode())
+            for item in value.replicas
+        ),
+    )
+    return plan_retirement(value, now=220)
+
+
+def retirement_store(catalog, factory=None):
+    from dpone.runtime.state.mssql_publication_retirement import MssqlPublicationRetirement
+
+    return MssqlPublicationRetirement(
+        catalog_connector=catalog[0],
+        binding=catalog[1],
+        endpoint_identity=catalog[2],
+        clock=lambda: 220,
+        session_factory=factory or (lambda: connect(catalog[1].database).connection),
+    )
+
+
+def test_concurrent_retirement_has_one_sql_winner_and_preserved_original_bytes(catalog):
+    from dpone.contracts.publication_authority_binding import publication_slot_key
+
+    plan = retirement_plan(catalog)
+    stores = [retirement_store(catalog) for _ in range(6)]
+    barrier = Barrier(len(stores))
+
+    def retire(store):
+        barrier.wait(timeout=20)
+        return store.retire_if_absent(plan)
+
+    with ThreadPoolExecutor(max_workers=len(stores)) as executor:
+        results = list(executor.map(retire, stores))
+    assert results.count("acknowledged") == 1
+    assert results.count("conflict") == 5
+    assert stores[0].inspect(plan) == "exact"
+    rows = catalog[0].get_records(
+        "SELECT origin,provenance,phase,revision FROM dbo.dpone_cluster_publication_events WHERE slot_key=?",
+        (publication_slot_key(catalog[1], plan.original.record.target_key),),
+    )
+    assert rows == [("legacy_retired", plan.payload.encode(), "RETIRED_UNPUBLISHED", 1)]
+    assert plan.original_payload.hex() in plan.payload
+    observed = authority(catalog).read_versioned(plan.original.record.target_key)
+    assert observed.record.phase.value == "RETIRED_UNPUBLISHED"
+    assert observed.record.operation_id == plan.original.record.operation_id
+    assert observed.record.quality_evidence is None
+    assert observed.version == 1
+    with pytest.raises(ValueError):
+        authority(catalog).compare_and_swap(observed, observed.record)
+
+
+def test_retirement_lost_commit_ack_resolves_by_read_only_inspection(catalog):
+    plan = retirement_plan(catalog)
+
+    class LostAck:
+        def __init__(self):
+            self.connection = connect(catalog[1].database).connection
+
+        @property
+        def autocommit(self):
+            return self.connection.autocommit
+
+        @autocommit.setter
+        def autocommit(self, value):
+            self.connection.autocommit = value
+
+        def cursor(self):
+            return self.connection.cursor()
+
+        def commit(self):
+            self.connection.commit()
+            raise TimeoutError("synthetic retirement ACK loss after commit")
+
+        def rollback(self):
+            self.connection.rollback()
+
+        def close(self):
+            self.connection.close()
+
+    assert retirement_store(catalog, LostAck).retire_if_absent(plan) == "unknown"
+    assert retirement_store(catalog).inspect(plan) == "exact"
+
+
+def test_retirement_refuses_existing_native_slot(catalog):
+    plan = retirement_plan(catalog)
+    assert authority(catalog).create_if_absent(plan.original.record).status is Status.VERIFIED
+    store = retirement_store(catalog)
+    assert store.retire_if_absent(plan) == "conflict"
+    assert store.inspect(plan) == "conflict"
+
+
+def test_retirement_orphan_history_is_not_absence_and_cannot_be_recreated(catalog):
+    from dpone.contracts.publication_authority_binding import publication_slot_key
+
+    plan = retirement_plan(catalog)
+    store = retirement_store(catalog)
+    assert store.retire_if_absent(plan) == "acknowledged"
+    key = publication_slot_key(catalog[1], plan.original.record.target_key)
+    # Deliberately corrupt only our disposable test database; retain the immutable
+    # event. This is a fault injection, never a migration/recovery technique.
+    catalog[0].execute_query("DELETE FROM dbo.dpone_cluster_publication_authority WHERE slot_key=?", (key,))
+    assert store.inspect(plan) == "unknown"
+    assert store.retire_if_absent(plan) == "unknown"
+    assert catalog[0].get_records(
+        "SELECT count(*) FROM dbo.dpone_cluster_publication_events WHERE slot_key=?", (key,)
+    ) == [(1,)]

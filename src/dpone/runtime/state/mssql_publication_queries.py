@@ -1,12 +1,20 @@
 """Bound SQL batches for one indexed authority slot plus its immutable events."""
 
+from __future__ import annotations
+
 import hashlib
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from dpone.adapters.mssql_publication_catalog_ddl import EVENT_TABLE, SLOT_TABLE, quote_identifier
-from dpone.ports.clickhouse_cluster_publication import contracts as c
-from dpone.ports.mssql_publication import PublicationAuthorityBinding, publication_slot_key
+from dpone.ports.mssql_publication import (
+    PublicationAuthorityBinding,
+    native_publication_provenance,
+    publication_slot_key,
+)
+
+if TYPE_CHECKING:
+    from dpone.ports.clickhouse_cluster_publication import contracts as c
 
 _COLUMNS = "slot_key,binding_digest,revision,operation_id,phase,payload,payload_sha256,write_id"
 _MATCH = (
@@ -19,7 +27,7 @@ _CHAIN = "((s.revision=1 AND e.previous_sha256 IS NULL) OR (s.revision>1 AND p.p
 
 def read_statement(binding: PublicationAuthorityBinding, *, won: str = "0") -> str:
     """Read current/event/predecessor in one statement; caller validates flags."""
-    slot, events = _tables(binding)
+    slot, events = publication_tables(binding)
     return (
         f"SELECT {won},s.revision,s.payload,s.payload_sha256,s.write_id,s.binding_digest,"
         f"CASE WHEN {_MATCH} THEN 1 ELSE 0 END,CASE WHEN {_CHAIN} THEN 1 ELSE 0 END,"
@@ -37,7 +45,7 @@ def mutation_statement(binding: PublicationAuthorityBinding) -> str:
     Commit is owned by the DBAPI transaction boundary, not an OUTPUT row. Event
     uniqueness and its append-only trigger are required by catalog admission.
     """
-    slot, events = _tables(binding)
+    slot, events = publication_tables(binding)
     return f"""
 DECLARE @slot char(64)=?, @binding binary(32)=?, @expected_revision bigint=?,
  @expected_payload varbinary(max)=?, @expected_hash binary(32)=?,
@@ -81,9 +89,7 @@ def mutation_params(
     current: c.VersionedAuthorityRecord | None,
     desired: c.AuthorityRecord,
 ) -> tuple[Any, ...]:
-    provenance = c.canonical_json(
-        {"contract": "dpone.publication-origin.v1", "origin": "native", "binding_digest": digest}
-    ).encode()
+    provenance = native_publication_provenance(digest)
     return (
         publication_slot_key(binding, desired.target_key),
         bytes.fromhex(digest),
@@ -100,6 +106,7 @@ def mutation_params(
     )
 
 
-def _tables(binding: PublicationAuthorityBinding) -> tuple[str, str]:
+def publication_tables(binding: PublicationAuthorityBinding) -> tuple[str, str]:
+    """Quote the same admitted catalog location for native and migration SQL."""
     prefix = f"{quote_identifier(binding.database)}.{quote_identifier(binding.schema)}"
     return f"{prefix}.[{SLOT_TABLE}]", f"{prefix}.[{EVENT_TABLE}]"

@@ -17,9 +17,11 @@ from dpone.ports.mssql_publication import (
     PublicationAuthorityBinding,
     PublicationCatalogReader,
     PublicationSessionFactory,
+    native_publication_provenance,
     publication_binding_digest,
     publication_slot_key,
 )
+from dpone.ports.publication_retirement import decode_retirement_plan, retirement_record
 from dpone.runtime.state.mssql_publication_admission import require_publication_catalog
 from dpone.runtime.state.mssql_publication_envelope import decode_envelope, require_transition
 from dpone.runtime.state.mssql_publication_queries import mutation_params, mutation_statement, read_statement
@@ -126,15 +128,6 @@ class MssqlPublicationAuthority:
             raise ValueError("invalid publication receipt revision")
         if binding != bytes.fromhex(self._digest) or event_ok != 1 or chain_ok != 1:
             raise ValueError("publication binding/history mismatch")
-        expected_origin = c.canonical_json(
-            {"contract": "dpone.publication-origin.v1", "origin": "native", "binding_digest": self._digest}
-        ).encode()
-        if (
-            origin != "native"
-            or provenance != expected_origin
-            or hashlib.sha256(provenance).digest() != provenance_hash
-        ):
-            raise ValueError("publication origin requires explicit adoption")
         record = decode_envelope(payload)
         if (
             record.target_key != target_key
@@ -142,6 +135,22 @@ class MssqlPublicationAuthority:
             or record.phase.value != phase
             or hashlib.sha256(payload).digest() != digest
             or record.authority_write_id != UUID(str(write_id)).hex
+            or hashlib.sha256(provenance).digest() != provenance_hash
         ):
             raise ValueError("publication envelope identity differs")
+        self._require_origin(origin, provenance, revision, record)
         return bool(won), c.VersionedAuthorityRecord(record, revision)
+
+    def _require_origin(self, origin: str, provenance: bytes, revision: int, record: c.AuthorityRecord) -> None:
+        if origin == "legacy_retired":
+            plan = decode_retirement_plan(provenance)
+            if (
+                revision != 1
+                or plan.observation.binding_digest != self._digest
+                or retirement_record(plan, write_id=UUID(hex=record.authority_write_id or "")) != record
+            ):
+                raise ValueError("retirement origin differs from publication slot")
+            return
+        expected = native_publication_provenance(self._digest)
+        if origin != "native" or provenance != expected or record.phase is c.AuthorityPhase.RETIRED_UNPUBLISHED:
+            raise ValueError("publication origin requires explicit adoption")
