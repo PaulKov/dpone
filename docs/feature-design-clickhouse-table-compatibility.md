@@ -11,6 +11,101 @@
 
 Last verified: 2026-09-30
 
+## Research correction: first-use existing tables
+
+**Status: RESEARCHED amendment, awaiting maintainer approval.** The approved
+historical-epoch algorithm below is preserved as the decision record; it must
+not be promoted into a universal requirement that dpone created the target.
+New pinned-source and live evidence supports a smaller current-state resolver.
+Dependent production implementation remains blocked by the structural gate and
+this pending algorithm correction; this section is not an implementation claim.
+
+### Evidence and correction
+
+For plain, nonreplicated MergeTree on **24.8.14.39**, the server's
+[Context caches one MergeTree defaults object](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Interpreters/Context.cpp#L4542-L4555).
+[system.merge_tree_settings reads that object](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/System/StorageSystemMergeTreeSettings.cpp#L35-L46).
+Table construction [copies those defaults](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/MergeTree/registerStorageMergeTree.cpp#L632-L633)
+and [applies persisted overrides](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/MergeTree/registerStorageMergeTree.cpp#L726-L735).
+[ALTER rebuilds settings](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/MergeTree/MergeTreeData.cpp#L3719-L3728)
+from [the same cached defaults](https://github.com/ClickHouse/ClickHouse/blob/v24.8.14.39-lts/src/Storages/StorageMergeTree.cpp#L2492-L2495)
+and the resulting overrides. This concerns the currently loaded configuration,
+not the settings under which every historical part was written.
+
+An owned Docker test created a table outside the epoch producer and retained its
+data across restart. With `min_bytes_for_wide_part=0`, inserts before restart
+produced Wide parts under the cached row threshold 0 even after config reload;
+after restart, the changed threshold 1234 produced Compact parts. Explicit ALTER
+to 0 produced Wide, and RESET returned to Compact. The table UUID and original
+rows survived. This independently observes table behavior, not only equality
+between two metadata queries. The test is
+`test_pinned_restart_and_alter_resolve_preexisting_table_settings` in
+`tests/integration/test_clickhouse_table_compatibility_live.py`.
+
+The prior negative epoch test establishes only that a historical-journal
+provider cannot manufacture CREATE coverage. It does **not** establish that
+all safe publication methods or tables need that provider. Its remaining epoch
+tests are retained as scoped research, not universal admission requirements.
+
+### Proposed algorithm amendment
+
+1. Preserve original-authority ownership checks and the continuously held
+   two-name exclusion. An externally created, genuinely unmanaged table is
+   eligible for first-use inspection; retained or uncertain dpone ownership is
+   not. Missing operation history cannot be replaced with a new store.
+2. Require the exact certified plain-MergeTree server profile and complete
+   visibility. Read current global defaults and complete persisted table
+   overrides, schema, keys, UUID and actual storage topology. Resolve the seven
+   managed settings as cached defaults overlaid by persisted overrides using
+   the pinned algorithm, not assumed built-in literals or a caller assertion.
+3. Bind the observation to the actual endpoint and one non-reconnecting native
+   connection for its complete bracketed read. Cross-check metadata and defaults
+   before/after; any connection break, mismatch or incomplete read invalidates
+   that snapshot. A fresh pre-enrollment snapshot is allowed; an enrolled
+   operation follows existing retention and source-free recovery rules.
+4. Keep current registry validation and unknown-setting/global-deviation refusal.
+   Do not extend this proof to Replicated/Shared/Distributed engines, a different
+   server version or another node. Verify actual default-policy disks/volumes;
+   the policy name alone does not establish topology.
+5. Preserve the resolved target configuration by default, render every managed
+   candidate setting explicitly, and independently read back candidate settings
+   before source access. Re-observe configuration at seal and pre-send. No target
+   ALTER, restart, setting reset or manual SQL copying is required for adoption.
+6. Keep the existing conservative equal-managed-settings condition for REPLACE,
+   separate physical-part checks, explicit after-states and block/warn semantics.
+   Current settings do not prove historical part formats. An unknown shared
+   fact still blocks; warn can exclude only an unverified method when another
+   method is independently verified.
+
+No new public flag, CLI command or manifest field is introduced. Configuration
+identity still uses resolved effective values; observation provenance now names
+the certified current-state resolver and captured facts instead of requiring a
+pre-creation epoch. The unchanged user journey is one publish call with optional
+settings, including for manually pre-created supported tables. Recovery never
+reconstructs execution permission from observation evidence.
+
+### Implementation and acceptance impact
+
+If approved, remove the planned deployment-epoch port/provider and bootstrap
+journal from the production dependency map. Keep the resolver in the already
+planned descriptor/catalog/observer owners. Update Task 1 and its exact path
+contract before executing Tasks 2–7; do not merely relabel the old epoch tests.
+Preserve historical artifacts and existing version readers unless a separate
+compatibility change is explicitly approved.
+
+Required acceptance cases are: a manually created table with no dpone CREATE
+receipt; default and nondefault overrides; actual reload/restart/ALTER/RESET
+behavior with persistent data; independent-process observation; connection and
+metadata drift; unsupported engine/version/settings; and unchanged retained
+ownership, default block, verified warning alternative and zero-replay recovery.
+The production resolver and full route still require exact-commit certification.
+
+This correction removes two proposed modules and five projected cross-layer
+edges, but the revised projection still fails the architecture budgets. It is
+not permission to weaken those gates or claim the publisher/ODBC route ready.
+Market comparison and measurable self-service targets below remain unchanged;
+the new evidence corrects dpone's implementation assumption, not a vendor ranking.
+
 ## Executive summary
 
 Audience: data engineers configuring a snapshot load, platform engineers owning

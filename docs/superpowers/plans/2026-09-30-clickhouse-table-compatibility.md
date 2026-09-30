@@ -186,6 +186,16 @@ layer label or allowing two more imports alone is not a demonstrated solution.
 
 ## Task 2: Typed settings, descriptors and deterministic policy
 
+> Continuation note: the independent test-only branch now includes a positive
+> current-settings characterization for a manually created table, persistent
+> restart, ALTER/RESET and real part layouts. This corrects the premise that a
+> pre-creation epoch is universally necessary. See the [RESEARCHED resolver
+> amendment](../../feature-design-clickhouse-table-compatibility.md#research-correction-first-use-existing-tables).
+> It awaits approval and does not supersede the approved algorithm silently.
+> Task 1 remains incomplete: structural feasibility still fails, and these raw
+> server tests are not certification of the production descriptor or publisher.
+> Existing historical evidence and the failed structural record above remain.
+
 **Files:** Create the three contract modules and descriptor/epoch adapters above,
 `ports/clickhouse_deployment_epoch.py`; modify grammar and observation profile.
 Tests: `tests/test_clickhouse_table_descriptor.py`,
