@@ -57,6 +57,7 @@ def test_runner_binds_every_execution_and_artifact_to_inspected_image(tmp_path: 
             },
         },
     )
+    monkeypatch.setattr(module, "_docker_server_architecture", lambda _docker: "amd64")
 
     def create(**values):
         cell = values["cell"]
@@ -95,7 +96,8 @@ def test_runner_binds_every_execution_and_artifact_to_inspected_image(tmp_path: 
     )
 
     assert len(created) == 7
-    assert result["schema_version"] == "dpone.mssql-sqlclient.certification-runner.v3"
+    assert result["schema_version"] == "dpone.mssql-sqlclient.certification-runner.v4"
+    assert result["docker_server_architecture"] == "amd64"
     assert {image for image, _cell in created} == {f"sha256:{digest}"}
     assert result["execution_count"] == 7
     assert {item["container_sampled_cache_adjusted_memory_bytes"] for item in result["executions"]} == {456_789}
@@ -117,6 +119,7 @@ def test_runner_binds_every_execution_and_artifact_to_inspected_image(tmp_path: 
 
 def test_runner_rejects_tag_resolving_to_another_image(tmp_path: Path, monkeypatch) -> None:
     module = _module()
+    monkeypatch.setattr(module, "_docker_server_architecture", lambda _docker: "amd64")
     monkeypatch.setattr(
         module,
         "_inspect_image",
@@ -133,6 +136,35 @@ def test_runner_rejects_tag_resolving_to_another_image(tmp_path: Path, monkeypat
             output=tmp_path / "runner.json",
             pass_env=(),
         )
+
+
+@pytest.mark.parametrize("architecture", ["arm64", "aarch64", "unknown", ""])
+def test_runner_rejects_emulated_or_unknown_docker_server_architecture(
+    tmp_path: Path, monkeypatch, architecture: str
+) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "_docker_server_architecture", lambda _docker: architecture)
+
+    with pytest.raises(ValueError, match="native_amd64_docker_server_required"):
+        module.run_campaign(
+            docker="docker",
+            image="candidate",
+            image_receipt=_image_receipt(tmp_path),
+            network="certification",
+            evidence_dir=tmp_path / "evidence",
+            output=tmp_path / "runner.json",
+            pass_env=(),
+        )
+
+
+@pytest.mark.parametrize(
+    ("reported", "expected"), [("x86_64\n", "amd64"), ("amd64\n", "amd64"), ("aarch64\n", "aarch64")]
+)
+def test_docker_server_architecture_is_normalized(monkeypatch, reported: str, expected: str) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "_capture", lambda _command: reported)
+
+    assert module._docker_server_architecture("docker") == expected
 
 
 @pytest.mark.parametrize("cell_index", [0, 6])

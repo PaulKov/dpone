@@ -103,12 +103,13 @@ def _runner(tmp_path: Path, commit: str, tree: str = "e" * 40, image: str = "f" 
     path.write_text(
         json.dumps(
             {
-                "schema_version": "dpone.mssql-sqlclient.certification-runner.v3",
+                "schema_version": "dpone.mssql-sqlclient.certification-runner.v4",
                 "status": "PASS",
                 "source_commit_sha": commit,
                 "source_tree_oid": tree,
                 "runner_image_sha256": image,
                 "runner_platform": "linux/amd64",
+                "docker_server_architecture": "amd64",
                 "source_mode": "exact_git_archive",
                 "worktree_dirty": False,
                 "execution_count": 7,
@@ -169,7 +170,7 @@ def test_campaign_closes_exact_matrix_without_overwrite(tmp_path: Path) -> None:
     )
 
     payload = json.loads(output.read_text(encoding="utf-8"))
-    assert payload["schema_version"] == "dpone.mssql-sqlclient.transport-campaign.v2"
+    assert payload["schema_version"] == "dpone.mssql-sqlclient.transport-campaign.v3"
     assert payload["status"] == "PASS"
     assert payload["cell_count"] == len(module.REQUIRED_CELLS)
     assert len({item["artifact"] for item in payload["cells"]}) == len(module.REQUIRED_CELLS)
@@ -182,6 +183,25 @@ def test_campaign_rejects_runner_with_untrusted_resource_evidence(tmp_path: Path
     runner = _runner(tmp_path, commit)
     payload = json.loads(runner.read_text(encoding="utf-8"))
     payload["executions"][0]["container_sampled_cache_adjusted_memory_bytes"] = 0
+    runner.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="invalid_runner_receipt"):
+        module.close_campaign(
+            root,
+            source_commit_sha=commit,
+            runner_receipt=runner,
+            package_version="0.88.0",
+            output=tmp_path / "campaign.json",
+        )
+
+
+def test_campaign_rejects_non_native_docker_server_architecture(tmp_path: Path) -> None:
+    module = _module()
+    commit = "d" * 40
+    root = _complete_dir(tmp_path, module, commit)
+    runner = _runner(tmp_path, commit)
+    payload = json.loads(runner.read_text(encoding="utf-8"))
+    payload["docker_server_architecture"] = "aarch64"
     runner.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError, match="invalid_runner_receipt"):

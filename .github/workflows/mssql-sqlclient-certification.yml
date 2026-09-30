@@ -1,0 +1,169 @@
+name: MSSQL SqlClient certification
+
+on:
+  workflow_dispatch:
+    inputs:
+      expected_commit_sha:
+        description: Exact protected-master commit to certify.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  certify:
+    name: Native x86-64 SqlClient campaign
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CERT_ROOT: test_artifacts/mssql_sqlclient_certification
+      DPONE_IT_MSSQL_HOST: dpone-it-mssql
+      DPONE_IT_MSSQL_PORT: "1433"
+      DPONE_IT_MSSQL_DATABASE: dpone_it
+      DPONE_IT_MSSQL_USER: sa
+      DPONE_IT_MSSQL_PASSWORD: Dp0ne.Strong.Pw.2026!
+      DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE: "yes"
+      DPONE_IT_CH_HOST: dpone-it-clickhouse
+      DPONE_IT_CH_PORT: "9000"
+      DPONE_IT_CH_DATABASE: dpone_it
+      DPONE_IT_CH_USER: default
+      DPONE_IT_CH_PASSWORD: dpone
+    steps:
+      - name: Checkout exact protected source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: master
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require exact native x86-64 host
+        env:
+          EXPECTED_COMMIT_SHA: ${{ inputs.expected_commit_sha }}
+        run: |
+          set -euo pipefail
+          test "$(uname -m)" = x86_64
+          case "$(docker info --format '{{.Architecture}}')" in
+            x86_64|amd64) ;;
+            *) exit 1 ;;
+          esac
+          test "${GITHUB_REF}" = refs/heads/master
+          test "${EXPECTED_COMMIT_SHA}" = "${GITHUB_SHA}"
+          test "${EXPECTED_COMMIT_SHA}" = "$(git rev-parse HEAD)"
+          test "${EXPECTED_COMMIT_SHA}" = "$(git rev-parse refs/remotes/origin/master)"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
+        with:
+          version: "0.11.28"
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install certification dependencies
+        run: uv sync --locked --all-extras --no-install-package dpone-mssql-sqlclient
+
+      - name: Start clean SQL Server target
+        run: |
+          set -euo pipefail
+          export DPONE_IT_MSSQL_MEMORY_LIMIT_MB=3072
+          docker compose -f docker/docker-compose.integration.yml up -d --wait clickhouse mssql
+          docker compose -f docker/docker-compose.integration.yml run --rm mssql-init
+
+      - name: Build exact immutable runner image
+        run: |
+          set -euo pipefail
+          mkdir -p "${CERT_ROOT}"
+          uv run python tools/mssql_sqlclient_certification_image.py \
+            --root . \
+            --docker docker \
+            --tag "dpone-mssql-sqlclient-cert:${GITHUB_SHA}" \
+            --source-commit "${GITHUB_SHA}" \
+            --output "${CERT_ROOT}/image.json"
+
+      - name: Run seven-cell campaign
+        run: |
+          set -euo pipefail
+          uv run python tools/mssql_sqlclient_certification_runner.py \
+            --docker docker \
+            --image "dpone-mssql-sqlclient-cert:${GITHUB_SHA}" \
+            --image-receipt "${CERT_ROOT}/image.json" \
+            --network docker_default \
+            --evidence-dir "${CERT_ROOT}/evidence" \
+            --output "${CERT_ROOT}/runner.json" \
+            --pass-env DPONE_IT_MSSQL_HOST \
+            --pass-env DPONE_IT_MSSQL_PORT \
+            --pass-env DPONE_IT_MSSQL_DATABASE \
+            --pass-env DPONE_IT_MSSQL_USER \
+            --pass-env DPONE_IT_MSSQL_PASSWORD \
+            --pass-env DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE
+
+      - name: Certify complete ClickHouse to MSSQL route
+        run: |
+          set -euo pipefail
+          IMAGE_DIGEST="$(uv run python -c 'import json; print(json.load(open("test_artifacts/mssql_sqlclient_certification/image.json"))["runner_image_sha256"])')"
+          SOURCE_TREE_OID="$(uv run python -c 'import json; print(json.load(open("test_artifacts/mssql_sqlclient_certification/image.json"))["source_tree_oid"])')"
+          mkdir -p "${CERT_ROOT}/route-evidence" "${RUNNER_TEMP}/sqlclient-junit"
+          route_test() {
+            docker run --rm \
+              --network docker_default \
+              --platform linux/amd64 \
+              --memory 2g --memory-swap 2g \
+              --mount "type=bind,src=${PWD}/${CERT_ROOT}/route-evidence,dst=/evidence" \
+              --mount "type=bind,src=${RUNNER_TEMP}/sqlclient-junit,dst=/junit" \
+              --env DPONE_RUN_INTEGRATION=1 \
+              --env DPONE_RUN_SQLCLIENT_LIVE=1 \
+              --env DPONE_SQLCLIENT_EVIDENCE_DIR=/evidence \
+              --env "DPONE_CERTIFICATION_COMMIT_SHA=${GITHUB_SHA}" \
+              --env "DPONE_CERTIFICATION_TREE_OID=${SOURCE_TREE_OID}" \
+              --env "DPONE_CERTIFICATION_IMAGE_SHA256=${IMAGE_DIGEST}" \
+              --env DPONE_IT_CH_HOST --env DPONE_IT_CH_PORT \
+              --env DPONE_IT_CH_DATABASE --env DPONE_IT_CH_USER --env DPONE_IT_CH_PASSWORD \
+              --env DPONE_IT_MSSQL_HOST --env DPONE_IT_MSSQL_PORT \
+              --env DPONE_IT_MSSQL_DATABASE --env DPONE_IT_MSSQL_USER \
+              --env DPONE_IT_MSSQL_PASSWORD --env DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE \
+              "$@"
+          }
+          for layout in 1 2; do
+            route_test --env "DPONE_SQLCLIENT_CERT_LAYOUT_VERSION=${layout}" \
+              "sha256:${IMAGE_DIGEST}" \
+              'tests/integration/mssql/test_clickhouse_mssql_target_local_runtime_live.py::test_clickhouse_mssql_target_local_runtime_orders_publication_and_cleanup[mssql_sqlclient]' \
+              -q -o addopts= --junitxml="/junit/layout${layout}.xml"
+            uv run python tools/ci/assert_junit_executed.py \
+              --junit "${RUNNER_TEMP}/sqlclient-junit/layout${layout}.xml" \
+              --sanitized-junit-output "${CERT_ROOT}/route-evidence/layout${layout}.xml" \
+              --min-passed 1 --max-skipped 0 \
+              --profile "sqlclient-target-local-layout${layout}" --commit-sha "${GITHUB_SHA}" \
+              --evidence-json "${CERT_ROOT}/route-evidence/layout${layout}-execution.json"
+          done
+          route_test "sha256:${IMAGE_DIGEST}" \
+            tests/integration/mssql/test_clickhouse_mssql_default_native_runtime_live.py \
+            -q -k mssql_sqlclient -o addopts= --junitxml=/junit/default-runtime.xml
+          uv run python tools/ci/assert_junit_executed.py \
+            --junit "${RUNNER_TEMP}/sqlclient-junit/default-runtime.xml" \
+            --sanitized-junit-output "${CERT_ROOT}/route-evidence/default-runtime.xml" \
+            --min-passed 3 --max-skipped 0 \
+            --profile sqlclient-default-runtime --commit-sha "${GITHUB_SHA}" \
+            --evidence-json "${CERT_ROOT}/route-evidence/default-runtime-execution.json"
+
+      - name: Close and privacy-scan campaign
+        run: |
+          set -euo pipefail
+          uv run python tools/mssql_sqlclient_transport_campaign.py \
+            --evidence-dir "${CERT_ROOT}/evidence" \
+            --source-commit-sha "${GITHUB_SHA}" \
+            --runner-receipt "${CERT_ROOT}/runner.json" \
+            --package-version 0.88.0 \
+            --secret-env DPONE_IT_MSSQL_PASSWORD \
+            --output "${CERT_ROOT}/campaign.json"
+
+      - name: Preserve certification evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: mssql-sqlclient-certification-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test_artifacts/mssql_sqlclient_certification
+          if-no-files-found: error
+          retention-days: 90

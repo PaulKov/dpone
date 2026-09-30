@@ -9,14 +9,19 @@ or SLO.
 ## Preconditions
 
 - clean Git worktree at the intended commit;
-- Docker with Linux amd64 execution support;
+- a native x86-64 Linux Docker daemon (`docker info` must report `x86_64`
+  or `amd64`); ARM hosts with Rosetta/QEMU emulation are diagnostic smoke only;
 - a dedicated Docker VM with at least 8 GiB assigned and no unrelated heavy
-  workloads; the repository SQL Server profile defaults to a 2 GiB engine cap;
+  workloads; the repository SQL Server profile defaults to a 3 GiB engine cap;
 - a reachable synthetic SQL Server on a named Docker network;
 - an empty access-controlled output directory;
 - the six `DPONE_IT_MSSQL_*` variables required by the live fixture;
 - database permission to create, bulk-load, lock, inspect, and drop synthetic
   stages plus use the external transaction catalog.
+
+Microsoft's [SQL Server container support policy](https://learn.microsoft.com/en-us/sql/linux/sql-server-linux-docker-container-deployment?view=sql-server-ver17)
+requires native Intel/AMD x86-64 Linux; emulation is outside tested support
+(checked 2026-09-30).
 
 Verify the network and target container before the run:
 
@@ -26,6 +31,27 @@ docker ps --format '{{.Names}} {{.Networks}}'
 ```
 
 ## Exact campaign
+
+For the release candidate on protected `master`, dispatch the native GitHub
+runner with the exact expected commit:
+
+```bash
+gh workflow run mssql-sqlclient-certification.yml \
+  --repo PaulKov/dpone --ref master \
+  -f expected_commit_sha="$(git rev-parse origin/master)"
+```
+
+The workflow rejects a different checkout, event commit, branch, or non-native
+Docker architecture. It builds the immutable image, runs all seven transport
+cells, then checks the complete synthetic ClickHouse → MSSQL route for both
+layouts and default-runtime success, interrupted extraction, and recovery after
+publication. JUnit gates require all five route cases to execute without skips.
+The retained `mssql-sqlclient-certification-<run>-<attempt>` artifact contains
+image, runner, campaign, and route receipts. Require the entire workflow to
+succeed; `campaign.json` alone certifies only the seven transport cells.
+
+On a separately approved native x86-64 Docker host, the transport-only campaign
+can also be run directly:
 
 ```bash
 CERT_ROOT="$(mktemp -d)"
@@ -76,7 +102,7 @@ prepared-stage reservation under the 128-table limit. Each runner container has
 a 2 GiB cgroup limit with swap disabled. Before execution, the runner verifies
 Docker's applied memory, memory-plus-swap, and OOM-killer settings. During the
 cell it samples Docker CLI's cache-adjusted memory usage and records the largest
-sample with the applied settings in its v3 receipt. Missing observations,
+sample with the applied settings in its v4 receipt. Missing observations,
 setting drift, or an OOM-killed cell fails certification. This sampled value is
 not a cgroup high-water mark. These limits apply to the synthetic campaign;
 normal manifests keep their existing configurable defaults.
@@ -91,13 +117,18 @@ normal manifests keep their existing configurable defaults.
 Never append to a failed evidence directory. Preserve it for diagnosis, then
 start with a new empty directory. A successful close contains seven immutable
 container executions and seven cell artifacts, exact commit/tree/image identities,
-`runner_platform: linux/amd64`, and `privacy_scan_status: PASS`.
+`runner_platform: linux/amd64`, `docker_server_architecture: amd64`, and
+`privacy_scan_status: PASS`. The daemon architecture is checked before any cell
+is started. `sqlclient_runner.native_amd64_docker_server_required` means the
+host cannot produce certification evidence; move the campaign to the native
+workflow or an approved native host.
 
 Each fixture runs in a fresh container and Python process. This prevents ODBC,
 multiprocessing, or companion-process state from one fixture affecting another
 fixture's result.
 
-The image, transport evidence, and campaign schemas remain v2. The runner
-receipt is v3 because it binds the inspected resource policy and sampled
-cache-adjusted container memory to every execution. Earlier runner receipts are rejected; rerun the
-producers rather than editing or translating evidence by hand.
+The image and transport evidence schemas remain v2. Runner receipt v4 and
+campaign v3 add the required native Docker daemon architecture to the inspected
+resource policy and sampled container memory. Earlier runner receipts are
+rejected; rerun the producers rather than editing or translating evidence by
+hand.
