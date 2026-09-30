@@ -281,6 +281,9 @@ def test_github_actions_cover_ci_and_pypi_release() -> None:
     assert "actions/setup-dotnet@" in ci_steps
     assert "coverage.xml" in ci_steps
 
+    windows_steps = "\n".join(str(step) for step in ci["jobs"]["doctor-import-windows"]["steps"])
+    assert "uv sync --locked --all-extras --no-install-package dpone-mssql-sqlclient" in windows_steps
+
     release_on = release[True]
     assert release_on["push"]["tags"] == ["v*.*.*"]
     assert "id-token" not in release["permissions"]

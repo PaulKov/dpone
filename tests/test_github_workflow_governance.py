@@ -299,7 +299,9 @@ def test_dependabot_groups_weekly_minor_patch_updates_with_bounded_open_prs() ->
 
 def test_release_sensitive_workflow_blobs_match_pr3a_implementation_base() -> None:
     expected_blobs = {
-        "release.yml": "49ca44b0ebaa4d834bed510688acbf8f8a706209",
+        # v0.88.0 adds the pinned .NET toolchain and the fifth SqlClient
+        # wheel/sdist pair to the immutable source-tag candidate set.
+        "release.yml": "8822df1bc2b2b456bb736434895d66055649096e",
         # v0.87.3 adds a fail-closed pip/Simple visibility barrier before the
         # immutable Docker candidate build; this intentionally supersedes the
         # earlier PR3A byte freeze without changing privileged GHCR jobs.

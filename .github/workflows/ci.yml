@@ -575,7 +575,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Install dependencies
-        run: uv sync --locked --all-extras
+        # The SqlClient companion is intentionally Linux x86-64 only. Keep the
+        # portable doctor-import contract on Windows without resolving that wheel.
+        run: uv sync --locked --all-extras --no-install-package dpone-mssql-sqlclient
 
       - name: Prove Windows doctor import backend
         run: >-
