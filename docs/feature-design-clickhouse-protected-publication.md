@@ -9,6 +9,12 @@
 
 Last verified: 2026-09-30
 
+Proposed amendment: [self-service table compatibility](feature-design-clickhouse-table-compatibility.md)
+is `RESEARCHED`, not yet approved. It addresses server-rendered settings,
+method-specific compatibility and version-safe recovery. This parent's approved
+contract is not silently broadened; the amendment needs written approval and a
+revised implementation plan before settings-aware production changes.
+
 ## Executive summary
 
 The journal and native publisher exist, but callers still supply observations
