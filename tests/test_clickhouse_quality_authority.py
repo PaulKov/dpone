@@ -96,6 +96,16 @@ def ready(connector: Connector) -> ClickHouseQualityKeeperMapAuthority:
     return authority
 
 
+def test_unadmitted_keeper_has_no_linearizable_permit() -> None:
+    authority = ClickHouseQualityKeeperMapAuthority(Connector(), "analytics")
+    assert authority.supports_linearizable_dispatch_permit() is False
+
+
+def test_admitted_keeper_has_linearizable_permit() -> None:
+    authority = ready(Connector())
+    assert authority.supports_linearizable_dispatch_permit() is True
+
+
 def test_preflight_is_read_only_and_exact() -> None:
     connector = Connector()
     ready(connector)

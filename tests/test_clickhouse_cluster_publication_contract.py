@@ -111,6 +111,11 @@ class _Connector:
         ]
 
 
+def test_legacy_authority_has_no_linearizable_permit() -> None:
+    authority = ClickHouseKeeperMapAuthority(_Connector(_record()), "analytics")
+    assert authority.supports_linearizable_dispatch_permit() is False
+
+
 def _record() -> AuthorityRecord:
     return AuthorityRecord(
         target_key="target",

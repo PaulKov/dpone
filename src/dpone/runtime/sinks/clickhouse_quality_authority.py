@@ -45,6 +45,10 @@ class ClickHouseQualityKeeperMapAuthority:
         self._table = table
         self._ready = False
 
+    def supports_linearizable_dispatch_permit(self) -> bool:
+        """Only an admitted shared KeeperMap may issue a recovery permit."""
+        return self._ready
+
     def require_ready(self, cluster: str, database: str, hosts: Sequence[str]) -> None:
         """Reject absent, legacy, inconsistent or unverified storage without DDL.
 

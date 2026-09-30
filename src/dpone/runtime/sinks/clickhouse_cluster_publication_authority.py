@@ -24,6 +24,10 @@ class ClickHouseKeeperMapAuthority:
         self._database = database
         self._table = table
 
+    def supports_linearizable_dispatch_permit(self) -> bool:
+        """Legacy versioned inserts do not provide an atomic cross-writer CAS."""
+        return False
+
     def read_versioned(self, target_key: str) -> contracts.VersionedAuthorityRecord | None:
         rows = self._connector.get_records(
             f"SELECT operation_id, fence_token, phase, dispatch_epoch, payload, payload_sha256, version "
