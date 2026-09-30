@@ -33,9 +33,9 @@ exact-commit live certificate. Reactivation is prohibited until every release
 gate in this document passes.
 
 The maintainer confirmed a dpone-only target writer for the initial deployment.
-The [proposed authority binding](feature-design-clickhouse-dpone-only-authority.md)
-records that requirement separately from its unapproved single-host/no-HA
-deployment tradeoff. Neither confirmation nor the proposal activates this route.
+The [approved authority design](feature-design-clickhouse-dpone-only-authority.md)
+also records acceptance of its single-host/no-HA deployment tradeoff.
+Design approval does not activate this route or complete its release gates.
 
 ## Personas and customer journey
 

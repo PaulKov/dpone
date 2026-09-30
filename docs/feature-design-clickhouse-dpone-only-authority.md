@@ -1,14 +1,16 @@
 # Feature design: dpone-only ClickHouse publication authority
 
-- Status: RESEARCHED
+- Status: APPROVED
 - Owner: dpone maintainers
 - Issue: production binding follow-up to PR #240
 - Target release: subsequent patch after implementation and scoped certification
 - Confirmed requirement: on 2026-09-30 the maintainer confirmed that only dpone
   writes the target ClickHouse table.
-- Proposed deployment decision: single-host authority, persistent local SQLite
-  storage, no automatic failover. This is not implied by the confirmed writer
-  requirement and is not yet approved.
+- Approved deployment decision: single-host authority, persistent local SQLite
+  storage, no automatic failover. The maintainer explicitly accepted this written
+  specification and its conservative unknown-outcome availability on 2026-09-30
+  with an explicit acceptance and instruction to implement. This approves
+  implementation, not production activation.
 
 Last verified: 2026-09-30
 
@@ -336,7 +338,12 @@ review; then separate route finalization and activation work.
 - [x] Sole target writer is dpone: confirmed by maintainer.
 - [x] Algorithm, public impact, alternatives, failures and limits described.
 - [x] Independent architecture, certification and UX input reconciled.
-- [ ] Single-host/no-HA and conservative unknown-outcome availability accepted.
-- [ ] Maintainer approves this written specification for implementation.
+- [x] Single-host/no-HA and conservative unknown-outcome availability accepted.
+- [x] Maintainer approves this written specification for implementation.
 - [ ] Detailed implementation plan and path-scoped task contract approved.
 - [ ] Implementation, exact-commit review and live certification complete.
+
+First executable planning increment:
+[durable authority foundation](superpowers/plans/2026-09-30-clickhouse-authority-foundation.md).
+It delivers the journal and transition rules; transport, observer and composition
+follow separately and are not represented as implemented by that increment.
