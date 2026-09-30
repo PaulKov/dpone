@@ -12,7 +12,8 @@ deployment coordinates. Approval is not implementation or live certification.
 ## Implementation availability
 
 This branch currently provides the unactivated binding, catalog admission,
-native SQL authority adapter, and shared normal/replay runtime composition.
+native SQL authority adapter, shared normal/replay runtime composition, and an
+internal endpoint-admitted schema plan/apply service.
 Public manifests still reject the proposed option; no existing workload switches
 backend. Legacy adoption, prepared-recovery integration, operator commands and
 end-to-end ClickHouse recovery acceptance remain required before activation.
@@ -99,6 +100,36 @@ to overwrite or retry automatically. Reads reject symlinks, non-regular files,
 shared permissions, extra hard links and observed concurrent changes. This
 adapter does not authenticate an operator plan or replace apply-time validation.
 
+### Catalog setup implementation boundary
+
+The internal schema plan binds the complete storage binding, admitted endpoint
+digest, catalog version and SHA-256 of the generated SQL. Its bounded canonical
+codec rejects unknown fields, duplicate/noncanonical encodings and unsupported
+versions. The plan carries no executable caller-supplied SQL or credentials.
+
+Schema apply uses the same endpoint-admitted dedicated session construction as
+runtime authority access, but does not require the catalog to exist beforehand.
+It requires exact plan confirmation before session creation. The connected
+database must match the binding; database metadata visibility and the existing
+schema must be available. A transaction-owned application lock serializes
+cooperating provisioners for that catalog. This is ordinary SQL session behavior,
+not server configuration or exclusion of privileged administrators.
+
+Only a completely absent catalog is provisioned. The generated table and trigger
+batches execute in one owned transaction; `GO` separators are never sent to the
+driver. Exact structural admission uses that same transaction before commit.
+An existing exact catalog is verified without DDL; partial, wrong-kind or drifted
+objects block without repair. No principal, privilege, database, schema or server
+setting is created or changed by this service.
+
+Failure or lost commit acknowledgement yields `outcome_unknown`, never success
+or an automatic second attempt. Explicit read-only inspection can establish
+whether the exact catalog exists. It cannot authorize a workload cutover or
+legacy retirement. Local SQL tests exercise concurrent setup, rollback after
+both table creations and loss of the acknowledgement after a real commit.
+The CLI/composition entry point from deployment configuration remains unfinished;
+the internal Python service is not a released operator command.
+
 ## Algorithm and transaction boundaries
 
 The operator-provisioned `dpone_cluster_publication_authority` slot table and
@@ -167,8 +198,12 @@ evaluation. Pure policy, application orchestration, bounded canonical plan
 decoding and an isolated SQL store are implemented as an unactivated foundation.
 The ordinary authority reader verifies the exact retired event, original plan
 and binding without granting replay or dispatch. Native-origin claims cannot
-label a retired envelope as an ordinary publication. The operator command, trusted
-deployment observer and fresh-operation runtime transition are not enabled yet.
+label a retired envelope as an ordinary publication. Operation-aware admission
+and SQL CAS authenticate the retained first event, permanently rejecting its
+retired operation ID even after a later operation completes. A new operation
+checks the unchanged healthy predecessor before source I/O, then acquires the
+slot through exact CAS with an isolated fresh candidate. The operator command,
+trusted deployment observer and public manifest activation remain unavailable.
 
 ### Intent and alternatives
 
@@ -227,6 +262,13 @@ unchanged target generation. It starts PREPARED without any old dispatch permit
 or quality capsule. The old operation ID is permanently ineligible for replay
 as a successful load. Preserve the retirement event when later phases advance;
 do not rewrite imported history as native history.
+
+Both normal and quality publication paths call the selected authority's explicit
+operation-aware admission capability; missing capability is not permission to
+fall back. The SQL mutation repeats root-history validation under the slot lock.
+Exactly one concurrent fresh CAS may win. A losing or ambiguous mutation grants
+no dispatch permission. A fresh candidate differs in name, UUID and replication
+path from the preserved unpublished candidate and the existing target.
 
 ### Public behavior and acceptance
 

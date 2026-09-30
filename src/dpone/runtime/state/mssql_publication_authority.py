@@ -24,7 +24,12 @@ from dpone.ports.mssql_publication import (
 from dpone.ports.publication_retirement import decode_retirement_plan, retirement_record
 from dpone.runtime.state.mssql_publication_admission import require_publication_catalog
 from dpone.runtime.state.mssql_publication_envelope import decode_envelope, require_transition
-from dpone.runtime.state.mssql_publication_queries import mutation_params, mutation_statement, read_statement
+from dpone.runtime.state.mssql_publication_queries import (
+    mutation_params,
+    mutation_statement,
+    operation_read_statement,
+    read_statement,
+)
 from dpone.runtime.state.mssql_publication_transaction import (
     PublicationTransactionUnknown,
     execute_publication_transaction,
@@ -76,6 +81,44 @@ class MssqlPublicationAuthority:
     def create_if_absent(self, record: c.AuthorityRecord) -> c.AuthorityMutationResult:
         return self._mutate(None, record)
 
+    def read_for_operation(self, target_key: str, operation_id: str) -> c.VersionedAuthorityRecord | None:
+        """Validate the immutable root before admitting any work for this ID.
+
+        The first retirement event remains authoritative after later native
+        publications. This read is not a reservation or a dispatch permission;
+        mutation must repeat its history guard under the exclusive slot lock.
+        """
+        if not isinstance(operation_id, str) or not 0 < len(operation_id) <= 128:
+            raise ValueError("invalid publication operation identity")
+
+        def validate(
+            rows: list[tuple[Any, ...]],
+        ) -> tuple[c.VersionedAuthorityRecord, c.VersionedAuthorityRecord] | None:
+            if not rows:
+                return None
+            _, current, root = self._decode_history(rows, target_key)
+            return current, root
+
+        try:
+            observed = execute_publication_transaction(
+                self._session_factory,
+                operation_read_statement(self._binding),
+                (publication_slot_key(self._binding, target_key),),
+                validate=validate,
+            )
+        except PublicationTransactionUnknown:
+            raise c.ClusterPublicationError(
+                "DPONE_MSSQL_PUBLICATION_READ_UNKNOWN", "operation history could not be verified"
+            ) from None
+        if observed is None:
+            return None
+        current, root = observed
+        if root.record.phase is c.AuthorityPhase.RETIRED_UNPUBLISHED and root.record.operation_id == operation_id:
+            raise c.ClusterPublicationError(
+                "DPONE_MSSQL_PUBLICATION_RETIRED_OPERATION", "retired operation cannot be admitted again"
+            )
+        return current
+
     def compare_and_swap(
         self, current: c.VersionedAuthorityRecord, desired: c.AuthorityRecord
     ) -> c.AuthorityMutationResult:
@@ -90,7 +133,13 @@ class MssqlPublicationAuthority:
         expected_revision = current.version + 1 if current else 1
 
         def validate(rows: list[tuple[Any, ...]]) -> tuple[bool, c.VersionedAuthorityRecord]:
-            won, observed = self._decode_receipt(rows, written.target_key)
+            won, observed, root = self._decode_history(rows, written.target_key)
+            if root.record.phase is c.AuthorityPhase.RETIRED_UNPUBLISHED:
+                if root.record.operation_id == written.operation_id:
+                    raise ValueError("retired operation cannot be mutated again")
+                if won and current is not None and current.record.phase is c.AuthorityPhase.RETIRED_UNPUBLISHED:
+                    if root != current:
+                        raise ValueError("fresh publication retirement provenance differs")
             if won and (observed.record != written or observed.version != expected_revision):
                 raise ValueError("publication write receipt does not match this invocation")
             return won, observed
@@ -105,6 +154,20 @@ class MssqlPublicationAuthority:
             return c.AuthorityMutationResult(c.AuthorityMutationStatus.CONFLICT, observed=observed)
         permit = c.DispatchPermit.for_record(written) if dispatch else None
         return c.AuthorityMutationResult(c.AuthorityMutationStatus.VERIFIED, observed=observed, permit=permit)
+
+    def _decode_history(
+        self, rows: list[tuple[Any, ...]], target_key: str
+    ) -> tuple[bool, c.VersionedAuthorityRecord, c.VersionedAuthorityRecord]:
+        """Authenticate current state and fixed-key origin before transaction ACK."""
+        if len(rows) != 1 or len(rows[0]) != 26:
+            raise ValueError("ambiguous publication root receipt")
+        won, current = self._decode_receipt([rows[0][:13]], target_key)
+        root = self._decode_receipt([rows[0][13:]], target_key)[1]
+        if root.version != 1 or (current.version == 1 and current != root):
+            raise ValueError("publication root identity differs")
+        if root.record.phase is not c.AuthorityPhase.RETIRED_UNPUBLISHED:
+            require_transition(None, root.record)
+        return won, current, root
 
     def _decode_receipt(self, rows: list[tuple[Any, ...]], target_key: str) -> tuple[bool, c.VersionedAuthorityRecord]:
         if len(rows) != 1 or len(rows[0]) != 13:

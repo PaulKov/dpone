@@ -25,17 +25,40 @@ _MATCH = (
 _CHAIN = "((s.revision=1 AND e.previous_sha256 IS NULL) OR (s.revision>1 AND p.payload_sha256=e.previous_sha256))"
 
 
-def read_statement(binding: PublicationAuthorityBinding, *, won: str = "0") -> str:
+def read_statement(binding: PublicationAuthorityBinding, *, won: str = "0", include_root: bool = False) -> str:
     """Read current/event/predecessor in one statement; caller validates flags."""
     slot, events = publication_tables(binding)
+    root_columns = (
+        ",0,r.revision,r.payload,r.payload_sha256,r.write_id,r.binding_digest,"
+        "CASE WHEN r.revision=1 THEN 1 ELSE 0 END,"
+        "CASE WHEN r.previous_sha256 IS NULL THEN 1 ELSE 0 END,"
+        "r.origin,r.provenance,r.provenance_sha256,r.operation_id,r.phase"
+        if include_root
+        else ""
+    )
+    root_join = (
+        f"LEFT JOIN {events} r WITH (HOLDLOCK) ON r.slot_key=s.slot_key AND r.revision=1 " if include_root else ""
+    )
     return (
         f"SELECT {won},s.revision,s.payload,s.payload_sha256,s.write_id,s.binding_digest,"
         f"CASE WHEN {_MATCH} THEN 1 ELSE 0 END,CASE WHEN {_CHAIN} THEN 1 ELSE 0 END,"
-        "e.origin,e.provenance,e.provenance_sha256,s.operation_id,s.phase "
+        f"e.origin,e.provenance,e.provenance_sha256,s.operation_id,s.phase{root_columns} "
         f"FROM {slot} s WITH (HOLDLOCK) LEFT JOIN {events} e WITH (HOLDLOCK) "
         "ON e.slot_key=s.slot_key AND e.revision=s.revision "
         f"LEFT JOIN {events} p WITH (HOLDLOCK) ON p.slot_key=s.slot_key AND p.revision=s.revision-1 "
+        f"{root_join}"
         "WHERE s.slot_key=@slot;"
+    )
+
+
+def operation_read_statement(binding: PublicationAuthorityBinding) -> str:
+    """Bounded immutable-root read; retained orphan history is never absence."""
+    slot, events = publication_tables(binding)
+    return (
+        "DECLARE @slot char(64)=?;\n"
+        f"IF NOT EXISTS (SELECT 1 FROM {slot} WITH (HOLDLOCK) WHERE slot_key=@slot) "
+        f"AND EXISTS (SELECT 1 FROM {events} WITH (HOLDLOCK) WHERE slot_key=@slot) "
+        "THROW 51075, 'publication history without current slot', 1;\n" + read_statement(binding, include_root=True)
     )
 
 
@@ -55,12 +78,23 @@ DECLARE @actual_revision bigint, @actual_payload varbinary(max), @actual_hash bi
  @actual_binding binary(32), @won bit=0;
 SELECT @actual_revision=revision,@actual_payload=payload,@actual_hash=payload_sha256,@actual_binding=binding_digest
  FROM {slot} WITH (UPDLOCK,HOLDLOCK) WHERE slot_key=@slot;
+IF @actual_revision IS NULL AND EXISTS (SELECT 1 FROM {events} WITH (HOLDLOCK) WHERE slot_key=@slot)
+ THROW 51075, 'publication history without current slot', 1;
+IF @actual_revision IS NOT NULL AND NOT EXISTS (
+ SELECT 1 FROM {events} WITH (HOLDLOCK) WHERE slot_key=@slot AND revision=1
+ AND binding_digest=@binding AND previous_sha256 IS NULL)
+ THROW 51076, 'publication root history differs', 1;
+IF EXISTS (SELECT 1 FROM {events} WITH (HOLDLOCK) WHERE slot_key=@slot AND revision=1
+ AND origin='legacy_retired' AND operation_id=@operation)
+ THROW 51077, 'retired publication operation cannot be reused', 1;
 IF @actual_revision IS NOT NULL AND NOT EXISTS (
  SELECT 1 FROM {slot} s JOIN {events} e WITH (HOLDLOCK) ON e.slot_key=s.slot_key AND e.revision=s.revision
  LEFT JOIN {events} p WITH (HOLDLOCK) ON p.slot_key=s.slot_key AND p.revision=s.revision-1
  WHERE s.slot_key=@slot AND {_MATCH} AND {_CHAIN}
- AND e.origin='native' AND e.provenance=@provenance
+ AND ((e.origin='native' AND e.provenance=@provenance
  AND DATALENGTH(e.provenance)=DATALENGTH(@provenance) AND e.provenance_sha256=@provenance_hash)
+ OR (s.revision=1 AND e.origin='legacy_retired' AND e.phase='RETIRED_UNPUBLISHED'
+ AND @expected_revision=1 AND @phase='PREPARED' AND e.operation_id<>@operation)))
  THROW 51072, 'publication history differs', 1;
 IF (@expected_revision IS NULL AND @actual_revision IS NULL) OR
  (@expected_revision=@actual_revision AND @expected_payload=@actual_payload
@@ -79,7 +113,7 @@ BEGIN
  IF @@ROWCOUNT<>1 THROW 51074, 'publication event write count differs', 1;
  SET @won=1;
 END;
-{read_statement(binding, won="@won")}
+{read_statement(binding, won="@won", include_root=True)}
 """
 
 

@@ -6,10 +6,9 @@ import hashlib
 from collections.abc import Callable, Iterable
 from copy import deepcopy
 from dataclasses import asdict, replace
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
-from dpone.config.load_config import LoadConfig
 from dpone.runtime.clickhouse_file_stage_contract import (
     CHUNK_BYTES,
     REMOTE_CONFIRMATION_SECONDS,
@@ -40,6 +39,9 @@ from dpone.runtime.sinks.clickhouse_validated_file_preparation import (
     make_plan,
 )
 from dpone.runtime.sinks.load_payload import LoadPayload
+
+if TYPE_CHECKING:
+    from dpone.config.load_config import LoadConfig
 
 
 class _StageSession:

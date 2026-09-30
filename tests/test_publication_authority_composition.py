@@ -194,3 +194,65 @@ def test_bound_provider_rejects_failed_readmission_without_stale_cached_authorit
         provider.ensure("replicas", "Business", ("one", "two"))
     with pytest.raises(ValueError, match="no longer admitted"):
         provider.for_database("Business")
+
+
+def test_schema_operator_plans_without_early_catalog_or_connector_admission():
+    operator = api().build_publication_schema(
+        connection=connection(),
+        binding=_BINDING,
+        environment="test",
+        connector_factory=lambda _: pytest.fail("schema plan attempted SQL I/O"),
+    )
+    assert operator.plan().endpoint_identity == _PIN
+
+
+@pytest.mark.parametrize("action", ["inspect", "apply"])
+def test_schema_operator_requires_endpoint_pin_before_catalog_or_ddl(action):
+    client = Connector((_OBSERVED[0], _OBSERVED[1], "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"))
+    operator = api().build_publication_schema(
+        connection=connection(),
+        binding=_BINDING,
+        environment="test",
+        connector_factory=lambda _: client,
+    )
+    plan = operator.plan()
+    result = operator.inspect(plan) if action == "inspect" else operator.apply(plan, confirmation_digest=plan.digest)
+    assert result.status == "outcome_unknown"
+    assert client.closed
+    assert len(client.calls) == 1
+
+
+def test_schema_operator_uses_real_shared_session_path_without_requiring_catalog_first():
+    from tests.test_mssql_publication_schema import SchemaSession
+
+    class Client(SchemaSession):
+        @property
+        def connection(self):
+            return self
+
+        def get_records(self, sql, params=()):
+            if "SERVERPROPERTY" in sql:
+                return [_OBSERVED]
+            return super().get_records(sql, params)
+
+    client = Client()
+    operator = api().build_publication_schema(
+        connection=connection(),
+        binding=_BINDING,
+        environment="test",
+        connector_factory=lambda _: client,
+    )
+    assert operator.inspect(operator.plan()).status == "ready"
+    result = operator.apply(operator.plan(), confirmation_digest=operator.plan().digest)
+    assert result.status == "completed"
+    assert len(client.ddl) == 3
+
+
+def test_schema_operator_rejects_unpinned_environment_before_io():
+    with pytest.raises(ValueError, match="publication_authority"):
+        api().build_publication_schema(
+            connection=connection(),
+            binding=_BINDING,
+            environment="prod",
+            connector_factory=lambda _: pytest.fail("unadmitted environment performed I/O"),
+        )

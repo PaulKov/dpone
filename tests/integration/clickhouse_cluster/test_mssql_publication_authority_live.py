@@ -138,10 +138,19 @@ def test_concurrent_create_and_dispatch_have_one_acknowledged_winner(catalog):
     assert stores[0].compare_and_swap(current, desired).status is Status.CONFLICT
 
 
-def test_lost_commit_ack_keeps_intent_but_cannot_grant_permit(catalog):
+@pytest.mark.parametrize("transition", ["native_dispatch", "fresh_prepared"])
+def test_lost_commit_ack_keeps_intent_but_cannot_grant_permit(catalog, transition):
     store = authority(catalog)
-    current = store.create_if_absent(record()).observed
-    desired = current.record.dispatching(token="commit-ack-loss", query_digest="d" * 64)
+    if transition == "fresh_prepared":
+        from tests.test_mssql_publication_fresh_cas import preparation
+
+        plan = retirement_plan(catalog)
+        assert retirement_store(catalog).retire_if_absent(plan) == "acknowledged"
+        current = store.read_versioned(plan.original.record.target_key)
+        desired = preparation(current.record)
+    else:
+        current = store.create_if_absent(record()).observed
+        desired = current.record.dispatching(token="commit-ack-loss", query_digest="d" * 64)
 
     class LostAck:
         def __init__(self):
@@ -171,7 +180,7 @@ def test_lost_commit_ack_keeps_intent_but_cannot_grant_permit(catalog):
     result = authority(catalog, factory=LostAck).compare_and_swap(current, desired)
     assert result.status is Status.OUTCOME_UNKNOWN and result.permit is None
     readback = store.read_versioned(current.record.target_key)
-    assert readback.version == 2 and readback.record.phase is Phase.DISPATCHING
+    assert readback.version == 2 and readback.record.phase is desired.phase
     assert store.compare_and_swap(current, desired).permit is None
 
 
@@ -400,6 +409,7 @@ def test_retirement_refuses_existing_native_slot(catalog):
 
 
 def test_retirement_orphan_history_is_not_absence_and_cannot_be_recreated(catalog):
+    from dpone.contracts.clickhouse_cluster_publication import ClusterPublicationError
     from dpone.contracts.publication_authority_binding import publication_slot_key
 
     plan = retirement_plan(catalog)
@@ -411,6 +421,83 @@ def test_retirement_orphan_history_is_not_absence_and_cannot_be_recreated(catalo
     catalog[0].execute_query("DELETE FROM dbo.dpone_cluster_publication_authority WHERE slot_key=?", (key,))
     assert store.inspect(plan) == "unknown"
     assert store.retire_if_absent(plan) == "unknown"
+    with pytest.raises(ClusterPublicationError, match="READ_UNKNOWN"):
+        authority(catalog).read_for_operation(plan.original.record.target_key, "fresh-operation")
+    assert authority(catalog).create_if_absent(plan.original.record).status is Status.OUTCOME_UNKNOWN
     assert catalog[0].get_records(
         "SELECT count(*) FROM dbo.dpone_cluster_publication_events WHERE slot_key=?", (key,)
     ) == [(1,)]
+
+
+def test_operation_read_validates_real_retirement_root_and_rejects_original_id(catalog):
+    from dpone.contracts.clickhouse_cluster_publication import ClusterPublicationError
+
+    plan = retirement_plan(catalog)
+    assert retirement_store(catalog).retire_if_absent(plan) == "acknowledged"
+    store = authority(catalog)
+    observed = store.read_for_operation(plan.original.record.target_key, "fresh-operation")
+    assert observed.version == 1
+    assert observed.record.phase is Phase.RETIRED_UNPUBLISHED
+    with pytest.raises(ClusterPublicationError, match="RETIRED_OPERATION"):
+        store.read_for_operation(plan.original.record.target_key, plan.original.record.operation_id)
+    assert retirement_store(catalog).inspect(plan) == "exact"
+
+
+def test_operation_read_validates_real_native_root_without_mutating_it(catalog):
+    store = authority(catalog)
+    original = record()
+    assert store.read_for_operation(original.target_key, original.operation_id) is None
+    result = store.create_if_absent(original)
+    assert result.status is Status.VERIFIED
+    assert store.read_for_operation(original.target_key, original.operation_id) == result.observed
+    assert store.read_versioned(original.target_key) == result.observed
+
+
+def test_one_fresh_cas_winner_keeps_retired_id_banned_after_completion(catalog):
+    from dataclasses import replace
+
+    from dpone.contracts.clickhouse_cluster_publication import ClusterPublicationError
+    from dpone.contracts.publication_authority_binding import publication_slot_key
+    from tests.test_mssql_publication_fresh_cas import preparation
+
+    plan = retirement_plan(catalog)
+    assert retirement_store(catalog).retire_if_absent(plan) == "acknowledged"
+    stores = [authority(catalog) for _ in range(6)]
+    current = stores[0].read_versioned(plan.original.record.target_key)
+    desired = preparation(current.record)
+    barrier = Barrier(len(stores))
+
+    def acquire(store):
+        barrier.wait(timeout=20)
+        return store.compare_and_swap(current, desired)
+
+    with ThreadPoolExecutor(max_workers=len(stores)) as executor:
+        results = list(executor.map(acquire, stores))
+    winners = [item for item in results if item.status is Status.VERIFIED]
+    assert len(winners) == 1
+    assert sum(item.status is Status.CONFLICT for item in results) == 5
+    assert all(item.permit is None for item in results)
+    prepared = winners[0].observed
+    store = stores[0]
+    dispatch = store.compare_and_swap(prepared, prepared.record.dispatching(token="synthetic", query_digest="1" * 64))
+    assert dispatch.status is Status.VERIFIED
+    committed = store.compare_and_swap(
+        dispatch.observed, replace(dispatch.observed.record, phase=Phase.COMMITTED, ddl_entry="synthetic-entry")
+    )
+    assert committed.status is Status.VERIFIED
+    completed = store.compare_and_swap(committed.observed, replace(committed.observed.record, phase=Phase.COMPLETED))
+    assert completed.status is Status.VERIFIED
+    with pytest.raises(ClusterPublicationError, match="RETIRED_OPERATION"):
+        store.read_for_operation(current.record.target_key, current.record.operation_id)
+    blocked = store.compare_and_swap(
+        completed.observed,
+        replace(preparation(completed.observed.record), operation_id=current.record.operation_id),
+    )
+    assert blocked.status is Status.OUTCOME_UNKNOWN
+    assert blocked.permit is None
+    assert store.read_versioned(current.record.target_key) == completed.observed
+    key = publication_slot_key(catalog[1], current.record.target_key)
+    assert catalog[0].get_records(
+        "SELECT origin,provenance FROM dbo.dpone_cluster_publication_events WHERE slot_key=? AND revision=1",
+        (key,),
+    ) == [("legacy_retired", plan.payload.encode())]

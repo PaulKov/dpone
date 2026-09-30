@@ -78,3 +78,38 @@ def test_quality_readiness_uses_provider_not_an_undocumented_authority_method(fo
     monkeypatch.setattr(store._catalog, "inventory", lambda cluster: SimpleNamespace(hosts=("one", "two")))
     with pytest.raises(ValueError, match="read-only catalog admission failed"):
         store.require_ready(_config())
+
+
+@pytest.mark.parametrize("quality", [False, True])
+def test_both_paths_use_selected_operation_admission_before_source(forbid_legacy_authority, quality):
+    from dpone.contracts.clickhouse_cluster_publication import ClusterPublicationError
+    from dpone.runtime.sinks.clickhouse_cluster_publication_identity import operation_id
+    from tests.test_clickhouse_cluster_full_refresh_publication import _Catalog, _config
+
+    calls = []
+
+    class SelectedAuthority:
+        def read_for_operation(self, target_key, requested_id):
+            calls.append((target_key, requested_id))
+            raise ClusterPublicationError("TEST_OPERATION_RETIRED", "admission rejected")
+
+        def read_versioned(self, target_key):
+            raise AssertionError("operation admission must not use an unguarded state read")
+
+    class AdmittedProvider(Provider):
+        def ensure(self, cluster, database, hosts):
+            pass
+
+    provider = AdmittedProvider()
+    provider.authority = SelectedAuthority()
+    if quality:
+        service, _ = composition.build_clickhouse_quality_publication(
+            object(), authority_provider=provider, target_acceptance_reader=object()
+        )
+    else:
+        service = composition.build_clickhouse_cluster_publication(object(), authority_provider=provider)
+    service._catalog = _Catalog()
+    with pytest.raises(ClusterPublicationError, match="TEST_OPERATION_RETIRED"):
+        service.prepare_admission(_config())
+    assert len(calls) == 1
+    assert calls[0][1] == operation_id(_config())

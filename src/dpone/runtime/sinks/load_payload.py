@@ -7,7 +7,6 @@ from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Any
 
 from dpone.runtime.artifact_protocols import ExtractionArtifact
-from dpone.type_system.source_sink.provenance import SourceColumnProvenance, SourceRelationDialect
 
 if TYPE_CHECKING:
     from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
@@ -18,6 +17,7 @@ if TYPE_CHECKING:
     )
     from dpone.runtime.sinks.mssql_target_mutation_plan import MssqlTargetMutationPlan
     from dpone.runtime.support.postgres_mssql_projection import PostgresMssqlSchemaProjection
+    from dpone.type_system.source_sink.provenance import SourceColumnProvenance, SourceRelationDialect
 
 
 @dataclass(frozen=True)

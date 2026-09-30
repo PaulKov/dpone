@@ -73,6 +73,14 @@ def receipt(value, base_revision, *, won=1, **changes):
     return tuple(fields.values())
 
 
+def mutation_receipt(value, base_revision, *, root=None, **changes):
+    """The native mutation response includes the immutable first event."""
+    if root is None:
+        initial = value if base_revision == 1 else replace(record(), authority_write_id=WRITE_ID.hex)
+        root = receipt(initial, 1, won=0)
+    return receipt(value, base_revision, **changes) + root
+
+
 class Transport:
     """Inject a server response, including commit/error ordering, without SQL execution."""
 
@@ -122,7 +130,7 @@ def authority(transport):
 
 def test_create_prepared_returns_exact_committed_envelope_without_permit():
     desired = replace(record(), authority_write_id=WRITE_ID.hex)
-    transport = Transport([receipt(desired, 1)])
+    transport = Transport([mutation_receipt(desired, 1)])
     result = authority(transport).create_if_absent(record())
     assert result.status is Status.VERIFIED
     assert result.observed == VersionedAuthorityRecord(desired, 1)
@@ -134,7 +142,7 @@ def test_only_acknowledged_winning_dispatch_transition_receives_permit():
     before = VersionedAuthorityRecord(record(), 1)
     desired = before.record.dispatching(token="intent-1", query_digest="1" * 64)
     written = replace(desired, authority_write_id=WRITE_ID.hex)
-    result = authority(Transport([receipt(written, 2)])).compare_and_swap(before, desired)
+    result = authority(Transport([mutation_receipt(written, 2)])).compare_and_swap(before, desired)
     assert result.status is Status.VERIFIED
     assert result.permit is not None
     assert result.permit.dispatch_epoch == 1
@@ -144,7 +152,7 @@ def test_only_acknowledged_winning_dispatch_transition_receives_permit():
 @pytest.mark.parametrize("failure", ["after_output", "commit"])
 def test_unknown_write_never_receives_permit_or_readback_retry(failure):
     desired = record().dispatching(token="intent-1", query_digest="1" * 64)
-    transport = Transport([receipt(replace(desired, authority_write_id=WRITE_ID.hex), 2)], failure)
+    transport = Transport([mutation_receipt(replace(desired, authority_write_id=WRITE_ID.hex), 2)], failure)
     result = authority(transport).compare_and_swap(VersionedAuthorityRecord(record(), 1), desired)
     assert result.status is Status.OUTCOME_UNKNOWN and result.permit is None
     assert len(transport.calls) == 1
@@ -152,7 +160,7 @@ def test_unknown_write_never_receives_permit_or_readback_retry(failure):
 
 def test_losing_identical_cas_does_not_impersonate_winner():
     desired = record().dispatching(token="intent-1", query_digest="1" * 64)
-    transport = Transport([receipt(replace(desired, authority_write_id=WRITE_ID.hex), 2, won=0)])
+    transport = Transport([mutation_receipt(replace(desired, authority_write_id=WRITE_ID.hex), 2, won=0)])
     result = authority(transport).compare_and_swap(VersionedAuthorityRecord(record(), 1), desired)
     assert result.status is Status.CONFLICT and result.permit is None
 
@@ -174,7 +182,7 @@ def test_losing_identical_cas_does_not_impersonate_winner():
 )
 def test_corrupt_receipt_never_grants_a_permit(change):
     desired = record().dispatching(token="intent-1", query_digest="1" * 64)
-    transport = Transport([receipt(replace(desired, authority_write_id=WRITE_ID.hex), 2, **change)])
+    transport = Transport([mutation_receipt(replace(desired, authority_write_id=WRITE_ID.hex), 2, **change)])
     result = authority(transport).compare_and_swap(VersionedAuthorityRecord(record(), 1), desired)
     assert result.status is Status.OUTCOME_UNKNOWN and result.permit is None
 
@@ -271,7 +279,7 @@ def test_cleanup_dispatch_has_distinct_acknowledged_permit():
         cleanup_correlation_token="cleanup-2",
         cleanup_query_digest="2" * 64,
     )
-    transport = Transport([receipt(replace(desired, authority_write_id=WRITE_ID.hex), 4)])
+    transport = Transport([mutation_receipt(replace(desired, authority_write_id=WRITE_ID.hex), 4)])
     result = authority(transport).compare_and_swap(VersionedAuthorityRecord(before, 3), desired)
     assert result.status is Status.VERIFIED and result.permit.dispatch_epoch == 2
 
@@ -287,7 +295,7 @@ def test_malformed_read_cannot_be_treated_as_absent(bad_payload):
 
 def test_transaction_batch_guards_predecessor_and_native_provenance():
     written = replace(record(), authority_write_id=WRITE_ID.hex)
-    transport = Transport([receipt(written, 1)])
+    transport = Transport([mutation_receipt(written, 1)])
     authority(transport).create_if_absent(record())
     sql, params = transport.calls[0]
     assert "UPDLOCK,HOLDLOCK" in sql

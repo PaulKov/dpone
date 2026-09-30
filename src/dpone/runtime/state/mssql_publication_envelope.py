@@ -56,6 +56,9 @@ def require_transition(current: c.VersionedAuthorityRecord | None, desired: c.Au
         raise ValueError("invalid publication revision")
     if desired.target_key != before.target_key:
         raise ValueError("publication target changed")
+    if before.phase is c.AuthorityPhase.RETIRED_UNPUBLISHED:
+        _require_fresh_after_retirement(current, desired)
+        return False
     if before.phase is c.AuthorityPhase.COMPLETED and desired.phase is c.AuthorityPhase.PREPARED:
         if (
             before.operation_id == desired.operation_id
@@ -101,6 +104,40 @@ def require_transition(current: c.VersionedAuthorityRecord | None, desired: c.Au
         if not token or not digest or desired.dispatch_epoch != before.dispatch_epoch + 1:
             raise ValueError("publication dispatch intent is incomplete")
     return dispatch
+
+
+def _require_fresh_after_retirement(current: c.VersionedAuthorityRecord, desired: c.AuthorityRecord) -> None:
+    """New preparation against the unchanged predecessor, not the old candidate.
+
+    This envelope check neither authenticates retirement provenance nor grants
+    ownership. The SQL adapter must bind immutable history and win exact CAS.
+    A different UUID sharing the old replication path is not a fresh generation.
+    """
+    before = current.record
+    prior_generations = (before.desired,) + ((before.predecessor,) if before.predecessor else ())
+    if (
+        current.version != 1
+        or before.dispatch_epoch != 0
+        or before.quality_evidence is not None
+        or desired.phase is not c.AuthorityPhase.PREPARED
+        or desired.operation_id == before.operation_id
+        or not desired.fence_token
+        or desired.fence_token == before.fence_token
+        or not desired.candidate
+        or desired.candidate in {before.candidate, before.target}
+        or desired.dispatch_epoch != before.dispatch_epoch + 1
+        or (desired.database, desired.target, desired.inventory_digest)
+        != (before.database, before.target, before.inventory_digest)
+        or desired.predecessor != before.predecessor
+        or any(
+            desired.desired.uuid == prior.uuid
+            or (desired.desired.keeper_name, desired.desired.keeper_path) == (prior.keeper_name, prior.keeper_path)
+            for prior in prior_generations
+        )
+    ):
+        raise ValueError("invalid fresh publication after retirement")
+    _empty_intents(before)
+    _empty_intents(desired)
 
 
 def _without(record: c.AuthorityRecord, names: set[str]) -> dict[str, Any]:

@@ -29,6 +29,7 @@ from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
     reconcile_existing,
     require_first_publication_complete,
     require_pre_dispatch_generation,
+    require_retired_predecessor,
     settle_prior_publication,
 )
 from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
@@ -61,7 +62,7 @@ require_quality_retired = quality_contracts.require_quality_retired
 
 
 class ClickHouseClusterFullRefreshPublicationService:
-    """Fence publication in Keeper and reconcile exact per-replica truth."""
+    """Fence publication in its admitted authority and reconcile replica truth."""
 
     def __init__(
         self,
@@ -124,10 +125,18 @@ class ClickHouseClusterFullRefreshPublicationService:
         readiness_deadline = candidate_readiness_deadline()
         require_pre_dispatch_generation(self._catalog, cluster, record, deadline=readiness_deadline)
         authority = self._authority_factory(database)
-        current = authority.read_versioned(target_key)
+        current = authority.read_for_operation(target_key, operation_id)
         if current is None:
             created = authority.create_if_absent(record)
             current = _require_verified(created, permit=False)
+        elif current.record.phase is AuthorityPhase.RETIRED_UNPUBLISHED:
+            if record.predecessor != current.record.predecessor:
+                raise ClusterPublicationError(
+                    "DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED", "fresh load cannot replace the retired baseline"
+                )
+            require_retired_predecessor(self._catalog, cluster, current.record)
+            record = replace(record, dispatch_epoch=current.record.dispatch_epoch + 1)
+            current = _require_verified(authority.compare_and_swap(current, record), permit=False)
         elif current.record.phase is AuthorityPhase.COMPLETED and current.record.operation_id != record.operation_id:
             require_quality_retired(
                 current.record.quality_evidence, current.record.quality_reader, authority_version=current.version
@@ -170,8 +179,11 @@ class ClickHouseClusterFullRefreshPublicationService:
         self._catalog.require_atomic_database(cluster, database, inventory.hosts)
         self._bootstrap.ensure(cluster, database, inventory.hosts)
         authority = self._authority_factory(database)
-        current = authority.read_versioned(target_key)
+        current = authority.read_for_operation(target_key, _operation_id(load_config))
         if current is None:
+            return load_config
+        if current.record.phase is AuthorityPhase.RETIRED_UNPUBLISHED:
+            require_retired_predecessor(self._catalog, cluster, current.record)
             return load_config
         if current.record.operation_id != _operation_id(load_config):
             require_quality_retired(

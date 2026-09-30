@@ -8,7 +8,6 @@ from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 from dpone.config.load_strategy import LoadStrategy
-from dpone.contracts.runtime_connection import ResolvedBindingConnection
 from dpone.runtime.credentials.authority_resolution import (
     canonical_ref,
     canonical_runtime_endpoint_type,
@@ -35,6 +34,7 @@ from .runtime_context import RuntimeConnectionContext
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
+    from dpone.contracts.runtime_connection import ResolvedBindingConnection
     from dpone.ports.mssql_publication import PublicationAuthorityBinding
 
 _STATELESS_STRATEGIES = frozenset({LoadStrategy.FULL_REFRESH, LoadStrategy.REPLACE, LoadStrategy.BACKFILL})

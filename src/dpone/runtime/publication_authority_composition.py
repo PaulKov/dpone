@@ -17,13 +17,14 @@ from uuid import UUID
 from dpone.ports.clickhouse_cluster_publication import contracts as c
 from dpone.runtime.credentials.resolved_connector_factory import ResolvedConnectorFactory
 from dpone.runtime.state.mssql_publication_authority import MssqlPublicationAuthority
+from dpone.runtime.state.mssql_publication_schema import MssqlPublicationSchema
 
 if TYPE_CHECKING:
+    from dpone.contracts.runtime_connection import ResolvedBindingConnection
     from dpone.ports.clickhouse_cluster_publication import ClusterPublicationAuthorityPort
     from dpone.ports.mssql_publication import (
         PublicationAuthorityBinding,
         PublicationSqlSession,
-        ResolvedBindingConnection,
     )
 
 _IDENTITY_SQL = (
@@ -74,14 +75,55 @@ def build_publication_authority(
     The catalog observer and every mutation/read session resolve from the same
     immutable workload connection snapshot. No xmin-state connector is reused.
     """
-    pin = _require_deployment_pin(connection, binding, environment)
-    factory = connector_factory if connector_factory is not None else ResolvedConnectorFactory.create
+    sessions = _PublicationConnections(connection, binding, environment, connector_factory)
+    catalog = sessions.connector()
+    try:
+        return MssqlPublicationAuthority(
+            catalog_connector=catalog, session_factory=sessions.session, binding=binding, endpoint_identity=sessions.pin
+        )
+    finally:
+        try:
+            catalog.close()
+        except Exception:
+            raise ValueError("publication_authority: catalog session close failed") from None
 
-    def admitted_connector() -> Any:
+
+def build_publication_schema(
+    *,
+    connection: ResolvedBindingConnection,
+    binding: PublicationAuthorityBinding,
+    environment: str,
+    connector_factory: Callable[[ResolvedBindingConnection], Any] | None = None,
+) -> MssqlPublicationSchema:
+    """Share endpoint admission, without requiring a catalog before explicit setup.
+
+    Plan construction is I/O-free; inspect/apply validate the pinned SQL server,
+    database and database GUID on every dedicated session. The caller still
+    needs exact plan confirmation to provision an absent catalog.
+    """
+    sessions = _PublicationConnections(connection, binding, environment, connector_factory)
+    return MssqlPublicationSchema(session_factory=sessions.session, binding=binding, endpoint_identity=sessions.pin)
+
+
+class _PublicationConnections:
+    """One admitted session source shared by catalog setup and runtime access."""
+
+    def __init__(
+        self,
+        connection: ResolvedBindingConnection,
+        binding: PublicationAuthorityBinding,
+        environment: str,
+        factory: Callable[[ResolvedBindingConnection], Any] | None,
+    ) -> None:
+        self.pin = _require_deployment_pin(connection, binding, environment)
+        self._connection = connection
+        self._factory = factory if factory is not None else ResolvedConnectorFactory.create
+
+    def connector(self) -> Any:
         connector = None
         try:
-            connector = factory(connection)
-            if _endpoint_digest(connector.get_records(_IDENTITY_SQL)) != pin:
+            connector = self._factory(self._connection)
+            if _endpoint_digest(connector.get_records(_IDENTITY_SQL)) != self.pin:
                 raise ValueError("endpoint identity differs")
             return connector
         except Exception:
@@ -90,25 +132,14 @@ def build_publication_authority(
                     connector.close()
             raise ValueError("publication_authority: SQL endpoint admission failed") from None
 
-    def session_factory() -> PublicationSqlSession:
-        connector = admitted_connector()
+    def session(self) -> PublicationSqlSession:
+        connector = self.connector()
         try:
             return connector.connection
         except Exception:
             with suppress(Exception):
                 connector.close()
             raise ValueError("publication_authority: dedicated SQL session unavailable") from None
-
-    catalog = admitted_connector()
-    try:
-        return MssqlPublicationAuthority(
-            catalog_connector=catalog, session_factory=session_factory, binding=binding, endpoint_identity=pin
-        )
-    finally:
-        try:
-            catalog.close()
-        except Exception:
-            raise ValueError("publication_authority: catalog session close failed") from None
 
 
 def build_runtime_publication_provider(

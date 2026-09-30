@@ -10,9 +10,8 @@ import struct
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from decimal import Decimal
-from typing import BinaryIO
+from typing import TYPE_CHECKING, BinaryIO
 
-from dpone.config.load_config import LoadConfig
 from dpone.runtime.artifact_integrity import ArtifactIntegrityError, FileIdentity
 from dpone.runtime.clickhouse_binary_encoding import encode_clickhouse_value, unwrap_nullable
 from dpone.runtime.clickhouse_file_stage_contract import (
@@ -31,6 +30,9 @@ from dpone.runtime.file_artifact_authority import FileVerificationBudget
 from dpone.runtime.process_io import add_exception_note
 from dpone.runtime.sinks.clickhouse_physical_types import ClickHousePhysicalColumnTypeResolver
 from dpone.runtime.support.type_mapping.mssql_clickhouse import MssqlClickHouseTypeMapper, MssqlClickHouseTypePolicy
+
+if TYPE_CHECKING:
+    from dpone.config.load_config import LoadConfig
 
 
 def config_digest(config: LoadConfig) -> str:

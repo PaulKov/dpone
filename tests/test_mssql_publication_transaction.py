@@ -135,3 +135,61 @@ def test_connection_failure_is_redacted_and_not_retried():
         api().execute_publication_transaction(factory, "SELECT ?", (), validate=lambda rows: rows)
     assert calls == [1]
     assert "synthetic-sensitive-driver-detail" not in str(error.value)
+
+
+def test_owned_operation_validates_multiple_batches_before_single_commit():
+    session = ScriptedSession()
+
+    def provision(cursor):
+        for _ in range(2):
+            rows = api().execute_publication_statement(cursor, "SET XACT_ABORT ON; SELECT ?", ("bound-value",))
+            assert rows == [("write-id", 1)]
+            assert "commit" not in session.events
+        return "catalog-admitted"
+
+    result = api().run_publication_transaction(lambda: session, provision)
+    assert result == "catalog-admitted"
+    assert session.events.count("execute") == 2
+    assert session.events.count("commit") == 1
+
+
+def test_owned_operation_post_ddl_validation_failure_rolls_back_without_commit():
+    session = ScriptedSession()
+
+    def reject_catalog(cursor):
+        api().execute_publication_statement(cursor, "SET XACT_ABORT ON; SELECT ?", ("bound-value",))
+        raise ValueError("synthetic-sensitive-catalog-detail")
+
+    with pytest.raises(api().PublicationTransactionUnknown) as error:
+        api().run_publication_transaction(lambda: session, reject_catalog)
+    assert "synthetic-sensitive" not in str(error.value)
+    assert "rollback" in session.events
+    assert "commit" not in session.events
+
+
+def test_ddl_statement_consumes_transport_errors_even_without_a_rowset():
+    session = ScriptedSession("nextset")
+    session.description = None
+    session.autocommit = False
+    with pytest.raises(RuntimeError):
+        api().execute_publication_statement(
+            session, "SET XACT_ABORT ON; SELECT ?", ("bound-value",), rows_required=False
+        )
+    assert session.events == ["execute", "nextset"]
+
+
+def test_ddl_statement_accepts_no_rows_but_rejects_an_unexpected_result():
+    session = ScriptedSession()
+    session.description = None
+    session.autocommit = False
+    assert (
+        api().execute_publication_statement(
+            session, "SET XACT_ABORT ON; SELECT ?", ("bound-value",), rows_required=False
+        )
+        == []
+    )
+    session.description = (("unexpected",),)
+    with pytest.raises(ValueError):
+        api().execute_publication_statement(
+            session, "SET XACT_ABORT ON; SELECT ?", ("bound-value",), rows_required=False
+        )

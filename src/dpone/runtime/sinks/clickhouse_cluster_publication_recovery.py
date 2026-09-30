@@ -80,6 +80,25 @@ def candidate_readiness_deadline() -> float:
     return time.monotonic() + DEFAULT_WAIT_SECONDS
 
 
+def require_retired_predecessor(
+    catalog: ClusterPublicationCatalogPort, cluster: str, record: contracts.AuthorityRecord
+) -> None:
+    """Admit fresh work only while every retained predecessor remains unchanged.
+
+    No fresh candidate exists at pre-source admission. The old candidate is
+    retained evidence, not the baseline for a new load or a cleanup request.
+    """
+    inventory = catalog.inventory(cluster)
+    contracts.require_inventory(record, inventory)
+    facts = catalog.generations(cluster, record.database, record.target, record.candidate, inventory.hosts)
+    if tuple(sorted(fact.host for fact in facts)) != inventory.hosts or any(
+        fact.target != record.predecessor or (fact.target is not None and not fact.target_healthy) for fact in facts
+    ):
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED", "retired predecessor is not exact and healthy"
+        )
+
+
 def require_pre_dispatch_generation(
     catalog: ClusterPublicationCatalogPort,
     cluster: str,

@@ -23,12 +23,20 @@
   upcoming publication operator workflow. Concurrent writers cannot overwrite
   an existing plan; ambiguous directory-sync outcomes preserve completed
   evidence for readback. Operator commands are not yet activated.
+- Add an internal versioned catalog plan/apply service with exact endpoint and
+  DDL confirmation. It creates only an absent publication catalog, serializes
+  cooperating setup invocations, validates structure within the DDL transaction
+  and provides read-only outcome inspection. Existing or partial objects are
+  never repaired implicitly. Public operator commands remain unavailable.
 - Add unactivated guarded-retirement policy, service and an admitted MSSQL
   absent-only store. Retirement preserves original replica bytes in immutable
   history, records `RETIRED_UNPUBLISHED` rather than publication success, and
   grants no dispatch permit. A private persistent attempt journal blocks repeat
-  writes after an unknown outcome. Trusted deployment observation, fresh-load
-  handoff and operator CLI integration remain required before activation.
+  writes after an unknown outcome. Operation-aware reads and SQL mutations
+  retain the original retirement event and permanently reject its operation ID;
+  fresh work checks every predecessor replica and competes through exact CAS
+  with an isolated new candidate. Trusted deployment observation, public
+  manifest selection and operator CLI integration remain required before activation.
 
 ### Fixed
 

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from dpone.ports.clickhouse_cluster_publication import contracts
+from dpone.ports.clickhouse_cluster_publication import contracts, reject_unproven_retirement
 
 AUTHORITY_TABLE = contracts.AUTHORITY_TABLE
 _INSERT_COLUMNS = "target_key, operation_id, fence_token, phase, dispatch_epoch, payload, payload_sha256, version"
@@ -47,7 +47,14 @@ class ClickHouseKeeperMapAuthority:
             return None
         return contracts.VersionedAuthorityRecord(record=record, version=int(row[6]))
 
+    def read_for_operation(self, target_key: str, operation_id: str) -> contracts.VersionedAuthorityRecord | None:
+        current = self.read_versioned(target_key)
+        if current is not None:
+            reject_unproven_retirement(current.record)
+        return current
+
     def create_if_absent(self, record: contracts.AuthorityRecord) -> contracts.AuthorityMutationResult:
+        reject_unproven_retirement(record)
         sql = (
             f"INSERT INTO {self._qualified} ({_INSERT_COLUMNS}) "
             "SELECT %(target_key)s, %(operation_id)s, %(fence_token)s, %(phase)s, %(dispatch_epoch)s, "
@@ -69,6 +76,8 @@ class ClickHouseKeeperMapAuthority:
         self, current: contracts.VersionedAuthorityRecord, desired: contracts.AuthorityRecord
     ) -> contracts.AuthorityMutationResult:
         before = current.record
+        reject_unproven_retirement(before)
+        reject_unproven_retirement(desired)
         sql = (
             f"INSERT INTO {self._qualified} ({_INSERT_COLUMNS}) "
             "SELECT %(target_key)s, %(operation_id)s, %(fence_token)s, %(new_phase)s, %(new_epoch)s, "
