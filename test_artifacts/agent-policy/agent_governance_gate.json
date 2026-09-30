@@ -1,6 +1,7 @@
 {
   "base_ref": "origin/master",
   "changed_paths": [
+    ".agents/policy/ci-shadow-reconciliation-observation-bundle-v1.yml",
     ".github/workflows/ci.yml",
     ".github/workflows/release.yml",
     ".github/workflows/source-release-readiness.yml",
@@ -274,8 +275,8 @@
     }
   ],
   "control_surface_changed": true,
-  "generated_at": "2026-09-30T09:32:36+00:00",
-  "head_commit": "06d2ecd7744965d6c342b0e4bb4df34476daab74",
+  "generated_at": "2026-09-30T09:54:51+00:00",
+  "head_commit": "fc6ac152189c9a3e0b9931dbcd3f8161ea4faeca",
   "risks": [
     "AG-001",
     "AG-002",
