@@ -6,8 +6,9 @@ import hashlib
 import json
 import re
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
+from threading import Lock
 from typing import Any
 
 from dpone._compat import StrEnum
@@ -214,9 +215,9 @@ class AuthorityRecord:
     @property
     def payload(self) -> str:
         values = asdict(self)
-        for field in ("quality_evidence", "quality_reader", "authority_write_id"):
-            if values[field] is None:
-                del values[field]
+        for name in ("quality_evidence", "quality_reader", "authority_write_id"):
+            if values[name] is None:
+                del values[name]
         return canonical_json(values)
 
     @property
@@ -241,12 +242,38 @@ class VersionedAuthorityRecord:
 
 @dataclass(frozen=True, slots=True)
 class DispatchPermit:
-    """In-memory proof that this call won an acknowledged, verified CAS."""
+    """One-shot, process-local capability from an acknowledged, verified CAS.
+
+    Consumption precedes transport invocation and is never undone on error.
+    A readback must not recreate a permit: only the winning write can issue it.
+    This capability is not a serialized authority record or a security token.
+    """
 
     target_key: str
     operation_id: str
     fence_token: str
     dispatch_epoch: int
+    effect_digest: str
+    _lock: Any = field(default_factory=Lock, init=False, repr=False, compare=False)
+    _consumed: bool = field(default=False, init=False, repr=False, compare=False)
+
+    @classmethod
+    def for_record(cls, record: AuthorityRecord) -> DispatchPermit:
+        # The receipt's write UUID differs from the caller's desired payload;
+        # every business/effect field remains bound, including correlation.
+        return cls(
+            record.target_key,
+            record.operation_id,
+            record.fence_token,
+            record.dispatch_epoch,
+            replace(record, authority_write_id=None).payload_sha256,
+        )
+
+    def consume(self) -> None:
+        with self._lock:
+            if self._consumed:
+                raise ValueError("cluster publication dispatch permit already consumed")
+            object.__setattr__(self, "_consumed", True)
 
 
 @dataclass(frozen=True, slots=True)

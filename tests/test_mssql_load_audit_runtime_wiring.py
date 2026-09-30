@@ -16,6 +16,7 @@ from dpone.ports.runtime_hydrator import RuntimeBindings
 from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
 from dpone.runtime.bootstrap_runner import DefaultProcessRunner
 from dpone.runtime.bootstrap_state import RuntimeStateBootstrap
+from dpone.runtime.credentials.authority import RuntimeResolvedConnections
 from dpone.runtime.credentials.config import CredentialsConfig
 from dpone.runtime.credentials.resolved_connector_factory import ResolvedConnectorFactory
 from dpone.runtime.errors import RuntimeConfigurationError
@@ -99,7 +100,7 @@ def test_hydrator_exposes_one_identity_service_bound_to_state_audit(
 ) -> None:
     audit_storage = object()
     state_bootstrap = _HydratorStateBootstrap(audit_storage)
-    connections = SimpleNamespace(
+    connections = RuntimeResolvedConnections(
         strict=True,
         source=None,
         sink=None,
@@ -389,7 +390,7 @@ def _build_target_atomic_runtime(
     state_connector: object | None,
     target_connector: object | None,
 ) -> RuntimeBindings:
-    connections = SimpleNamespace(
+    connections = RuntimeResolvedConnections(
         strict=True,
         source=None,
         sink=_resolved_mssql_connection(database="DWH_Dev", schema="sample_metrics"),

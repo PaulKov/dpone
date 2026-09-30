@@ -8,8 +8,18 @@
   identity, exact catalog admission, append-only event history, versioned CAS and
   commit-acknowledged dispatch permits. Local SQL Server fault tests cover
   competing writers and lost acknowledgements. Manifest selection, legacy
-  adoption and end-to-end ClickHouse recovery are not yet enabled; existing
-  publication backends and workloads are unchanged.
+  adoption and end-to-end ClickHouse recovery are not yet enabled. Internal
+  runtime composition shares the admitted binding across publication, quality
+  replay and cloned sinks, validates the SQL endpoint on every owned session,
+  and rejects unsupported selections before source I/O. Existing manifests
+  retain their backend selection.
+
+### Fixed
+
+- Bind clustered publication and cleanup dispatch permits to the exact phase,
+  payload and rendered DDL intent. Consume each process-local permit once,
+  before transport, including concurrent reuse and lost transport replies;
+  readback never recreates permission to dispatch.
 
 ## 0.88.0 - 2026-09-30
 

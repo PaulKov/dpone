@@ -41,6 +41,7 @@ from dpone.runtime.sinks.sink_protocol import AbstractSink
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
+    from dpone.ports.clickhouse_cluster_publication import ClusterPublicationAuthorityProviderPort
     from dpone.ports.clickhouse_connector import ClickHouseConnectorPort
 
 
@@ -72,11 +73,13 @@ class ClickHouseSink(
         | None = None,
         durable_quality_replay: bool = False,
         target_acceptance_reader: Any | None = None,
+        publication_authority_provider: ClusterPublicationAuthorityProviderPort | None = None,
     ):
         configure_quality_replay(
             self, durable_quality_replay=durable_quality_replay, target_acceptance_reader=target_acceptance_reader
         )
         self.connector = connector
+        self.publication_authority_provider = publication_authority_provider
         self.state_storage = state_storage
         self.logger = logger or _default_etl_logger()
         self.acceptance_metric_probe = _default_acceptance_metric_probe(connector)
@@ -101,6 +104,7 @@ class ClickHouseSink(
             ),
             count_rows=self._count,
             mutations_sync=self._mutations_sync,
+            authority_provider=publication_authority_provider,
         )
         self._validated_file_service = staging.validated_file
         self._staging_decoder = staging.decoder
@@ -286,6 +290,7 @@ class ClickHouseSink(
             http_runner_cls=self._http_runner_cls,
             durable_quality_replay=self.durable_quality_replay,
             target_acceptance_reader=self.target_acceptance_reader if connector is self.connector else None,
+            publication_authority_provider=self.publication_authority_provider,
         )
 
     def _execute_insert(self, load_config: LoadConfig, columns: Sequence[str], rows: Sequence[tuple[Any, ...]]) -> int:

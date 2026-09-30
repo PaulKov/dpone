@@ -25,6 +25,7 @@ from dpone.runtime.credentials.authority_resolution import (
     state_ref,
     warn_legacy_runtime_connections,
 )
+from dpone.runtime.credentials.publication_binding import select_publication_binding
 
 from .governed_database_authority import (
     require_governed_mssql_database_authority,
@@ -34,6 +35,7 @@ from .runtime_context import RuntimeConnectionContext
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
+    from dpone.ports.mssql_publication import PublicationAuthorityBinding
 
 _STATELESS_STRATEGIES = frozenset({LoadStrategy.FULL_REFRESH, LoadStrategy.REPLACE, LoadStrategy.BACKFILL})
 
@@ -50,6 +52,8 @@ class RuntimeResolvedConnections:
     object_storage_runtime: ResolvedBindingConnection | None = None
     object_storage_clickhouse: ResolvedBindingConnection | None = None
     source_materialization: ResolvedBindingConnection | None = None
+    publication_authority: ResolvedBindingConnection | None = None
+    publication_binding: PublicationAuthorityBinding | None = None
     by_ref: Mapping[str, ResolvedBindingConnection] = field(default_factory=lambda: MappingProxyType({}))
     receipts: tuple[Mapping[str, Any], ...] = ()
 
@@ -64,6 +68,9 @@ def resolve_runtime_connections(
 
     source = mapping(config.get("source"))
     sink = mapping(config.get("sink"))
+    publication_binding = select_publication_binding(
+        sink, load_config=load_config, environment=context.environment if context else None
+    )
     state = mapping(config.get("state"))
     proxy = mapping(config.get("bigquery_proxy"))
     object_storage = mapping(config.get("object_storage"))
@@ -94,6 +101,8 @@ def resolve_runtime_connections(
     )
 
     refs: dict[str, str] = {}
+    if publication_binding is not None:
+        refs["publication_authority"] = publication_binding.connection_ref
     selected_source_ref = source_ref(source)
     if selected_source_ref is not None:
         refs["source"] = selected_source_ref
@@ -125,6 +134,8 @@ def resolve_runtime_connections(
     resolved_by_ref = {
         connection_ref: resolve(context, connection_ref) for connection_ref in sorted(set(refs.values()))
     }
+    if publication_binding is not None:
+        publication_binding.require_descriptor(resolved_by_ref[refs["publication_authority"]].descriptor)
     if "source" in refs:
         require_type(resolved_by_ref[refs["source"]], source, capability="source")
     if "source_materialization" in refs:
@@ -154,6 +165,10 @@ def resolve_runtime_connections(
     )
     return RuntimeResolvedConnections(
         strict=True,
+        publication_binding=publication_binding,
+        publication_authority=(
+            resolved_by_ref[refs["publication_authority"]] if "publication_authority" in refs else None
+        ),
         source=resolved_by_ref[refs["source"]] if "source" in refs else None,
         sink=resolved_sink,
         state=resolved_by_ref[refs["state"]] if "state" in refs else None,

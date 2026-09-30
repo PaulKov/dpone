@@ -13,6 +13,7 @@ from dpone.contracts.runtime_connection import (
 from dpone.contracts.source_physical_identity import SourcePhysicalIdentity
 from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
 from dpone.runtime.bootstrap_state_models import RuntimeStateBindings
+from dpone.runtime.credentials.authority import RuntimeResolvedConnections
 from dpone.runtime.credentials.config import CredentialsConfig
 from dpone.runtime.credentials.resolved_connector_factory import ResolvedConnectorFactory
 from dpone.runtime.state.factory import StateFactory
@@ -126,7 +127,7 @@ def test_production_hydration_uses_only_target_identity_and_generic_four_object_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     state_connector = object()
-    connections = SimpleNamespace(
+    connections = RuntimeResolvedConnections(
         strict=True,
         source=_connection("postgres", database="source", schema="public"),
         sink=_connection("mssql", database="DWH", schema="dbo"),
@@ -351,7 +352,7 @@ def test_strict_key_snapshot_hydration_binds_database_authority_to_xmin(
         def build_run_state_storage(**_kwargs) -> None:
             return None
 
-    connections = SimpleNamespace(
+    connections = RuntimeResolvedConnections(
         strict=True,
         source=_connection("postgres", database="source", schema="public"),
         sink=_connection("mssql", database="DWH", schema="dbo"),

@@ -84,10 +84,13 @@ class ResolvedEndpointFactory:
         proxy_connection: ResolvedBindingConnection | None = None,
         runtime_storage_policy: RuntimeStoragePolicy | None = None,
         durable_quality_replay: bool = False,
+        publication_authority_provider: Any | None = None,
     ) -> Any:
         """Create a sink from one immutable resolved connection."""
 
         connection_type = cls._connection_type(connection, endpoint="sink")
+        if publication_authority_provider is not None and connection_type != ConnectionType.CLICKHOUSE:
+            raise ValueError("publication_authority: ClickHouse sink required")
         require_replay_boolean(durable_quality_replay, sink_type=connection_type.value)
         connector = ResolvedConnectorFactory.create(
             connection,
@@ -127,6 +130,11 @@ class ResolvedEndpointFactory:
                 state_storage=state_storage,
                 logger=etl_logger,
                 **({"durable_quality_replay": True} if durable_quality_replay else {}),
+                **(
+                    {"publication_authority_provider": publication_authority_provider}
+                    if publication_authority_provider is not None
+                    else {}
+                ),
             )
         if connection_type == ConnectionType.KAFKA:
             from dpone.runtime.sinks.kafka import KafkaSink

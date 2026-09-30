@@ -16,6 +16,7 @@ from dpone.contracts.publication_authority_binding import (
 from dpone.contracts.publication_authority_binding import (
     publication_slot_key as publication_slot_key,
 )
+from dpone.contracts.runtime_connection import ResolvedBindingConnection as ResolvedBindingConnection
 
 
 class PublicationCatalogReader(Protocol):

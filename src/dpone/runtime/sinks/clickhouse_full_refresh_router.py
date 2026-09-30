@@ -8,6 +8,7 @@ from typing import Any
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION
 from dpone.ports.clickhouse_cluster_publication import (
     ClickHouseClusterAdmissionError,
+    ClusterPublicationAuthorityProviderPort,
     clickhouse_cluster_admission_input,
     evaluate_clickhouse_cluster_admission,
 )
@@ -37,13 +38,18 @@ class ClickHouseFullRefreshPublicationRouter:
         self._cluster = cluster
         self._external = external
         self._durable_quality = False
+        self._bound_authority = False
 
     @classmethod
-    def from_connector(cls, connector: Any) -> ClickHouseFullRefreshPublicationRouter:
-        return cls(
+    def from_connector(
+        cls, connector: Any, *, authority_provider: ClusterPublicationAuthorityProviderPort | None = None
+    ) -> ClickHouseFullRefreshPublicationRouter:
+        router = cls(
             ClickHouseFullRefreshPublicationService.from_connector(connector),
-            build_clickhouse_cluster_publication(connector),
+            build_clickhouse_cluster_publication(connector, authority_provider=authority_provider),
         )
+        router._bound_authority = authority_provider is not None
+        return router
 
     @classmethod
     def from_sink(cls, sink: Any) -> ClickHouseFullRefreshPublicationRouter:
@@ -53,10 +59,13 @@ class ClickHouseFullRefreshPublicationRouter:
             build_clickhouse_external_replication,
         )
 
-        router = cls.from_connector(sink.connector)
+        provider = getattr(sink, "publication_authority_provider", None)
+        router = cls.from_connector(sink.connector, authority_provider=provider)
         if getattr(sink, "durable_quality_replay", False):
             router._cluster, sink.quality_replay_store = build_clickhouse_quality_publication(
-                sink.connector, target_acceptance_reader=getattr(sink, "target_acceptance_reader", None)
+                sink.connector,
+                target_acceptance_reader=getattr(sink, "target_acceptance_reader", None),
+                authority_provider=provider,
             )
             router._durable_quality = True
         router._external = build_clickhouse_external_replication(sink)
@@ -127,6 +136,8 @@ class ClickHouseFullRefreshPublicationRouter:
 
     def _service(self, load_config: Any) -> Any:
         decision = evaluate_clickhouse_cluster_admission(_admission_input(load_config))
+        if self._bound_authority and (not decision.selected or decision.mode != "cluster"):
+            raise ValueError("publication_authority: internal replicated full refresh required; no fallback")
         if self._durable_quality and decision.mode != "cluster":
             raise ReplayQualityEvidenceError("UNSUPPORTED")
         if not self._local.is_enabled(load_config) and not decision.requested:
