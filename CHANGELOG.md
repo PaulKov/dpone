@@ -24,6 +24,8 @@
   for successful loads.
 - Declare the version parser used by SqlClient composition as a base runtime
   dependency so the standard `dpone` wheel keeps CLI startup self-contained.
+- Remove unused localization satellite assemblies from the SqlClient companion
+  wheel while retaining neutral runtime assemblies under descriptor integrity.
 
 ## 0.87.4 - 2026-09-29
 

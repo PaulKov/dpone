@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import platform
+import runpy
 import shutil
 import subprocess
 from pathlib import Path
@@ -17,6 +18,9 @@ from wheel.bdist_wheel import bdist_wheel
 ROOT = Path(__file__).resolve().parent
 PROJECT = ROOT / "companion" / "Dpone.Mssql.SqlClient.csproj"
 RUNTIME_IDENTITY = hashlib.sha256(b"Microsoft.NETCore.App\x0010").hexdigest()
+_remove_satellite_resource_assemblies = runpy.run_path(str(ROOT / "build_support.py"))[
+    "_remove_satellite_resource_assemblies"
+]
 
 
 class CompanionDistribution(Distribution):
@@ -54,6 +58,7 @@ class BuildCompanion(build_py):
             check=True,
             env={"PATH": os.environ.get("PATH", ""), "DOTNET_NOLOGO": "1", "DOTNET_CLI_TELEMETRY_OPTOUT": "1"},
         )
+        _remove_satellite_resource_assemblies(publish)
         target = Path(self.build_lib) / "dpone_mssql_sqlclient" / "companion"
         shutil.rmtree(target, ignore_errors=True)
         shutil.copytree(publish, target)

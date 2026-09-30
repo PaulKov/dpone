@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib
 import json
+import runpy
 from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
@@ -188,3 +189,27 @@ def test_companion_build_is_independent_of_parent_source_control_metadata() -> N
     ).read_text(encoding="utf-8")
 
     assert "<EnableSourceControlManagerQueries>false</EnableSourceControlManagerQueries>" in project
+
+
+def test_build_prunes_only_localized_satellite_assemblies(
+    tmp_path: Path,
+) -> None:
+    support_path = Path(__file__).parents[1] / "packages" / "dpone-mssql-sqlclient" / "build_support.py"
+    namespace = runpy.run_path(str(support_path), run_name="dpone_mssql_sqlclient_build_support")
+    publish = tmp_path / "publish"
+    (publish / "cs").mkdir(parents=True)
+    (publish / "pt-BR").mkdir()
+    (publish / "data").mkdir()
+    (publish / "cs" / "Microsoft.Data.SqlClient.resources.dll").write_bytes(b"cs")
+    (publish / "pt-BR" / "Microsoft.Data.SqlClient.resources.dll").write_bytes(b"pt")
+    neutral = publish / "Microsoft.Data.SqlClient.dll"
+    nested = publish / "data" / "contract.json"
+    neutral.write_bytes(b"neutral")
+    nested.write_text("{}", encoding="utf-8")
+
+    namespace["_remove_satellite_resource_assemblies"](publish)
+
+    assert not (publish / "cs").exists()
+    assert not (publish / "pt-BR").exists()
+    assert neutral.read_bytes() == b"neutral"
+    assert nested.read_text(encoding="utf-8") == "{}"
