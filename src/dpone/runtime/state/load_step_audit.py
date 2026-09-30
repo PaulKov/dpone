@@ -63,11 +63,21 @@ class PostgresLoadStepAuditStorage:
 class MSSQLLoadStepAuditStorage:
     """Route-runtime adapter over the canonical SQL Server step store."""
 
-    def __init__(self, connector: Any, schema: str = "etl_state", table: str = "__dpone__load_steps") -> None:
+    def __init__(
+        self,
+        connector: Any,
+        schema: str = "etl_state",
+        table: str = "__dpone__load_steps",
+        *,
+        database: str | None = None,
+        provisioning: str = "runtime",
+    ) -> None:
         self.connector = connector
         self.schema = schema
         self.table = table
-        self._storage = MSSQLGovernanceLoadStepAuditStorage(connector, schema=schema, table=table)
+        self._storage = MSSQLGovernanceLoadStepAuditStorage(
+            connector, schema=schema, table=table, database=database, provisioning=provisioning
+        )
 
     @property
     def fq_table(self) -> str:

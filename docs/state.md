@@ -256,6 +256,35 @@ compares both the previous XMin value and revision, then increments revision in
 the same transaction. This is required because several valid PostgreSQL
 snapshots can share the same safe XMin while a long transaction is open.
 
+### SQL Server step-audit adapter
+
+The internal `MSSQLLoadStepAuditStorage` adapter accepts keyword-only
+`database` and `provisioning` coordinates, independently of the connector's
+default database. Its route-decision wrapper preserves these coordinates.
+The legacy constructor still defaults to `etl_state.__dpone__load_steps` and
+runtime provisioning; existing callers retain additive migrations for
+`error_message` and nullable `finished_at`.
+
+With `provisioning="external"`, `create_step_table()` is a read-only admission
+check, not permission to create or alter anything. It validates the exact
+column set, SQL types, lengths, datetime precision, nullability and column
+metadata in the selected database before INSERT. Missing or drifted tables
+block the write. Step history is append-only at this adapter boundary: the
+contract requires no unique step index because multiple events for the same
+step are valid. It does not certify table permissions or install an immutable
+history trigger.
+
+All catalog queries, runtime migrations and INSERTs use that same normalized
+database/schema/table. JSON and error text remain parameters; the INSERT
+supplies the server UTC load timestamp explicitly, so an external table's
+default expression cannot determine it. An admission failure is not cached as
+readiness and does not trigger an implicit repair or retry.
+
+This adapter capability alone does **not** redirect a manifest's governance or
+route audit. Paired load/step runtime injection and an independent audit-only
+selection contract remain integration work. Do not enable fictitious source
+state or infer audit credentials from publication authority to select it.
+
 ### One-shot repair authority
 
 Mass-delete guard overrides and full repair baselines use an expiring

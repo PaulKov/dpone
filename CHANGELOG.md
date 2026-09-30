@@ -44,6 +44,11 @@
 
 ### Fixed
 
+- Add explicit database and external-provisioning support to the internal
+  MSSQL step-audit adapter and route wrapper. Scope metadata, migrations and
+  inserts to one location; reject external schema drift without DDL and write
+  the server timestamp explicitly. Legacy defaults remain unchanged. Runtime
+  selection of an independent audit pair is not activated by this adapter change.
 - Bind clustered publication and cleanup dispatch permits to the exact phase,
   payload and rendered DDL intent. Consume each process-local permit once,
   before transport, including concurrent reuse and lost transport replies;
