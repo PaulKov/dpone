@@ -1,0 +1,87 @@
+schema_version: 1
+task_id: DPONE-CLICKHOUSE-AUTHORITY-FOUNDATION
+title: Durable dpone-only ClickHouse authority foundation
+goal: Implement nonexpiring ownership and acknowledged one-shot journal transitions without route activation
+specification: docs/feature-design-clickhouse-dpone-only-authority.md
+base_commit: f231a05331d521937a5e813038c83bed22c4de74
+integrator: root
+acceptance_criteria:
+  - Existing authority opens without implicit creation or ownership transfer
+  - Only acknowledged claim CAS returns a dispatch grant and readback never reissues it
+  - Send and no-send closure are competing irreversible durable transitions
+  - Unknown and terminal publication states retain target ownership
+  - Fresh processes prove contention and crash behavior against real SQLite
+  - No production backend, source route or release readiness is implied
+public_contract_impact:
+  level: compatible
+  surfaces: [Python API, documentation]
+  migration_required: false
+owned_paths:
+  - src/dpone/contracts/clickhouse_authority.py
+  - src/dpone/adapters/clickhouse_publication_codec.py
+  - src/dpone/adapters/clickhouse_authority_storage.py
+  - src/dpone/adapters/clickhouse_authority_sqlite.py
+  - tests/test_clickhouse_publication_codec.py
+  - tests/test_clickhouse_authority_sqlite.py
+  - tests/test_clickhouse_authority_processes.py
+  - docs/clickhouse-authority-journal.md
+integrator_owned_paths:
+  - docs/adr-index.md
+  - docs/adr/0076-method-aware-clickhouse-publication.md
+  - docs/adr/0078-method-aware-clickhouse-publication.md
+  - src/dpone/contracts/clickhouse_publication.py
+  - docs/quality-metrics.md
+  - docs/feature-design-clickhouse-dpone-only-authority.md
+  - docs/superpowers/plans/2026-09-30-clickhouse-authority-foundation.md
+  - docs/agent-tasks/clickhouse-authority-foundation.yml
+  - docs/clickhouse-publication-methods.md
+  - docs/feature-design-mssql-columnar-range-parallelism-v2.md
+  - CHANGELOG.md
+  - mkdocs.yml
+read_only_paths:
+  - src/dpone/ports/clickhouse_publication.py
+  - src/dpone/runtime/sinks/clickhouse_guarded_publication.py
+  - src/dpone/adapters/bounded_window_sqlite.py
+  - tests/test_clickhouse_guarded_publication.py
+  - docs/import-rules.md
+  - docs/engineering-standards.md
+forbidden_paths:
+  - docs/adr-index.md
+  - docs/adr/0076-method-aware-clickhouse-publication.md
+  - docs/adr/0078-method-aware-clickhouse-publication.md
+  - src/dpone/contracts/clickhouse_publication.py
+  - docs/quality-metrics.md
+  - pyproject.toml
+  - uv.lock
+  - .github/workflows
+  - CHANGELOG.md
+  - mkdocs.yml
+  - docs/feature-design-clickhouse-dpone-only-authority.md
+  - docs/superpowers/plans/2026-09-30-clickhouse-authority-foundation.md
+  - docs/agent-tasks/clickhouse-authority-foundation.yml
+  - docs/clickhouse-publication-methods.md
+  - docs/feature-design-mssql-columnar-range-parallelism-v2.md
+shared_file_owner: root
+dependencies: []
+required_checks:
+  focused:
+    - pytest tests/test_clickhouse_publication_codec.py tests/test_clickhouse_authority_sqlite.py tests/test_clickhouse_authority_processes.py tests/test_clickhouse_guarded_publication.py -q
+  broad:
+    - Ruff lint and format
+    - mypy and import rules
+    - layer metrics and exact-commit module size
+    - full non-live pytest suite
+    - docs links and generated references and language and strict MkDocs
+  live:
+    - Owned Docker Desktop Linux runner process tests with exact source and image identity
+    - ClickHouse and MSSQL route certification remains UNVERIFIED until later increments
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - Implementation plan review and execution method are not confirmed.

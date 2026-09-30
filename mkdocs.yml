@@ -554,6 +554,10 @@ nav:
       - Feature design - governed REST bulk delivery V1: feature-design-rest-api-sink-v1.md
       - Feature design - committed replay quality evidence: feature-design-committed-replay-quality-evidence.md
       - Feature design - declarative replay quality: feature-design-declarative-replay-quality.md
+      - Feature design - guarded ClickHouse publication method: feature-design-clickhouse-publication-method.md
+      - Feature design - dpone-only ClickHouse authority: feature-design-clickhouse-dpone-only-authority.md
+      - ClickHouse authority journal foundation: clickhouse-authority-journal.md
+      - ClickHouse publication methods and recovery: clickhouse-publication-methods.md
       - Governed REST bulk-delivery threat model: rest-bulk-delivery-threat-model.md
       - Documentation standard: documentation-standard.md
       - Agent templates:
@@ -683,6 +687,7 @@ nav:
       - ADR 0075: adr/0075-mssql-columnar-range-parallelism.md
       - ADR 0076: adr/0076-mssql-sqlclient-companion-boundary.md
       - ADR 0077: adr/0077-mssql-persisted-hash-layout-v2.md
+      - ADR 0078: adr/0078-method-aware-clickhouse-publication.md
 
 extra:
   generator: false

@@ -388,7 +388,44 @@ artifacts are produced locally and are not committed as release certification.
 
 ## Implementation verification
 
-The implemented boundary above is covered by 419 local Docker tests with no
+### Window adapter ownership and compatibility
+
+`ClickHouseWindowTarget` owns configuration validation, admission timing, plan
+identity, publication decisions, guarded mutation and UUID reconciliation.
+Physical topology/schema admission (`validate_target`) and canonical schema
+fingerprinting (`window_schema_fingerprint`) live beside `WindowIO` in
+`clickhouse_window_staging`; the target module re-exports those same functions.
+The former `clickhouse_window_admission` path also re-exports the same callables,
+including target-owned `validate_configuration`. Existing target-level admission
+patching still intercepts preflight, preparation and publication. Admission SQL,
+ordering, exceptions and fingerprint bytes are unchanged.
+
+`WindowIO` owns shared resources, metadata paths and persisted generation
+readback; `WindowStaging` continues to own isolated attempts. The query-only
+`clickhouse_window_queries` module owns aggregate/day SQL reads, timestamp
+normalization and cursor closure through `WindowQueryReader`. It receives
+validated quoted identifiers and predicates from `WindowIO.metrics`, has no
+domain-state dependency, and issues no table mutations or writer-authority release.
+The broader existing `WindowConnector` read/write/close interface is preserved.
+
+The public target
+method `generation_total` validates plan identity before delegating metadata
+identity/name/count checks. `generation_evidence` first calls the target's
+`generation_total` (including subclass overrides), then delegates the existing
+second metadata read and timing fallback to `WindowIO`. This is stored verified
+preparation evidence, not a fresh target row count or a publication-status
+decision. These reads issue no source or target SQL, acquire no new authority,
+and perform no cleanup. Receipt formats and recovery behavior are unchanged.
+
+This internal relocation adds no CLI, manifest or runtime selection option.
+Existing operator journeys and the injected all-writer-authority prerequisite
+remain unchanged; it does not activate the parallel MSSQL ODBC route or supply
+a production guard. The historical live receipt below is not certification of
+the relocated code; current non-live checks belong to the assessed PR commit.
+
+### Historical implementation evidence
+
+The original feature implementation was covered by 419 local Docker tests with no
 failures, errors, or skips on source commit
 `b608e86cfec7595405b1bfd140441275f314734b` (2026-09-09), including real synthetic
 PostgreSQL/ClickHouse transfer and recovery. The SHA-bound receipt validates all
