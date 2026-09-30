@@ -123,6 +123,7 @@ def _immutable_authority_identity(record: contracts.AuthorityRecord) -> tuple[An
         record.desired,
         record.predecessor,
         record.staged_rows,
+        record.prepared_origin,
         QualityReplayCapsule.parse(record.quality_evidence).core_digest if record.quality_evidence else None,
     )
 

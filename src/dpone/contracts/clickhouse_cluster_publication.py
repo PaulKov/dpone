@@ -210,11 +210,12 @@ class AuthorityRecord:
     quality_evidence: str | None = None
     quality_reader: str | None = None
     authority_write_id: str | None = None
+    prepared_origin: str | None = None
 
     @property
     def payload(self) -> str:
         values = asdict(self)
-        for field in ("quality_evidence", "quality_reader", "authority_write_id"):
+        for field in ("quality_evidence", "quality_reader", "authority_write_id", "prepared_origin"):
             if values[field] is None:
                 del values[field]
         return canonical_json(values)

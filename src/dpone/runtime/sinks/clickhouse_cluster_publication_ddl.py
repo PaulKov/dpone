@@ -30,8 +30,8 @@ class ClickHouseClusterPublicationDdl:
         """Corroborate strict PREPARED authority with negative DDL observations.
 
         A pre-start log row and current logging setting do not prove continuous
-        historical logging. The caller must independently prove initial-version
-        strict authority and all-writer admission. Any observed prior DDL or
+        historical logging. The caller must independently prove operation-scoped
+        strict preparation and all-writer admission. Any observed prior DDL or
         unavailable observation fails closed.
         """
         if not record.authority_write_id:
@@ -52,13 +52,15 @@ class ClickHouseClusterPublicationDdl:
             if {str(host) for host, value in settings if str(value) == "1"} != hosts or len(settings) != len(hosts):
                 return False
             coverage = self._connector.get_records(
-                "SELECT hostName(), min(event_time) FROM clusterAllReplicas(%(cluster)s, system.query_log) "
+                "SELECT hostName(), count() FROM clusterAllReplicas(%(cluster)s, system.query_log) "
                 "WHERE event_time <= %(started_at)s GROUP BY hostName()",
                 params,
             )
             if {str(host) for host, _ in coverage} != hosts or len(coverage) != len(hosts):
                 return False
-            if any(start is None or start > operation_started_at for _, start in coverage):
+            # Native DateTime is commonly naive; keep time comparison in SQL
+            # instead of comparing it to an aware Python datetime.
+            if any(type(count) is not int or count <= 0 for _, count in coverage):
                 return False
             prior = self._connector.get_records(
                 "SELECT hostName(), count() FROM clusterAllReplicas(%(cluster)s, system.query_log) "

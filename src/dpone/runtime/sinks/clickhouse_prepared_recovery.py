@@ -18,6 +18,7 @@ from dpone.ports.clickhouse_cluster_publication import (
 )
 from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
 from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import require_pre_dispatch_generation
+from dpone.runtime.sinks.clickhouse_prepared_origin import require_prepared_origin
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,6 +183,7 @@ class PreparedRecoveryService:
             or record.desired != plan.candidate_identity
             or record.predecessor != plan.predecessor_identity
             or record.staged_rows != plan.record.staged_rows
+            or record.prepared_origin != plan.record.prepared_origin
             or not record.authority_write_id
             or record.ddl_correlation_token != plan.token
             or record.ddl_query_digest != plan.query_digest
@@ -258,16 +260,13 @@ def plan_prepared_recovery(
         raise contracts.ClusterPublicationError(
             "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "original authority identity changed"
         )
-    # KeeperMap's initial version is the durable create-if-absent receipt. Under
-    # all-writer admission, any dispatch intent must advance it before DDL.
-    # Query-log absence is only corroboration: logs can rotate or be disabled.
-    if current.version != 0 or not authority.supports_linearizable_dispatch_permit():
+    if not authority.supports_linearizable_dispatch_permit():
         raise contracts.ClusterPublicationError(
             "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_UNSAFE", "original strict creation is not proven"
         )
+    require_prepared_origin(current)
     if (
         record.phase is not contracts.AuthorityPhase.PREPARED
-        or record.dispatch_epoch != 0
         or record.database != database
         or record.target != target
         or record.ddl_entry
@@ -275,6 +274,7 @@ def plan_prepared_recovery(
         or record.ddl_query_digest
         or record.cleanup_entry
         or record.cleanup_correlation_token
+        or record.cleanup_query_digest
     ):
         raise contracts.ClusterPublicationError(
             "DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_UNRESOLVED", "original operation is not undispatched PREPARED"

@@ -113,6 +113,25 @@ def test_preflight_is_read_only_and_exact() -> None:
     assert all(sql.startswith("SELECT") for sql in connector.reads)
 
 
+@pytest.mark.parametrize("primary_key", ["target_key", "`target_key`"])
+def test_admission_accepts_real_keeper_engine_full_primary_key_suffix(primary_key):
+    connector = Connector()
+    connector.tables = [
+        (host, f"KeeperMap('/dpone/authority') PRIMARY KEY {primary_key}", primary_key) for host in HOSTS
+    ]
+    assert ready(connector).supports_linearizable_dispatch_permit()
+    assert not connector.calls
+
+
+def test_admission_rejects_extra_engine_expression_after_primary_key():
+    connector = Connector()
+    connector.tables = [
+        (host, "KeeperMap('/dpone/authority') PRIMARY KEY target_key OTHER", "target_key") for host in HOSTS
+    ]
+    with pytest.raises(contracts.ClusterPublicationError, match="UNSUPPORTED"):
+        ready(connector)
+
+
 @pytest.mark.parametrize(
     "case", ["legacy", "absent", "missing_host", "duplicate_host", "path", "macro", "pk", "column", "extra", "default"]
 )
@@ -151,10 +170,9 @@ def test_unchecked_authority_cannot_write() -> None:
 
 
 def test_strict_insert_starts_at_zero_and_bypasses_generic_retry() -> None:
-    connector = Connector()
+    connector = AtomicConnector()
     authority = ready(connector)
     desired = record()
-    connector.observe(desired, 0)
     result = authority.create_if_absent(desired)
     assert result.status is contracts.AuthorityMutationStatus.VERIFIED
     assert result.permit is None
@@ -273,6 +291,8 @@ class AtomicConnector(Connector):
                 return
             if self.rows[0][6] != params["version"]:
                 return
+            if self.rows[0][5] != params.get("expected_payload_sha256", self.rows[0][5]):
+                return
             version = params["version"] + 1
         self.rows = [
             (
@@ -290,8 +310,10 @@ class AtomicConnector(Connector):
 def test_identical_competing_cas_cannot_issue_second_permit() -> None:
     connector = AtomicConnector()
     first, second = ready(connector), ready(connector)
-    before = contracts.VersionedAuthorityRecord(record(), 0)
-    assert first.create_if_absent(before.record).status is contracts.AuthorityMutationStatus.VERIFIED
+    created = first.create_if_absent(record())
+    assert created.status is contracts.AuthorityMutationStatus.VERIFIED
+    assert created.observed is not None
+    before = created.observed
     desired = before.record.dispatching(token="same-token", query_digest="same-query")
     winner = first.compare_and_swap(before, desired)
     loser = second.compare_and_swap(before, desired)
@@ -389,7 +411,7 @@ def test_v2_capsule_bytes_survive_create_and_cas() -> None:
     assert created.observed is not None
     assert created.observed.record.quality_evidence == desired.quality_evidence
     updated = authority.compare_and_swap(
-        created.observed, replace(created.observed.record, phase=contracts.AuthorityPhase.COMMITTED)
+        created.observed, created.observed.record.dispatching(token="token", query_digest="query")
     )
     assert updated.status is contracts.AuthorityMutationStatus.VERIFIED
     assert updated.observed is not None

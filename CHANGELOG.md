@@ -9,6 +9,16 @@
   strict KeeperMap dispatch permit and replica/DDL reconciliation prevent blind
   `EXCHANGE` retries. Legacy ReplacingMergeTree authority and operations lacking
   strict-origin evidence remain blocked; this does not migrate existing data.
+- Bind strict preparation provenance to each operation instead of the first
+  lifetime of a target slot. Fence CAS with the exact prior payload digest,
+  reject phase regression, and do not reissue cleanup permits during quality
+  governance updates. Add opt-in real three-replica KeeperMap acceptance.
+
+### Fixed
+
+- Accept ClickHouse's actual KeeperMap `engine_full` primary-key suffix without
+  relaxing the exact key/schema/path checks. Evaluate query-history timestamp
+  bounds server-side to avoid naive-versus-aware native driver date comparisons.
 
 ## 0.88.0 - 2026-09-30
 

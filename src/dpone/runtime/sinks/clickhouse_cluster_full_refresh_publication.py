@@ -145,6 +145,7 @@ class ClickHouseClusterFullRefreshPublicationService:
             if record.phase is not AuthorityPhase.PREPARED:
                 _require_inventory(record, inventory)
                 return self._reconcile_existing(authority, current, cluster)
+        record = current.record
         require_pre_dispatch_generation(self._catalog, cluster, record, deadline=readiness_deadline)
         token = _correlation_token(operation_id, "publish", record.dispatch_epoch + 1)
         dispatching = record.dispatching(

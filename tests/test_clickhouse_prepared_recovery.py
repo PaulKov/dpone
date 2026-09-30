@@ -281,9 +281,10 @@ class EvidenceConnector:
         hosts = ("replica-a", "replica-b")
         if "system.settings" in sql:
             return [(host, "1") for host in hosts]
-        if "min(event_time)" in sql:
-            event_time = datetime(2026, 9, 27, 9 if self.history_covered else 11, tzinfo=UTC)
-            return [(host, event_time) for host in hosts]
+        if "event_time <=" in sql:
+            # Compare timestamp bounds server-side: native DateTime results
+            # are naive in this real driver, even for a UTC server.
+            return [(host, 3 if self.history_covered else 0) for host in hosts]
         if "system.query_log" in sql:
             return [("replica-a", 1)] if self.prior_query else []
         if "system.processes" in sql:
@@ -520,6 +521,15 @@ def test_completed_replay_rejects_foreign_ddl_identity() -> None:
         authority.current,
         record=replace(authority.current.record, ddl_correlation_token="foreign-token"),
     )
+    with pytest.raises(ClusterPublicationError, match="AUTHORITY_CONFLICT"):
+        service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert ddl.dispatches == 1
+
+
+def test_completed_replay_rejects_replaced_preparation_origin() -> None:
+    plan, service, authority, ddl = _execution_case()
+    service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    authority.current = replace(authority.current, record=replace(authority.current.record, prepared_origin="{}"))
     with pytest.raises(ClusterPublicationError, match="AUTHORITY_CONFLICT"):
         service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
     assert ddl.dispatches == 1

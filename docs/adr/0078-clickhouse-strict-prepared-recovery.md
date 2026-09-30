@@ -13,8 +13,12 @@ not provide a linearizable compare-and-swap permit across workers.
 ## Decision
 
 Recovery is a separate operator workflow for the **same** operation. Its plan
-requires an admitted strict authority's initial KeeperMap version (`0`) still
-in `PREPARED` with dispatch epoch `0`. Under a completed all-writer cutover,
+requires an admitted strict authority's operation-scoped preparation version,
+epoch and canonical payload digest still in `PREPARED`. The strict adapter
+stamps provenance on initial acquisition or reuse of a retired COMPLETED slot;
+it rejects caller-supplied provenance, phase regression and immutable identity
+changes. Initial strict version-zero/epoch-zero records remain compatible.
+Under a completed all-writer cutover,
 that durable linearizable state proves no managed writer received a dispatch
 permit. It also requires unchanged healthy candidate and predecessor generations
 on every replica, matching row counts, and no matching DDL in available logs,
@@ -39,6 +43,10 @@ all-writer cutover; this feature will not silently import or repair them.
 ## Consequences
 
 - Existing business pipelines and default publication behavior are unchanged.
+- Strict envelope readers/writers must be upgraded together before producing
+  the optional `prepared_origin` field. Legacy absent-field hashes are preserved.
+- Same-phase quality updates can advance authority version but never reissue a
+  publication or cleanup permit. Only explicit dispatch transitions grant one.
 - Operators get a fail-closed, auditable self-service path only after strict
   infrastructure admission. Without it, work remains blocked rather than green.
 - Live fault integration needs an admitted strict authority. Synthetic unit

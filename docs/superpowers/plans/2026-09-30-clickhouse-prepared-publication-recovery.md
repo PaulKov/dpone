@@ -141,16 +141,30 @@ read-back into evidence it does not provide.
 
 ### Correction A: repeated-operation strict provenance
 
-- [ ] Add failing adapter/planner tests for reused slots, forged origins,
+- [x] Add failing adapter/planner tests for reused slots, forged origins,
   same-operation phase regression, changed payload, stale plan and residual DDL.
-- [ ] Add optional canonical `prepared_origin` envelope in authority contracts;
-  add a focused pure provenance policy module. Strict acquisition stamps it;
+- [x] Add optional canonical `prepared_origin` envelope in authority contracts;
+  add a focused pure runtime lifecycle policy module. Strict acquisition stamps it;
   normal transitions preserve it; exact CAS binds prior payload digest.
-- [ ] Publisher uses acknowledged authority record for dispatch. Planner
+- [x] Publisher uses acknowledged authority record for dispatch. Planner
   validates operation provenance instead of slot-global zero. Old initial
   strict records retain conservative compatibility; legacy records stay blocked.
 - [ ] Run focused suite, quality/contract regressions, lint/type/architecture
   gates and fresh-context review; update operator docs and existing PR.
+
+Current correction evidence: 123 focused tests passed, including the isolated
+cache-retention regression; three real local three-replica KeeperMap tests passed
+(repeated generations, competing CAS, lost acknowledgement). Ruff, format, mypy,
+import rules, layer metrics, docs links/language/generated references and strict
+MkDocs passed. The first broader run is **incomplete**, not green: interrupted
+after 6,664 passed / 507 skipped / one unrelated five-second cache-retention
+thread-wait failure. That test passed in isolation; a clean full run and final
+immutable-head independent review remain required before merge.
+
+The provenance envelope is passive contract data. Its acquisition, transition
+and recovery rules belong to the runtime lifecycle policy alongside existing
+publication policies, using the established publication port and quality
+contract facade. Architecture thresholds and baselines are unchanged.
 
 ### Correction B: quality and empty-result contracts
 

@@ -21,6 +21,7 @@ from dataclasses import replace
 from typing import Any, NoReturn
 
 from dpone.ports.clickhouse_cluster_publication import contracts
+from dpone.runtime.sinks.clickhouse_prepared_origin import prepare_strict_write
 
 _COLUMNS = (
     ("target_key", "String"),
@@ -31,7 +32,10 @@ _COLUMNS = (
     ("payload", "String"),
     ("payload_sha256", "FixedString(64)"),
 )
-_ENGINE = re.compile(r"KeeperMap\(\s*'(/[A-Za-z0-9_./-]+)'\s*(?:,\s*[0-9]+\s*)?\)")
+_ENGINE = re.compile(
+    r"KeeperMap\(\s*'(/[A-Za-z0-9_./-]+)'\s*(?:,\s*[0-9]+\s*)?\)"
+    r"(?: PRIMARY KEY (?:target_key|`target_key`))?"
+)
 _MUTATION_SETTINGS = {"keeper_map_strict_mode": 1, "insert_keeper_max_retries": 0}
 _MAX_PAYLOAD_BYTES = 1024 * 1024
 
@@ -122,6 +126,7 @@ class ClickHouseQualityKeeperMapAuthority:
     def create_if_absent(self, record: contracts.AuthorityRecord) -> contracts.AuthorityMutationResult:
         """Strict insert once: existing keys cannot be silently replaced."""
         self._require_ready()
+        record = prepare_strict_write(None, record)
         sql = (
             f"INSERT INTO {self._qualified} "
             "(target_key, operation_id, fence_token, phase, dispatch_epoch, payload, payload_sha256) "
@@ -138,6 +143,7 @@ class ClickHouseQualityKeeperMapAuthority:
         before = current.record
         if desired.target_key != before.target_key or type(current.version) is not int or current.version < 0:
             _reject("INVALID", "authority CAS identity or version is invalid")
+        desired = prepare_strict_write(current, desired)
         sql = (
             f"ALTER TABLE {self._qualified} UPDATE operation_id = %(operation_id)s, "
             "fence_token = %(fence_token)s, phase = %(phase)s, dispatch_epoch = %(dispatch_epoch)s, "
@@ -145,6 +151,7 @@ class ClickHouseQualityKeeperMapAuthority:
             "WHERE target_key = %(target_key)s AND _version = %(version)s "
             "AND operation_id = %(expected_operation)s AND fence_token = %(expected_fence)s "
             "AND phase = %(expected_phase)s"
+            " AND payload_sha256 = %(expected_payload_sha256)s"
         )
         params = {
             **_record_params(desired),
@@ -152,11 +159,29 @@ class ClickHouseQualityKeeperMapAuthority:
             "expected_operation": before.operation_id,
             "expected_fence": before.fence_token,
             "expected_phase": before.phase.value,
+            "expected_payload_sha256": before.payload_sha256,
         }
-        return self._mutate_once(sql, params, desired, prior_version=current.version)
+        return self._mutate_once(
+            sql,
+            params,
+            desired,
+            prior_version=current.version,
+            issue_permit=before.phase != desired.phase
+            and desired.phase
+            in {
+                contracts.AuthorityPhase.DISPATCHING,
+                contracts.AuthorityPhase.CLEANUP_DISPATCHING,
+            },
+        )
 
     def _mutate_once(
-        self, sql: str, params: dict[str, Any], desired: contracts.AuthorityRecord, *, prior_version: int | None
+        self,
+        sql: str,
+        params: dict[str, Any],
+        desired: contracts.AuthorityRecord,
+        *,
+        prior_version: int | None,
+        issue_permit: bool = False,
     ) -> contracts.AuthorityMutationResult:
         # Bind the acknowledged write to this particular caller. A filtered
         # zero-row UPDATE cannot impersonate another caller's identical desired
@@ -184,7 +209,7 @@ class ClickHouseQualityKeeperMapAuthority:
         if observed.record.payload != desired.payload or observed.version != expected_version:
             return contracts.AuthorityMutationResult(contracts.AuthorityMutationStatus.CONFLICT, observed=observed)
         permit = None
-        if desired.phase in {contracts.AuthorityPhase.DISPATCHING, contracts.AuthorityPhase.CLEANUP_DISPATCHING}:
+        if issue_permit:
             permit = contracts.DispatchPermit(
                 target_key=desired.target_key,
                 operation_id=desired.operation_id,
