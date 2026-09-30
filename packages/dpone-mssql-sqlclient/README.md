@@ -11,6 +11,9 @@ Each deployment still requires evidence-bound route qualification; package
 metadata does not enforce or claim that qualification.
 Credentials cross an anonymous inherited pipe and never enter argv,
 environment variables, stdout, stderr, journals, or evidence.
+The wheel omits dependency localization satellites because the companion emits
+stable machine-readable diagnostic codes; neutral assemblies remain integrity
+bound by the packaged descriptor.
 
 Install and diagnose through the version-matched dpone extra after activation:
 
