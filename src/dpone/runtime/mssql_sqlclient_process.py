@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import signal
 import subprocess
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from tempfile import mkdtemp
 from threading import Thread
 from typing import IO
 
@@ -27,6 +29,11 @@ class CompanionProcessResult:
     stdout: bytes = b""
     exit_code: int | None = None
     diagnostic_code: str | None = None
+
+
+@dataclass(slots=True)
+class _ProcessSettlement:
+    settled: bool = True
 
 
 class _BoundedReader:
@@ -100,6 +107,45 @@ def run_sqlclient_companion(
     ):
         _clear(credential_frame)
         return CompanionProcessResult("custody_lost")
+    private_home: str | None = None
+    try:
+        private_home = mkdtemp(prefix="dpone-sqlclient-home-")
+        os.chmod(private_home, 0o700)
+    except OSError:
+        _clear(credential_frame)
+        if private_home is not None:
+            _remove_private_home(private_home)
+        return CompanionProcessResult("cleanup_failed")
+    settlement = _ProcessSettlement()
+    result = _run_sqlclient_companion_with_home(
+        command,
+        request=request,
+        credential_frame=credential_frame,
+        deadline=deadline,
+        cleanup_reserve_seconds=cleanup_reserve_seconds,
+        private_home=private_home,
+        settlement=settlement,
+        clock=clock,
+        process_started=process_started,
+    )
+    if settlement.settled and not _remove_private_home(private_home):
+        return CompanionProcessResult("cleanup_failed")
+    return result
+
+
+def _run_sqlclient_companion_with_home(
+    command: Sequence[str],
+    *,
+    request: NativeStageWriteRequest,
+    credential_frame: bytearray,
+    deadline: OperationDeadline,
+    cleanup_reserve_seconds: float,
+    private_home: str,
+    settlement: _ProcessSettlement,
+    clock: Callable[[], float],
+    process_started: Callable[[int, NativeStageWriteRequest], None] | None,
+) -> CompanionProcessResult:
+    """Run one companion after its private writable home is established."""
     read_fd = -1
     write_fd = -1
     process: subprocess.Popen[bytes] | None = None
@@ -123,7 +169,7 @@ def run_sqlclient_companion(
             close_fds=True,
             pass_fds=(read_fd,),
             start_new_session=True,
-            env=_minimal_environment(),
+            env=_minimal_environment(private_home),
         )
         if process_started is not None:
             process_started(process.pid, request)
@@ -177,14 +223,25 @@ def run_sqlclient_companion(
         _close_descriptor(read_fd)
         _close_descriptor(write_fd)
         _clear(credential_frame)
+        settlement.settled = process is None or process.poll() is not None
 
 
-def _minimal_environment() -> dict[str, str]:
+def _minimal_environment(private_home: str) -> dict[str, str]:
+    """Return the closed child environment with an isolated .NET home."""
     return {
         "PATH": os.defpath,
         "DOTNET_NOLOGO": "1",
         "DOTNET_CLI_TELEMETRY_OPTOUT": "1",
+        "HOME": private_home,
     }
+
+
+def _remove_private_home(private_home: str) -> bool:
+    try:
+        shutil.rmtree(private_home)
+    except OSError:
+        return False
+    return True
 
 
 def _positive_wait(expires_at: float, clock: Callable[[], float]) -> float:

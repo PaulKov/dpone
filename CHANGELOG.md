@@ -19,6 +19,9 @@
 
 ### Fixed
 
+- Give each SqlClient child a private temporary home so encrypted connections
+  work under non-root numeric container UIDs without a passwd entry. Keep the
+  child environment restricted and remove the home after process settlement.
 - Accept bounded zero-row and partial persisted-hash observations only during
   interrupted-writer recovery while retaining exact row-count and digest checks
   for successful loads.
@@ -32,8 +35,9 @@
   evidence or an OOM kill.
 - Require a native x86-64 Docker daemon for SqlClient certification and record
   its architecture in runner v4 and campaign v3 receipts. Add an exact-master
-  workflow for the seven transport cells and five full-route cases, with
-  skip rejection and a 3 GiB SQL Server engine cap.
+  workflow for the seven transport cells and fifteen full-route cases, with
+  skip rejection and a 3 GiB SQL Server engine cap. Exercise raw/prepared stage
+  mutation rejection and nullable/non-nullable framing for every SqlClient type.
 
 ## 0.87.4 - 2026-09-29
 

@@ -31,5 +31,5 @@ def test_native_sqlclient_certification_workflow_is_exact_commit_and_fail_closed
     assert '--user "$(id -u):$(id -g)"' in steps
     assert "assert_junit_executed.py" in steps
     assert "--min-passed 1 --max-skipped 0" in steps
-    assert "--min-passed 3 --max-skipped 0" in steps
+    assert "--min-passed 13 --max-skipped 0" in steps
     assert any(step.get("uses", "").startswith("actions/upload-artifact@") for step in job["steps"])
