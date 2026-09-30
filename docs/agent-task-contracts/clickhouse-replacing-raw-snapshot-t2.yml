@@ -1,0 +1,44 @@
+schema_version: 1
+task_id: "DPONE-CH-RAW-SNAPSHOT-T2"
+title: "Implement ReplacingMergeTree raw snapshot extraction"
+goal: "Admit and execute one query-visible non-FINAL ClickHouse snapshot with bounded physical provenance."
+specification: "docs/feature-specs/clickhouse-replacing-raw-snapshot.md"
+base_commit: "28aea0d9439ab3f24e0fb39800a041a6b6d661ed"
+integrator: "root integrator"
+acceptance_criteria:
+  - "Exact mode freezes and revalidates the Task 1 profile, then executes exactly one data SELECT with required settings."
+  - "Patches, delete masks, policies, duplicates, NULLs, and raw versions retain query-visible semantics without FINAL."
+  - "Physical before/after profiles detect observed drift; virtual provenance never enters target rows."
+  - "Legacy plain MergeTree extraction and failure behavior remain unchanged."
+public_contract_impact:
+  level: compatible
+  surfaces: ["ClickHouse to MSSQL native source capability"]
+  migration_required: false
+owned_paths:
+  - src/dpone/runtime/sources/clickhouse_native_source.py
+  - src/dpone/runtime/sources/clickhouse_native_guard.py
+  - src/dpone/runtime/sources/clickhouse_raw_snapshot.py
+  - tests/test_clickhouse_native_source.py
+  - tests/test_clickhouse_raw_snapshot.py
+integrator_owned_paths: []
+read_only_paths:
+  - docs/feature-specs/clickhouse-replacing-raw-snapshot.md
+  - src/dpone/contracts/clickhouse_raw_snapshot.py
+  - src/dpone/manifest/clickhouse_raw_snapshot_policy.py
+  - src/dpone/runtime/mssql_native_application_assembly.py
+forbidden_paths: [pyproject.toml, uv.lock, CHANGELOG.md, mkdocs.yml, .github/workflows, src/dpone/schema, tests/conftest.py]
+shared_file_owner: "root integrator"
+dependencies: ["T1 frozen interfaces and hashes"]
+required_checks:
+  focused: ["uv run pytest tests/test_clickhouse_native_source.py tests/test_clickhouse_raw_snapshot.py -q"]
+  broad: ["uv run ruff check owned paths", "uv run mypy --config-file mypy.ini owned production modules", "uv run dpone docs check-import-rules", "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json", "uv run dpone docs check-module-size with exact base/head"]
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

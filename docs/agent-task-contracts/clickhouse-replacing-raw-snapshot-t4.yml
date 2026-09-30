@@ -1,0 +1,65 @@
+schema_version: 1
+task_id: "DPONE-CH-RAW-SNAPSHOT-T4"
+title: "Integrate raw snapshot schema, UX, documentation, and certification"
+goal: "Ship the approved capability through public schema, self-service documentation, exact-commit tests, and route evidence."
+specification: "docs/feature-specs/clickhouse-replacing-raw-snapshot.md"
+base_commit: "28aea0d9439ab3f24e0fb39800a041a6b6d661ed"
+integrator: "root integrator"
+acceptance_criteria:
+  - "Public schema and examples expose only the closed selector and preserve omission compatibility."
+  - "Plan/doctor remain credential-free; connection and live observations occur only in explicit check modes/runtime."
+  - "User docs cover discovery, prerequisites, raw-vs-FINAL semantics, evidence, failure recovery, rollback, and replica limits."
+  - "Synthetic narrow/wide BCP and SqlClient route, concurrency, recovery, TLS, and replica cells produce truthful exact-commit evidence."
+public_contract_impact:
+  level: compatible
+  surfaces: ["manifest JSON schema", "ClickHouse to MSSQL route documentation", "route certification evidence"]
+  migration_required: false
+owned_paths:
+  - examples/native/clickhouse-replacing-to-mssql-native.yaml
+  - tests/integration/mssql/test_clickhouse_replacing_raw_snapshot_live.py
+  - tests/test_clickhouse_replacing_raw_snapshot_docs.py
+integrator_owned_paths:
+  - src/dpone/schema/etl-batch-manifest.schema.json
+  - tests/test_manifest_schema_reference_docs.py
+  - docs/feature-specs/clickhouse-replacing-raw-snapshot.md
+  - docs/source-sink/clickhouse-to-mssql.md
+  - docs/connector-certification.md
+  - docs/adr-index.md
+  - docs/adr/0072-clickhouse-replacing-raw-snapshot.md
+  - docs/errors/DPONE_MSSQL_NATIVE_SOURCE_SNAPSHOT_UNSUPPORTED.md
+  - CHANGELOG.md
+  - mkdocs.yml
+read_only_paths:
+  - docs/architecture.md
+  - docs/import-rules.md
+  - docs/release.md
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - src/dpone/schema
+  - tests/conftest.py
+  - tests/test_manifest_schema_reference_docs.py
+  - docs/feature-specs/clickhouse-replacing-raw-snapshot.md
+  - docs/source-sink/clickhouse-to-mssql.md
+  - docs/connector-certification.md
+  - docs/adr-index.md
+  - docs/adr/0072-clickhouse-replacing-raw-snapshot.md
+  - docs/errors/DPONE_MSSQL_NATIVE_SOURCE_SNAPSHOT_UNSUPPORTED.md
+shared_file_owner: "root integrator"
+dependencies: ["T1, T2, and T3 frozen implementations and reviews"]
+required_checks:
+  focused: ["uv run pytest tests/test_manifest_schema_reference_docs.py tests/test_clickhouse_replacing_raw_snapshot_docs.py -q", "uv run dpone docs check-docs", "uv run mkdocs build --strict"]
+  broad: ["uv run python tools/agent_policy/select_checks.py --base-ref origin/master", "uv run ruff check .", "uv run ruff format --check .", "uv run mypy --config-file mypy.ini", "uv run dpone docs check-import-rules", "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json", "uv run pytest -m 'not integration_live' -n auto --dist loadfile"]
+  live: ["DPONE_RUN_INTEGRATION=1 DPONE_RUN_INTEGRATION_LIVE=1 uv run pytest tests/integration/mssql/test_clickhouse_replacing_raw_snapshot_live.py -q"]
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

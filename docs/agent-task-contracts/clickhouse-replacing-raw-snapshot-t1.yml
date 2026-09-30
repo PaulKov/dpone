@@ -1,0 +1,42 @@
+schema_version: 1
+task_id: "DPONE-CH-RAW-SNAPSHOT-T1"
+title: "Define canonical ReplacingMergeTree raw snapshot contracts"
+goal: "Provide closed manifest policy, canonical profile/EOF models, and versioned marker/extension codecs."
+specification: "docs/feature-specs/clickhouse-replacing-raw-snapshot.md"
+base_commit: "28aea0d9439ab3f24e0fb39800a041a6b6d661ed"
+integrator: "root integrator"
+acceptance_criteria:
+  - "Selector omission preserves query_visible legacy behavior; exact_raw_rows requires one closed replica_scope value."
+  - "Profile and EOF preimages round-trip strictly and produce deterministic canonical SHA-256 identities."
+  - "Raw marker and source_snapshot_v1 extension reject unknown versions, extras, tampering, and row-count mismatch."
+public_contract_impact:
+  level: compatible
+  surfaces: ["ClickHouse native source snapshot manifest and durable identity"]
+  migration_required: false
+owned_paths:
+  - src/dpone/contracts/clickhouse_raw_snapshot.py
+  - src/dpone/manifest/clickhouse_raw_snapshot_policy.py
+  - tests/test_clickhouse_raw_snapshot_contracts.py
+  - tests/test_clickhouse_raw_snapshot_policy.py
+integrator_owned_paths: []
+read_only_paths:
+  - docs/feature-specs/clickhouse-replacing-raw-snapshot.md
+  - src/dpone/manifest/mssql_native_policy.py
+  - src/dpone/contracts/mssql_native_chunks.py
+  - src/dpone/contracts/mssql_native_verification.py
+forbidden_paths: [pyproject.toml, uv.lock, CHANGELOG.md, mkdocs.yml, .github/workflows, src/dpone/schema, tests/conftest.py]
+shared_file_owner: "root integrator"
+dependencies: []
+required_checks:
+  focused: ["uv run pytest tests/test_clickhouse_raw_snapshot_contracts.py tests/test_clickhouse_raw_snapshot_policy.py -q"]
+  broad: ["uv run ruff check owned paths", "uv run mypy --config-file mypy.ini owned production modules", "uv run dpone docs check-import-rules", "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json", "uv run dpone docs check-module-size with exact base/head"]
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."
