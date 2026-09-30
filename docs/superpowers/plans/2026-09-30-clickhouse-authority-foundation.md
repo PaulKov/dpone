@@ -75,6 +75,9 @@ publication snapshots from ownership capabilities; no compatibility reexports
 or new generic modules are added. Direct invalid `JournalEntry` values raise
 `ValueError`, consistent with the publication contract; invalid persisted values
 surface as `AuthorityError`. These APIs have not been released.
+The integrator also refreshes `docs/quality-metrics.md` only through
+`dpone docs update-dev-metrics`; generated freshness is part of the existing
+quality gate, not a change to its thresholds or baseline.
 
 ## Task 1: Immutable identity and strict record codec
 

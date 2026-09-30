@@ -27,6 +27,7 @@ owned_paths:
   - docs/clickhouse-authority-journal.md
 integrator_owned_paths:
   - src/dpone/contracts/clickhouse_publication.py
+  - docs/quality-metrics.md
   - docs/feature-design-clickhouse-dpone-only-authority.md
   - docs/superpowers/plans/2026-09-30-clickhouse-authority-foundation.md
   - docs/agent-tasks/clickhouse-authority-foundation.yml
@@ -43,6 +44,7 @@ read_only_paths:
   - docs/engineering-standards.md
 forbidden_paths:
   - src/dpone/contracts/clickhouse_publication.py
+  - docs/quality-metrics.md
   - pyproject.toml
   - uv.lock
   - .github/workflows

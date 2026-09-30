@@ -341,6 +341,10 @@ review; then separate route finalization and activation work.
 - [x] Single-host/no-HA and conservative unknown-outcome availability accepted.
 - [x] Maintainer approves this written specification for implementation.
 - [x] Durable-foundation plan and path-scoped task contract approved (Native execution).
+- [x] Foundation journal implemented: retained ownership, acknowledged claims,
+  send/close CAS, immutable observations and diagnostic output. Corrective review
+  approved commit `0c37b851bea60bd1ab1de74eaa46267ee69394da`; 122 focused tests
+  passed locally and in an owned Docker Desktop Linux runner, zero skips.
 - [ ] Implementation, exact-commit review and live certification complete.
 
 First executable planning increment:
