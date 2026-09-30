@@ -4,6 +4,14 @@
 
 ### Added
 
+- Explicit staged ClickHouse authority v2 adds atomic cross-role target/candidate
+  reservations, invocation-bound candidate request grants, immutable request
+  history, irreversible admission closure and exactly-once expected-evidence
+  accounting. Lost commit acknowledgements never recreate send permission.
+  V1 defaults and publication CAS semantics are preserved without migration;
+  native candidate transport, sealing, full backend and ODBC activation are not
+  enabled by this journal increment.
+
 - Protected ClickHouse publication now has staged closed-design and typed-input
   building blocks: immutable explicit limits, lossless scalar validation,
   complete CREATE parsing, deterministic profile identity and bounded batch

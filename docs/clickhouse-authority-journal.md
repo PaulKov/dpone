@@ -115,6 +115,58 @@ workers. A record readback after lost claim ACK cannot reconstruct the secret or
 authorize sending. These checks protect cooperating service processes, not an
 attacker with direct write access to the journal or publisher OS account.
 
+## Explicit v2 candidate journal (staged)
+
+`dpone.adapters.clickhouse_candidate_sqlite.SQLiteCandidateAuthority` is a
+separate, explicit v2 entry point. Its constructor and `provision(path,
+deployment_id)` require `dpone.clickhouse.authority.v2`; the original
+`SQLitePublicationAuthority` still defaults to v1. Neither cross-opens nor
+migrates the other version. Both reuse the same publication CAS implementation.
+Do not create another store to bypass an occupied name or a missing original.
+
+The v2 journal is not yet a complete publication backend. Fresh enrollment needs
+a trusted `VerifiedEnrollment` capability; there is deliberately no operator
+boolean, digest-only authorization or readiness-fabrication example. A future
+composition layer supplies readiness and the native candidate transport.
+
+| v2 operation | Durable effect and failure boundary |
+|---|---|
+| `enroll(request, enrollment)` | Atomically reserve target **and** candidate across both roles, create original operation, then return a local invocation only after commit ACK |
+| `CandidateRequestJournal.register(invocation, request)` | Persist immutable CREATE/INSERT identity; only one incomplete request; CREATE must complete first |
+| `begin_send(grant)` | Persist `may_have_sent` before native I/O; losing ACK cannot authorize another send |
+| `record_terminal(grant, completion)` | Trusted positive-EOS receipt only; atomically close request and add its expected multiset exactly once |
+| `source_exhausted(invocation)` | Record normal source exhaustion independently of request completion; never inferred from readback |
+| `close_admission(operation_id)` | Irreversible source-free closure; accepted requests remain in the frontier, later registration fails |
+| `close_unsent(operation_id)` | Under execution exclusion, cancel only provably unsent requests and retain the incomplete load |
+| `retain(operation_id, reason)` | Close admission and retain names with a bounded safe reason code, never a raw exception |
+| `inspect` / `diagnostics` / `write_diagnostics` | Original source-free metadata, without recreating any invocation or grant |
+
+The invocation and request grants are process-, thread- and lifetime-bound;
+closing them does not release durable names. They cannot be copied or serialized.
+An existing operation ID always conflicts on fresh enrollment, even if its
+request is identical. Registration returns no permission on a lost commit ACK.
+A send-entry ACK loss remains `may_have_sent` even if the process never reached
+the network. Never turn that uncertainty into an unsent state.
+
+Candidate request IDs use a separate `dpone-candidate-` namespace derived from
+operation ID, kind and sequence. SQL, payload and design digests are immutable.
+The journal trusts the injected transport's receipt validation; constructing a
+receipt DTO in application code is not proof of ClickHouse execution. All
+candidate and publication records share one original SQLite file and retained
+ownership domain. Names, history and seals cannot be updated or deleted.
+
+The candidate lifecycle is `registered` → `loading` → `admission_closed` →
+`sealed`, with failure retention possible at every stage. Source exhaustion is
+an independent monotonic fact. This increment has no seal producer: `seal=None`
+means **not sealed**, never permission to publish. Owner release, cleanup,
+checkpoint advancement and automatic replay remain unavailable.
+
+V2 diagnostics use `dpone.clickhouse.protected-publication-status.v1`. They omit
+source rows, SQL payloads, inventory details and capability secrets/hashes, and
+are atomically written without overwrite outside the private journal directory.
+Publication state, when present, is labelled historical; it does not certify the
+current target. Preserve the original journal and all sidecars after failure.
+
 ## Failure and recovery runbook
 
 | Symptom | Required action |
@@ -153,6 +205,9 @@ The focused suite is:
 
 ```bash
 uv run pytest tests/test_clickhouse_publication_codec.py \
+  tests/test_clickhouse_candidate_sqlite.py \
+  tests/test_clickhouse_candidate_processes.py \
+  tests/test_clickhouse_candidate_diagnostics.py \
   tests/test_clickhouse_authority_sqlite.py \
   tests/test_clickhouse_authority_processes.py \
   tests/test_clickhouse_guarded_publication.py -q

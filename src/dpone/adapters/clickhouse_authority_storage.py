@@ -14,33 +14,11 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from dpone.adapters.clickhouse_authority_schema import AuthorityVersion, schema_sql
 from dpone.contracts.clickhouse_authority import AuthorityStorageIdentity
 
 SCHEMA_VERSION = "dpone.clickhouse.authority.v1"
 _SIDECAR_SUFFIXES = ("-wal", "-shm", "-journal")
-_SCHEMA = """
-CREATE TABLE authority_metadata (singleton INTEGER PRIMARY KEY CHECK(singleton=1),
-    schema_version TEXT NOT NULL, deployment TEXT NOT NULL);
-CREATE TABLE subjects (subject_key TEXT PRIMARY KEY, payload TEXT NOT NULL,
-    owner TEXT NOT NULL UNIQUE, epoch INTEGER NOT NULL CHECK(epoch>0));
-CREATE TABLE operations (operation_id TEXT PRIMARY KEY, subject_key TEXT NOT NULL UNIQUE
-    REFERENCES subjects(subject_key), candidate TEXT NOT NULL, query_id TEXT NOT NULL UNIQUE,
-    revision INTEGER NOT NULL DEFAULT 0 CHECK(revision>=0), record TEXT, intent TEXT,
-    transport TEXT NOT NULL DEFAULT 'not_started' CHECK(transport IN
-      ('not_started','may_have_sent','closed_without_send','closed_terminal')),
-    grant_hash TEXT, completion_digest TEXT, observed TEXT);
-CREATE TABLE history (operation_id TEXT NOT NULL REFERENCES operations(operation_id),
-    revision INTEGER NOT NULL, event TEXT NOT NULL, transport TEXT NOT NULL,
-    record_digest TEXT, observed TEXT, observation_digest TEXT, PRIMARY KEY(operation_id,revision));
-CREATE TRIGGER history_no_update BEFORE UPDATE ON history BEGIN
-    SELECT RAISE(ABORT,'Immutable authority history'); END;
-CREATE TRIGGER history_no_delete BEFORE DELETE ON history BEGIN
-    SELECT RAISE(ABORT,'Immutable authority history'); END;
-CREATE TRIGGER subject_no_update BEFORE UPDATE ON subjects BEGIN
-    SELECT RAISE(ABORT,'Retained authority owner'); END;
-CREATE TRIGGER subject_no_delete BEFORE DELETE ON subjects BEGIN
-    SELECT RAISE(ABORT,'Retained authority owner'); END;
-"""
 
 
 class AuthorityStorageError(RuntimeError):
@@ -64,7 +42,10 @@ def _authority_path(path: Path) -> Path:
 class AuthorityStorage:
     """Short durable transactions against one existing deployment-owned inode."""
 
-    def __init__(self, path: Path, deployment_id: str) -> None:
+    def __init__(self, path: Path, deployment_id: str, *, version: AuthorityVersion = AuthorityVersion.V1) -> None:
+        if type(version) is not AuthorityVersion:
+            raise AuthorityStorageError("Unsupported authority version")
+        self.version = version
         self.path = _authority_path(path)
         self.deployment_id = deployment_id
         try:
@@ -78,8 +59,10 @@ class AuthorityStorage:
             raise AuthorityStorageError("Cannot open existing authority") from error
 
     @staticmethod
-    def provision(path: Path, deployment_id: str) -> None:
+    def provision(path: Path, deployment_id: str, *, version: AuthorityVersion = AuthorityVersion.V1) -> None:
         """Initialize once; leave failed initialization quarantined, never reset it."""
+        if type(version) is not AuthorityVersion:
+            raise AuthorityStorageError("Unsupported authority version")
         path = _authority_path(path)
         try:
             _private(path.parent, directory=True)
@@ -92,8 +75,8 @@ class AuthorityStorage:
                 db.execute("PRAGMA journal_mode=WAL")
                 db.execute("PRAGMA synchronous=FULL")
                 db.execute("PRAGMA foreign_keys=ON")
-                db.executescript("BEGIN IMMEDIATE;" + _SCHEMA)
-                db.execute("INSERT INTO authority_metadata VALUES (1,?,?)", (SCHEMA_VERSION, deployment_id))
+                db.executescript("BEGIN IMMEDIATE;" + schema_sql(version))
+                db.execute("INSERT INTO authority_metadata VALUES (1,?,?)", (version.value, deployment_id))
                 db.commit()
             finally:
                 db.close()
@@ -134,7 +117,7 @@ class AuthorityStorage:
             if any(db.execute(f"PRAGMA {key}").fetchone()[0] != value for key, value in expected.items()):
                 raise AuthorityStorageError("Required authority durability settings unavailable")
             if db.execute("SELECT schema_version,deployment FROM authority_metadata").fetchall() != [
-                (SCHEMA_VERSION, self.deployment_id)
+                (self.version.value, self.deployment_id)
             ]:
                 raise AuthorityStorageError("Authority schema or deployment mismatch")
             yield db

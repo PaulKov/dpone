@@ -198,7 +198,7 @@ compatibility modules. Tests: `tests/test_clickhouse_observation_profile.py`,
 - [x] Run focused tests plus existing binary/RowBinary/window tests selected by
   `rg --files tests` for those modules; all old vectors must pass unchanged.
   Run Ruff, mypy and import-rule checks for the new boundary.
-- [ ] Commit the scoped green task and immediately update/attach its PR. Do not
+- [x] Commit the scoped green task and immediately update/attach its PR. Do not
   describe the profile as live-certified yet.
 
 ## Task 2: Explicit v2 journal, namespace reservations and candidate history
@@ -278,10 +278,10 @@ Tests: `tests/test_clickhouse_candidate_sqlite.py`,
   `CandidateSeal` with the fields specified in Task 4, before any consumer uses
   them. Its producer is not available until Task 4; use `seal=None` beforehand.
 
-- [ ] Write RED tests for v1 defaults and unchanged bytes/history; v1/v2
+- [x] Write RED tests for v1 defaults and unchanged bytes/history; v1/v2
   cross-open/unknown versions must fail. New v2 provisioning cannot replace
   an existing file or adopt sidecars. Test symlink/inode/permission guards.
-- [ ] Write cross-role name collision tests (target/candidate, candidate/candidate),
+- [x] Write cross-role name collision tests (target/candidate, candidate/candidate),
   concurrent processes and same operation with changed request. Assert no partial
   owner/name reservation survives a rolled-back transaction.
   `test_candidate_name_cannot_be_another_target` uses two valid readiness
@@ -293,17 +293,17 @@ Tests: `tests/test_clickhouse_candidate_sqlite.py`,
           authority.enroll(conflicting_request, second_enrollment)
   assert authority.inspect(first_request.operation_id).binding.candidate == first_request.candidate
   ```
-- [ ] Write commit-ACK fault tests at enrollment, registration, send entry,
+- [x] Write commit-ACK fault tests at enrollment, registration, send entry,
   completion and admission closure. Readback never returns a new capability;
   persisted MAY_HAVE_SENT is retained even when no network call occurred.
-- [ ] Write Event-coordinated close-versus-registration tests. Accepted-before-close
+- [x] Write Event-coordinated close-versus-registration tests. Accepted-before-close
   stays recorded; rejected-after-close has no transport entry. Duplicate IDs,
   stale revisions, foreign/forked/expired grants and modified digests reject.
-- [ ] Run focused tests RED, then implement the SQL/lifecycle interfaces. Keep
+- [x] Run focused tests RED, then implement the SQL/lifecycle interfaces. Keep
   namespace uniqueness, immutable metadata/history and monotonic state guarded
   transactionally. Recheck exact original binding and request on each transition.
   Successful completion atomically updates expected aggregate once, never twice.
-- [ ] Run all new files and existing `test_clickhouse_authority_sqlite.py`,
+- [x] Run all new files and existing `test_clickhouse_authority_sqlite.py`,
   `test_clickhouse_authority_processes.py`, codec/kernel tests GREEN. For fresh
   Linux process checks preserve journals and counters; no macOS durability claim.
 - [ ] Commit/update PR; v2 is not exposed as an enabled publication backend yet.
