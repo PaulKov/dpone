@@ -4,7 +4,16 @@
 - Owner: dpone maintainers
 - Issue: SS-40 and follow-up findings from the Airflow self-service global review
 - Target release: 0.73.2
-- Last verified: 2026-07-18
+- Last verified: 2026-09-30
+
+## Approved amendments
+
+- 2026-09-30 / 0.88.0: the archive member limit is 64 MiB so the hygiene
+  scanner can certify the supported `Microsoft.Data.SqlClient` native runtime.
+  The scanner still reads the member with bounded memory and retains the 1 GiB
+  per-archive aggregate, 100:1 compression-ratio, member-count, path, type,
+  nested-archive, and replacement guards. This supersedes the original 32 MiB
+  member limit; all other hygiene decisions remain unchanged.
 
 ## Executive summary
 
@@ -433,7 +442,7 @@ Archive mode:
 2. Open archives no-follow and bind identity with `fstat`.
 3. Reject absolute/traversal paths, links, devices, nested archives, unsupported
    formats, and replacement during read.
-4. Enforce 32 archives, 20,000 members per archive, 32 MiB per member, 1 GiB
+4. Enforce 32 archives, 20,000 members per archive, 64 MiB per member, 1 GiB
    uncompressed per archive, and 100:1 compression-ratio limits.
 5. Scan bounded member bytes without extracting.
 6. Emit deterministic, non-disclosing findings.
@@ -628,7 +637,7 @@ limitations: live Vault and GCS behavior requires an approved environment
 - Vault token/JWT/AppRole material never crosses pack/operator arguments.
 - Signed URLs are treated as credentials and are never logged.
 - Source scan bounds: 50,000 blobs, 16 MiB per blob, 1 GiB aggregate.
-- Archive bounds: 32 archives, 20,000 members/archive, 32 MiB/member, 1 GiB
+- Archive bounds: 32 archives, 20,000 members/archive, 64 MiB/member, 1 GiB
   uncompressed/archive, 100:1 compression ratio.
 - Unsafe scan input is a certification failure.
 - Metrics: resolution attempts/success/failure by safe resolver type, authority

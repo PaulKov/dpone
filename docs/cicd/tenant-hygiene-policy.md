@@ -1,6 +1,6 @@
 # Configure tenant hygiene for a release
 
-The source readiness workflow scans frozen Git blobs and eight candidate
+The source readiness workflow scans frozen Git blobs and ten candidate
 archives. Repository secret `TENANT_HYGIENE_POLICY` contains the maintainer's
 deny list, not a PyPI credential. Configure it under GitHub repository settings,
 **Secrets and variables → Actions**. Never commit the real policy or print it.
@@ -61,8 +61,10 @@ without matching values are not automatically classified as corporate material.
 Source paths, blob bodies, archive member paths and bodies share one matcher.
 Structured policies read each size-bounded archive member completely before
 matching, preventing missed Unicode/separator matches at read boundaries. The
-32 MiB member limit remains; decoded and normalized representations require
-additional bounded memory. Legacy policies retain streaming literal matching.
+64 MiB member limit admits the supported SqlClient native dependency while
+bounding decoded and normalized representations. The 1 GiB per-archive
+aggregate limit and compression-ratio guard remain in force. Legacy policies
+retain streaming literal matching.
 
 Wheel metadata `*.dist-info/RECORD` is interpreted as strict UTF-8 CSV rather
 than arbitrary prose. The scanner computes SHA-256 and byte counts while scanning
@@ -81,10 +83,11 @@ size, compression, path, link and replacement guards still apply. No private
 deny-list values are needed to validate this behavior. The layout follows the
 [PyPA wheel specification](https://packaging.python.org/en/latest/specifications/binary-distribution-format/).
 
-Frozen source identity, no-follow archive access, replacement detection, archive
-limits, report schema and exit codes are unchanged. Reports contain safe codes
-and paths, never matched values. Protected paths are redacted. A finding returns
-`FAIL` / exit 2; invalid or unsafe input returns `UNABLE_TO_CERTIFY` / exit 3.
+Frozen source identity, no-follow archive access, replacement detection, the
+remaining archive limits, report schema and exit codes are unchanged. Reports
+contain safe codes and paths, never matched values. Protected paths are
+redacted. A finding returns `FAIL` / exit 2; invalid or unsafe input returns
+`UNABLE_TO_CERTIFY` / exit 3.
 
 After integrating the scanner, dispatch `source-release-readiness.yml` on
 protected `master`. Retain both successful jobs and their original artifacts as
