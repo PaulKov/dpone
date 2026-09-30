@@ -435,6 +435,16 @@ the closed certification producer. Its schema requires:
 - retry, unknown-outcome, and reconciliation classifications;
 - exact commit, package version, dirty flag, and allowlisted environment digest.
 
+The default application composition accepts optional `observer_factory` and
+`write_observer` constructor dependencies on `DefaultMssqlNativeRuntimeFactory`
+and `MssqlNativeApplicationRuntime`. The factory creates one delivery observer
+for each run; the SqlClient writer forwards its terminal observations to the
+supplied sink. Qualification can therefore collect the existing phase evidence
+through the normal manifest execution path. These observations are diagnostic,
+not publication authority. Defaults, operational evidence v1, manifest fields,
+and `ProcessResult` remain unchanged. Recovery keeps its existing composition
+and never restarts a writer to produce missing measurements.
+
 All timing values are non-negative decimal seconds from one monotonic clock.
 `confirmed_visibility_seconds` spans runtime admission start through the first
 successful post-commit visibility observation. Overlapping spans are stored

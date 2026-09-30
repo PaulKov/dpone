@@ -51,6 +51,12 @@ UPDATE, DELETE, TRUNCATE, and same-count DELETE plus INSERT. Its small schema
 exercises nullable and non-nullable framing for every SqlClient type, including
 NULL and signed bigint extrema. Each injected mutation must block publication
 and reject source-free resume while retaining custody for operator inspection.
+The default-runtime success case also injects delivery and writer observers
+through the public factory. It requires measured source work, verification,
+preparation, publication, and successful SqlClient write timings from the actual
+route. BCP compatibility coverage requires no SqlClient writer observations.
+This instrumentation check does not establish a deployment performance SLO.
+
 The retained `mssql-sqlclient-certification-<run>-<attempt>` artifact contains
 image, runner, campaign, and route receipts. Require the entire workflow to
 succeed; `campaign.json` alone certifies only the seven transport cells.
