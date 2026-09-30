@@ -18,6 +18,7 @@ owned_paths:
   - src/dpone/runtime/sources/clickhouse_native_source.py
   - src/dpone/runtime/sources/clickhouse_native_guard.py
   - src/dpone/runtime/sources/clickhouse_raw_snapshot.py
+  - src/dpone/runtime/sources/clickhouse_raw_catalog.py
   - tests/test_clickhouse_native_source.py
   - tests/test_clickhouse_raw_snapshot.py
 integrator_owned_paths: []
