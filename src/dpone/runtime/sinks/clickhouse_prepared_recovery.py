@@ -28,6 +28,7 @@ class PreparedRecoveryPlan:
     record: contracts.AuthorityRecord
     authority_version: int
     operation_started_at: datetime
+    replica_count: int
     token: str
     query_digest: str
     plan_digest: str
@@ -44,7 +45,7 @@ class PreparedRecoveryPlan:
     def predecessor_identity(self) -> contracts.GenerationIdentity | None:
         return self.record.predecessor
 
-    def to_public_dict(self) -> dict[str, str | int]:
+    def to_public_dict(self) -> dict[str, Any]:
         """Expose proof digests, not physical table names or identifiers."""
         return {
             "status": "ready",
@@ -57,6 +58,8 @@ class PreparedRecoveryPlan:
             if self.predecessor_identity
             else "none",
             "query_digest": self.query_digest,
+            "correlation_id": self.token,
+            "replica_summary": {"expected": self.replica_count, "candidate_ready": self.replica_count},
             "plan_digest": self.plan_digest,
         }
 
@@ -131,7 +134,7 @@ class PreparedRecoveryService:
                 "DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_UNRESOLVED", "cleanup has not completed"
             )
         receipt.validate_for_authority(completed)
-        return ClusterFullRefreshReceipt.from_authority(completed, plan.cluster)
+        return self._completed_receipt(plan, completed)
 
     def _resume_existing(
         self, plan: PreparedRecoveryPlan, current: contracts.VersionedAuthorityRecord
@@ -189,6 +192,10 @@ class PreparedRecoveryService:
             )
         inventory = self.catalog.inventory(plan.cluster)
         contracts.require_inventory(record, inventory)
+        if plan.replica_count != len(inventory.hosts):
+            raise contracts.ClusterPublicationError(
+                "DPONE_CLICKHOUSE_CLUSTER_INVENTORY_INCOMPLETE", "plan replica count changed"
+            )
         entry = require_exact_ddl_entry(
             self.ddl,
             plan.cluster,
@@ -205,7 +212,9 @@ class PreparedRecoveryService:
             entry.state_for(inventory.hosts) is not contracts.QueueState.TERMINAL_SUCCESS
             or len(observed_hosts) != len(inventory.hosts)
             or set(observed_hosts) != set(inventory.hosts)
-            or any(fact.target != record.desired or not fact.target_healthy for fact in facts)
+            or any(
+                fact.target != record.desired or fact.candidate is not None or not fact.target_healthy for fact in facts
+            )
         ):
             raise contracts.ClusterPublicationError(
                 "DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_UNKNOWN", "completed publication has no physical proof"
@@ -249,6 +258,13 @@ def plan_prepared_recovery(
         raise contracts.ClusterPublicationError(
             "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_CONFLICT", "original authority identity changed"
         )
+    # KeeperMap's initial version is the durable create-if-absent receipt. Under
+    # all-writer admission, any dispatch intent must advance it before DDL.
+    # Query-log absence is only corroboration: logs can rotate or be disabled.
+    if current.version != 0 or not authority.supports_linearizable_dispatch_permit():
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_AUTHORITY_UNSAFE", "original strict creation is not proven"
+        )
     if (
         record.phase is not contracts.AuthorityPhase.PREPARED
         or record.dispatch_epoch != 0
@@ -291,6 +307,7 @@ def plan_prepared_recovery(
             "record": record.payload_sha256,
             "version": current.version,
             "inventory": inventory.digest,
+            "replica_count": len(inventory.hosts),
             "started_at": operation_started_at.astimezone(UTC).isoformat(),
             "token": token,
             "query_digest": query_digest,
@@ -301,6 +318,7 @@ def plan_prepared_recovery(
         record=record,
         authority_version=current.version,
         operation_started_at=operation_started_at,
+        replica_count=len(inventory.hosts),
         token=token,
         query_digest=query_digest,
         plan_digest=plan_digest,
@@ -319,4 +337,4 @@ def _recovery_token(record: contracts.AuthorityRecord) -> str:
             "epoch": epoch,
         }
     )[:32]
-    return f"dpone-recovery-v1-{record.operation_id[:20]}-publish-{epoch}-{suffix}"
+    return f"dpone-recovery-v1-publish-{epoch}-{suffix}"

@@ -27,11 +27,12 @@ class ClickHouseClusterPublicationDdl:
     def prove_no_prior_publication(
         self, record: contracts.AuthorityRecord, *, cluster: str, operation_started_at: datetime
     ) -> bool:
-        """Require complete logged history plus absence of the exact DDL identity.
+        """Corroborate strict PREPARED authority with negative DDL observations.
 
-        Query-log absence alone is never accepted: every replica must retain
-        query events older than the original operation and have logging enabled.
-        An unavailable observation fails closed.
+        A pre-start log row and current logging setting do not prove continuous
+        historical logging. The caller must independently prove initial-version
+        strict authority and all-writer admission. Any observed prior DDL or
+        unavailable observation fails closed.
         """
         if not record.authority_write_id:
             return False

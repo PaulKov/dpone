@@ -5,46 +5,29 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from types import SimpleNamespace
 from typing import Any
 
 from dpone.adapters.yaml_pyyaml import PyYamlCodec
 from dpone.app.prepared_recovery_plan_store import read_plan, write_plan
 from dpone.runtime.credentials.binding_resolver import BindingCredentialResolver
 from dpone.runtime.credentials.resolved_connector_factory import ResolvedConnectorFactory
-from dpone.runtime.sinks.clickhouse_cluster_full_refresh_publication import (
-    ClickHouseClusterFullRefreshPublicationService,
+from dpone.runtime.sinks.clickhouse_prepared_recovery_facade import (
+    PreparedRecoveryBackend,
+    build_prepared_recovery_backend,
 )
-from dpone.runtime.sinks.clickhouse_cluster_publication_catalog import ClickHouseClusterPublicationCatalog
-from dpone.runtime.sinks.clickhouse_cluster_publication_ddl import ClickHouseClusterPublicationDdl
-from dpone.runtime.sinks.clickhouse_prepared_recovery import PreparedRecoveryService, plan_prepared_recovery
-from dpone.runtime.sinks.clickhouse_quality_authority import ClickHouseQualityKeeperMapAuthority
 
 
 @dataclass(slots=True)
 class PreparedRecoveryRuntime:
     """One admitted authority, catalog and connector for a single invocation."""
 
-    catalog: ClickHouseClusterPublicationCatalog
-    authority: ClickHouseQualityKeeperMapAuthority
-    ddl: ClickHouseClusterPublicationDdl
-    service: PreparedRecoveryService
+    backend: PreparedRecoveryBackend
 
     def plan(self, args: Any) -> Any:
-        return plan_prepared_recovery(
-            self.catalog,
-            self.authority,
-            self.ddl,
-            cluster=args.cluster,
-            database=args.database,
-            target=args.target,
-            operation_id=args.operation_id,
-            expected_version=args.authority_version,
-            operation_started_at=datetime.fromisoformat(args.operation_started_at),
-        )
+        return self.backend.plan(args)
 
     def execute(self, plan: Any, *, confirmation_digest: str) -> Any:
-        return self.service.execute_prepared_recovery(plan, confirmation_digest=confirmation_digest)
+        return self.backend.execute(plan, confirmation_digest=confirmation_digest)
 
     def save_plan(self, plan: Any, path: str) -> None:
         write_plan(plan, Path(path))
@@ -77,26 +60,9 @@ def build_prepared_recovery_runtime(args: Any) -> PreparedRecoveryRuntime:
         args.connection_ref
     )
     connector = ResolvedConnectorFactory.create(resolved)
-    catalog = ClickHouseClusterPublicationCatalog(connector)
-    inventory = catalog.inventory(args.cluster)
-    catalog.require_atomic_database(args.cluster, args.database, inventory.hosts)
-    authority = ClickHouseQualityKeeperMapAuthority(connector, args.database)
-    authority.require_ready(args.cluster, args.database, inventory.hosts)
-    ddl = ClickHouseClusterPublicationDdl(connector, catalog)
-    publication = ClickHouseClusterFullRefreshPublicationService(
-        catalog,
-        lambda database: authority if database == args.database else _reject_database(),
-        ddl,
-        SimpleNamespace(ensure=lambda cluster, database, hosts: authority.require_ready(cluster, database, hosts)),
+    return PreparedRecoveryRuntime(
+        build_prepared_recovery_backend(connector, cluster=args.cluster, database=args.database)
     )
-    service = PreparedRecoveryService(
-        catalog,
-        authority,
-        ddl,
-        lambda current, cluster: publication._reconcile_existing(authority, current, cluster),
-        publication.cleanup,
-    )
-    return PreparedRecoveryRuntime(catalog, authority, ddl, service)
 
 
 def _read_mapping(path: Path, codec: PyYamlCodec) -> dict[str, Any]:
@@ -106,7 +72,3 @@ def _read_mapping(path: Path, codec: PyYamlCodec) -> dict[str, Any]:
     if not isinstance(payload, dict):
         raise ValueError("binding document must be a mapping")
     return payload
-
-
-def _reject_database() -> Any:
-    raise ValueError("recovery authority database changed")
