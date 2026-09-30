@@ -126,3 +126,12 @@ def test_invalid_identity_digests_are_rejected(value):
         _api().publication_slot_key(_binding(), value)
     with pytest.raises(ValueError):
         _api().publication_binding_digest(_binding(), endpoint_identity=value)
+    with pytest.raises(ValueError):
+        _api().native_publication_provenance(value)
+
+
+def test_native_origin_has_exact_closed_canonical_contract():
+    assert _api().native_publication_provenance("a" * 64) == (
+        b'{"binding_digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",'
+        b'"contract":"dpone.publication-origin.v1","origin":"native"}'
+    )

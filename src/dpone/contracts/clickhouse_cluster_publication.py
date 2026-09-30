@@ -34,6 +34,7 @@ class AuthorityPhase(StrEnum):
     COMMITTED = "COMMITTED"
     CLEANUP_DISPATCHING = "CLEANUP_DISPATCHING"
     COMPLETED = "COMPLETED"
+    RETIRED_UNPUBLISHED = "RETIRED_UNPUBLISHED"
 
 
 class AuthorityMutationStatus(StrEnum):
@@ -259,6 +260,8 @@ class DispatchPermit:
 
     @classmethod
     def for_record(cls, record: AuthorityRecord) -> DispatchPermit:
+        if record.phase is AuthorityPhase.RETIRED_UNPUBLISHED:
+            raise ValueError("retired publication has no dispatch permit")
         # The receipt's write UUID differs from the caller's desired payload;
         # every business/effect field remains bound, including correlation.
         return cls(

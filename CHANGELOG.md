@@ -23,6 +23,12 @@
   upcoming publication operator workflow. Concurrent writers cannot overwrite
   an existing plan; ambiguous directory-sync outcomes preserve completed
   evidence for readback. Operator commands are not yet activated.
+- Add unactivated guarded-retirement policy, service and an admitted MSSQL
+  absent-only store. Retirement preserves original replica bytes in immutable
+  history, records `RETIRED_UNPUBLISHED` rather than publication success, and
+  grants no dispatch permit. A private persistent attempt journal blocks repeat
+  writes after an unknown outcome. Trusted deployment observation, fresh-load
+  handoff and operator CLI integration remain required before activation.
 
 ### Fixed
 

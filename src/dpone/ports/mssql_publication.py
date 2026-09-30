@@ -11,6 +11,9 @@ from dpone.contracts.publication_authority_binding import (
     PublicationAuthorityBinding as PublicationAuthorityBinding,
 )
 from dpone.contracts.publication_authority_binding import (
+    native_publication_provenance as native_publication_provenance,
+)
+from dpone.contracts.publication_authority_binding import (
     publication_binding_digest as publication_binding_digest,
 )
 from dpone.contracts.publication_authority_binding import (

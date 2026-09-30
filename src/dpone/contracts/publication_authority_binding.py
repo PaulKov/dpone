@@ -12,7 +12,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass, fields
 from typing import Any
 
-from dpone.contracts.clickhouse_cluster_publication import digest_payload
+from dpone.contracts.clickhouse_cluster_publication import canonical_json, digest_payload
 from dpone.contracts.mssql_object_name import safe_mssql_identifier
 from dpone.contracts.runtime_connection import ResolvedConnectionDescriptor
 
@@ -103,3 +103,11 @@ def publication_binding_digest(binding: PublicationAuthorityBinding, *, endpoint
 def _require_digest(value: str) -> None:
     if not isinstance(value, str) or _DIGEST.fullmatch(value) is None:
         raise ValueError("publication_authority: canonical SHA-256 required")
+
+
+def native_publication_provenance(binding_digest: str) -> bytes:
+    """One closed origin contract shared by native SQL writes and readback."""
+    _require_digest(binding_digest)
+    return canonical_json(
+        {"contract": "dpone.publication-origin.v1", "origin": "native", "binding_digest": binding_digest}
+    ).encode()

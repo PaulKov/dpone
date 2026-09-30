@@ -33,6 +33,7 @@ class ClusterFullRefreshReceipt:
         """Build the stable receipt from the currently verified authority row."""
 
         record = current.record
+        _require_not_retired(record)
         marker = FullRefreshPublicationMarker.create(
             operation_id=record.operation_id,
             database=record.database,
@@ -62,6 +63,7 @@ class ClusterFullRefreshReceipt:
         """Reject stale or modified receipt identity before cleanup side effects."""
 
         supplied, authoritative = self.authority, current.record
+        _require_not_retired(supplied)
         expected_target_key = contracts.digest_payload(
             {
                 "cluster": self.cluster,
@@ -89,6 +91,7 @@ class ClusterFullRefreshReceipt:
                 "DPONE_CLICKHOUSE_CLUSTER_RECEIPT_INVALID", "schema version mismatch"
             )
         authority = authority_from_mapping(_mapping(value.get("authority")))
+        _require_not_retired(authority)
         marker = FullRefreshPublicationMarker(**_mapping(value.get("marker")))
         return cls(
             marker=marker,
@@ -99,6 +102,13 @@ class ClusterFullRefreshReceipt:
 
 
 QualityReplayCapsule = quality_contracts.QualityReplayCapsule
+
+
+def _require_not_retired(record: contracts.AuthorityRecord) -> None:
+    if record.phase is contracts.AuthorityPhase.RETIRED_UNPUBLISHED:
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_RECEIPT_INVALID", "retirement is not publication evidence"
+        )
 
 
 def authority_from_mapping(value: dict[str, Any]) -> contracts.AuthorityRecord:
