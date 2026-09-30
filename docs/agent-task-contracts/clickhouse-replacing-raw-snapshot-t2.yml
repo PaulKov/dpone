@@ -15,7 +15,11 @@ public_contract_impact:
   surfaces: ["ClickHouse to MSSQL native source capability"]
   migration_required: false
 owned_paths:
+  - src/dpone/contracts/clickhouse_raw_read_policy.py
+  - src/dpone/contracts/clickhouse_raw_snapshot.py
+  - tests/test_clickhouse_raw_snapshot_contracts.py
   - src/dpone/runtime/sources/clickhouse_native_source.py
+  - src/dpone/runtime/sources/clickhouse_plain_snapshot.py
   - src/dpone/runtime/sources/clickhouse_native_guard.py
   - src/dpone/runtime/sources/clickhouse_raw_snapshot.py
   - src/dpone/runtime/sources/clickhouse_raw_catalog.py
@@ -24,7 +28,6 @@ owned_paths:
 integrator_owned_paths: []
 read_only_paths:
   - docs/feature-specs/clickhouse-replacing-raw-snapshot.md
-  - src/dpone/contracts/clickhouse_raw_snapshot.py
   - src/dpone/manifest/clickhouse_raw_snapshot_policy.py
   - src/dpone/runtime/mssql_native_application_assembly.py
 forbidden_paths: [pyproject.toml, uv.lock, CHANGELOG.md, mkdocs.yml, .github/workflows, src/dpone/schema, tests/conftest.py]

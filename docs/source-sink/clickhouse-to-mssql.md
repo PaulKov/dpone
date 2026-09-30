@@ -40,6 +40,15 @@ or [SqlClient seven-day example](../../examples/native/clickhouse-to-mssql-sqlcl
 then follow the native guide for custody, permissions, recovery,
 and current certification status.
 
+For an exact non-`FINAL` stream from `ReplacingMergeTree`, use the explicit
+[`exact_raw_rows` source selector](../mssql-native-transport.md#exact-raw-rows-from-replacingmergetree)
+with `verification_backend: target_local`. It preserves query-visible versions,
+duplicates and deletion-marker values; it does not reconstruct rows already
+removed by merges. Start with the
+[raw snapshot example](../../examples/native/clickhouse-replacing-to-mssql-native.yaml).
+This new source capability requires its own route qualification; existing plain
+MergeTree certificates do not establish it.
+
 ## When to use this path
 
 Use this path when ClickHouse is the system of record or ingestion boundary and

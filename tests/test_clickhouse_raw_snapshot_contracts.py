@@ -32,6 +32,10 @@ def _profile() -> ClickHouseRawSnapshotProfileV1:
         primary_key_sha256=_C,
         window=("event_day", "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z"),
         read_settings=(
+            ("limit", 0),
+            ("offset", 0),
+            ("extremes", 0),
+            ("sort_overflow_mode", "throw"),
             ("final", 0),
             ("use_query_cache", 0),
             ("apply_mutations_on_fly", 0),
@@ -256,3 +260,10 @@ def test_deeply_nested_extension_is_rejected_before_json_materialization(monkeyp
     monkeypatch.setattr(snapshot_bounds, "canonical_json_bytes", serialization_must_not_run)
     with pytest.raises(ValueError):
         restore_raw_snapshot_extension(extension, binding=binding, completed_rows=2)
+
+
+@pytest.mark.parametrize("name", ["limit", "offset", "extremes", "sort_overflow_mode"])
+def test_profile_requires_result_completeness_settings(name):
+    profile = _profile()
+    with pytest.raises(ValueError, match="profile_invalid"):
+        replace(profile, read_settings=tuple(item for item in profile.read_settings if item[0] != name))

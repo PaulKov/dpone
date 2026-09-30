@@ -59,7 +59,7 @@ class MssqlNativeStagePreparer:
             if lifecycle is None:
                 raise ValueError("mssql_native.recovery_source_lifecycle_required")
         else:
-            from dpone.runtime.sinks.mssql_native_completed_payload import completion_metadata
+            from dpone.runtime.sinks import mssql_native_completed_payload
             from dpone.runtime.sinks.mssql_native_source_values import _sized_native_source_rows
 
             adapted = context.observer.source_rows(
@@ -71,7 +71,7 @@ class MssqlNativeStagePreparer:
                 adapted,
                 context.wire_contract,
                 context.lease,
-                completion_metadata=lambda: completion_metadata(
+                completion_metadata=lambda: mssql_native_completed_payload.completion_metadata(
                     payload,
                     recovery_bindings=(
                         None if context.recovery_bindings is None else context.recovery_bindings(admission)
@@ -79,6 +79,7 @@ class MssqlNativeStagePreparer:
                 ),
                 cancelled=context.cancelled,
             )
+            mssql_native_completed_payload.require_raw_snapshot_row_count(payload, complete)
             lifecycle = payload.require_completed_extraction()
         receipts = tuple(complete.receipts)
         if tuple(receipt.ordinal for receipt in receipts) != tuple(range(len(receipts))):

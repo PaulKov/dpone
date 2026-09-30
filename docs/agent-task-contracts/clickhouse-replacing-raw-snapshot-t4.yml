@@ -19,13 +19,25 @@ owned_paths:
   - tests/integration/mssql/test_clickhouse_replacing_raw_snapshot_live.py
   - tests/test_clickhouse_replacing_raw_snapshot_docs.py
 integrator_owned_paths:
+  - docs/layer_metrics_baseline.json
+  - docs/quality-metrics.md
+  - src/dpone/runtime/connectors/clickhouse.py
+  - tests/test_runtime_clickhouse_connector_split.py
+  - src/dpone/readiness/managed_planning.py
+  - src/dpone/manifest/mssql_native_policy.py
+  - tests/test_mssql_native_policy.py
+  - src/dpone/readiness/mssql_native_planning.py
+  - src/dpone/commands/plan_mssql_native_render.py
+  - tests/test_mssql_native_plan_diagnostics.py
+  - docs/reference/manifest-schemas.md
   - src/dpone/schema/etl-batch-manifest.schema.json
   - tests/test_manifest_schema_reference_docs.py
   - docs/feature-specs/clickhouse-replacing-raw-snapshot.md
   - docs/source-sink/clickhouse-to-mssql.md
+  - docs/mssql-native-transport.md
   - docs/connector-certification.md
   - docs/adr-index.md
-  - docs/adr/0072-clickhouse-replacing-raw-snapshot.md
+  - docs/adr/0057-bounded-window-atomic-publication.md
   - docs/errors/DPONE_MSSQL_NATIVE_SOURCE_SNAPSHOT_UNSUPPORTED.md
   - CHANGELOG.md
   - mkdocs.yml
@@ -44,9 +56,10 @@ forbidden_paths:
   - tests/test_manifest_schema_reference_docs.py
   - docs/feature-specs/clickhouse-replacing-raw-snapshot.md
   - docs/source-sink/clickhouse-to-mssql.md
+  - docs/mssql-native-transport.md
   - docs/connector-certification.md
   - docs/adr-index.md
-  - docs/adr/0072-clickhouse-replacing-raw-snapshot.md
+  - docs/adr/0057-bounded-window-atomic-publication.md
   - docs/errors/DPONE_MSSQL_NATIVE_SOURCE_SNAPSHOT_UNSUPPORTED.md
 shared_file_owner: "root integrator"
 dependencies: ["T1, T2, and T3 frozen implementations and reviews"]

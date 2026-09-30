@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 from dpone.runtime.connectors.clickhouse import ClickHouseConnector
 
@@ -248,3 +252,21 @@ def test_clickhouse_connector_does_not_retry_metadata_lag_for_insert(monkeypatch
         raise AssertionError("INSERT should not be retried automatically")
 
     assert len(connector._client.executed) == 1
+
+
+@pytest.mark.parametrize("certificate", [None, "/synthetic/authority.pem"])
+def test_native_connection_forwards_configured_ca_without_disabling_tls(monkeypatch, certificate):
+    observed = {}
+
+    def client(**options):
+        observed.update(options)
+        return object()
+
+    monkeypatch.setitem(sys.modules, "clickhouse_driver", SimpleNamespace(Client=client))
+    connector = ClickHouseConnector("source.invalid", 9440, "synthetic", "reader", "", secure=True, ca_cert=certificate)
+    connector.connection
+    assert observed.get("ca_certs") == certificate
+    assert ("ca_certs" in observed) is (certificate is not None)
+    assert observed["secure"] is True
+    assert observed.get("verify", True) is True
+    assert observed.get("check_hostname", True) is True

@@ -12,6 +12,8 @@ from typing import Any
 from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
 from dpone.adapters.mssql_native_chunks_journal import NativeChunkJournal
 from dpone.adapters.mssql_native_recovery_plan import persist_mssql_native_recovery_plan
+from dpone.contracts.clickhouse_raw_snapshot import raw_source_query_binding
+from dpone.manifest.clickhouse_raw_snapshot_policy import native_source_snapshot_policy
 from dpone.manifest.mssql_native_policy import (
     native_import_backend,
     native_limits,
@@ -28,6 +30,7 @@ from dpone.ports.mssql_native import (
 from dpone.ports.native_delivery_observer import NativeDeliveryObserver
 from dpone.runtime.connectors.mssql_bulk import BcpOptions
 from dpone.runtime.etl.mssql_schema_preplan import MSSQL_SCHEMA_PREPLAN_OPTION
+from dpone.runtime.etl.mssql_schema_preplan_support import schema_columns_sha256, source_columns
 from dpone.runtime.etl.mssql_transaction_admission import ADMISSION_OPTION
 from dpone.runtime.extraction_lifecycle import ArtifactTerminalOutcome
 from dpone.runtime.mssql_native_runtime import NativeMssqlRuntime, NativeRuntimeBindings
@@ -68,7 +71,31 @@ class _NativeRuntimeAssembly:
             query=_digest((self.preplan.source_relation_identity, self.preplan.source_schema_sha256.hex())),
             target_format="mssql_native",
         )
-        self.plan = _chunk_plan(config, self.admission, self.preplan, self.wire.type_layout_hash)
+        self.native_source: Any = ClickHouseNativeSource(
+            self.source.connector,
+            schema_guard_factory=lambda value: ClickHouseSchemaStabilityGuard(
+                self.source.connector, value.source_schema, value.source_table
+            ),
+        )
+        self.snapshot_profile = None
+        source_query_id = None
+        if native_source_snapshot_policy(config).mode == "exact_raw_rows":
+            self.snapshot_profile = self.native_source.snapshot_profile(config)
+            if self.snapshot_profile is None:
+                raise ValueError("mssql_native.source_snapshot_profile_required")
+            if (
+                self.snapshot_profile.relation_uuid != self.preplan.source_relation_identity
+                or tuple((name, dtype) for name, dtype, _ in self.snapshot_profile.ordered_schema)
+                != tuple(self.source_projection.relation_schema)
+                or schema_columns_sha256(source_columns(self.source_projection)) != self.preplan.source_schema_sha256
+            ):
+                raise ValueError("mssql_native.source_snapshot_schema_changed")
+            source_query_id = raw_source_query_binding(
+                _legacy_source_binding(config, self.admission, self.preplan), self.snapshot_profile
+            )
+        self.plan = _chunk_plan(
+            config, self.admission, self.preplan, self.wire.type_layout_hash, source_query_id=source_query_id
+        )
         policy = RuntimeStoragePolicy.from_sources(
             runtime=(process.raw_config or {}).get("runtime"),
             source_options=config.options,
@@ -128,8 +155,7 @@ class _NativeRuntimeAssembly:
     ) -> None:
         self.observer = observer if observer is not None else BoundedNativeDeliveryObserver()
         self._write_observer = write_observer
-        if not hasattr(self, "_artifact"):
-            self._artifact: Any = None
+        self._artifact: Any = getattr(self, "_artifact", None)
         self.runtime = NativeMssqlRuntime(
             store=self.store,
             target_id=self.plan.target_id,
@@ -218,15 +244,12 @@ class _NativeRuntimeAssembly:
     def _source(self, config: Any, _binding: NativeRuntimeBindings):
         if self._recovery_only:
             raise RuntimeError("mssql_native.recovery_source_forbidden")
-        native = ClickHouseNativeSource(
-            self.source.connector,
-            schema_guard_factory=lambda value: ClickHouseSchemaStabilityGuard(
-                self.source.connector,
-                value.source_schema,
-                value.source_table,
-            ),
+        source_options = (
+            {}
+            if self.snapshot_profile is None
+            else dict(expected_profile=self.snapshot_profile, source_query_binding=self.plan.source_query_id)
         )
-        result = native.extract(config)
+        result = self.native_source.extract(config, **source_options)
         artifact: Any = result.artifact
         if artifact.source_relation_uuid != self.preplan.source_relation_identity:
             raise ValueError("mssql_native.source_identity_changed")
@@ -299,7 +322,18 @@ def _wire_schema(source_schema: Any, preplan: Any) -> tuple[tuple[str, str], ...
     return tuple(resolved)
 
 
-def _chunk_plan(config: Any, admission: Any, preplan: Any, wire_fingerprint: str) -> NativeChunkPlan:
+def _legacy_source_binding(config: Any, admission: Any, preplan: Any) -> str:
+    """Keep the historical preimage shared by legacy and raw source identities."""
+    window = native_window(config)
+    value = None if window is None else (window.column, window.start.isoformat(), window.end.isoformat())
+    return _digest(
+        (preplan.source_relation_identity, admission.operation.attempt.request.route_fingerprint.hex(), value)
+    )
+
+
+def _chunk_plan(
+    config: Any, admission: Any, preplan: Any, wire_fingerprint: str, *, source_query_id: str | None = None
+) -> NativeChunkPlan:
     operation = admission.operation
     if operation is None or not preplan.source_relation_identity:
         raise ValueError("mssql_native.identity_unavailable")
@@ -312,7 +346,7 @@ def _chunk_plan(config: Any, admission: Any, preplan: Any, wire_fingerprint: str
     return NativeChunkPlan(
         operation.operation_key.hex(),
         target_id,
-        _digest((preplan.source_relation_identity, request.route_fingerprint.hex(), window_value)),
+        _legacy_source_binding(config, admission, preplan) if source_query_id is None else source_query_id,
         _digest(window_value),
         preplan.source_schema_sha256.hex(),
         wire_fingerprint,

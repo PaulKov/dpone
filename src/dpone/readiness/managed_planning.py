@@ -34,7 +34,7 @@ from dpone.readiness.managed_utils import (
     _source_columns,
     _table,
 )
-from dpone.readiness.mssql_native_planning import project_mssql_native
+from dpone.readiness.mssql_native_planning import project_mssql_native, validate_source_snapshot_plan
 from dpone.readiness.physical_design import PhysicalDesignOptions, PhysicalDesignPlanner
 from dpone.readiness.resolved_process_route import resolve_process_route
 from dpone.readiness.schema_contracts import SchemaContract
@@ -86,6 +86,7 @@ class ExecutionPlanService:
         route = resolve_process_route(spec)
         source_type = route.source
         sink_type = route.sink
+        validate_source_snapshot_plan(lc, source_type, sink_type)
         mssql_strategy_contract = normalize_mssql_authoring_strategy(lc).to_dict() if sink_type == "mssql" else None
         postgres_mssql_wire = (
             normalize_postgres_mssql_wire(lc).to_dict() if source_type == "postgres" and sink_type == "mssql" else None

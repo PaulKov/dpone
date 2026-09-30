@@ -12,6 +12,7 @@ import re
 from dataclasses import dataclass
 from typing import Literal
 
+from dpone.contracts.clickhouse_raw_read_policy import valid_raw_read_settings
 from dpone.contracts.clickhouse_raw_snapshot_bounds import (
     preflight_raw_snapshot_shape,
     validate_raw_snapshot_document,
@@ -24,27 +25,6 @@ BINDING_KIND = "dpone.clickhouse-raw-query-binding.v1"
 BINDING_PREFIX = "clickhouse.raw-query.v1:"
 _DIGEST = re.compile(r"[0-9a-f]{64}\Z")
 _MARKER = re.compile(r"clickhouse\.raw-query\.v([0-9]+):(.+)\Z")
-_FIXED_READ_SETTINGS: dict[str, str | int] = {
-    "final": 0,
-    "use_query_cache": 0,
-    "apply_mutations_on_fly": 0,
-    "apply_patch_parts": 1,
-    "apply_deleted_mask": 1,
-    "max_parallel_replicas": 1,
-    "skip_unavailable_shards": 0,
-    "read_overflow_mode": "throw",
-    "result_overflow_mode": "throw",
-    "timeout_overflow_mode": "throw",
-}
-_BOUNDED_LIMIT_NAMES = frozenset(
-    {
-        "max_rows_to_read",
-        "max_bytes_to_read",
-        "max_result_rows",
-        "max_result_bytes",
-        "max_execution_time",
-    }
-)
 _PROFILE_FIELDS = frozenset(
     {
         "kind",
@@ -158,22 +138,7 @@ class ClickHouseRawSnapshotProfileV1:
             type(item) is tuple and len(item) == 3 and all(type(part) is str for part in item)
             for item in self.ordered_schema
         )
-        settings_ok = type(self.read_settings) is tuple and all(
-            type(item) is tuple and len(item) == 2 and _text(item[0]) and (type(item[1]) is str or type(item[1]) is int)
-            for item in self.read_settings
-        )
-        if settings_ok:
-            names = [item[0] for item in self.read_settings]
-            settings_ok = len(names) == len(set(names))
-        if settings_ok:
-            values = dict(self.read_settings)
-            settings_ok = all(
-                name in values and type(values[name]) is type(expected) and values[name] == expected
-                for name, expected in _FIXED_READ_SETTINGS.items()
-            ) and all(
-                name in _FIXED_READ_SETTINGS or (name in _BOUNDED_LIMIT_NAMES and type(value) is int and value > 0)
-                for name, value in self.read_settings
-            )
+        settings_ok = valid_raw_read_settings(self.read_settings)
         window_ok = self.window is None or (
             type(self.window) is tuple and len(self.window) == 3 and all(_text(part) for part in self.window)
         )

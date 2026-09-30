@@ -44,16 +44,21 @@ Customer journey:
 
 1. **Discover:** the route guide explains `query_visible` versus
    `exact_raw_rows` and warns that `FINAL` is intentionally absent.
-2. **Check prerequisites:** credential-free `dpone plan`/doctor validates only
-   manifest shape and static compatibility. The existing explicit live path
-   (`dpone check PATH --connections` or `dpone check PATH --live`) verifies engine, direct native
-   protocol, TLS, database engine, schema/types/defaults, permissions, effective
-   read profile, replica scope, and provenance capability before row I/O.
+2. **Check prerequisites:** credential-free `dpone plan` validates manifest
+   shape and static compatibility; doctor checks local runtime readiness.
+   `dpone check PIPELINE --connections`
+   checks registered bindings without network access. The existing pipeline-only
+   `--live` path requires a configured live runner and does not itself certify a
+   batch source. Runtime admission verifies engine, direct native protocol, TLS,
+   database engine, schema/types/defaults, permissions, effective read profile,
+   replica scope, and provenance capability before row I/O. Missing live evidence
+   remains `UNVERIFIED`; a static plan never substitutes for admission.
 3. **Configure:** the user adds the closed selector below; credentials remain in
    the existing connection authority.
 4. **Run:** one fixed UTC half-open window and one dedicated native SELECT are
    acquired. Hidden provenance is observed but never loaded into the target.
-5. **Observe:** plan and evidence show selector, actual engine, replica scope,
+5. **Observe:** plan shows the declared selector and replica scope. Runtime
+   evidence records actual engine, replica scope,
    effective settings, relation/schema/profile identities, query ID, source EOF,
    part coverage, and typed row digest without secrets or row values.
 6. **Diagnose:** overridden read settings, policy or identity drift, replica
@@ -141,6 +146,12 @@ Closed schema:
 | `source_snapshot.mode` | `query_visible` or `exact_raw_rows` | Omission behaves exactly as today: only plain `MergeTree`; `query_visible` is the explicit spelling of that legacy behavior and is not materialized into old manifests |
 | `source_snapshot.replica_scope` | `single_server` or `connected_replica` | `single_server` is required for non-replicated `ReplacingMergeTree`; `connected_replica` is required for `ReplicatedReplacingMergeTree`; any other combination fails before extraction |
 
+`exact_raw_rows` requires `execution.verification_backend: target_local` so the
+existing v2 identity and persisted recovery authority can certify source-free
+recovery. BCP remains the default import backend; SqlClient remains opt-in.
+This requirement applies only to the new raw selector; omitted/query-visible
+legacy verification defaults are unchanged.
+
 `additionalProperties: false`. No knobs expose `FINAL`, cache, patch, mask,
 policy, or consistency settings: those are a versioned framework profile and
 cannot be weakened per workload. `SharedReplacingMergeTree` and aliases fail
@@ -162,11 +173,11 @@ outside this change.
 
 ### CLI and Python API
 
-No new command or top-level Python API. Credential-free plan/doctor output gains
+No new command or top-level Python API. Credential-free plan output gains
 a sanitized **declared** `source_snapshot` section and never resolves credentials
 or claims a live engine, TLS endpoint, permission, policy, or replica observation.
-Those observations exist only in the already explicit connection/live check
-paths and runtime admission. Invalid
+Doctor and connection checks retain their existing behavior; they do not certify
+raw source admission. Live observations occur in runtime admission. Invalid
 combinations exit through existing manifest/admission failure handling and emit
 one stable code, for example:
 
@@ -310,7 +321,11 @@ query-descriptor SHA. No extra monotonic fence is required or claimed.
 6. Freeze query settings at query level: `final=0`, `use_query_cache=0`,
    `apply_mutations_on_fly=0`, `apply_patch_parts=1`,
    `apply_deleted_mask=1`, `max_parallel_replicas=1`,
-   `skip_unavailable_shards=0`, and existing throwing read/result/timeout limits.
+   `skip_unavailable_shards=0`, `limit=0`, `offset=0`, `extremes=0`,
+   `sort_overflow_mode=throw`, and existing throwing read/result/timeout limits.
+   Inspect and reject unsupported nonempty additional table/result filters;
+   inspect a version-optional result `filter` when present. Never clear access
+   filters to obtain admission. Bind the inspected empty/absent filter state.
    Thus committed patch parts and lightweight-delete masks visible to the acquired
    query are applied even if they appear after metadata preflight. An unsupported
    or overridden effective value fails admission. For `connected_replica`, bind
@@ -321,7 +336,10 @@ query-descriptor SHA. No extra monotonic fence is required or claimed.
    base/patch part identity, delete-mask identity, physical rows/data
    version/merge level, and server-provided file checksums. Canonically hash it as
    `physical_profile_sha256`. For a bounded window, admit only a partition expression from the
-   closed window-column allowlist and enumerate its exact partition IDs. For a
+   closed window-column allowlist and enumerate its exact partition IDs.
+   Explicit UTC timestamp columns are accepted; implicit timestamp window
+   columns require proven UTC server/session calendars, bound in partition
+   semantics. Reject non-UTC implicit calendars before row I/O. For a
    full refresh, enumerate all active parts under a fixed implementation cap;
    exceeding the cap fails before data I/O rather than truncating provenance.
    This manifest is provenance and a race detector, not a row-content digest.
@@ -535,7 +553,7 @@ cell is not certification.
 Update the ClickHouse → MSSQL guide, native transport reference, manifest schema
 reference, source/sink matrix wording, ADR, recovery/performance runbooks,
 examples, generated schema docs, and changelog. The tutorial must show discovery,
-doctor output, both replica scopes, raw-versus-FINAL examples, common failure
+declared plan output, both replica scopes, raw-versus-FINAL examples, common failure
 codes, evidence inspection, safe retry, source-free recovery, rollback, and the
 limits of physical checksums/before-after observations.
 

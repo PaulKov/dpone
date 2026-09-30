@@ -16,8 +16,10 @@ public_contract_impact:
   migration_required: false
 owned_paths:
   - src/dpone/runtime/mssql_native_application_assembly.py
+  - src/dpone/runtime/mssql_native_recovery_composition.py
   - src/dpone/runtime/sinks/mssql_native_completed_payload.py
   - src/dpone/runtime/sinks/mssql_native_prepare.py
+  - src/dpone/runtime/sinks/mssql_native_staged_load.py
   - src/dpone/app/mssql_native_recovery_application.py
   - tests/test_mssql_native_application.py
   - tests/test_mssql_native_recovery_inspection.py
