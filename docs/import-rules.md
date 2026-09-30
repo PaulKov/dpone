@@ -49,6 +49,27 @@ command-local facades delegate to the shared `dpone.cli_render` implementation.
 The historical top-level `dpone.output_json` and `dpone.output_text` paths
 remain compatibility re-exports.
 
+### Readiness diagnostics and managed services
+
+Importing `dpone.readiness` or its `python_import_health` diagnostic does not
+initialize the managed planning and performance services. The package delegates
+its six historical managed service exports to `dpone.readiness.managed` on first
+access. This avoids loading manifest planning and schema/type matrices merely to
+check whether a Python dependency can be imported.
+
+No user configuration or import migration is required. Package attributes, named
+imports, star imports, `__all__`, `dir()`, and canonical service-object identity
+remain available. `dir()` alone does not load a managed service; requesting a
+service, including through star import or value-based introspection, does.
+Unknown package attributes do not expose additional names from the child facade.
+
+The compatibility package only forwards exports and retains its explicit
+dependency on the existing managed facade; it does not own planning policy.
+Type-checking imports preserve the exported types. Diagnostic communication and
+process-cleanup limits are unchanged; this import boundary is not a guarantee
+of a fixed wall-clock duration for the entire command. See the [MSSQL doctor
+contract](mssql.md) for those limits and environmental prerequisites.
+
 ### Layer matrix
 
 | Source layer | Must not import |
