@@ -15,9 +15,10 @@
 Last verified: 2026-09-30
 
 The next [protected-publication supplement](feature-design-clickhouse-protected-publication.md)
-is RESEARCHED, not yet approved. It proposes candidate lifecycle, observation and
-composition details, including an explicit v2 storage/non-migration boundary.
-It does not retroactively change this approved v1 foundation contract.
+was APPROVED on 2026-09-30. It specifies the next candidate lifecycle,
+observation and composition increment, including an explicit v2
+storage/non-migration boundary. Its implementation plan still requires review;
+it does not retroactively change this approved v1 foundation contract.
 
 ## Purpose and customer journey
 

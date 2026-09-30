@@ -25,8 +25,10 @@ adds local execution exclusion and conservative transport closure. Protected
 observation, candidate sealing, owner release and production composition remain
 separate, unimplemented gates; no complete backend is bundled.
 The [protected-publication supplement](feature-design-clickhouse-protected-publication.md)
-documents the proposed next lifecycle/observer/backend increment. Its RESEARCHED
-status does not enable the feature or change existing v1 journal behavior.
+documents the approved next lifecycle/observer/backend increment. Design approval
+does not enable the feature or change existing v1 journal behavior; the
+[implementation plan](superpowers/plans/2026-09-30-clickhouse-protected-publication.md)
+still requires review.
 
 ## Selection policy
 

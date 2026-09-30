@@ -1,6 +1,6 @@
 # Feature design: protected ClickHouse candidate lifecycle and composition
 
-- Status: RESEARCHED
+- Status: APPROVED
 - Owner: dpone maintainers
 - Issue: next increment after PR #249
 - Target release: no version assigned; staged capability, not route activation
@@ -23,10 +23,13 @@ mutations, an irreversible seal, a narrow typed observer, and a session-aware
 backend. It does not activate ODBC, finalize checkpoints, release owners, or
 make successive full refreshes production-ready.
 
-This is a proposed amendment, not an implementation or certification receipt.
-The parent remains approved; its stated v1 storage contract is not silently
-reinterpreted. Approval of this supplement is needed before its implementation
-plan. The previously selected Native execution method remains unchanged.
+The maintainer approved this written supplement on 2026-09-30 with an explicit
+`approved` response, including v2 without migration of existing journals. This
+approves the design, not implementation completion or production certification.
+The parent remains approved; its v1 foundation contract is preserved alongside
+the explicit new v2 boundary. The previously selected Native execution method
+remains unchanged. The [implementation plan](superpowers/plans/2026-09-30-clickhouse-protected-publication.md)
+requires review before production edits.
 
 ## Personas and customer journey
 
@@ -474,5 +477,5 @@ cleanup, checkpoint/evidence finalization and full route certification.
 - [x] Observer profile and session/grant composition have explicit limits.
 - [x] Research distinguishes platform facts from dpone design obligations.
 - [x] Tests, evidence, documentation, rollout and ownership are specified.
-- [ ] Maintainer approves this written supplement.
+- [x] Maintainer approves this written supplement (2026-09-30).
 - [ ] Detailed implementation plan is written and reviewed before production edits.
