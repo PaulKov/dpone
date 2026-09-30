@@ -322,7 +322,7 @@ def _capture(command: tuple[str, ...]) -> str:
 
 
 def _run_attached(command: tuple[str, ...], *, docker: str, container: str) -> int:
-    """Run an attached container while sampling its cgroup memory use."""
+    """Run a container while sampling Docker CLI cache-adjusted memory usage."""
 
     process = subprocess.Popen(command)
     peak = 0
