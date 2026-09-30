@@ -225,6 +225,19 @@ disabled state, ordered source-free admission, one connector close on failure,
 worker ownership and no-selector backward compatibility. Existing histories are
 preserved; deployment and migration still require their separate gates.
 
+The opt-in local SQL test
+`tests/integration/clickhouse_cluster/test_mssql_independent_audit_live.py`
+checks real external catalog admission and load/step audit persistence. It uses
+unique metadata and decoy databases, hand-authored table definitions and
+database-scoped DDL-deny triggers. The registry location differs from the
+connector's default database; readback verifies identity, counters, Unicode and
+NULL values without creating checkpoint tables. Missing or drifted catalogs
+fail closed, while disabled step auditing retains the load ledger. This test
+constructs the resolved audit binding directly: it is not live proof of trusted
+context admission, business endpoint ordering, workers, migration or a complete
+MSSQL-to-ClickHouse route. Databases are retained for inspection; production
+endpoints and existing catalogs are never used by the fixture.
+
 The operator-provisioned `dpone_cluster_publication_authority` slot table and
 `dpone_cluster_publication_events` append-only table form one versioned catalog.
 Slot key, positive revision, operation, phase, canonical payload bytes/hash and
