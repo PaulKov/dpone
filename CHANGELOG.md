@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- An unbound, dependency-injected ClickHouse publication kernel selects guarded
+  single-partition replacement, whole-table exchange, rename or no-op from frozen
+  catalog/content evidence. Its method-specific recovery never redispatches DDL.
+  Added design, operator/developer runbook and fault tests. No production backend
+  or router binding is supplied yet; existing v1 receipts/defaults and the MSSQL
+  ODBC range suspension remain unchanged. This is not live route certification.
+
 ## 0.87.4 - 2026-09-29
 
 ### Added

@@ -98,3 +98,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0074: Declarative replay uses guarded target completion (Accepted)](adr/0074-declarative-replay-target-completion.md)
 
 - [ADR 0075: Govern MSSQL columnar range parallelism with one publication barrier (Accepted)](adr/0075-mssql-columnar-range-parallelism.md)
+
+- [ADR 0076: Method-aware guarded ClickHouse publication (Accepted for unbound kernel)](adr/0076-method-aware-clickhouse-publication.md)
