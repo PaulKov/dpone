@@ -662,11 +662,13 @@ try:
     staging = clickhouse.load_and_confirm(attempt.inventory, plan.topology)
     reconciliation = reconcile(source.under(authority), objects, staging, target)
     quality = validate(staging, reconciliation)
+    method_plan = target_authority.select_from_sealed_catalog_and_content(
+        staging, target, target_guard)
     intent = journal.persist_publication_intent_cas(
         operation, attempt, target_guard.epoch, quality.digest,
-        old_target_uuid, replacement_uuid, target_authority.next_sequence())
+        method_plan, target_authority.next_sequence())
     journal.require_durable_ack(intent)
-    publication = target_authority.exchange_once_under_guard(intent, target_guard)
+    publication = target_authority.publish_once_under_guard(intent, target_guard)
     journal.persist_publication_receipt_cas(publication, fence)
     evidence = evidence_v2.persist_create_once(attempt, publication)
     checkpoint.promote_cas(operation, publication, evidence)
@@ -701,24 +703,38 @@ epochs. Attempt records are terminal-immutable. The exact crash reconciliation i
 | Object ACK before chunk journal | List deterministic attempt prefix; compare content digest/size; adopt matching object by CAS or quarantine mismatch |
 | Chunk journal before EOF | Missing EOF means incomplete range; preserve inventory, reconcile, then clean and start a new attempt |
 | Staging mutation before receipt | Query staging identity/count/hash under attempt fence; adopt exact match or discard entire prepublication staging attempt |
-| Intent durable before dispatch, or dispatch before ACK | Under target exclusion, reconcile saved old/replacement UUID mapping and command settlement; expected replacement at target proves publication, original mapping plus proven absence of an outstanding command permits one dispatch, every other mapping remains unknown |
+| Intent durable before dispatch, or dispatch before ACK | Permanently close/drain the original publisher under target exclusion; reconcile the frozen method-specific identities/content and claim history. Original observation proves not-published; desired observation with a claim proves published. Recovery never dispatches; uncertain observations retain the fence |
 | Publication proven, receipt/evidence missing | Persist receipt/evidence/checkpoint idempotently; never re-extract or republish |
 | Evidence durable, checkpoint missing | Promote checkpoint by CAS from publication/evidence identity |
 | Checkpoint durable, cleanup incomplete | Business outcome remains committed; retry owned cleanup independently and report warning/failure evidence |
 
-For publication reconciliation, the saved old/replacement UUID mapping inspected
-under the target guard and proven command settlement are authoritative. Counts
-and hashes are corroborating data checks only. Proven not published permits prepublication
+Publication method selection and recovery follow the
+[guarded publication design](feature-design-clickhouse-publication-method.md)
+and [runbook](clickhouse-publication-methods.md). Prefer REPLACE for one complete
+snapshot partition with compatible physical design and no stale target partitions;
+retain EXCHANGE for empty/multiple-partition snapshots and design changes. A
+partition loop is not atomic full refresh. Unknown catalog visibility blocks.
+
+For EXCHANGE, the saved old/replacement UUID mapping inspected under the target
+guard and proven publisher closure are authoritative, with logical checks as
+corroboration. For REPLACE, UUIDs remain unchanged: require frozen compatible
+design, unchanged sealed staging and typed logical target parity after closure.
+This parity is probabilistic and cannot be replaced by row counts alone. The
+immutable acknowledged-claim history must survive unknown states; an unclaimed
+operation never proves publication. Proven not published permits prepublication
 cleanup and a new attempt. Proven published permits only finalization. Still
 unknown fences the operation, preserves objects/staging, exits `3`, and requires
 operator escalation; no new attempt is admitted.
 
-The marker is the durable pre-dispatch intent, bound to both generation UUIDs,
-target guard epoch, operation/attempt, quality receipt and publication sequence.
+The marker is the versioned durable pre-dispatch intent, bound to both generation
+UUIDs, selected method, original/desired logical evidence, canonical partition
+identity where applicable, target guard epoch, operation/attempt, quality receipt
+and publication sequence. Existing UUID-v1 markers are not reinterpreted.
 Counts/hashes alone never prove an exchange outcome. A journal state preceding
 dispatch is not proof of nonpublication when intent exists. An absent ACK or
 currently unchanged UUID mapping is also insufficient while a server command can
-still settle. Recovery never blindly repeats `EXCHANGE`.
+still settle. Recovery never repeats publication DDL, including REPLACE. The
+unbound kernel is a prerequisite, not a production router or authority binding.
 
 ### State machine
 
@@ -978,8 +994,9 @@ aliases targeting the same relation must share exclusion; an unresolved intent
 blocks both, and an older `as_of` cannot overwrite a newer publication. Pause a
 controller after its lease check and before server execution to prove mutation
 fencing prevents stale effects through settlement. Kill the process before and
-after durable intent, dispatch and ACK; verify UUID reconciliation never exchanges
-twice. Temporal verifier tests cover valid provisioned receipts and unknown issuer,
+after durable intent, dispatch and ACK; verify method-specific reconciliation never
+dispatches twice, including REPLACE with unchanged UUIDs and a prepared-to-unknown
+record without a claim. Temporal verifier tests cover valid provisioned receipts and unknown issuer,
 wrong key/signature, expiry, mismatched relation/as-of, missing reference and
 unavailable verifier; invalid authority performs no payload fetch.
 
