@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Added
+
+- Add an unactivated MSSQL publication-authority foundation: immutable binding
+  identity, exact catalog admission, append-only event history, versioned CAS and
+  commit-acknowledged dispatch permits. Local SQL Server fault tests cover
+  competing writers and lost acknowledgements. Manifest selection, legacy
+  adoption and end-to-end ClickHouse recovery are not yet enabled; existing
+  publication backends and workloads are unchanged.
+
 ## 0.88.0 - 2026-09-30
 
 ### Added
