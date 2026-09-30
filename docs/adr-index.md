@@ -102,3 +102,5 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0076: SqlClient bulk loading uses a closed optional companion boundary (Accepted)](adr/0076-mssql-sqlclient-companion-boundary.md)
 
 - [ADR 0077: MSSQL persisted-hash stages use a versioned physical identity (Accepted)](adr/0077-mssql-persisted-hash-layout-v2.md)
+
+- [ADR 0078: Method-aware guarded ClickHouse publication (Accepted for unbound kernel)](adr/0078-method-aware-clickhouse-publication.md)
