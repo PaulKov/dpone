@@ -7,22 +7,15 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any
 
-from dpone.contracts.technical_columns import TechnicalColumnCatalog, TechnicalColumnRole
 from dpone.runtime.governance.ports import LineageProjectionResult as GovernanceLineageProjectionResult
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.lineage.options import LineageOptions
 from dpone.runtime.sinks.clickhouse_operation_tables import DEFAULT_STAGING_SCHEMA, ClickHouseOperationTableResolver
+from dpone.runtime.sinks.clickhouse_physical_types import ClickHouseTechnicalColumnPolicy, TechnicalColumnCatalog
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
 
-_CLICKHOUSE_LINEAGE_TYPES = {
-    TechnicalColumnRole.RUN_ID: "String",
-    TechnicalColumnRole.LOAD_ID: "String",
-    TechnicalColumnRole.ROW_ID: "String",
-    TechnicalColumnRole.LOADED_AT: "DateTime64(6, 'UTC')",
-    TechnicalColumnRole.EXTRACTED_AT: "DateTime64(6, 'UTC')",
-}
 _UTC = timezone.utc  # noqa: UP017 - keep mypy-compatible timezone alias.
 
 
@@ -187,7 +180,8 @@ class _ProjectionPlan:
         existing = {column.lower() for column, _ in payload_schema}
         raw_lineage = (getattr(load_config, "options", {}) or {}).get("lineage")
         unsupported_policy = _row_identity_unsupported_policy(raw_lineage)
-        row_id_name = catalog.name(TechnicalColumnRole.ROW_ID)
+        technical = ClickHouseTechnicalColumnPolicy(catalog)
+        row_id_name = technical.row_id_name
         row_id_already_projected = row_id_name.lower() in existing
         wants_row_identity = lineage_options.has_feature("row_identity")
         warnings: list[str] = []
@@ -196,20 +190,8 @@ class _ProjectionPlan:
                 raise ValueError("lineage row_identity requires unique_key or certified business_hash support")
             warnings.append("row_identity_unique_key_missing")
 
-        roles = [
-            TechnicalColumnRole.RUN_ID,
-            TechnicalColumnRole.LOAD_ID,
-            TechnicalColumnRole.LOADED_AT,
-            TechnicalColumnRole.EXTRACTED_AT,
-        ]
-        if wants_row_identity and unique_key:
-            roles.append(TechnicalColumnRole.ROW_ID)
         return cls(
-            schema_columns=[
-                (catalog.name(role), _CLICKHOUSE_LINEAGE_TYPES[role])
-                for role in roles
-                if catalog.name(role).lower() not in existing
-            ],
+            schema_columns=technical.lineage_schema(existing, include_row_id=bool(wants_row_identity and unique_key)),
             unique_key=unique_key if wants_row_identity else (),
             source_identity=_source_identity(load_config),
             warnings=tuple(warnings),
@@ -312,17 +294,7 @@ def _quote(column: str) -> str:
 
 
 def _missing_core_lineage(source_columns: Sequence[tuple[str, str]]) -> tuple[tuple[str, str], ...]:
-    existing = {column.lower() for column, _ in source_columns}
-    return tuple(
-        (column, _CLICKHOUSE_LINEAGE_TYPES[role])
-        for role in (
-            TechnicalColumnRole.RUN_ID,
-            TechnicalColumnRole.LOAD_ID,
-            TechnicalColumnRole.LOADED_AT,
-            TechnicalColumnRole.EXTRACTED_AT,
-        )
-        if (column := TechnicalColumnCatalog().name(role)).lower() not in existing
-    )
+    return ClickHouseTechnicalColumnPolicy().lineage_schema(tuple(column for column, _ in source_columns))
 
 
 def _legacy_operation_schema(load_config: LoadConfig) -> str:
