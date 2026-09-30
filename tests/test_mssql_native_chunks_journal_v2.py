@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from contextlib import nullcontext
 from threading import Event, Thread, current_thread
 
 import pytest
@@ -24,6 +25,20 @@ def _identity(plan):
         "c" * 64,
         "mssql-native-sha256-sum-v1",
         "d" * 64,
+    )
+
+
+def _sqlclient_identity(plan):
+    return NativeVerificationIdentityV2(
+        plan,
+        "mssql_sqlclient",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+        writer_proof_capability="sqlclient-session-applock-v1",
     )
 
 
@@ -236,6 +251,118 @@ def test_lost_ack_cannot_reconcile_from_stage_contents_or_retry(tmp_path):
     store.save(journal.key, journal.revision, json.dumps(tampered), lease)
     with pytest.raises(WindowContractError, match="event"):
         NativeChunkJournalV2(store, lease, _identity(plan))
+
+
+def test_sqlclient_partial_is_observed_retired_and_current_invocation_stays_frozen(tmp_path):
+    store = SQLiteWindowStore(tmp_path / "journal.db", clock=lambda: 1.0)
+    lease = store.acquire("target", "owner", 60)
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    journal = NativeChunkJournalV2(store, lease, _sqlclient_identity(plan))
+    file = EncodedNativeFile(tmp_path / "sealed.bcp", 0, 2, 2, "e" * 64, "f" * 64)
+    journal.begin()
+    journal.attempt(0, 0, file)
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(
+        0,
+        attempt_id,
+        "GRANTED",
+        writer_binding={
+            **_writer(),
+            "import_backend": "mssql_sqlclient",
+            "writer_proof_capability": "sqlclient-session-applock-v1",
+        },
+    )
+    journal.append_event(0, attempt_id, "WRITING")
+    journal.append_event(
+        0,
+        attempt_id,
+        "UNKNOWN",
+        observation={
+            **_observation(),
+            "writer_outcome": "lost_ack",
+            "input_rows_consumed": None,
+            "row_count": None,
+            "count_overflow": None,
+            "limbs": None,
+            "quiescence": "failed",
+        },
+    )
+    partial = {
+        **_observation(),
+        "writer_outcome": "failure",
+        "input_rows_consumed": None,
+        "row_count": 1,
+        "diagnostic_code": "mssql_native.sqlclient_reconciled",
+    }
+    journal.observe_sqlclient_partial(
+        0,
+        attempt_id,
+        barrier=lambda: nullcontext(),
+        observe=lambda: partial,
+    )
+    assert journal.data["events"][attempt_id][-1]["event"] == "PARTIAL_PROVED"
+    journal.record_nonpublication("9" * 64, assert_nonpublication=lambda: None)
+    dropped = []
+    journal.retire_verified(0, attempt_id, drop_exact_owned=lambda: dropped.append(attempt_id))
+    assert dropped == [attempt_id]
+    assert journal.data["events"][attempt_id][-1]["event"] == "RETIRED"
+    with pytest.raises(WindowContractError, match="nonpublication_frozen"):
+        journal.attempt(0, 1, file)
+
+
+def test_sqlclient_partial_requires_two_stable_observations_under_one_barrier(tmp_path):
+    store = SQLiteWindowStore(tmp_path / "journal.db", clock=lambda: 1.0)
+    lease = store.acquire("target", "owner", 60)
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    journal = NativeChunkJournalV2(store, lease, _sqlclient_identity(plan))
+    file = EncodedNativeFile(tmp_path / "sealed.bcp", 0, 2, 2, "e" * 64, "f" * 64)
+    journal.begin()
+    journal.attempt(0, 0, file)
+    attempt_id = journal.attempt_id(0, 0)
+    journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=_stage(journal))
+    journal.append_event(
+        0,
+        attempt_id,
+        "GRANTED",
+        writer_binding={
+            **_writer(),
+            "import_backend": "mssql_sqlclient",
+            "writer_proof_capability": "sqlclient-session-applock-v1",
+        },
+    )
+    journal.append_event(0, attempt_id, "WRITING")
+    journal.append_event(
+        0,
+        attempt_id,
+        "UNKNOWN",
+        observation={
+            **_observation(),
+            "writer_outcome": "lost_ack",
+            "input_rows_consumed": None,
+            "row_count": None,
+            "count_overflow": None,
+            "limbs": None,
+            "quiescence": "failed",
+        },
+    )
+    calls = []
+
+    def observe():
+        calls.append(1)
+        return {
+            **_observation(),
+            "writer_outcome": "failure",
+            "input_rows_consumed": None,
+            "row_count": len(calls),
+            "diagnostic_code": "mssql_native.sqlclient_reconciled",
+        }
+
+    with pytest.raises(WindowContractError, match="partial_proof_missing"):
+        journal.observe_sqlclient_partial(0, attempt_id, barrier=lambda: nullcontext(), observe=observe)
+
+    assert len(calls) == 2
+    assert journal.data["events"][attempt_id][-1]["event"] == "UNKNOWN"
 
 
 def test_reopened_bcp_unknown_requires_positive_terminal_and_observation_only_barrier(tmp_path):

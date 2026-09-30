@@ -75,8 +75,8 @@ class CandidateInventoryReport:
     releases: tuple[DistributionRelease, ...]
     artifacts: tuple[CandidateInventoryArtifact, ...]
     blockers: tuple[str, ...]
-    expected_artifact_count: int = 8
-    expected_distribution_count: int = 4
+    expected_artifact_count: int = 10
+    expected_distribution_count: int = 5
     source_identity: tuple[int, ...] = field(default=(), compare=False, repr=False)
 
     @property

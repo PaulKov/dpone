@@ -410,6 +410,11 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up .NET 10 for the SqlClient companion
+        uses: actions/setup-dotnet@d4c94342e560b34958eacfc5d055d21461ed1c5d # v5.0.0
+        with:
+          dotnet-version: "10.0.x"
+
       - name: Install build dependencies
         run: uv sync --all-extras
 
@@ -419,6 +424,7 @@ jobs:
           uv build packages/dpone-native-accel --out-dir dist
           uv build packages/dpone-airflow-pack --out-dir dist
           uv build packages/apache-airflow-providers-dpone --out-dir dist
+          uv build packages/dpone-mssql-sqlclient --out-dir dist
           rm -f dist/.gitignore
 
       - name: Validate exact candidate inventory
@@ -475,7 +481,7 @@ jobs:
           /tmp/dpone-release-smoke/bin/pip check \
             | tee test_artifacts/release-candidates/pip-check.txt
           /tmp/dpone-release-smoke/bin/python -c \
-            'import importlib.metadata as m, os; expected=os.environ["RELEASE_VERSION"]; names=("dpone","dpone-native-accel","dpone-airflow-pack","apache-airflow-providers-dpone"); actual={name:m.version(name) for name in names}; assert all(version == expected for version in actual.values()), actual; print(actual)' \
+            'import importlib.metadata as m, os; expected=os.environ["RELEASE_VERSION"]; names=("dpone","dpone-native-accel","dpone-airflow-pack","dpone-mssql-sqlclient","apache-airflow-providers-dpone"); actual={name:m.version(name) for name in names}; assert all(version == expected for version in actual.values()), actual; print(actual)' \
             | tee test_artifacts/release-candidates/candidate-versions.txt
           /tmp/dpone-release-smoke/bin/python tools/package_smoke.py \
             --project-root . \

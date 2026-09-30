@@ -5,7 +5,7 @@ hide:
 ---
 
 <div class="dpone-hero" markdown>
-<div class="dpone-eyebrow">Open-source batch ELT framework - Current source version v0.87.4</div>
+<div class="dpone-eyebrow">Open-source batch ELT framework - Current source version v0.88.0</div>
 
 # Build reliable data pipelines without hiding the machinery.
 
@@ -82,6 +82,7 @@ Doctor, plan, run reports, quality gates, state inspection, connector certificat
 | Decide whether a minor/major release can ship | [Release evidence](release-evidence.md) |
 | Use PostgreSQL as source, sink, or state | [PostgreSQL guide](postgres.md) |
 | Use SQL Server as source, sink, or state | [MSSQL guide](mssql.md) |
+| Operate the high-throughput ClickHouse → SQL Server route | [MSSQL SqlClient transport](mssql-sqlclient-transport.md) |
 | Use BigQuery as analytical sink or state backend | [BigQuery guide](bigquery.md) |
 | Use ClickHouse as analytical source or sink | [ClickHouse guide](clickhouse.md) |
 | Use bounded Kafka batch source/sink | [Kafka guide](kafka.md) |

@@ -12,6 +12,7 @@ resolution-markers = [
 members = [
     "dpone",
     "dpone-airflow-pack",
+    "dpone-mssql-sqlclient",
     "dpone-native-accel",
 ]
 
@@ -817,7 +818,7 @@ wheels = [
 
 [[package]]
 name = "dpone"
-version = "0.87.4"
+version = "0.88.0"
 source = { editable = "." }
 dependencies = [
     { name = "dpone-airflow-pack" },
@@ -911,6 +912,10 @@ kubernetes = [
 mssql = [
     { name = "pyodbc" },
 ]
+mssql-sqlclient = [
+    { name = "dpone-mssql-sqlclient" },
+    { name = "pyodbc" },
+]
 mysql = [
     { name = "pymysql" },
 ]
@@ -992,6 +997,7 @@ requires-dist = [
     { name = "dbt-sqlserver", marker = "extra == 'dbt-mssql'", specifier = "==1.11.1" },
     { name = "dbt-sqlserver", marker = "extra == 'semantic-refresh-airflow'", specifier = "==1.11.1" },
     { name = "dpone-airflow-pack", editable = "packages/dpone-airflow-pack" },
+    { name = "dpone-mssql-sqlclient", marker = "extra == 'mssql-sqlclient'", editable = "packages/dpone-mssql-sqlclient" },
     { name = "dpone-native-accel", marker = "extra == 'accel'", editable = "packages/dpone-native-accel" },
     { name = "fastavro", marker = "extra == 'full'", specifier = ">=1.11,<2" },
     { name = "fastavro", marker = "extra == 'kafka'", specifier = ">=1.11,<2" },
@@ -1035,6 +1041,7 @@ requires-dist = [
     { name = "pymysql", marker = "extra == 'mysql'", specifier = ">=1.1,<2" },
     { name = "pyodbc", marker = "extra == 'full'", specifier = ">=5.2,<6" },
     { name = "pyodbc", marker = "extra == 'mssql'", specifier = ">=5.2,<6" },
+    { name = "pyodbc", marker = "extra == 'mssql-sqlclient'", specifier = ">=5.2,<6" },
     { name = "pyodbc", marker = "extra == 'semantic-refresh-airflow'", specifier = ">=5.2,<6" },
     { name = "pytz", specifier = ">=2023.3" },
     { name = "pyyaml", specifier = ">=6.0.1" },
@@ -1045,7 +1052,7 @@ requires-dist = [
     { name = "vault-kv-client", marker = "extra == 'semantic-refresh-airflow'", specifier = ">=0.1.0,<0.2.0" },
     { name = "vault-kv-client", marker = "extra == 'vault'", specifier = ">=0.1.0,<0.2.0" },
 ]
-provides-extras = ["postgres", "clickhouse", "mssql", "mysql", "gcp", "s3", "azure", "object-storage", "accel", "columnar", "pandas", "vault", "semantic-refresh-airflow", "dbt", "dbt-mssql", "kubernetes", "google-ads", "kafka", "full"]
+provides-extras = ["postgres", "clickhouse", "mssql", "mssql-sqlclient", "mysql", "gcp", "s3", "azure", "object-storage", "accel", "columnar", "pandas", "vault", "semantic-refresh-airflow", "dbt", "dbt-mssql", "kubernetes", "google-ads", "kafka", "full"]
 
 [package.metadata.requires-dev]
 dev = [
@@ -1069,7 +1076,7 @@ dev = [
 
 [[package]]
 name = "dpone-airflow-pack"
-version = "0.87.4"
+version = "0.88.0"
 source = { editable = "packages/dpone-airflow-pack" }
 dependencies = [
     { name = "pyyaml" },
@@ -1079,8 +1086,19 @@ dependencies = [
 requires-dist = [{ name = "pyyaml", specifier = ">=6.0.1" }]
 
 [[package]]
+name = "dpone-mssql-sqlclient"
+version = "0.88.0"
+source = { editable = "packages/dpone-mssql-sqlclient" }
+dependencies = [
+    { name = "dpone" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "dpone", editable = "." }]
+
+[[package]]
 name = "dpone-native-accel"
-version = "0.87.4"
+version = "0.88.0"
 source = { editable = "packages/dpone-native-accel" }
 dependencies = [
     { name = "clickhouse-driver", extra = ["lz4", "zstd"] },

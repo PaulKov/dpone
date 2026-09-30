@@ -41,6 +41,11 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Set up .NET 10 for the SqlClient companion
+        uses: actions/setup-dotnet@d4c94342e560b34958eacfc5d055d21461ed1c5d # v5.0.0
+        with:
+          dotnet-version: "10.0.x"
+
       - name: Validate changed workflows with pinned actionlint
         shell: bash
         run: |
@@ -254,6 +259,7 @@ jobs:
           uv build packages/dpone-native-accel --out-dir dist
           uv build packages/dpone-airflow-pack --out-dir dist
           uv build packages/apache-airflow-providers-dpone --out-dir dist
+          uv build packages/dpone-mssql-sqlclient --out-dir dist
 
       - name: Smoke REST design contract from clean base wheel
         run: |

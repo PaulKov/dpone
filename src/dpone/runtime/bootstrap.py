@@ -6,6 +6,6 @@ from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
 from dpone.runtime.bootstrap_runner import DefaultProcessRunner
 
 register_runtime_hydrator(DefaultRuntimeHydrator())
-register_process_runner(DefaultProcessRunner())
+register_process_runner(DefaultProcessRunner.with_default_native_runtime())
 
 __all__ = ["DefaultProcessRunner", "DefaultRuntimeHydrator"]

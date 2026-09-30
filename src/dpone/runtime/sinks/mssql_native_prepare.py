@@ -2,58 +2,31 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable, Iterable
-from dataclasses import dataclass, field, fields, replace
+from collections.abc import Callable
+from dataclasses import fields, replace
 from typing import Any
 
 from dpone.contracts.mssql_transaction_governance import MssqlTransactionAdmission
 from dpone.runtime.consumed_payload_evidence import ConsumedPayloadEvidence, ConsumedPayloadPartEvidence
-from dpone.runtime.mssql_native_chunks_observations import delivery_session
+from dpone.runtime.sinks.mssql_native_prepare_models import (
+    NativePreparedResources,
+    NativeStageContext,
+    require_prepared_resources,
+    strategy_for_prepared,
+)
+from dpone.runtime.sinks.mssql_native_prepared_digests import digest_stage_projection, full_prepared_contract
 from dpone.runtime.sinks.mssql_native_staged_load import NativePreparedStage
 from dpone.runtime.sinks.staging_managers.mssql_staging_support import issue_direct_native_staging_authority
 from dpone.runtime.sinks.strategies.mssql.mssql_native_lineage import MssqlNativeLineageProjection
 from dpone.runtime.sinks.strategies.mssql.mssql_native_staging import MssqlNativeStagingNormalizer
 
 
-@dataclass(frozen=True)
-class NativeStageContext:
-    """Composition-owned, fenced services for normal and source-free recovery."""
-
-    plan: Any
-    wire_contract: Any
-    executor: Any
-    lease: Any
-    row_source: Callable[[], Iterable[Any]]
-    verify_receipts: Callable[[tuple[Any, ...]], None]
-    cleanup_receipts: Callable[[tuple[Any, ...]], None]
-    capacity_check: Callable[[int], None]
-    journal_factory: Callable[[], Any]
-    preparation_scope: Callable[[], Any]
-    interval: Any = None
-    recover: bool = False
-    completed_lifecycle: Any = None
-    max_row_bytes: int = 1048576
-    cancelled: Any = None
-    observer: Any = field(default=None, kw_only=True)
-    verification_identity: Any = field(default=None, kw_only=True)
-    target_local_timeout_seconds: int = field(default=3600, kw_only=True)
-
-    def __post_init__(self) -> None:
-        object.__setattr__(self, "observer", delivery_session(self.observer))
-
-
-@dataclass(frozen=True)
-class _PreparedResources:
-    context: NativeStageContext
-    receipts: tuple[Any, ...]
-    verify_digest: str
-    source_schema: tuple[tuple[str, str], ...]
-    object_id: int
-    planned: dict[str, str]
-
-
 class MssqlNativeStagePreparer:
     """Consume one stream, then apply existing native lineage before governance."""
+
+    @staticmethod
+    def _stage_digest(strategy: Any, stage: Any, context: NativeStageContext, *, all_columns: bool = False) -> str:
+        return digest_stage_projection(strategy, stage, context, all_columns=all_columns)
 
     def __init__(self, sink: Any, context_factory: Callable[..., NativeStageContext]) -> None:
         self._sink = sink
@@ -98,7 +71,12 @@ class MssqlNativeStagePreparer:
                 adapted,
                 context.wire_contract,
                 context.lease,
-                completion_metadata=lambda: completion_metadata(payload),
+                completion_metadata=lambda: completion_metadata(
+                    payload,
+                    recovery_bindings=(
+                        None if context.recovery_bindings is None else context.recovery_bindings(admission)
+                    ),
+                ),
                 cancelled=context.cancelled,
             )
             lifecycle = payload.require_completed_extraction()
@@ -212,9 +190,13 @@ class MssqlNativeStagePreparer:
             )
             normalizer._validate_direct_native(config, stage, schema, resolved)
             normalizer._complete_direct_native(config, stage, resolved, lineage)
+            if context.persisted_hash_layout:
+                strategy.connector.execute_query(
+                    f"ALTER TABLE {strategy._staging_name(stage)} ADD [__dpone__mutation_version] rowversion NOT NULL"
+                )
             from dpone.runtime.sinks.mssql_native_prepared_digests import digest_prepared_rows, digest_prepared_target
 
-            full_contract = self._full_contract(stage)
+            full_contract = full_prepared_contract(stage)
             columns = ", ".join(strategy.connector.quote_identifier(column.name) for column in full_contract.columns)
             with recorder.phase("prepared_verify", reason="preparation", rows=stage.row_count):
                 if context.verification_identity is not None:
@@ -224,6 +206,7 @@ class MssqlNativeStagePreparer:
                         business_contract=context.wire_contract,
                         full_contract=full_contract,
                         expected_rows=stage.row_count,
+                        include_mutation_watermark=context.persisted_hash_layout,
                     )
                 else:
                     digests = digest_prepared_rows(
@@ -254,7 +237,17 @@ class MssqlNativeStagePreparer:
                 payload.mssql_target_mutation_plan,
                 payload.target_projection,
                 context.interval,
-                (_PreparedResources(context, receipts, digest, schema, object_id, planned),),
+                (
+                    NativePreparedResources(
+                        context,
+                        receipts,
+                        digest,
+                        schema,
+                        object_id,
+                        planned,
+                        digests.mutation_watermark,
+                    ),
+                ),
             )
             from dpone.runtime.sinks.mssql_native_recovery import prepared_snapshot
 
@@ -264,6 +257,7 @@ class MssqlNativeStagePreparer:
                     "digest": digest,
                     "schema": [list(column) for column in schema],
                     "object_id": object_id,
+                    "mutation_watermark": digests.mutation_watermark,
                 },
             )
             snapshot["planned_stage"] = planned
@@ -277,13 +271,13 @@ class MssqlNativeStagePreparer:
             raise
 
     def reverify(self, prepared: NativePreparedStage) -> None:
-        resources = self._resources(prepared)
+        resources = require_prepared_resources(prepared)
         context = resources.context
         recorder = context.observer.recorder()
         with recorder.phase("raw_verify", reason="prepublication"):
             context.verify_receipts(resources.receipts)
         context.capacity_check(0)
-        strategy = self._strategy_for(prepared)
+        strategy = strategy_for_prepared(self._sink, prepared)
         from dpone.runtime.sinks.mssql_native_prepared_owner import require_prepared_owner
 
         require_prepared_owner(strategy.connector, resources.planned)
@@ -293,11 +287,28 @@ class MssqlNativeStagePreparer:
         if object_id != resources.object_id:
             raise ValueError("mssql_native.prepared_object_identity_changed")
         with recorder.phase("prepared_verify", reason="prepublication", rows=prepared.staging.row_count):
-            if self._stage_digest(strategy, prepared.staging, context, all_columns=True) != resources.verify_digest:
+            if resources.mutation_watermark is not None:
+                from dpone.runtime.sinks.mssql_native_persisted_hash import (
+                    build_repeat_watermark_sql,
+                    decode_repeat_watermark,
+                )
+
+                rows = strategy.connector.get_records(
+                    build_repeat_watermark_sql(strategy._staging_name(prepared.staging), prepared.staging.row_count)
+                )
+                if len(rows) != 1:
+                    raise ValueError("mssql_native.persisted_hash_row_shape")
+                observed = decode_repeat_watermark(tuple(rows[0]), expected_rows=prepared.staging.row_count)
+                if observed.mutation_watermark != resources.mutation_watermark:
+                    raise ValueError("mssql_native.prepared_content_changed")
+            elif (
+                digest_stage_projection(strategy, prepared.staging, context, all_columns=True)
+                != resources.verify_digest
+            ):
                 raise ValueError("mssql_native.prepared_content_changed")
 
     def publication_started(self, prepared: NativePreparedStage) -> None:
-        journal = self._resources(prepared).context.journal_factory()
+        journal = require_prepared_resources(prepared).context.journal_factory()
         state = journal.publication.state()
         if state is None:
             raise ValueError("mssql_native.prepared_journal_required")
@@ -306,7 +317,7 @@ class MssqlNativeStagePreparer:
     def publication_confirmed(self, prepared: NativePreparedStage, result: Any) -> None:
         if not result.commit_receipt_id:
             raise ValueError("mssql_native.target_receipt_required")
-        self._resources(prepared).context.journal_factory().publication.publication_confirmed(
+        require_prepared_resources(prepared).context.journal_factory().publication.publication_confirmed(
             {
                 "receipt_id": result.commit_receipt_id,
             }
@@ -324,13 +335,14 @@ class MssqlNativeStagePreparer:
             raise ValueError("mssql_native.complete_stage_required")
         binding = state["prepared"]
         recovery = binding["recovery"]
-        resources = _PreparedResources(
+        resources = NativePreparedResources(
             context,
             tuple(complete.receipts),
             recovery["digest"],
             tuple(tuple(column) for column in recovery["schema"]),
             recovery["object_id"],
             binding["planned_stage"],
+            recovery.get("mutation_watermark"),
         )
         strategy = self._sink._strategy_map[config.load_strategy]
         return restore_prepared(
@@ -342,17 +354,17 @@ class MssqlNativeStagePreparer:
         )
 
     def publication_scope(self, prepared: NativePreparedStage) -> Any:
-        return self._resources(prepared).context.preparation_scope()
+        return require_prepared_resources(prepared).context.preparation_scope()
 
     def cleanup(self, prepared: NativePreparedStage) -> None:
         from dpone.runtime.sinks.mssql_native_prepared_owner import retire_exact_prepared
 
-        resources = self._resources(prepared)
+        resources = require_prepared_resources(prepared)
         if resources.context.verification_identity is not None:
             state = resources.context.journal_factory().publication.state()
             if state is None or state["phase"] != "succeeded":
                 raise ValueError("mssql_native.published_cleanup_publication_required")
-        strategy = self._strategy_for(prepared)
+        strategy = strategy_for_prepared(self._sink, prepared)
         with resources.context.preparation_scope():
             retire_exact_prepared(
                 strategy.connector,
@@ -362,27 +374,3 @@ class MssqlNativeStagePreparer:
                 timeout_seconds=resources.context.target_local_timeout_seconds,
             )
         resources.context.cleanup_receipts(resources.receipts)
-
-    def _strategy_for(self, prepared: NativePreparedStage) -> Any:
-        for strategy in self._sink._strategy_map.values():
-            if getattr(strategy, "connector", None) is self._sink.connector:
-                return strategy
-        raise ValueError("mssql_native.strategy_unavailable")
-
-    @staticmethod
-    def _resources(prepared: NativePreparedStage) -> _PreparedResources:
-        if len(prepared.resources) != 1 or not isinstance(prepared.resources[0], _PreparedResources):
-            raise ValueError("mssql_native.prepared_ownership_required")
-        return prepared.resources[0]
-
-    @staticmethod
-    def _full_contract(stage: Any) -> Any:
-        from dpone.runtime.sinks.mssql_native_prepared_digests import full_prepared_contract
-
-        return full_prepared_contract(stage)
-
-    @staticmethod
-    def _stage_digest(strategy: Any, stage: Any, context: NativeStageContext, *, all_columns: bool = False) -> str:
-        from dpone.runtime.sinks.mssql_native_prepared_digests import digest_stage_projection
-
-        return digest_stage_projection(strategy, stage, context, all_columns=all_columns)

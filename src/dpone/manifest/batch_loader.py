@@ -89,7 +89,8 @@ class BatchYamlManifestLoader:
                 cfg = _parse_etl_config(proc.raw_config, base_path=path.parent, metadata_only=metadata_only)
             except Exception as exc:
                 raise ManifestConfigurationError(
-                    f"Ошибка парсинга скомпилированного процесса '{proc.selector}' из {path}: {exc}"
+                    f"Ошибка парсинга скомпилированного процесса '{proc.selector}' из {path}: {exc}",
+                    code=getattr(exc, "code", None),
                 ) from exc
 
             specs.append(

@@ -15,6 +15,7 @@ PACKAGE_FILES = {
     "dpone": Path("pyproject.toml"),
     "dpone-native-accel": Path("packages/dpone-native-accel/pyproject.toml"),
     "dpone-airflow-pack": Path("packages/dpone-airflow-pack/pyproject.toml"),
+    "dpone-mssql-sqlclient": Path("packages/dpone-mssql-sqlclient/pyproject.toml"),
     "apache-airflow-providers-dpone": Path("packages/apache-airflow-providers-dpone/pyproject.toml"),
 }
 
@@ -33,7 +34,7 @@ def load_package_projects(
     read_commit_text: ReadCommitText,
     blocker: BlockerFactory,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, str], list[Any]]:
-    """Load the four public package projects from the frozen commit."""
+    """Load the five public package projects from the frozen commit."""
 
     projects: dict[str, dict[str, Any]] = {}
     versions: dict[str, str] = {}
@@ -107,6 +108,7 @@ def dependency_blockers(
     required_pins = (
         ("dpone", None, "dpone-airflow-pack"),
         ("dpone", "accel", "dpone-native-accel"),
+        ("dpone", "mssql-sqlclient", "dpone-mssql-sqlclient"),
         ("apache-airflow-providers-dpone", None, "dpone-airflow-pack"),
     )
     blockers: list[Any] = []

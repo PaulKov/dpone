@@ -77,7 +77,7 @@ def test_valid_or_omitted_limit_keeps_plan_output(tmp_path, monkeypatch, capsys,
         main(["plan", str(path), "--format", output_format])
     assert error.value.code == 0
     output = capsys.readouterr()
-    assert "composition_required" in output.out
+    assert "live_preflight_required" in output.out
     assert not output.err
     assert list(tmp_path.iterdir()) == [path]
 

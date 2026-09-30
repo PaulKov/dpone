@@ -19,19 +19,25 @@ doctor from the same standard environment used by the route runtime. Under an
 effective `-S`, irrelevant `.pth` files are not treated as executed startup
 state.
 
-For the opt-in bounded native Python composition API, see the
-[native transport guide](../mssql-native-transport.md). It requires explicit
-deployment authorities. Retained 0.80.0 native-route evidence covers small local
-Docker correctness and controlled-recovery fixtures; it does not certify this
-guide's character-spool path or production performance. See the native guide
-for the exact source, profiles and remaining governance limitations.
+For the opt-in bounded native route, see the
+[native transport guide](../mssql-native-transport.md). For the optional TDS
+writer, use the [SqlClient install and selection guide](../mssql-sqlclient-transport.md).
+The standard runner
+composes BCP or optional `Microsoft.Data.SqlClient` delivery when quality policy
+is inert; deployments with authored quality gates inject their quality executor.
+Retained synthetic evidence covers local Docker correctness, source-free recovery
+and controlled failure fixtures; it does not certify a production workload or
+environment. See the native guide for the exact profiles and remaining gates.
 
 Bounded native delivery keeps BCP plus Python business-row readback when
 `verification_backend` is omitted. Set it explicitly to `target_local` to use
 supervised BCP and aggregate-only SQL Server verification under identity/journal
-v2. The optimized path never falls back to v1 within an invocation. Start with
-the [target-local example](../../examples/native/clickhouse-to-mssql-target-local.yaml),
-then follow the native guide for composition, custody, permissions, recovery,
+v2. Select `import_backend: mssql_sqlclient` for session-bound `SqlBulkCopy` and
+optionally `layout_version: 2` for persisted target-local hash verification. The
+optimized path never falls back between backends within an invocation. Start with
+the [target-local BCP example](../../examples/native/clickhouse-to-mssql-target-local.yaml)
+or [SqlClient seven-day example](../../examples/native/clickhouse-to-mssql-sqlclient.yaml),
+then follow the native guide for custody, permissions, recovery,
 and current certification status.
 
 ## When to use this path
@@ -150,6 +156,9 @@ Troubleshooting:
 
 These rows describe public runtime contracts, not certification of this exact
 source, sink, transport, schema-evolution mode, and runtime combination.
+They apply to the legacy CSV/BCP route described below. The bounded-native BCP
+and bounded-native SqlClient route instead follows the explicit-window strategy
+and recovery contract in the [native transport guide](../mssql-native-transport.md).
 
 | Strategy | Status | Notes |
 |---|---|---|
@@ -171,19 +180,24 @@ Treat this route as production-ready only when these gates are green:
 | Source boundary | `source_boundary_profile` | Event tables need a complete table snapshot or complete bounded replacement window; a target-derived cursor is rejected. |
 | Type profile | `type_matrix` | `clickhouse_to_mssql_landing_v1` must classify every column as safe or contract-required. |
 | Schema evolution | `route_schema_evolution` | New/widened columns are planned before source IO; incompatible changes fail or use `__dpone__nc__*`. |
-| MSSQL bulk readiness | `bcp_bulk_readiness` | The runtime image has `bcp`, ODBC driver, staging permissions, and safe text codec settings. |
+| MSSQL bulk readiness | `bcp_bulk_readiness` for legacy CSV/BCP and bounded-native BCP; SqlClient doctor for bounded-native SqlClient | The selected runtime image has its backend, driver/runtime, staging permissions, and safe wire settings. |
 | Runtime evidence | `route_execution_ledger`, `run_artifact` | Load steps, row counts, errors and cleanup are durable. |
 | Acceptance | `quality_reconciliation` | Counts, nulls, distincts, types and lineage columns are checked. |
 | Performance | Operator-collected benchmark evidence | The runtime does not emit a complete versioned phase benchmark; status stays `UNVERIFIED` until the DEV campaign records the agreed measurements. |
 
 ## Runtime algorithm
 
-This sink does not currently implement `StagedLoadPort`, so this route records
+This section describes the legacy CSV/BCP route. That sink does not implement
+`StagedLoadPort`, so the route records
 `governance_finalization=legacy_post_finalize`. Blocking gates run only after
 the sink has mutated or finalized the target. A failure prevents source-state
 advancement but cannot roll back that target mutation; inspect and repair or
 deduplicate the target before retrying. See
 [Load governance](../load-governance.md#runtime-lifecycle).
+
+The bounded native BCP and SqlClient routes use prepublication quality,
+receipt-backed atomic publication, and source-free recovery. Follow the
+[native transport guide](../mssql-native-transport.md) for that lifecycle.
 
 ```mermaid
 flowchart TD
@@ -199,7 +213,7 @@ flowchart TD
     J --> K["Advance state only after success"]
 ```
 
-## Strategy behavior
+## Legacy strategy behavior
 
 - `full_refresh`: only for small or bounded reference tables. For large event tables it is a red flag unless the source predicate bounds the run.
 - `incremental_append`: rejected before source or target I/O. Do not schedule it
@@ -215,11 +229,15 @@ flowchart TD
   `mssql.partition_replace.finalizer` for
   `typed_sargable_distinct_join` or `canonical_identity_fallback`.
 
-`partition_replace` derives its delete identities from staging. It preserves
+On the legacy path, `partition_replace` derives its delete identities from staging. It preserves
 all target dates outside that set, but it cannot remove an expected partition
 that becomes completely empty because no staging identity exists for it. Keep
 the bounded source window complete and do not claim empty-partition
 reconciliation until an explicit expected-partition authority is available.
+
+The bounded native route instead seals an explicit window authority and can
+publish an empty authoritative window without deriving its scope from staged
+rows.
 
 Snapshot reconciliation is separate from the load strategy. Runtime planning
 reports that capability as `reconciliation.mode=snapshot`; in the official

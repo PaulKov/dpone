@@ -5,8 +5,10 @@ from types import SimpleNamespace
 import pytest
 
 from dpone.manifest.mssql_native_policy import (
+    native_import_backend,
     native_limits,
     native_requested,
+    native_sqlclient_layout_version,
     native_verification_backend,
     native_window,
     validate_native_config,
@@ -58,6 +60,45 @@ def test_verification_backend_is_closed_and_omission_preserves_v1() -> None:
         execution["verification_backend"] = invalid
         with pytest.raises(ValueError, match="verification_backend"):
             validate_native_config(value)
+
+
+def test_import_backend_is_closed_defaults_to_bcp_and_sqlclient_requires_target_local() -> None:
+    value = config()
+    execution = value.options["native_transfer"]["execution"]
+    assert native_import_backend(value).value == "bcp"
+    execution["import_backend"] = "mssql_sqlclient"
+    with pytest.raises(ValueError, match="sqlclient_requires_target_local"):
+        validate_native_config(value)
+    execution["verification_backend"] = "target_local"
+    validate_native_config(value)
+    assert native_import_backend(value).value == "mssql_sqlclient"
+    for invalid in (None, "unknown", True):
+        execution["import_backend"] = invalid
+        with pytest.raises(ValueError, match="import_backend"):
+            validate_native_config(value)
+
+
+def test_sqlclient_layout_version_is_explicit_closed_and_backend_scoped() -> None:
+    value = config()
+    execution = value.options["native_transfer"]["execution"]
+    assert native_sqlclient_layout_version(value) == 1
+
+    execution.update(
+        import_backend="mssql_sqlclient",
+        verification_backend="target_local",
+        layout_version=2,
+    )
+    assert native_sqlclient_layout_version(value) == 2
+    validate_native_config(value)
+
+    for invalid in (0, 3, True, None, "2"):
+        execution["layout_version"] = invalid
+        with pytest.raises(ValueError, match="layout_version"):
+            validate_native_config(value)
+
+    execution.update(import_backend="bcp", layout_version=1)
+    with pytest.raises(ValueError, match="layout_requires_sqlclient"):
+        validate_native_config(value)
 
 
 @pytest.mark.parametrize(
@@ -151,6 +192,24 @@ def test_public_schema_native_limits_and_wire(name):
     assert list(validator.iter_errors(invalid))
     assert not list(validator.iter_errors({**native["execution"], "verification_backend": "target_local"}))
     assert list(validator.iter_errors({**native["execution"], "verification_backend": "unknown"}))
+    assert not list(
+        validator.iter_errors(
+            {**native["execution"], "verification_backend": "target_local", "import_backend": "mssql_sqlclient"}
+        )
+    )
+    assert list(validator.iter_errors({**native["execution"], "import_backend": "unknown"}))
+    assert not list(
+        validator.iter_errors(
+            {
+                **native["execution"],
+                "verification_backend": "target_local",
+                "import_backend": "mssql_sqlclient",
+                "layout_version": 2,
+            }
+        )
+    )
+    for invalid in (0, 3, True, None, "2"):
+        assert list(validator.iter_errors({**native["execution"], "layout_version": invalid}))
 
 
 def test_native_window_policy_never_derives_scope_from_staging():

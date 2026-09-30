@@ -138,7 +138,7 @@ extras, optional import isolation, dependency review, secret scanning, and
 scope-required SBOM/provenance evidence according to `docs/release.md`.
 For source readiness, retain the canonical annotated-tag report and live
 required-check report for the exact commit. For publication observation,
-compare the controller's retained four-package wheel/sdist inventory with
+compare the controller's retained five-package wheel/sdist inventory with
 PyPI by filename and SHA-256; local candidate bytes are not a substitute.
 Report public resolver visibility separately. For a runtime image in scope,
 retain the GHCR digest, pull and smoke by digest, verify the installed dpone
@@ -156,7 +156,7 @@ source evidence is a release blocker, not permission for manual reconstruction.
 The exact-commit evidence is produced by
 `tools/agent_policy/release_identity_gate.py` and
 `tools/agent_policy/release_commit_gate.py`. The first binds the annotated tag,
-four package versions, exact internal dependency pins, changelog and protected
+five package versions, exact internal dependency pins, changelog and protected
 base ancestry. The protected base is always `origin/<branch>` from the frozen
 branch-protection policy (never a caller-selected `HEAD`); evidence records
 `protected_base_sha` and `policy_sha256`. It reads package, changelog, and
@@ -171,8 +171,8 @@ files or a screenshot of green checks cannot replace either machine-readable
 report.
 
 Before archive inspection, attestations, or upload, run the closed candidate
-inventory gate. It must prove exactly eight regular artifacts: one wheel and
-one `.tar.gz` sdist for each of the four public distributions, all at the
+inventory gate. It must prove exactly ten regular artifacts: one wheel and
+one `.tar.gz` sdist for each of the five public distributions, all at the
 requested version. Duplicate variants, `.zip`, unrelated files, directories,
 and symlinks are blockers. Keep the deterministic JSON inventory with filenames
 and SHA-256 digests as release evidence, then validate archive members, run
@@ -202,7 +202,7 @@ before dispatch, the run assesses the new C, not the intended earlier commit;
 do not transfer its result to another SHA. Require both jobs to succeed.
 
 The build job records C/tree/version/run/attempt, synchronizes validation
-dependencies from `uv.lock`, builds and inspects all eight archives, then checks
+dependencies from `uv.lock`, builds and inspects all ten archives, then checks
 a fresh installed `full,accel` environment and revalidates the closed inventory
 before upload. A separate runner downloads the
 candidate artifact by immutable ID with digest mismatch treated as an error.

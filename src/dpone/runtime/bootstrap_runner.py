@@ -25,6 +25,18 @@ _RUNTIME_DETAIL_KEYS = (
 class DefaultProcessRunner:
     """Execute an ETLProcess via runtime ETLProcessor."""
 
+    @classmethod
+    def with_default_native_runtime(cls) -> DefaultProcessRunner:
+        """Build the application runner with dpone's native MSSQL composition.
+
+        Keeping composition behind this explicit constructor lets tests and
+        embedders continue to require dependency injection while the package
+        bootstrap exposes the supported ready-to-run configuration.
+        """
+        from dpone.runtime.mssql_native_application import DefaultMssqlNativeRuntimeFactory
+
+        return cls(native_runtime_factory=DefaultMssqlNativeRuntimeFactory())
+
     def __init__(
         self,
         *,

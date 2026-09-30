@@ -119,6 +119,20 @@ def test_target_local_prepared_digest_reads_one_aggregate_row_only():
     assert "#dpone_target_hashes" in queries[0]
 
 
+def test_target_local_prepared_digest_returns_same_scan_mutation_watermark():
+    contract = wire((("n", "bigint"),))
+    aggregate = (2, 0, bytes.fromhex("0000000000000009"), *([0] * 16))
+    result = digest_prepared_target(
+        lambda sql: [aggregate],
+        qualified_stage="[db].[dbo].[prepared]",
+        business_contract=contract,
+        full_contract=contract,
+        expected_rows=2,
+        include_mutation_watermark=True,
+    )
+    assert result.mutation_watermark == 9
+
+
 @pytest.mark.parametrize(
     ("row", "code"),
     [

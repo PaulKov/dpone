@@ -31,6 +31,7 @@ def test_rejects_package_version_and_dependency_drift(tmp_path: Path, monkeypatc
     [
         ("pyproject.toml", "dpone-airflow-pack==1.2.3"),
         ("pyproject.toml", "dpone-native-accel==1.2.3"),
+        ("pyproject.toml", "dpone-mssql-sqlclient==1.2.3"),
         (
             "packages/apache-airflow-providers-dpone/pyproject.toml",
             "dpone-airflow-pack==1.2.3",

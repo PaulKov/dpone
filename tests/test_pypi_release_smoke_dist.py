@@ -23,6 +23,8 @@ VALID_CANDIDATE_NAMES = (
     "dpone_native_accel-0.73.2.tar.gz",
     "dpone_airflow_pack-0.73.2-py3-none-any.whl",
     "dpone_airflow_pack-0.73.2.tar.gz",
+    "dpone_mssql_sqlclient-0.73.2-py3-none-any.whl",
+    "dpone_mssql_sqlclient-0.73.2.tar.gz",
     "apache_airflow_providers_dpone-0.73.2-py3-none-any.whl",
     "apache_airflow_providers_dpone-0.73.2.tar.gz",
 )
@@ -262,12 +264,12 @@ def test_inventory_only_is_deterministic_and_never_constructs_pypi_client(
     assert payload["status"] == "passed"
     assert payload["decision"] == "GO"
     assert payload["summary"] == {
-        "artifact_count": 8,
-        "distribution_count": 4,
-        "expected_artifact_count": 8,
-        "expected_distribution_count": 4,
+        "artifact_count": 10,
+        "distribution_count": 5,
+        "expected_artifact_count": 10,
+        "expected_distribution_count": 5,
     }
-    assert len(payload["artifacts"]) == 8
+    assert len(payload["artifacts"]) == 10
     assert all(artifact["size_bytes"] > 0 for artifact in payload["artifacts"])
 
 
@@ -596,11 +598,12 @@ def test_candidate_inventory_rejects_symlinked_root(tmp_path: Path) -> None:
     assert report.artifacts == ()
     assert report.blockers == (
         "PYPI_CANDIDATE_ROOT_SYMLINK: candidate directory must not be a symlink",
-        "PYPI_CANDIDATE_ENTRY_COUNT_MISMATCH: expected=8 actual=0",
-        "PYPI_CANDIDATE_ARTIFACT_COUNT_MISMATCH: expected=8 actual=0",
-        "PYPI_CANDIDATE_DISTRIBUTION_COUNT_MISMATCH: expected=4 actual=0",
+        "PYPI_CANDIDATE_ENTRY_COUNT_MISMATCH: expected=10 actual=0",
+        "PYPI_CANDIDATE_ARTIFACT_COUNT_MISMATCH: expected=10 actual=0",
+        "PYPI_CANDIDATE_DISTRIBUTION_COUNT_MISMATCH: expected=5 actual=0",
         "PYPI_CANDIDATE_PACKAGE_SET_MISMATCH: "
-        "missing=['apache-airflow-providers-dpone', 'dpone', 'dpone-airflow-pack', 'dpone-native-accel'] "
+        "missing=['apache-airflow-providers-dpone', 'dpone', 'dpone-airflow-pack', "
+        "'dpone-mssql-sqlclient', 'dpone-native-accel'] "
         "unexpected_count=0",
     )
 

@@ -12,8 +12,10 @@ from dpone.adapters.mssql_native_chunks_journal_v2 import NativeChunkJournalV2
 from dpone.adapters.mssql_native_custody import NativeTargetCustody
 from dpone.contracts.bounded_window import WindowOutcomeUnknown
 from dpone.contracts.mssql_native_chunks import EncodedNativeFile, NativeChunkPlan, NativeChunkReceipt
+from dpone.contracts.mssql_native_stage_writer import NativeStageWriteMetrics, NativeStageWriteObservation
 from dpone.contracts.mssql_native_verification import NativeVerificationBackend, NativeVerificationIdentityV2
 from dpone.contracts.mssql_native_writer import NativeStageWriteOutcome
+from dpone.runtime.sinks.mssql_native_persisted_hash import PersistedHashObservation
 from dpone.runtime.sinks.mssql_native_target_digest import TargetDigest
 from dpone.runtime.sinks.mssql_native_target_local_import import NativeTargetLocalAttempt
 
@@ -117,6 +119,111 @@ def test_positive_attempt_records_boundary_order_and_one_aggregate(
     ]
     assert calls.index("stage-created") < calls.index("launch") < calls.index("barrier") < calls.index("aggregate")
     assert calls.count("launch") == 1 and calls.count("aggregate") == 1
+
+
+@pytest.mark.parametrize("persisted_hash_layout", [False, True])
+def test_sqlclient_attempt_uses_canonical_request_deadline_and_grant_bound_barrier(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, persisted_hash_layout: bool
+) -> None:
+    store = SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1.0)
+    lease = store.acquire("target", "owner", 60)
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "mssql_sqlclient",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+        writer_proof_capability="sqlclient-session-applock-v1",
+    )
+    custody = NativeTargetCustody(store, "target")
+    custody.claim(lease, identity.invocation_key)
+    journal = NativeChunkJournalV2(store, lease, identity)
+    journal.begin()
+    path = tmp_path / "sealed.native"
+    path.write_bytes(b"sealed")
+    file = EncodedNativeFile(path, 0, 1, 6, sha256(b"sealed").hexdigest(), "f" * 64)
+    journal.attempt(0, 0, file)
+    attempt_id = journal.attempt_id(0, 0)
+    grant_secret = bytes(range(32))
+    monkeypatch.setattr(
+        "dpone.runtime.sinks.mssql_native_target_local_import.secrets.token_bytes", lambda _n: grant_secret
+    )
+    observed: dict[str, object] = {}
+
+    class Importer:
+        columns = (SimpleNamespace(name="event_id", nullable=False),)
+        _types = ("bigint",)
+        _persisted_hash_layout = persisted_hash_layout
+        _mutation_scope = staticmethod(lambda *args: nullcontext())
+        _assert_lease = staticmethod(lambda lease: None)
+        table_name = staticmethod(lambda plan, attempt: "owned")
+        qualified = staticmethod(lambda table: "[db].[dbo].[owned]")
+        _create_owned_stage = staticmethod(lambda *args: None)
+        _object_id = staticmethod(lambda table: 11)
+        _ownership = staticmethod(lambda *args: {"binding": "1" * 64})
+        _assert_stage_identity = staticmethod(lambda *args: None)
+
+        @staticmethod
+        def _target_digest(table, file):
+            if persisted_hash_layout:
+                return (
+                    PersistedHashObservation(1, file.typed_digest, 7, 1),
+                    (1, 0, b"\x00\x00\x00\x00\x00\x00\x00\x01", *(["7"] + ["0"] * 7)),
+                )
+            return TargetDigest(1, file.typed_digest, 7), (1, 0, *(["7"] + ["0"] * 7))
+
+        _receipt = staticmethod(
+            lambda plan, file, attempt, object_id, typed_sum, artifact, **_kwargs: NativeChunkReceipt(
+                0, attempt, "[db].[dbo].[owned]", 1, 6, file.file_sha256, file.typed_digest
+            )
+        )
+
+    class Writer:
+        def write(self, request, *, deadline):
+            observed["request"] = request
+            observed["deadline"] = deadline
+            return NativeStageWriteObservation(
+                request.attempt_id,
+                1,
+                "success",
+                "7" * 64,
+                "8" * 64,
+                f"dpone.mssql-sqlclient.ipc.v{request.layout_version}",
+                NativeStageWriteMetrics(0.1, 0.2, 0.1),
+            )
+
+    def barrier(stage, grant_token_sha256, assert_identity):
+        observed["barrier"] = (stage, grant_token_sha256)
+        assert_identity()
+        return nullcontext()
+
+    attempt = NativeTargetLocalAttempt(
+        journal,
+        custody,
+        Writer(),
+        barrier,
+        WindowOutcomeUnknown,
+        lambda _file: None,
+        timeout_seconds=30,
+        max_row_bytes=6,
+        clock=lambda: 10.0,
+    )
+    attempt.import_file(Importer(), plan, file, attempt_id, lease, SimpleNamespace())
+
+    request = observed["request"]
+    assert request.qualified_stage == "[db].[dbo].[owned]"
+    assert request.stage_id_sha256 == journal.opaque_stage_id("[db].[dbo].[owned]")
+    assert request.owner_binding_sha256 == "1" * 64
+    assert request.object_id == 11
+    assert request.max_row_bytes == 6
+    assert request.columns[0].target_type == "bigint"
+    assert request.layout_version == (2 if persisted_hash_layout else 1)
+    assert observed["deadline"].expires_at_monotonic == 40.0
+    assert observed["barrier"] == ("[db].[dbo].[owned]", sha256(grant_secret).hexdigest())
 
 
 def test_published_cleanup_requires_durable_authority_and_exact_stage_identity():
@@ -258,19 +365,23 @@ def test_published_partial_cleanup_replays_each_exact_stage_without_second_drop(
     assert drops == [receipt.stage_id for receipt in receipts]
 
 
-def test_positive_terminal_recovery_reobserves_without_writer_launch(tmp_path):
+@pytest.mark.parametrize("backend", ["bcp", "mssql_sqlclient"])
+def test_positive_terminal_recovery_reobserves_without_writer_launch(tmp_path, backend):
     store = SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1.0)
     lease = store.acquire("target", "owner", 60)
     plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
     identity = NativeVerificationIdentityV2(
         plan,
-        "bcp",
+        backend,
         NativeVerificationBackend.TARGET_LOCAL,
         "a" * 64,
         "b" * 64,
         "c" * 64,
         "mssql-native-sha256-sum-v1",
         "d" * 64,
+        writer_proof_capability=(
+            "sqlclient-session-applock-v1" if backend == "mssql_sqlclient" else "bcp-supervised-stage-barrier-v1"
+        ),
     )
     journal = NativeChunkJournalV2(store, lease, identity)
     journal.begin()
@@ -286,7 +397,7 @@ def test_positive_terminal_recovery_reobserves_without_writer_launch(tmp_path):
         schema_sha256=identity.capability_layout_sha256,
     )
     writer = dict(
-        import_backend="bcp",
+        import_backend=backend,
         writer_proof_capability=identity.writer_proof_capability,
         protocol_sha256=identity.companion_protocol_sha256,
         package_sha256=identity.companion_package_sha256,
@@ -297,17 +408,22 @@ def test_positive_terminal_recovery_reobserves_without_writer_launch(tmp_path):
     journal.append_event(0, attempt_id, "STAGE_OWNED", stage_binding=stage)
     journal.append_event(0, attempt_id, "GRANTED", writer_binding=writer)
     journal.append_event(0, attempt_id, "WRITING")
-    journal.append_event(
-        0,
-        attempt_id,
-        "WRITER_TERMINAL",
-        observation=NativeTargetLocalAttempt._observation("success", 1),
-    )
+    if backend == "bcp":
+        journal.append_event(
+            0,
+            attempt_id,
+            "WRITER_TERMINAL",
+            observation=NativeTargetLocalAttempt._observation("success", 1),
+        )
     journal.append_event(
         0,
         attempt_id,
         "UNKNOWN",
-        observation=NativeTargetLocalAttempt._observation("success", 1, quiescence="failed"),
+        observation=NativeTargetLocalAttempt._observation(
+            "success" if backend == "bcp" else "lost_ack",
+            1 if backend == "bcp" else None,
+            quiescence="failed",
+        ),
     )
     calls = []
 
@@ -333,6 +449,11 @@ def test_positive_terminal_recovery_reobserves_without_writer_launch(tmp_path):
             return TargetDigest(1, file.typed_digest, 7), (1, 0, *("7", *("0",) * 7))
 
         @staticmethod
+        def _target_digest_observation(table, expected_rows):
+            calls.append("aggregate")
+            return TargetDigest(1, file.typed_digest, 7), (1, 0, *("7", *("0",) * 7))
+
+        @staticmethod
         def _receipt(plan, file, attempt, object_id, typed_sum, artifact):
             return NativeChunkReceipt(0, attempt, "[db].[dbo].[owned]", 1, 6, file.file_sha256, file.typed_digest)
 
@@ -340,8 +461,11 @@ def test_positive_terminal_recovery_reobserves_without_writer_launch(tmp_path):
         def write(self, *args, **kwargs):
             pytest.fail("recovery must never launch a writer")
 
-    def barrier(stage, assert_identity):
+    def barrier(stage, *args):
         calls.append("barrier")
+        assert_identity = args[-1]
+        if backend == "mssql_sqlclient":
+            assert args[0] == "3" * 64
         assert_identity()
         return nullcontext()
 

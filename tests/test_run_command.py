@@ -362,6 +362,33 @@ def test_dpone_run_cli_missing_manifest_returns_two_without_side_effects(
     assert payload["result"]["inserted_rows"] == 0
 
 
+def test_sqlclient_example_reports_stable_runtime_context_code_before_io(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _patch_cli(monkeypatch)
+
+    with pytest.raises(SystemExit) as exc:
+        cli_main.main(
+            [
+                "run",
+                "examples/native/clickhouse-to-mssql-sqlclient.yaml",
+                "--interval-end",
+                "2026-09-28T00:00:00Z",
+                "--format",
+                "json",
+            ]
+        )
+
+    assert exc.value.code == 2
+    captured = capsys.readouterr()
+    assert captured.err == ""
+    payload = json.loads(captured.out)
+    assert payload["attempts"] == 0
+    assert payload["result"]["extracted_rows"] == 0
+    assert payload["result"]["error_code"] == "DPONE_RUNTIME_CONNECTION_CONTEXT_REQUIRED"
+
+
 @pytest.mark.parametrize("output_format", ("text", "md", "json"))
 def test_dpone_run_cli_returns_two_for_typed_configuration_failure(
     monkeypatch: pytest.MonkeyPatch,

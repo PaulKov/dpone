@@ -1,0 +1,123 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.mssql-native-recovery.v2.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "artifact_refs": {
+      "items": {
+        "pattern": "^[0-9a-f]{64}$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "attempts": {
+      "items": {
+        "additionalProperties": false,
+        "properties": {
+          "attempt_id_sha256": {
+            "pattern": "^[0-9a-f]{64}$",
+            "type": "string"
+          },
+          "ordinal": {
+            "minimum": 0,
+            "type": "integer"
+          },
+          "stage_id_sha256": {
+            "anyOf": [
+              {
+                "type": "null"
+              },
+              {
+                "pattern": "^[0-9a-f]{64}$",
+                "type": "string"
+              }
+            ]
+          },
+          "terminal_event": {
+            "enum": [
+              "INTENT",
+              "STAGE_OWNED",
+              "GRANTED",
+              "WRITING",
+              "WRITER_TERMINAL",
+              "QUIESCENT",
+              "VERIFIED",
+              "PARTIAL_PROVED",
+              "UNKNOWN",
+              "FAILED_RETIRABLE",
+              "INCIDENT_RETAINED",
+              "RETIRED"
+            ]
+          }
+        },
+        "required": [
+          "attempt_id_sha256",
+          "ordinal",
+          "stage_id_sha256",
+          "terminal_event"
+        ],
+        "type": "object"
+      },
+      "type": "array"
+    },
+    "diagnostic_code": {
+      "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+      "type": "string"
+    },
+    "identity_sha256": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "invocation_id": {
+      "pattern": "^[0-9a-f]{64}$",
+      "type": "string"
+    },
+    "kind": {
+      "const": "dpone.mssql-native-recovery.v2"
+    },
+    "permitted_actions": {
+      "items": {
+        "enum": [
+          "inspect",
+          "reconcile",
+          "resume",
+          "retire"
+        ]
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "state": {
+      "enum": [
+        "EMPTY_STAGING",
+        "WRITING_UNKNOWN",
+        "PARTIAL_PROVED",
+        "VERIFIED_EOF",
+        "REEXTRACT_REQUIRED",
+        "PUBLICATION_UNKNOWN",
+        "PUBLISHED",
+        "SUCCEEDED",
+        "RETIRED",
+        "CUSTODY_RELEASED",
+        "INCIDENT_RETAINED"
+      ]
+    }
+  },
+  "required": [
+    "artifact_refs",
+    "attempts",
+    "diagnostic_code",
+    "identity_sha256",
+    "invocation_id",
+    "kind",
+    "permitted_actions",
+    "schema_version",
+    "state"
+  ],
+  "title": "dpone MSSQL native recovery v2",
+  "type": "object"
+}

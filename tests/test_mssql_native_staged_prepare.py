@@ -47,6 +47,7 @@ class MemoryConnector:
         self.properties = {}
         self.statements = []
         self.typed_readbacks = []
+        self.mutation_watermark = None
 
     def quote_identifier(self, name):
         return "[" + name.replace("]", "]]") + "]"
@@ -109,7 +110,11 @@ class MemoryConnector:
 
     def get_records(self, sql, params=(), **kwargs):
         if "#dpone_target_hashes" in sql:
+            if "mutation_watermark" in sql:
+                return [(0, 0, None, *([0] * 16))]
             return [(0, 0, *([0] * 16))]
+        if "MAX(CONVERT(binary(8), [__dpone__mutation_version]))" in sql:
+            return [(0, self.mutation_watermark)]
         if "extended_properties" in sql:
             return [(self.properties[params[0]],)]
         if "OBJECT_ID" in sql:
@@ -174,6 +179,7 @@ def test_target_local_empty_prepare_has_no_raw_attempt_and_verified_empty_eviden
         lambda: journal,
         nullcontext,
         verification_identity=object(),
+        persisted_hash_layout=True,
     )
     payload = SimpleNamespace(
         schema=(("n", "bigint"),),
@@ -194,6 +200,8 @@ def test_target_local_empty_prepare_has_no_raw_attempt_and_verified_empty_eviden
     assert prepared.staging.consumed_payload_evidence.require_complete().parts == ()
     assert not any(sql.startswith("INSERT INTO ") for sql in connector.statements)
     assert connector.typed_readbacks == []
+    assert any("ADD [__dpone__mutation_version] rowversion NOT NULL" in sql for sql in connector.statements)
+    assert prepared.resources[0].mutation_watermark == 0
     preparer.reverify(prepared)
     from dpone.runtime.sinks.mssql_native_recovery import restore_prepared
 
@@ -206,6 +214,10 @@ def test_target_local_empty_prepare_has_no_raw_attempt_and_verified_empty_eviden
     )
     preparer.reverify(restored)
     assert restored.staging.consumed_payload_evidence == prepared.staging.consumed_payload_evidence
+    connector.mutation_watermark = bytes.fromhex("0000000000000001")
+    with pytest.raises(ValueError, match="prepared_content_changed"):
+        preparer.reverify(restored)
+    connector.mutation_watermark = None
     stage_name = strategy._staging_name(prepared.staging)
     with pytest.raises(ValueError, match="publication_required"):
         preparer.cleanup(prepared)

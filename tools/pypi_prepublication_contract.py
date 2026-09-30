@@ -8,7 +8,13 @@ from dataclasses import dataclass
 from typing import Final
 
 EXPECTED_PACKAGES: Final = frozenset(
-    {"apache-airflow-providers-dpone", "dpone", "dpone-airflow-pack", "dpone-native-accel"}
+    {
+        "apache-airflow-providers-dpone",
+        "dpone",
+        "dpone-airflow-pack",
+        "dpone-mssql-sqlclient",
+        "dpone-native-accel",
+    }
 )
 PYPI_INDEX_URL: Final = "https://pypi.org"
 WORKFLOW_PATH: Final = ".github/workflows/release.yml"

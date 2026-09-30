@@ -88,7 +88,7 @@ def _candidate(value: object, *, expected_version: str) -> Candidate:
 
 
 def load_candidate_inventory(path: Path, *, expected_version: str) -> tuple[tuple[Candidate, ...], str]:
-    """Load the build receipt as one closed, canonical eight-file inventory."""
+    """Load the build receipt as one closed, canonical ten-file inventory."""
 
     raw = _read_bounded(path)
     payload = decode_json(raw, invalid_code="PYPI_PREPUBLICATION_CANDIDATE_JSON_INVALID")
@@ -98,10 +98,10 @@ def load_candidate_inventory(path: Path, *, expected_version: str) -> tuple[tupl
     if not isinstance(summary, dict) or set(summary) != _SUMMARY_KEYS:
         raise fail("PYPI_PREPUBLICATION_CANDIDATE_SUMMARY_INVALID")
     expected_summary = {
-        "artifact_count": 8,
-        "distribution_count": 4,
-        "expected_artifact_count": 8,
-        "expected_distribution_count": 4,
+        "artifact_count": 10,
+        "distribution_count": 5,
+        "expected_artifact_count": 10,
+        "expected_distribution_count": 5,
     }
     if (
         type(payload["schema_version"]) is not int
@@ -115,10 +115,10 @@ def load_candidate_inventory(path: Path, *, expected_version: str) -> tuple[tupl
     ):
         raise fail("PYPI_PREPUBLICATION_CANDIDATE_INVENTORY_NOT_GO")
     artifacts = payload["artifacts"]
-    if not isinstance(artifacts, list) or len(artifacts) != 8:
+    if not isinstance(artifacts, list) or len(artifacts) != 10:
         raise fail("PYPI_PREPUBLICATION_CANDIDATE_COUNT_INVALID")
     candidates = tuple(_candidate(item, expected_version=expected_version) for item in artifacts)
-    if candidates != tuple(sorted(candidates)) or len({candidate.filename for candidate in candidates}) != 8:
+    if candidates != tuple(sorted(candidates)) or len({candidate.filename for candidate in candidates}) != 10:
         raise fail("PYPI_PREPUBLICATION_CANDIDATE_ORDER_OR_UNIQUENESS_INVALID")
     observed = {(candidate.package, candidate.artifact_type) for candidate in candidates}
     expected = {(package, kind) for package in EXPECTED_PACKAGES for kind in ("sdist", "wheel")}

@@ -15,6 +15,10 @@ from dpone.runtime.state.mssql_contract import (
     exact_external_table_contract,
     require_external_table_shape,
 )
+from dpone.runtime.state.mssql_generic_transaction_names import (
+    TARGET_IDENTITY_REGISTRY_TABLE,
+    TARGET_IDENTITY_REGISTRY_TRIGGER,
+)
 from dpone.runtime.support.mssql_identifier_integrity import require_case_unambiguous_identifiers
 from dpone.runtime.support.mssql_trigger_integrity import (
     require_exact_immutable_trigger,
@@ -22,8 +26,6 @@ from dpone.runtime.support.mssql_trigger_integrity import (
 )
 
 TARGET_IDENTITY_REGISTRY_SCHEMA = "dbo"
-TARGET_IDENTITY_REGISTRY_TABLE = "dpone_target_identity"
-TARGET_IDENTITY_REGISTRY_TRIGGER = "trg_dpone_target_identity_immutable"
 
 TARGET_IDENTITY_REGISTRY_CONTRACT = exact_external_table_contract(
     columns=frozenset({"binding_id", "schema_name", "table_name", "created_at_utc"}),

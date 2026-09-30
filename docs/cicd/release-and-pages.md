@@ -9,8 +9,8 @@ Use [Release](../release.md) for the current, copyable operator runbook and
 ```mermaid
 flowchart LR
     Approval["Named version and approved source readiness"] --> Dispatch["Manual controller dispatch: version only"]
-    Dispatch --> Build["Build four distributions from dpone vX.Y.Z"]
-    Build --> Artifacts["Eight archives and immutable manifest"]
+    Dispatch --> Build["Build five distributions from dpone vX.Y.Z"]
+    Build --> Artifacts["Ten archives and immutable manifest"]
     Artifacts --> Publish["Artifact-only OIDC publish job"]
     Publish --> Verify["Read-only public filename / SHA-256 verification"]
     Verify --> Observe["Retain run result; retrospective receipt when needed"]
@@ -51,7 +51,7 @@ revision, source tag/commit, and these non-overwriting artifacts:
 
 | Operation | Artifacts | Interpretation |
 | --- | --- | --- |
-| Publication | `dpone-pypi-X.Y.Z`, `dpone-pypi-manifest-X.Y.Z` | Eight original archives and `release-manifest.json`; public verification result is in workflow logs/conclusion. |
+| Publication | `dpone-pypi-X.Y.Z`, `dpone-pypi-manifest-X.Y.Z` | Ten original archives and `release-manifest.json`; public verification result is in workflow logs/conclusion. |
 | Artifact-only rehearsal | `dpone-pypi-rehearsal-X.Y.Z`, `dpone-pypi-rehearsal-receipt-X.Y.Z` | Build/hash/install proof, not PyPI upload or live publisher permission proof. |
 | Retrospective verification | Local `retro_pypi_verification.json` and `fresh_install.log` | Read-only observation tied to original run/artifact identities and retained bytes. |
 

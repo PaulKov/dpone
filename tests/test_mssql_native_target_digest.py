@@ -14,6 +14,7 @@ from dpone.runtime.sinks.mssql_native_target_digest import (
     build_prepared_target_digest_sql,
     build_target_digest_sql,
     decode_prepared_target_digest_row,
+    decode_prepared_target_digest_with_watermark,
     decode_target_digest_row,
 )
 from dpone.runtime.sinks.mssql_native_target_local_layout import TARGET_LOCAL_LAYOUT_MATRIX_V1
@@ -237,6 +238,26 @@ def test_prepared_decoder_returns_business_and_full_digest_from_18_fields() -> N
         decode_prepared_target_digest_row(row[:-1], expected_rows=2)
     with pytest.raises(ValueError, match="count_overflow"):
         decode_prepared_target_digest_row((3, 1, *row[2:]), expected_rows=2)
+
+
+def test_prepared_persisted_layout_binds_digest_and_watermark_in_one_scan() -> None:
+    business = _contract(("v", "bigint"))
+    sql = build_prepared_target_digest_sql("[dbo].[stage]", business, business, 2, include_mutation_watermark=True)
+    assert "s.[__dpone__mutation_version]" in sql
+    assert "MAX(mutation_watermark)" in sql
+    row = (
+        2,
+        0,
+        bytes.fromhex("0000000000000009"),
+        *([Decimal(0)] * 7),
+        Decimal(2),
+        *([Decimal(0)] * 7),
+        Decimal(3),
+    )
+    digests, watermark = decode_prepared_target_digest_with_watermark(row, expected_rows=2)
+    assert watermark == 9
+    assert digests.business.typed_sum == 2
+    assert digests.full.typed_sum == 3
 
 
 @pytest.mark.parametrize("stage", ["dbo.stage", "[dbo].[stage];DROP TABLE x", "[dbo].[stage].[extra].[part]"])

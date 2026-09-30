@@ -11,10 +11,10 @@ SAMPLE = Path("examples/native/clickhouse-to-mssql-native.yaml")
 TARGET_LOCAL_SAMPLE = Path("examples/native/clickhouse-to-mssql-target-local.yaml")
 
 
-def test_native_example_plan_is_bounded_and_requires_composition() -> None:
+def test_native_example_plan_is_bounded_and_requires_live_preflight() -> None:
     plan = ExecutionPlanService().plan_manifest(SAMPLE, explain_strategy=True)
     native = plan["mssql_native"]
-    assert native["status"] == "composition_required"
+    assert native["status"] == "live_preflight_required"
     assert native["source_query_count"] == 1
     assert native["offset_pagination"] is False
     assert native["limits"]["parallelism"] == 2
@@ -43,6 +43,28 @@ def test_target_local_example_projects_explicit_v2_proof() -> None:
     assert plan["bulk_path"] == "clickhouse_bounded_mssql_native_bcp"
 
 
+def test_sqlclient_plan_projects_companion_and_session_lock_without_fallback(tmp_path: Path) -> None:
+    import yaml
+
+    raw = yaml.safe_load(TARGET_LOCAL_SAMPLE.read_text())
+    execution = raw["defaults"]["source"]["options"]["native_transfer"]["execution"]
+    execution["import_backend"] = "mssql_sqlclient"
+    execution["layout_version"] = 2
+    path = tmp_path / "sqlclient.yaml"
+    path.write_text(yaml.safe_dump(raw))
+
+    plan = ExecutionPlanService().plan_manifest(path)
+    native = plan["mssql_native"]
+    assert native["import_backend"] == "mssql_sqlclient"
+    assert native["layout_version"] == 2
+    assert native["verification_strategy"] == "persisted_hash_and_mutation_watermark"
+    assert native["writer_proof_capability"] == "sqlclient-session-applock-v1"
+    assert "verified_sqlclient_companion" in native["required_dependencies"]
+    assert "supervised_bcp_writer" not in native["required_dependencies"]
+    assert plan["bulk_path"] == "clickhouse_bounded_mssql_native_mssql_sqlclient"
+    assert plan["native_transfer_route_decision"]["fallback_chain"] == []
+
+
 def test_explicit_python_readback_projects_v1_without_target_local_requirements(tmp_path: Path) -> None:
     import yaml
 
@@ -62,7 +84,7 @@ def test_explicit_python_readback_projects_v1_without_target_local_requirements(
 def test_native_plan_render_reports_limits_and_no_generic_snapshot(render) -> None:
     output = render(ExecutionPlanService().plan_manifest(SAMPLE))
     for token in (
-        "composition_required",
+        "live_preflight_required",
         "max_row_bytes",
         "max_total_encoded_bytes",
         "stage_allocated_bytes_stop_threshold",

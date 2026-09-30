@@ -13,6 +13,7 @@ from dpone.runtime.native_wire_models import SourceNativeWireContract
 from dpone.runtime.sinks.mssql_native_target_digest import (
     build_prepared_target_digest_sql,
     decode_prepared_target_digest_row,
+    decode_prepared_target_digest_with_watermark,
     full_prepared_contract,
 )
 from dpone.runtime.sinks.mssql_native_verification import verification_allowance
@@ -25,6 +26,7 @@ class PreparedDigests:
     business_digest: str
     full_digest: str
     rows: int
+    mutation_watermark: int | None = None
 
 
 def digest_prepared_target(
@@ -34,16 +36,27 @@ def digest_prepared_target(
     business_contract: SourceNativeWireContract,
     full_contract: SourceNativeWireContract,
     expected_rows: int,
+    include_mutation_watermark: bool = False,
 ) -> PreparedDigests:
     """Return business and full digests from one bounded 18-field SQL aggregate."""
-    sql = build_prepared_target_digest_sql(qualified_stage, business_contract, full_contract, expected_rows)
+    sql = build_prepared_target_digest_sql(
+        qualified_stage,
+        business_contract,
+        full_contract,
+        expected_rows,
+        include_mutation_watermark=include_mutation_watermark,
+    )
     rows = read_aggregate(sql)
     if len(rows) != 1:
         raise ValueError("mssql_native.prepared_target_digest_shape")
-    observed = decode_prepared_target_digest_row(rows[0], expected_rows=expected_rows)
+    if include_mutation_watermark:
+        observed, watermark = decode_prepared_target_digest_with_watermark(rows[0], expected_rows=expected_rows)
+    else:
+        observed = decode_prepared_target_digest_row(rows[0], expected_rows=expected_rows)
+        watermark = None
     if observed.business.rows != expected_rows or observed.full.rows != expected_rows:
         raise ValueError("mssql_native.prepared_count_mismatch")
-    return PreparedDigests(observed.business.typed_digest, observed.full.typed_digest, expected_rows)
+    return PreparedDigests(observed.business.typed_digest, observed.full.typed_digest, expected_rows, watermark)
 
 
 def digest_stage_projection(strategy: Any, stage: Any, context: Any, *, all_columns: bool) -> str:

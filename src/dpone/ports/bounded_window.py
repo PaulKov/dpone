@@ -16,6 +16,13 @@ from dpone.contracts.bounded_window import (
     WindowRecord,
     WindowResult,
 )
+from dpone.contracts.bounded_window import WindowContractError as WindowContractError
+from dpone.contracts.bounded_window import (
+    WindowOutcomeUnknown as WindowOutcomeUnknown,
+)
+from dpone.contracts.bounded_window import (
+    WindowTransientError as WindowTransientError,
+)
 
 
 class WindowSource(Protocol):

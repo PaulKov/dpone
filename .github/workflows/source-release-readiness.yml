@@ -77,10 +77,15 @@ jobs:
         with:
           python-version: "3.11"
 
+      - name: Set up .NET 10 for the SqlClient companion
+        uses: actions/setup-dotnet@d4c94342e560b34958eacfc5d055d21461ed1c5d # v5.0.0
+        with:
+          dotnet-version: "10.0.x"
+
       - name: Install locked validation dependencies
         run: uv sync --locked --all-extras
 
-      - name: Build and inspect all eight release archives
+      - name: Build and inspect all ten release archives
         env:
           RELEASE_VERSION: ${{ steps.context.outputs.version }}
         run: |
@@ -89,6 +94,7 @@ jobs:
           uv build packages/dpone-native-accel --out-dir dist --no-create-gitignore
           uv build packages/dpone-airflow-pack --out-dir dist --no-create-gitignore
           uv build packages/apache-airflow-providers-dpone --out-dir dist --no-create-gitignore
+          uv build packages/dpone-mssql-sqlclient --out-dir dist --no-create-gitignore
           uv run --frozen python tools/pypi_release_smoke_dist.py \
             --dist-dir dist --expected-version "${RELEASE_VERSION}" --inventory-only --format json \
             > test_artifacts/source-readiness-build/candidate-inventory.json
@@ -110,7 +116,7 @@ jobs:
           "${smoke_dir}/bin/pip" install --find-links dist "dpone[full,accel]==${RELEASE_VERSION}"
           "${smoke_dir}/bin/pip" check | tee test_artifacts/source-readiness-build/pip-check.txt
           "${smoke_dir}/bin/python" -I -c \
-            'import importlib.metadata as m, os; expected=os.environ["RELEASE_VERSION"]; names=("dpone","dpone-native-accel","dpone-airflow-pack","apache-airflow-providers-dpone"); actual={name:m.version(name) for name in names}; assert all(version == expected for version in actual.values()), actual; print(actual)' \
+            'import importlib.metadata as m, os; expected=os.environ["RELEASE_VERSION"]; names=("dpone","dpone-native-accel","dpone-airflow-pack","dpone-mssql-sqlclient","apache-airflow-providers-dpone"); actual={name:m.version(name) for name in names}; assert all(version == expected for version in actual.values()), actual; print(actual)' \
             | tee test_artifacts/source-readiness-build/installed-versions.txt
           "${smoke_dir}/bin/python" tools/package_smoke.py --project-root . --dpone-cmd "${smoke_dir}/bin/dpone" \
             | tee test_artifacts/source-readiness-build/package-smoke.txt
@@ -195,9 +201,9 @@ jobs:
           inventory = json.loads(Path("candidate/test_artifacts/source-readiness-build/handoff-inventory.json").read_text())
           names = {item["filename"] for item in inventory["artifacts"]}
           entries = list(Path("candidate/dist").iterdir())
-          if (len(inventory["artifacts"]) != 8 or len(names) != 8 or {path.name for path in entries} != names
+          if (len(inventory["artifacts"]) != 10 or len(names) != 10 or {path.name for path in entries} != names
                   or any(path.is_symlink() or not path.is_file() for path in entries)):
-              raise SystemExit("candidate directory is no longer the closed eight-archive inventory")
+              raise SystemExit("candidate directory is no longer the closed ten-archive inventory")
           context.update(
               artifact_id=int(os.environ["CANDIDATE_ARTIFACT_ID"]),
               artifact_digest=os.environ["CANDIDATE_ARTIFACT_DIGEST"],

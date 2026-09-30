@@ -29,9 +29,9 @@ class NativeCompletedPayload:
         return self.lifecycle
 
 
-def completion_metadata(payload: Any) -> dict[str, Any]:
+def completion_metadata(payload: Any, *, recovery_bindings: Any = None) -> dict[str, Any]:
     lifecycle = asdict(payload.require_completed_extraction())
-    return {
+    metadata = {
         "version": 1,
         "source_relation_uuid": getattr(getattr(payload, "artifact", None), "source_relation_uuid", None),
         "schema": [list(column) for column in payload.schema],
@@ -49,6 +49,14 @@ def completion_metadata(payload: Any) -> dict[str, Any]:
         "operation_key": payload.mssql_transaction_admission.operation.operation_key.hex(),
         "generation": payload.mssql_transaction_admission.operation.attempt.generation,
     }
+    if recovery_bindings is not None:
+        from dpone.contracts.mssql_native_recovery_authority import build_mssql_native_recovery_authority
+
+        metadata["recovery_authority_v1"] = build_mssql_native_recovery_authority(
+            payload.mssql_transaction_admission,
+            recovery_bindings,
+        )
+    return metadata
 
 
 def restore_payload(context: Any, admission: Any) -> NativeCompletedPayload:
@@ -75,3 +83,55 @@ def restore_payload(context: Any, admission: Any) -> NativeCompletedPayload:
         restore_mutation(metadata["mutation"]),
         receipt,
     )
+
+
+def authenticate_recovery_admission(context: Any, admission: Any) -> Any:
+    """Bind a freshly claimed target admission to the source-EOF authority."""
+
+    identity = getattr(context, "verification_identity", None)
+    if identity is None:
+        return admission
+    journal = context.journal_factory()
+    if journal.completed() is None:
+        return admission
+    metadata = journal.completed_metadata()
+    authority = metadata.get("recovery_authority_v1")
+    bindings_factory = getattr(context, "recovery_bindings", None)
+    if authority is None or not callable(bindings_factory):
+        raise ValueError("mssql_native.recovery_authority_required")
+    from dpone.contracts.mssql_native_recovery_authority import restore_mssql_native_recovery_admission
+
+    original = restore_mssql_native_recovery_admission(
+        authority,
+        expected_bindings=bindings_factory(admission),
+    )
+    if _admission_identity(original) != _admission_identity(admission):
+        raise ValueError("mssql_native.recovery_operation_changed")
+    return admission
+
+
+def _admission_identity(admission: Any) -> tuple[Any, ...]:
+    operation = getattr(admission, "operation", None)
+    receipt = getattr(admission, "replay_receipt", None)
+    if operation is not None:
+        attempt = operation.attempt
+        return (
+            operation.operation_key,
+            attempt.attempt_key,
+            attempt.target_identity,
+            attempt.route_fingerprint,
+            attempt.generation,
+            operation.scope_hash,
+            attempt.request.load_id,
+        )
+    if receipt is not None:
+        return (
+            receipt.operation_key,
+            receipt.attempt_key,
+            receipt.target_identity,
+            receipt.route_fingerprint,
+            receipt.generation,
+            receipt.scope_hash,
+            receipt.load_id,
+        )
+    raise ValueError("mssql_native.recovery_operation_required")

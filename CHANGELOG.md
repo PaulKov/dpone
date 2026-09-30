@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+## 0.88.0 - 2026-09-30
+
+### Added
+
+- Add an opt-in `mssql_sqlclient` backend for bounded ClickHouse to SQL Server
+  delivery. The separately packaged Linux x86-64 .NET companion uses
+  `Microsoft.Data.SqlClient.SqlBulkCopy`, parallel isolated stages, target-local
+  fixed-width content verification, exact writer identity, durable custody,
+  and source-free recovery. BCP remains the default backend.
+- Add operator diagnostics, recovery commands, narrow and 100-column synthetic
+  fixtures, immutable-image certification, and force-kill testing with two
+  concurrent writers. Each certification cell runs in a fresh container and
+  publishes privacy-scanned evidence bound to the exact commit, tree, image,
+  fixture, protocol layout, and package version.
+
+### Fixed
+
+- Accept bounded zero-row and partial persisted-hash observations only during
+  interrupted-writer recovery while retaining exact row-count and digest checks
+  for successful loads.
+
 ## 0.87.4 - 2026-09-29
 
 ### Added

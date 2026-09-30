@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=80,<81", "wheel>=0.45,<1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dpone-mssql-sqlclient"
+version = "0.88.0"
+description = "Optional Microsoft.Data.SqlClient bulk-copy companion for dpone"
+readme = "README.md"
+requires-python = ">=3.11,<3.13"
+license = "Apache-2.0"
+authors = [{ name = "PaulKov" }]
+maintainers = [{ name = "PaulKov" }]
+dependencies = ["dpone>=0.88,<0.89"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed",
+]
+
+[project.urls]
+Homepage = "https://github.com/PaulKov/dpone"
+Repository = "https://github.com/PaulKov/dpone"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+dpone_mssql_sqlclient = ["companion/**/*"]

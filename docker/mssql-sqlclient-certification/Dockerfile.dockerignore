@@ -1,0 +1,12 @@
+.git
+.agents
+.codex
+.env
+.env.*
+**/.env
+**/.env.*
+**/__pycache__
+**/*.pyc
+test_artifacts
+dist
+site

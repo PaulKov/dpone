@@ -22,6 +22,8 @@ NAMES = (
     "dpone-0.74.0.tar.gz",
     "dpone_airflow_pack-0.74.0-py3-none-any.whl",
     "dpone_airflow_pack-0.74.0.tar.gz",
+    "dpone_mssql_sqlclient-0.74.0-py3-none-any.whl",
+    "dpone_mssql_sqlclient-0.74.0.tar.gz",
     "dpone_native_accel-0.74.0-py3-none-any.whl",
     "dpone_native_accel-0.74.0.tar.gz",
 )
@@ -96,10 +98,10 @@ def write_inventory(root: Path) -> tuple[Path, Path, list[dict[str, Any]]]:
         "schema_version": 1,
         "status": "passed",
         "summary": {
-            "artifact_count": 8,
-            "distribution_count": 4,
-            "expected_artifact_count": 8,
-            "expected_distribution_count": 4,
+            "artifact_count": 10,
+            "distribution_count": 5,
+            "expected_artifact_count": 10,
+            "expected_distribution_count": 5,
         },
     }
     inventory = root / "candidate-inventory.json"
@@ -161,6 +163,8 @@ def package_for(filename: str) -> str:
         return "apache-airflow-providers-dpone"
     if filename.startswith("dpone_airflow"):
         return "dpone-airflow-pack"
+    if filename.startswith("dpone_mssql_sqlclient"):
+        return "dpone-mssql-sqlclient"
     if filename.startswith("dpone_native"):
         return "dpone-native-accel"
     return "dpone"

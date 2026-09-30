@@ -90,6 +90,24 @@ def test_mutated_config_fails_before_publication():
     assert events == ["stage"]
 
 
+def test_runtime_lease_identity_does_not_make_unchanged_config_look_mutated():
+    service, config, events = fixture_service()
+    config.options["__dpone_mssql_transaction_lease"] = object()
+    handle = service.stage(config, object())
+
+    assert service.finalize(config, handle).inserted_rows == 2
+    assert events == ["stage", "verify", "finalize"]
+
+
+def test_runtime_authority_sentinel_does_not_make_unchanged_config_look_mutated():
+    service, config, events = fixture_service()
+    config.options["runtime_authority"] = object()
+    handle = service.stage(config, object())
+
+    assert service.finalize(config, handle).inserted_rows == 2
+    assert events == ["stage", "verify", "finalize"]
+
+
 def test_direct_load_uses_same_staging_and_finalization():
     service, config, events = fixture_service()
     assert service.load(config, object()).inserted_rows == 2

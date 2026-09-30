@@ -13,10 +13,12 @@ from . import (
 )
 from .base import Command
 from .func_command import CommandGroup, FuncCommand
+from .registry_ops_mssql import mssql_native_recovery_group
 
 
 def operations_group() -> Command:
     sub = [
+        mssql_native_recovery_group(),
         FuncCommand("artifact-index", ops_cmd.register_artifact_index_parser, ops_cmd.cmd_artifact_index),
         FuncCommand("certification-run", ops_cmd.register_certification_run_parser, ops_cmd.cmd_certification_run),
         FuncCommand(

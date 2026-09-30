@@ -1,0 +1,271 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.mssql-native-delivery-evidence.v2.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "backend": {
+      "additionalProperties": false,
+      "properties": {
+        "backend_identity_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "import_backend": {
+          "enum": [
+            "bcp",
+            "mssql_sqlclient"
+          ]
+        },
+        "package_version": {
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "type": "string"
+        },
+        "wire_identity_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "backend_identity_sha256",
+        "import_backend",
+        "package_version",
+        "wire_identity_sha256"
+      ],
+      "type": "object"
+    },
+    "correctness": {
+      "additionalProperties": false,
+      "properties": {
+        "publication_verified": {
+          "type": "boolean"
+        },
+        "published_rows": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "receipt_count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "source_rows": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "target_digest_verified": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "publication_verified",
+        "published_rows",
+        "receipt_count",
+        "source_rows",
+        "target_digest_verified"
+      ],
+      "type": "object"
+    },
+    "kind": {
+      "const": "dpone.mssql-native-delivery-evidence.v2"
+    },
+    "privacy": {
+      "additionalProperties": false,
+      "properties": {
+        "scan_status": {
+          "enum": [
+            "PASS",
+            "FAIL"
+          ]
+        },
+        "synthetic_only": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "scan_status",
+        "synthetic_only"
+      ],
+      "type": "object"
+    },
+    "recovery": {
+      "additionalProperties": false,
+      "properties": {
+        "classification": {
+          "enum": [
+            "not_required",
+            "reconciled",
+            "partial_retired",
+            "incident_retained"
+          ]
+        },
+        "retry_count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "unknown_outcome_count": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "classification",
+        "retry_count",
+        "unknown_outcome_count"
+      ],
+      "type": "object"
+    },
+    "resources": {
+      "additionalProperties": false,
+      "properties": {
+        "bcp_process_count": {
+          "minimum": 0,
+          "type": "integer"
+        },
+        "business_rows_read_back": {
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "bcp_process_count",
+        "business_rows_read_back"
+      ],
+      "type": "object"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "status": {
+      "enum": [
+        "PASS",
+        "FAIL",
+        "UNVERIFIED"
+      ]
+    },
+    "subject": {
+      "additionalProperties": false,
+      "properties": {
+        "dirty": {
+          "type": "boolean"
+        },
+        "environment_receipt_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "invocation_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "runner_image_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "source_commit_sha": {
+          "pattern": "^[0-9a-f]{40}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "dirty",
+        "environment_receipt_sha256",
+        "invocation_id",
+        "runner_image_sha256",
+        "source_commit_sha"
+      ],
+      "type": "object"
+    },
+    "timings": {
+      "additionalProperties": false,
+      "properties": {
+        "bulk_write_seconds": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "minimum": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "confirmed_visibility_seconds": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "minimum": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "preparation_seconds": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "minimum": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "publication_seconds": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "minimum": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "source_read_seconds": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "minimum": 0,
+              "type": "number"
+            }
+          ]
+        },
+        "target_digest_seconds": {
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "minimum": 0,
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "required": [
+        "bulk_write_seconds",
+        "confirmed_visibility_seconds",
+        "preparation_seconds",
+        "publication_seconds",
+        "source_read_seconds",
+        "target_digest_seconds"
+      ],
+      "type": "object"
+    }
+  },
+  "required": [
+    "backend",
+    "correctness",
+    "kind",
+    "privacy",
+    "recovery",
+    "resources",
+    "schema_version",
+    "status",
+    "subject",
+    "timings"
+  ],
+  "title": "dpone MSSQL native delivery evidence v2",
+  "type": "object"
+}

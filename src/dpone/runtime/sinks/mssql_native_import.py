@@ -30,6 +30,19 @@ def native_attempt_table_name(plan: NativeChunkPlan, attempt_id: str) -> str:
     return "dpone_native_" + sha256(repr((asdict(plan), attempt_id)).encode()).hexdigest()[:40]
 
 
+def native_stage_allocated_bytes(connector: Any, database: str) -> int:
+    """Observe native-stage allocation through one caller-owned target session."""
+    quoted_database = connector.quote_identifier(database)
+    rows = connector.get_records(
+        f"SELECT COALESCE(SUM(p.reserved_page_count), 0) * 8192 FROM "
+        f"{quoted_database}.sys.dm_db_partition_stats p "
+        f"JOIN {quoted_database}.sys.tables t ON t.object_id=p.object_id WHERE t.name LIKE 'dpone[_]native[_]%'"
+    )
+    if not rows or type(rows[0][0]) is not int or rows[0][0] < 0:
+        raise ValueError("mssql_native.allocation_unavailable")
+    return int(rows[0][0])
+
+
 class MssqlNativeChunkImporter:
     """Import isolated, predictably named tables; counts never use shared deltas."""
 
@@ -46,6 +59,7 @@ class MssqlNativeChunkImporter:
         options_factory: Callable[..., Any],
         target_digest_contract: Any = None,
         target_local_attempt: Any = None,
+        persisted_hash_layout: bool = False,
         observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
     ) -> None:
         self.connector = connector
@@ -59,6 +73,7 @@ class MssqlNativeChunkImporter:
         self._options_factory = options_factory
         self._target_digest_contract = target_digest_contract
         self._target_local_attempt = target_local_attempt
+        self._persisted_hash_layout = persisted_hash_layout
         self._types = tuple(
             normalize_mssql_physical_type(column.source_type.removesuffix(" nullable")) for column in columns
         )
@@ -134,6 +149,8 @@ class MssqlNativeChunkImporter:
             f"{self.connector.quote_identifier(column.name)} {dtype} {'NULL' if column.nullable else 'NOT NULL'}"
             for column, dtype in zip(self.columns, self._types, strict=True)
         )
+        if self._persisted_hash_layout:
+            ddl += ", [__dpone__native_row_hash] binary(32) NOT NULL, [__dpone__mutation_version] rowversion NOT NULL"
         self.connector.begin()
         try:
             self.connector.execute_query(f"CREATE TABLE {self.qualified(table)} ({ddl})")
@@ -159,6 +176,7 @@ class MssqlNativeChunkImporter:
         object_id: int,
         typed_sum: int,
         artifact: FileExportArtifact,
+        mutation_watermark: int | None = None,
     ) -> NativeChunkReceipt:
         schema = tuple((column.name, dtype) for column, dtype in zip(self.columns, self._types, strict=True))
         evidence = ConsumedPayloadEvidence.empty().append_verified_file(
@@ -174,6 +192,9 @@ class MssqlNativeChunkImporter:
         part["native_typed_sum"] = typed_sum
         part["native_object_id"] = object_id
         part["native_plan_binding"] = stable_hash(asdict(plan))
+        if mutation_watermark is not None:
+            part["native_mutation_watermark"] = mutation_watermark
+            part["native_stage_layout"] = "mssql-native-persisted-hash-v2"
         return NativeChunkReceipt(
             file.ordinal,
             attempt_id,
@@ -247,15 +268,7 @@ class MssqlNativeChunkImporter:
 
     def allocated_bytes(self) -> int:
         """Observe reserved pages of all native staging tables in this database."""
-
-        database = self.connector.quote_identifier(self.database)
-        rows = self.connector.get_records(
-            f"SELECT COALESCE(SUM(p.reserved_page_count), 0) * 8192 FROM {database}.sys.dm_db_partition_stats p "
-            f"JOIN {database}.sys.tables t ON t.object_id=p.object_id WHERE t.name LIKE 'dpone[_]native[_]%'"
-        )
-        if not rows or type(rows[0][0]) is not int or rows[0][0] < 0:
-            raise ValueError("mssql_native.allocation_unavailable")
-        return int(rows[0][0])
+        return native_stage_allocated_bytes(self.connector, self.database)
 
     def digest_rows(self, rows: Iterable[Any]) -> tuple[int, str]:
         """Canonical native re-encoding verifies duplicates without ordering rows."""
@@ -274,13 +287,8 @@ class MssqlNativeChunkImporter:
 
     def _verify_contents(self, table: str, expected_rows: int, expected_digest: str) -> int:
         actual = self.connector.fetch_schema_columns(self.schema, table, database=self.database)
-        expected = tuple(
-            (column.name, dtype, column.nullable) for column, dtype in zip(self.columns, self._types, strict=True)
-        )
-        if (
-            tuple((column.name, normalize_mssql_physical_type(column.dtype), column.nullable) for column in actual)
-            != expected
-        ):
+        expected = self._expected_stage_schema()
+        if tuple(self._normalize_stage_column(column) for column in actual) != expected:
             raise ValueError("mssql_native.stage_schema_changed")
         if self._target_digest_contract is not None:
             digest, _row = self._target_digest(table, SimpleNamespace(rows=expected_rows, typed_digest=expected_digest))
@@ -297,16 +305,33 @@ class MssqlNativeChunkImporter:
         return total
 
     def _target_digest(self, table: str, file: Any) -> tuple[Any, tuple[Any, ...]]:
+        observed, row = self._target_digest_observation(table, file.rows)
+        if observed.rows != file.rows or observed.typed_digest != file.typed_digest:
+            raise ValueError("mssql_native.typed_digest_mismatch")
+        return observed, row
+
+    def _target_digest_observation(self, table: str, expected_rows: int) -> tuple[Any, tuple[Any, ...]]:
+        """Return bounded aggregate evidence without interpreting content equality."""
+        if self._persisted_hash_layout:
+            from dpone.runtime.sinks.mssql_native_persisted_hash import (
+                build_initial_persisted_hash_sql,
+                decode_persisted_hash_observation,
+            )
+
+            query = build_initial_persisted_hash_sql(self.qualified(table), expected_rows)
+            aggregate = self.connector.get_records(query)
+            if len(aggregate) != 1:
+                raise ValueError("mssql_native.persisted_hash_row_shape")
+            row = tuple(aggregate[0])
+            return decode_persisted_hash_observation(row, expected_rows=expected_rows), row
         from dpone.runtime.sinks.mssql_native_target_digest import build_target_digest_sql, decode_target_digest_row
 
-        query = build_target_digest_sql(self.qualified(table), self._target_digest_contract, file.rows)
+        query = build_target_digest_sql(self.qualified(table), self._target_digest_contract, expected_rows)
         aggregate = self.connector.get_records(query)
         if len(aggregate) != 1:
             raise ValueError("mssql_native.target_digest_row_shape")
         row = tuple(aggregate[0])
-        observed = decode_target_digest_row(row, expected_rows=file.rows)
-        if observed.rows != file.rows or observed.typed_digest != file.typed_digest:
-            raise ValueError("mssql_native.typed_digest_mismatch")
+        observed = decode_target_digest_row(row, expected_rows=expected_rows)
         return observed, row
 
     def _assert_stage_identity(self, plan: NativeChunkPlan, attempt_id: str, table: str, object_id: int) -> None:
@@ -316,14 +341,36 @@ class MssqlNativeChunkImporter:
         if self._object_id(table) != object_id:
             raise ValueError("mssql_native.stage_identity_mismatch")
         actual = self.connector.fetch_schema_columns(self.schema, table, database=self.database)
-        expected = tuple(
+        expected = self._expected_stage_schema()
+        if tuple(self._normalize_stage_column(column) for column in actual) != expected:
+            raise ValueError("mssql_native.stage_schema_changed")
+
+    def _expected_stage_schema(self) -> tuple[tuple[str, str, bool], ...]:
+        business = tuple(
             (column.name, dtype, column.nullable) for column, dtype in zip(self.columns, self._types, strict=True)
         )
-        if (
-            tuple((column.name, normalize_mssql_physical_type(column.dtype), column.nullable) for column in actual)
-            != expected
-        ):
-            raise ValueError("mssql_native.stage_schema_changed")
+        if not self._persisted_hash_layout:
+            return business
+        return (
+            *business,
+            ("__dpone__native_row_hash", "binary(32)", False),
+            ("__dpone__mutation_version", "timestamp", False),
+        )
+
+    @staticmethod
+    def _normalize_stage_column(column: Any) -> tuple[str, str, bool]:
+        dtype = str(column.dtype).strip().lower()
+        if column.name == "__dpone__mutation_version" and dtype in {"timestamp", "rowversion"}:
+            return column.name, "timestamp", column.nullable
+        return column.name, normalize_mssql_physical_type(column.dtype), column.nullable
+
+    def _repeat_mutation_watermark(self, table: str, expected_rows: int) -> Any:
+        from dpone.runtime.sinks.mssql_native_persisted_hash import build_repeat_watermark_sql, decode_repeat_watermark
+
+        rows = self.connector.get_records(build_repeat_watermark_sql(self.qualified(table), expected_rows))
+        if len(rows) != 1:
+            raise ValueError("mssql_native.persisted_hash_row_shape")
+        return decode_repeat_watermark(tuple(rows[0]), expected_rows=expected_rows)
 
     def _ownership(self, plan: NativeChunkPlan, attempt_id: str) -> dict[str, str]:
         return {

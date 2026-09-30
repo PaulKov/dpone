@@ -3,19 +3,34 @@
 from __future__ import annotations
 
 import secrets
+import time
 from collections.abc import Callable
+from functools import partial
 from hashlib import sha256
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Any
 
-from dpone.ports.mssql_native_writer import NativeStageWriteGrant
+from dpone.ports.mssql_native import (
+    SQLCLIENT_SESSION_PROOF,
+    NativeStageColumnMapping,
+    NativeStageWriteGrant,
+    NativeStageWriteRequest,
+    OperationDeadline,
+)
 from dpone.runtime.file_artifacts import FileExportArtifact
 from dpone.runtime.mssql_native_target_local_recovery import retire_exact_owned_stage
+from dpone.runtime.sinks.mssql_native_target_local_evidence import (
+    aggregate_limbs,
+    verified_receipt,
+    writer_observation,
+)
 
 
 class NativeTargetLocalAttempt:
     """Bind one sealed attempt to supervised BCP and an exact-stage aggregate."""
+
+    _observation = staticmethod(writer_observation)
 
     def __init__(
         self,
@@ -26,31 +41,20 @@ class NativeTargetLocalAttempt:
         unknown_error: type[Exception],
         verify_file: Callable[[Any], None],
         retirement_timeout_seconds: int = 3600,
+        *,
+        timeout_seconds: int | None = None,
+        max_row_bytes: int | None = None,
+        clock: Callable[[], float] = time.monotonic,
     ) -> None:
         self.journal, self.custody, self.writer, self.barrier = journal, custody, writer, barrier
         self.unknown_error = unknown_error
         self.verify_file = verify_file
         self.retirement_timeout_seconds = retirement_timeout_seconds
-
-    @staticmethod
-    def _observation(
-        outcome: str,
-        consumed: int | None,
-        *,
-        quiescence: str = "unverified",
-        row_count: int | None = None,
-        limbs: list[str] | None = None,
-        diagnostic: str = "mssql_native.writer_observed",
-    ) -> dict[str, Any]:
-        return dict(
-            writer_outcome=outcome,
-            input_rows_consumed=consumed,
-            row_count=row_count,
-            count_overflow=False if row_count is not None else None,
-            limbs=limbs,
-            quiescence=quiescence,
-            diagnostic_code=diagnostic,
-        )
+        self.timeout_seconds = retirement_timeout_seconds if timeout_seconds is None else timeout_seconds
+        self.max_row_bytes = max_row_bytes
+        self.clock = clock
+        if type(self.timeout_seconds) is not int or self.timeout_seconds < 1:
+            raise ValueError("mssql_native.invalid_writer_timeout")
 
     def import_file(self, importer: Any, plan: Any, file: Any, attempt_id: str, lease: Any, artifact: Any) -> Any:
         """Append proof only after its real stage, process, and SQL boundary."""
@@ -76,16 +80,7 @@ class NativeTargetLocalAttempt:
             self.journal.append_event(file.ordinal, attempt_id, "STAGE_OWNED", stage_binding=stage)
             self.custody.reassert_grant(lease, identity.invocation_key)
             grant_token_sha256 = sha256(secrets.token_bytes(32)).hexdigest()
-            grant = NativeStageWriteGrant(
-                attempt_id,
-                qualified,
-                file.path,
-                file.rows,
-                file.encoded_bytes,
-                file.file_sha256,
-                grant_token_sha256,
-                identity.writer_proof_capability,
-            )
+            grant = self._grant(importer, file, attempt_id, qualified, stage, grant_token_sha256)
             writer_binding = dict(
                 import_backend=identity.import_backend,
                 writer_proof_capability=identity.writer_proof_capability,
@@ -100,16 +95,25 @@ class NativeTargetLocalAttempt:
                 rejects = Path(directory) / "rejects.txt"
                 self.journal.append_event(file.ordinal, attempt_id, "WRITING")
                 try:
-                    outcome = self.writer.write(grant, rejects_path=rejects)
+                    if identity.writer_proof_capability == SQLCLIENT_SESSION_PROOF:
+                        outcome = self.writer.write(
+                            grant,
+                            deadline=OperationDeadline(float(self.clock() + self.timeout_seconds), clock=self.clock),
+                        )
+                    else:
+                        outcome = self.writer.write(grant, rejects_path=rejects)
                 except Exception:
                     self.journal.append_event(
                         file.ordinal,
                         attempt_id,
                         "UNKNOWN",
-                        observation=self._observation("custody_lost", None, diagnostic="mssql_native.writer_uncertain"),
+                        observation=writer_observation(
+                            "custody_lost", None, diagnostic="mssql_native.writer_uncertain"
+                        ),
                     )
                     raise
-            observed = self._observation(outcome.classification, outcome.rows_consumed)
+            consumed = getattr(outcome, "input_rows_consumed", getattr(outcome, "rows_consumed", None))
+            observed = writer_observation(outcome.classification, consumed)
             if outcome.classification == "failure":
                 self.journal.append_event(file.ordinal, attempt_id, "WRITER_TERMINAL", observation=observed)
             if not outcome.positive_terminal:
@@ -117,16 +121,25 @@ class NativeTargetLocalAttempt:
                 raise self.unknown_error("mssql_native.writer_outcome_unknown")
             self.journal.append_event(file.ordinal, attempt_id, "WRITER_TERMINAL", observation=observed)
             try:
-                with self.barrier(
-                    qualified, lambda: importer._assert_stage_identity(plan, attempt_id, table, object_id)
-                ):
+                barrier = (
+                    self.barrier(
+                        qualified,
+                        grant_token_sha256,
+                        lambda: importer._assert_stage_identity(plan, attempt_id, table, object_id),
+                    )
+                    if identity.writer_proof_capability == SQLCLIENT_SESSION_PROOF
+                    else self.barrier(
+                        qualified, lambda: importer._assert_stage_identity(plan, attempt_id, table, object_id)
+                    )
+                )
+                with barrier:
                     digest, aggregate = importer._target_digest(table, file)
             except Exception:
                 self.journal.append_event(
                     file.ordinal,
                     attempt_id,
                     "UNKNOWN",
-                    observation=self._observation(
+                    observation=writer_observation(
                         "success", file.rows, quiescence="failed", diagnostic="mssql_native.stage_observation_failed"
                     ),
                 )
@@ -135,22 +148,68 @@ class NativeTargetLocalAttempt:
                 file.ordinal,
                 attempt_id,
                 "QUIESCENT",
-                observation=self._observation("success", file.rows, quiescence="proved"),
+                observation=writer_observation("success", file.rows, quiescence="proved"),
             )
             self.journal.append_event(
                 file.ordinal,
                 attempt_id,
                 "VERIFIED",
-                observation=self._observation(
+                observation=writer_observation(
                     "success",
                     file.rows,
                     quiescence="proved",
                     row_count=digest.rows,
-                    limbs=[str(value) for value in aggregate[2:]],
+                    limbs=aggregate_limbs(digest, aggregate),
                     diagnostic="mssql_native.verified",
                 ),
             )
-            return importer._receipt(plan, file, attempt_id, object_id, digest.typed_sum, artifact)
+            return verified_receipt(importer, plan, file, attempt_id, object_id, digest, artifact)
+
+    def _grant(
+        self,
+        importer: Any,
+        file: Any,
+        attempt_id: str,
+        qualified: str,
+        stage: dict[str, Any],
+        grant_token_sha256: str,
+    ) -> Any:
+        identity = self.journal.identity
+        if identity.writer_proof_capability != SQLCLIENT_SESSION_PROOF:
+            return NativeStageWriteGrant(
+                attempt_id,
+                qualified,
+                file.path,
+                file.rows,
+                file.encoded_bytes,
+                file.file_sha256,
+                grant_token_sha256,
+                identity.writer_proof_capability,
+            )
+        if type(self.max_row_bytes) is not int or self.max_row_bytes < 1:
+            raise ValueError("mssql_native.max_row_bytes_required")
+        columns = tuple(
+            NativeStageColumnMapping(index, column.name, dtype, column.nullable)
+            for index, (column, dtype) in enumerate(zip(importer.columns, importer._types, strict=True))
+        )
+        return NativeStageWriteRequest(
+            attempt_id=attempt_id,
+            qualified_stage=qualified,
+            stage_id_sha256=stage["stage_id"],
+            owner_binding_sha256=stage["owner_binding_sha256"],
+            object_id=stage["object_id"],
+            schema_sha256=stage["schema_sha256"],
+            file_path=file.path,
+            expected_rows=file.rows,
+            encoded_bytes=file.encoded_bytes,
+            max_row_bytes=min(self.max_row_bytes, max(1, file.encoded_bytes)),
+            file_sha256=file.file_sha256,
+            grant_token_sha256=grant_token_sha256,
+            proof_capability=identity.writer_proof_capability,
+            wire_layout_sha256=identity.capability_layout_sha256,
+            columns=columns,
+            layout_version=2 if getattr(importer, "_persisted_hash_layout", False) else 1,
+        )
 
     def inspect(self, importer: Any, plan: Any, receipt: Any, lease: Any) -> Any:
         """Repeat exact-stage aggregate verification without business-row reads."""
@@ -160,13 +219,31 @@ class NativeTargetLocalAttempt:
         if type(object_id) is not int or object_id < 1:
             raise ValueError("mssql_native.stage_identity_mismatch")
         importer._assert_lease(lease)
-        with self.barrier(
-            receipt.stage_id,
-            lambda: importer._assert_stage_identity(plan, receipt.attempt_id, table, object_id),
-        ):
-            observed = importer._verify_contents(table, receipt.rows, receipt.typed_digest)
-            if part.get("native_typed_sum") != observed:
-                raise ValueError("mssql_native.typed_digest_mismatch")
+
+        def check() -> None:
+            importer._assert_stage_identity(plan, receipt.attempt_id, table, object_id)
+
+        if self.journal.identity.writer_proof_capability == SQLCLIENT_SESSION_PROOF:
+            events = self.journal.data["events"][receipt.attempt_id]
+            boundary = self.barrier(
+                receipt.stage_id,
+                events[-1]["writer_binding"]["grant_token_sha256"],
+                check,
+            )
+        else:
+            boundary = self.barrier(receipt.stage_id, check)
+        with boundary:
+            if getattr(importer, "_persisted_hash_layout", False):
+                observed = importer._repeat_mutation_watermark(table, receipt.rows)
+                if (
+                    part.get("native_stage_layout") != "mssql-native-persisted-hash-v2"
+                    or part.get("native_mutation_watermark") != observed.mutation_watermark
+                ):
+                    raise ValueError("mssql_native.stage_mutation_detected")
+            else:
+                observed_sum = importer._verify_contents(table, receipt.rows, receipt.typed_digest)
+                if part.get("native_typed_sum") != observed_sum:
+                    raise ValueError("mssql_native.typed_digest_mismatch")
         return receipt
 
     def recover_positive(self, importer: Any, plan: Any, file: Any, attempt_id: str, lease: Any) -> Any:
@@ -192,21 +269,69 @@ class NativeTargetLocalAttempt:
 
         def observe() -> tuple[dict[str, Any], Any]:
             digest, aggregate = importer._target_digest(table, file)
-            observation = self._observation(
+            observation = writer_observation(
                 "success",
                 file.rows,
                 quiescence="proved",
                 row_count=digest.rows,
-                limbs=[str(value) for value in aggregate[2:]],
+                limbs=aggregate_limbs(digest, aggregate),
                 diagnostic="mssql_native.verified",
             )
-            receipt = importer._receipt(plan, file, attempt_id, object_id, digest.typed_sum, artifact)
+            receipt = verified_receipt(importer, plan, file, attempt_id, object_id, digest, artifact)
             return observation, receipt
 
-        return self.journal.recover_bcp_verified(
+        terminal = events[-1]
+        grant_token_sha256 = terminal["writer_binding"]["grant_token_sha256"]
+        if self.journal.identity.writer_proof_capability == SQLCLIENT_SESSION_PROOF:
+            barrier = partial(self.barrier, qualified, grant_token_sha256, assert_identity)
+            observed_digest: Any = None
+            observed_aggregate: tuple[Any, ...] | None = None
+
+            def observe_sqlclient() -> dict[str, Any]:
+                nonlocal observed_digest, observed_aggregate
+                observed_digest, observed_aggregate = importer._target_digest_observation(table, file.rows)
+                return writer_observation(
+                    "success" if observed_digest.rows == file.rows else "failure",
+                    file.rows if observed_digest.rows == file.rows else None,
+                    quiescence="proved",
+                    row_count=observed_digest.rows,
+                    limbs=aggregate_limbs(observed_digest, observed_aggregate),
+                    diagnostic="mssql_native.sqlclient_reconciled",
+                )
+
+            def observe_sqlclient_verified() -> tuple[dict[str, Any], Any]:
+                observation = observe_sqlclient()
+                if observed_digest.typed_digest != file.typed_digest:
+                    raise ValueError("mssql_native.typed_digest_mismatch")
+                receipt = verified_receipt(importer, plan, file, attempt_id, object_id, observed_digest, artifact)
+                return observation, receipt
+
+            try:
+                return self.journal.recover_sqlclient_verified(
+                    file.ordinal,
+                    attempt_id,
+                    barrier=barrier,
+                    observe=observe_sqlclient_verified,
+                )
+            except ValueError as error:
+                if str(error) != "mssql_native.typed_digest_mismatch" or observed_digest is None:
+                    raise
+                if observed_digest.rows >= file.rows:
+                    raise
+            self.journal.observe_sqlclient_partial(
+                file.ordinal,
+                attempt_id,
+                barrier=barrier,
+                observe=observe_sqlclient,
+            )
+            return None
+        else:
+            barrier = partial(self.barrier, qualified, assert_identity)
+            recover = self.journal.recover_bcp_verified
+        return recover(
             file.ordinal,
             attempt_id,
-            barrier=lambda: self.barrier(qualified, assert_identity),
+            barrier=barrier,
             observe=observe,
         )
 

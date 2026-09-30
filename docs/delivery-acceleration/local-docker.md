@@ -39,6 +39,7 @@ manifests, command arguments, evidence or shell history:
 | `DPONE_IT_MSSQL_USER`, `DPONE_IT_MSSQL_PASSWORD` | Approved target credentials |
 | `DPONE_IT_MSSQL_BCP_PATH` | Installed BCP executable |
 | `DPONE_IT_MSSQL_TRUST_SERVER_CERTIFICATE` | Disposable self-signed TLS setting |
+| `DPONE_IT_MSSQL_MEMORY_LIMIT_MB` | SQL Server memory cap; defaults to 3072 MiB so wide-route tests cannot exhaust the Docker VM |
 | `DPONE_DDA_SPOOL_ROOT` | Durable private directory outside both source checkouts |
 
 Install the selected subject's native connector dependencies and keep the

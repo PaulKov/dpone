@@ -98,3 +98,7 @@ New ADRs should include status, context, decision, consequences, and links to re
 - [ADR 0074: Declarative replay uses guarded target completion (Accepted)](adr/0074-declarative-replay-target-completion.md)
 
 - [ADR 0075: Govern MSSQL columnar range parallelism with one publication barrier (Accepted)](adr/0075-mssql-columnar-range-parallelism.md)
+
+- [ADR 0076: SqlClient bulk loading uses a closed optional companion boundary (Accepted)](adr/0076-mssql-sqlclient-companion-boundary.md)
+
+- [ADR 0077: MSSQL persisted-hash stages use a versioned physical identity (Accepted)](adr/0077-mssql-persisted-hash-layout-v2.md)

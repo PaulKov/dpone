@@ -20,7 +20,7 @@ def test_pyproject_declares_public_oss_metadata() -> None:
     project = _pyproject()["project"]
 
     assert project["name"] == "dpone"
-    assert project["version"] == "0.87.4"
+    assert project["version"] == "0.88.0"
     assert project["license"] == "Apache-2.0"
     assert project["authors"] == [{"name": "PaulKov"}]
     assert project["maintainers"] == [{"name": "PaulKov"}]
@@ -34,7 +34,7 @@ def test_pyproject_exposes_public_vault_and_full_extras() -> None:
     extras = _pyproject()["project"]["optional-dependencies"]
 
     assert extras["vault"] == ["vault-kv-client>=0.1.0,<0.2.0"]
-    assert extras["accel"] == ["dpone-native-accel==0.87.4"]
+    assert extras["accel"] == ["dpone-native-accel==0.88.0"]
     assert "vault-client" not in "\n".join(extras["vault"])
 
     full = set(extras["full"])
@@ -277,6 +277,8 @@ def test_github_actions_cover_ci_and_pypi_release() -> None:
     assert "uv run coverage xml" in ci_steps
     assert "uv build" in ci_steps
     assert "uv build packages/apache-airflow-providers-dpone --out-dir dist" in ci_steps
+    assert "uv build packages/dpone-mssql-sqlclient --out-dir dist" in ci_steps
+    assert "actions/setup-dotnet@" in ci_steps
     assert "coverage.xml" in ci_steps
 
     release_on = release[True]
@@ -295,6 +297,8 @@ def test_github_actions_cover_ci_and_pypi_release() -> None:
     release_steps = "\n".join(str(step) for step in release["jobs"]["github-release"]["steps"])
     assert "uv build" in build_steps
     assert "uv build packages/apache-airflow-providers-dpone --out-dir dist" in build_steps
+    assert "uv build packages/dpone-mssql-sqlclient --out-dir dist" in build_steps
+    assert "actions/setup-dotnet@" in build_steps
     assert "uv run twine check dist/*" in build_steps
     assert "pypa/gh-action-pypi-publish" not in publish_steps
     assert "dpone-release-controller/.github/workflows/pypi-release.yml" in publish_steps

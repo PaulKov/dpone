@@ -6,7 +6,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from dpone.contracts.mssql_native_chunks import NativeChunkLimits
-from dpone.contracts.mssql_native_verification import NativeVerificationBackend
+from dpone.contracts.mssql_native_verification import NativeImportBackend, NativeVerificationBackend
 from dpone.contracts.rolling_window import FrozenRollingWindow, RollingWindowSpec
 
 
@@ -65,6 +65,30 @@ def native_verification_backend(config: Any) -> NativeVerificationBackend:
     return NativeVerificationBackend.parse(value)
 
 
+def native_import_backend(config: Any) -> NativeImportBackend:
+    """Resolve the closed writer selector while keeping omission on BCP."""
+    execution = _native(config).get("execution")
+    if not isinstance(execution, Mapping):
+        raise ValueError("mssql_native.execution_required")
+    if "import_backend" not in execution:
+        return NativeImportBackend.BCP
+    value = execution["import_backend"]
+    if value is None:
+        raise ValueError("mssql_native.invalid_import_backend")
+    return NativeImportBackend.parse(value)
+
+
+def native_sqlclient_layout_version(config: Any) -> int:
+    """Resolve the explicit SqlClient physical layout, preserving v1 on omission."""
+    execution = _native(config).get("execution")
+    if not isinstance(execution, Mapping):
+        raise ValueError("mssql_native.execution_required")
+    value = execution.get("layout_version", 1)
+    if type(value) is not int or value not in {1, 2}:
+        raise ValueError("mssql_native.invalid_layout_version")
+    return value
+
+
 def native_window(config: Any) -> FrozenRollingWindow | None:
     """Freeze authored scope against the supplied execution interval, never wall time."""
     strategy = getattr(config.load_strategy, "value", config.load_strategy)
@@ -96,7 +120,20 @@ def validate_native_config(config: Any) -> None:
     if options.get("source_type") != "clickhouse" or options.get("sink_type") != "mssql":
         raise ValueError("mssql_native.route_unsupported")
     native_limits(config)
-    native_verification_backend(config)
+    verifier = native_verification_backend(config)
+    importer = native_import_backend(config)
+    layout_version = native_sqlclient_layout_version(config)
+    if importer is NativeImportBackend.MSSQL_SQLCLIENT and verifier is not NativeVerificationBackend.TARGET_LOCAL:
+        raise ValueError("mssql_native.sqlclient_requires_target_local_verification")
+    execution = value.get("execution")
+    if (
+        isinstance(execution, Mapping)
+        and "layout_version" in execution
+        and importer is not NativeImportBackend.MSSQL_SQLCLIENT
+    ):
+        raise ValueError("mssql_native.layout_requires_sqlclient")
+    if layout_version == 2 and importer is not NativeImportBackend.MSSQL_SQLCLIENT:
+        raise ValueError("mssql_native.layout_requires_sqlclient")
     native_window(config)
     unsupported = (
         "query",

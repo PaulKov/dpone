@@ -37,6 +37,9 @@ class BatchManifestCompiler:
         root_naming = self._merge_dict_templates(raw.get("naming") or {})
         root_defaults = self._ensure_dict(raw.get("defaults") or {}, "defaults", manifest_path)
         self._ensure_quality_mapping(root_defaults, "defaults.quality", manifest_path)
+        if "runtime" in raw:
+            root_runtime = self._ensure_dict(raw["runtime"], "runtime", manifest_path)
+            root_defaults = {**root_defaults, "runtime": root_runtime}
         root_quality: dict[str, Any] | None = None
         if "quality" in raw:
             root_quality = self._quality_mapping(raw["quality"], "quality", manifest_path)

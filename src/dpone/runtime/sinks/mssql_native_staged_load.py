@@ -13,6 +13,7 @@ from typing import Any
 from uuid import uuid4
 
 from dpone.config.load_strategy import LoadStrategy
+from dpone.runtime.etl.mssql_operation_lease import LEASE_OPTION
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.strategies.mssql.mssql_transaction_finalizer import (
@@ -46,6 +47,25 @@ class _OwnedStage:
     status: str = "prepared"
 
 
+def _snapshot_config(load_config: Any) -> Any:
+    """Freeze publication inputs while retaining the live lease controller identity.
+
+    The lease controller is an injected runtime service whose equality is based
+    on object identity.  Deep-copying it manufactures a false configuration
+    change even when every authored and admitted value is unchanged.
+    """
+
+    options = getattr(load_config, "options", None)
+    runtime_identities = (
+        [] if not isinstance(options, dict) else [value for value in options.values() if type(value) is object]
+    )
+    lease = options.get(LEASE_OPTION) if isinstance(options, dict) else None
+    if lease is not None:
+        runtime_identities.append(lease)
+    memo = {id(value): value for value in runtime_identities}
+    return deepcopy(load_config, memo)
+
+
 class MssqlNativeStagedLoadService:
     """Keep stage ownership and finalization state behind one sink instance."""
 
@@ -68,7 +88,7 @@ class MssqlNativeStagedLoadService:
             staged_rows=artifact.row_count,
             metadata={"mssql_native_owner": token, "transport": "mssql_native"},
         )
-        self._owned[token] = _OwnedStage(deepcopy(load_config), handle, prepared)
+        self._owned[token] = _OwnedStage(_snapshot_config(load_config), handle, prepared)
         return handle
 
     def finalize(self, load_config: Any, handle: StagedLoadHandle) -> LoadResult:
@@ -122,6 +142,9 @@ class MssqlNativeStagedLoadService:
 
     def resume(self, load_config: Any, context: Any, admission: Any) -> StagedLoadHandle | LoadResult | None:
         """Probe publication first; no source or target stage read after commit."""
+        from dpone.runtime.sinks.mssql_native_completed_payload import authenticate_recovery_admission
+
+        admission = authenticate_recovery_admission(context, admission)
         from dpone.runtime.sinks.load_result import AtomicCommitOutcome
         from dpone.runtime.sinks.mssql_receipt_projection import load_result_from_mssql_receipt
         from dpone.runtime.sinks.strategies.mssql.mssql_transaction_finalization_evidence import (

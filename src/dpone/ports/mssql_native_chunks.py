@@ -3,7 +3,13 @@
 from typing import Protocol
 
 from dpone.contracts.bounded_window import WindowLease
-from dpone.contracts.mssql_native_chunks import EncodedNativeFile, NativeChunkPlan, NativeChunkReceipt
+from dpone.contracts.mssql_native_chunks import (
+    EncodedNativeFile,
+    NativeChunkLimits,
+    NativeChunkPlan,
+    NativeChunkReceipt,
+    NativeStageComplete,
+)
 
 
 class NativeChunkImporter(Protocol):
@@ -18,3 +24,13 @@ class NativeChunkImporter(Protocol):
     def settle(self, plan: NativeChunkPlan, attempt_id: str, lease: WindowLease) -> None: ...
 
     def allocated_bytes(self) -> int: ...
+
+
+__all__ = [
+    "EncodedNativeFile",
+    "NativeChunkImporter",
+    "NativeChunkLimits",
+    "NativeChunkPlan",
+    "NativeChunkReceipt",
+    "NativeStageComplete",
+]
