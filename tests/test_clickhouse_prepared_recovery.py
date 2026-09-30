@@ -45,6 +45,7 @@ class Catalog:
         self.candidate = _identity("new")
         self.rows = 2
         self.published = False
+        self.cleaned = False
         self.missing_host = False
 
     def inventory(self, cluster: str) -> ClusterInventory:
@@ -60,7 +61,7 @@ class Catalog:
         self, cluster: str, database: str, target: str, candidate: str, hosts: tuple[str, ...]
     ) -> tuple[ReplicaGeneration, ...]:
         target_identity, candidate_identity = (
-            (self.candidate, self.target) if self.published else (self.target, self.candidate)
+            (self.candidate, None if self.cleaned else self.target) if self.published else (self.target, self.candidate)
         )
         observed_hosts = hosts[:1] if self.missing_host else hosts
         return tuple(
@@ -70,8 +71,11 @@ class Catalog:
 
 class Authority:
     def __init__(self, record: AuthorityRecord) -> None:
-        self.current = VersionedAuthorityRecord(record, 1)
+        self.current = VersionedAuthorityRecord(record, 0)
         self.mutations = 0
+
+    def supports_linearizable_dispatch_permit(self) -> bool:
+        return True
 
     def read_versioned(self, target_key: str) -> VersionedAuthorityRecord:
         return self.current
@@ -127,7 +131,7 @@ def _plan(catalog: Catalog, authority: Authority, ddl: Ddl):
         database="analytics",
         target="target",
         operation_id="original-operation",
-        expected_version=1,
+        expected_version=0,
         operation_started_at=datetime(2026, 9, 27, 10, 7, tzinfo=UTC),
     )
 
@@ -136,12 +140,15 @@ def test_plan_accepts_exact_prepared_generation() -> None:
     catalog, authority, ddl = _case()
     plan = _plan(catalog, authority, ddl)
     assert plan.operation_id == "original-operation"
-    assert plan.authority_version == 1
+    assert plan.authority_version == 0
     assert plan.candidate_identity == catalog.candidate
     assert plan.predecessor_identity == catalog.target
     assert plan.query_digest == "query-digest"
     assert plan.plan_digest
-    public = str(plan.to_public_dict())
+    public_payload = plan.to_public_dict()
+    assert public_payload["correlation_id"] == plan.token
+    assert public_payload["replica_summary"] == {"expected": 2, "candidate_ready": 2}
+    public = str(public_payload)
     assert "original-operation" not in public and "'new'" not in public and "'old'" not in public
     assert authority.mutations == ddl.dispatches == 0
 
@@ -176,6 +183,32 @@ def test_plan_rejects_legacy_prepared_origin() -> None:
     with pytest.raises(ClusterPublicationError, match="AUTHORITY_UNSAFE"):
         _plan(catalog, authority, ddl)
     assert authority.mutations == ddl.dispatches == 0
+
+
+def test_plan_rejects_noninitial_prepared_version_even_with_negative_logs() -> None:
+    catalog, authority, ddl = _case()
+    authority.current = replace(authority.current, version=1)
+    with pytest.raises(ClusterPublicationError, match="AUTHORITY_UNSAFE"):
+        plan_prepared_recovery(
+            catalog,
+            authority,
+            ddl,
+            cluster="cluster",
+            database="analytics",
+            target="target",
+            operation_id="original-operation",
+            expected_version=1,
+            operation_started_at=datetime(2026, 9, 27, 10, 7, tzinfo=UTC),
+        )
+    assert ddl.dispatches == 0
+
+
+def test_plan_rejects_unadmitted_authority_even_with_negative_logs() -> None:
+    catalog, authority, ddl = _case()
+    authority.supports_linearizable_dispatch_permit = lambda: False  # type: ignore[method-assign]
+    with pytest.raises(ClusterPublicationError, match="AUTHORITY_UNSAFE"):
+        _plan(catalog, authority, ddl)
+    assert ddl.dispatches == 0
 
 
 def test_plan_rejects_foreign_operation() -> None:
@@ -328,6 +361,7 @@ class RecoveryDdl(Ddl):
         super().__init__()
         self.catalog = catalog
         self.raise_after_dispatch = False
+        self.queue_failed = False
         self.last_token: str | None = None
 
     def dispatch_publication(self, record: AuthorityRecord, permit: DispatchPermit, *, cluster: str) -> None:
@@ -343,7 +377,12 @@ class RecoveryDdl(Ddl):
                 "query-1",
                 "query-digest",
                 token,
-                tuple(QueueHostResult(host, "Finished", 0, "") for host in self.catalog.inventory_value.hosts),
+                tuple(
+                    QueueHostResult(
+                        host, "Finished", 1 if self.queue_failed else 0, "failed" if self.queue_failed else ""
+                    )
+                    for host in self.catalog.inventory_value.hosts
+                ),
             ),
         )
 
@@ -352,8 +391,9 @@ class RecoveryDdl(Ddl):
 
 
 class RecoveryPublication:
-    def __init__(self, authority: MutationAuthority) -> None:
+    def __init__(self, authority: MutationAuthority, catalog: Catalog) -> None:
         self.authority = authority
+        self.catalog = catalog
 
     def reconcile(self, current: VersionedAuthorityRecord, cluster: str) -> ClusterFullRefreshReceipt:
         committed = replace(current.record, phase=AuthorityPhase.COMMITTED, ddl_entry="query-1")
@@ -361,6 +401,7 @@ class RecoveryPublication:
         return ClusterFullRefreshReceipt.from_authority(self.authority.current, cluster)
 
     def cleanup(self, receipt: ClusterFullRefreshReceipt) -> None:
+        self.catalog.cleaned = True
         current = self.authority.current
         self.authority.current = VersionedAuthorityRecord(
             replace(current.record, phase=AuthorityPhase.COMPLETED), current.version + 1
@@ -372,13 +413,14 @@ def _execution_case(*, strict: bool = True):
     authority = MutationAuthority(initial.current.record, strict=strict)
     ddl = RecoveryDdl(catalog)
     plan = _plan(catalog, authority, ddl)
-    publication = RecoveryPublication(authority)
+    publication = RecoveryPublication(authority, catalog)
     service = PreparedRecoveryService(catalog, authority, ddl, publication.reconcile, publication.cleanup)
     return plan, service, authority, ddl
 
 
 def test_execute_refuses_legacy_authority() -> None:
-    plan, service, authority, ddl = _execution_case(strict=False)
+    plan, service, authority, ddl = _execution_case()
+    authority.strict = False
     with pytest.raises(ClusterPublicationError, match="AUTHORITY_UNSAFE"):
         service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
     assert authority.mutations == ddl.dispatches == 0
@@ -408,6 +450,17 @@ def test_execute_strict_winner_dispatches_once_and_returns_original_receipt() ->
     assert ddl.dispatches == 1
     assert receipt.authority.operation_id == plan.operation_id
     assert authority.current.record.phase is AuthorityPhase.COMPLETED
+
+
+def test_execute_and_replay_reject_terminal_failed_ddl_consistently() -> None:
+    plan, service, authority, ddl = _execution_case()
+    ddl.queue_failed = True
+    with pytest.raises(ClusterPublicationError, match="PUBLICATION_UNKNOWN"):
+        service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert authority.current.record.phase is AuthorityPhase.COMPLETED
+    with pytest.raises(ClusterPublicationError, match="PUBLICATION_UNKNOWN"):
+        service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert ddl.dispatches == 1
 
 
 def test_crash_after_cas_reconciles_without_redispatch() -> None:
@@ -444,6 +497,16 @@ def test_completed_replay_rejects_missing_replica() -> None:
     plan, service, authority, ddl = _execution_case()
     service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
     service.catalog.missing_host = True
+    with pytest.raises(ClusterPublicationError, match="PUBLICATION_UNKNOWN"):
+        service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert authority.current.record.phase is AuthorityPhase.COMPLETED
+    assert ddl.dispatches == 1
+
+
+def test_completed_replay_rejects_residual_predecessor() -> None:
+    plan, service, authority, ddl = _execution_case()
+    service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    service.catalog.cleaned = False
     with pytest.raises(ClusterPublicationError, match="PUBLICATION_UNKNOWN"):
         service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
     assert authority.current.record.phase is AuthorityPhase.COMPLETED

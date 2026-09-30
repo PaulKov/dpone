@@ -24,7 +24,7 @@ def _args(*, action: str = "plan", confirmation: str | None = None, plan_file: s
         database="analytics",
         target="target",
         operation_id="original-operation",
-        authority_version=1,
+        authority_version=0,
         operation_started_at=datetime(2026, 9, 27, 10, 7, tzinfo=UTC).isoformat(),
         confirmation_digest=confirmation,
         format="json",
@@ -41,7 +41,10 @@ class _Runtime:
         if self.error:
             raise self.error
         return SimpleNamespace(
-            plan_digest="safe-digest", to_public_dict=lambda: {"status": "ready", "plan_digest": "safe-digest"}
+            plan_digest="safe-digest",
+            token="safe-correlation",
+            replica_count=2,
+            to_public_dict=lambda: {"status": "ready", "plan_digest": "safe-digest"},
         )
 
     def execute(self, plan: object, *, confirmation_digest: str):
@@ -77,6 +80,25 @@ def test_execute_requires_matching_digest(monkeypatch: pytest.MonkeyPatch, capsy
     assert code == 2
     assert runtime.executions == 0
     assert "original-operation" not in capsys.readouterr().out
+
+
+def test_execute_reports_replica_summary_without_operation_id(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    runtime = _Runtime()
+    monkeypatch.setattr(prepared_recovery_cmd, "build_prepared_recovery_runtime", lambda args: runtime)
+    assert (
+        prepared_recovery_cmd.cmd_prepared_recovery(
+            _args(action="execute", confirmation="safe-digest"), ctx=None, logger=logging.getLogger(__name__)
+        )
+        == 0
+    )
+    output = capsys.readouterr().out
+    payload = json.loads(output)
+    assert payload["replica_summary"] == {"expected": 2, "published": 2}
+    assert payload["correlation_id"] == "safe-correlation"
+    assert "original-operation" not in output
+    assert runtime.executions == 1
 
 
 def test_safety_block_exits_two(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:

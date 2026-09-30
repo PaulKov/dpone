@@ -69,7 +69,14 @@ def cmd_prepared_recovery(args: argparse.Namespace, *, ctx: object, logger: logg
             write_json({"status": "blocked", "code": "DPONE_CLICKHOUSE_CLUSTER_RECOVERY_PLAN_CHANGED"})
             return 2
         receipt = runtime.execute(plan, confirmation_digest=args.confirmation_digest)
-        write_json({"status": "completed", "operation_digest": digest_payload(receipt.authority.operation_id)})
+        write_json(
+            {
+                "status": "completed",
+                "operation_digest": digest_payload(receipt.authority.operation_id),
+                "correlation_id": plan.token,
+                "replica_summary": {"expected": plan.replica_count, "published": plan.replica_count},
+            }
+        )
         return 0
     except ClusterPublicationError as exc:
         write_json({"status": "blocked", "code": exc.code})

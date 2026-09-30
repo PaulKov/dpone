@@ -16,8 +16,11 @@ read and no new candidate is created by the command.
    ReplicatedReplacingMergeTree with a version column is **not** sufficient.
 3. Confirm all candidate rows, schemas, target/predecessor generations and
    replica health are unchanged. The preflight independently checks them.
-4. Ensure `system.query_log` covers the entire interval from before the
-   operation start on every replica. A queue lookup alone is insufficient.
+4. Check `system.query_log` for a pre-start event on every replica, enabled
+   logging now, and no matching DDL in query history, processes or queue.
+   These are negative corroboration only: retained logs do not by themselves
+   prove continuous historical logging. The strict initial-version authority
+   and approved all-writer cutover provide the durable no-dispatch argument.
 5. Use a logical `connection_ref` in the binding-set/connection registry;
    never put passwords on the CLI. The standalone command supports normal
    projected credentials. A Vault-only reference without its pinned runtime
@@ -37,7 +40,7 @@ dpone ops clickhouse-prepared-recovery plan \
   --binding-set binding-set.yaml --connection-registry connection-registry.yaml \
   --connection-ref analytics_sink --cluster analytics_cluster \
   --database analytics --target daily_fact --operation-id original-operation-id \
-  --authority-version 1 --operation-started-at 2026-09-30T08:00:00+00:00 \
+  --authority-version 0 --operation-started-at 2026-09-30T08:00:00+00:00 \
   --plan-file ./prepared-recovery-plan.json --format json
 ```
 
@@ -51,7 +54,7 @@ dpone ops clickhouse-prepared-recovery execute \
   --binding-set binding-set.yaml --connection-registry connection-registry.yaml \
   --connection-ref analytics_sink --cluster analytics_cluster \
   --database analytics --target daily_fact --operation-id original-operation-id \
-  --authority-version 1 --operation-started-at 2026-09-30T08:00:00+00:00 \
+  --authority-version 0 --operation-started-at 2026-09-30T08:00:00+00:00 \
   --plan-file ./prepared-recovery-plan.json \
   --confirmation-digest '<digest from plan>' --format json
 ```

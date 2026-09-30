@@ -13,10 +13,14 @@ not provide a linearizable compare-and-swap permit across workers.
 ## Decision
 
 Recovery is a separate operator workflow for the **same** operation. Its plan
-requires the exact authority version and identity, unchanged healthy candidate
-and predecessor generations on every replica, matching row counts, complete
-query-log coverage from the authenticated operation start time, and no matching
-DDL in logs, running processes, or distributed queue. Zero-row and unverified
+requires an admitted strict authority's initial KeeperMap version (`0`) still
+in `PREPARED` with dispatch epoch `0`. Under a completed all-writer cutover,
+that durable linearizable state proves no managed writer received a dispatch
+permit. It also requires unchanged healthy candidate and predecessor generations
+on every replica, matching row counts, and no matching DDL in available logs,
+running processes, or distributed queue. A pre-start query-log event and the
+current logging setting are corroboration, **not** proof of continuous logging.
+Zero-row and unverified
 quality-evidence cases remain blocked. The plan is stored in an owner-private
 file and confirmed by digest before execution.
 
