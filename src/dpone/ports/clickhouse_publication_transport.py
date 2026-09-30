@@ -9,6 +9,7 @@ from dpone.contracts.clickhouse_authority import (
     OperationBinding,
     TransportState,
 )
+from dpone.contracts.clickhouse_native_publication import NativePublicationCompletion, NativePublicationRequest
 from dpone.contracts.clickhouse_publication import JournalEntry
 
 
@@ -34,3 +35,9 @@ class PublicationExclusion(Protocol):
     """Hold across dispatch/closure, not merely across a SQLite transaction."""
 
     def hold(self, operation_id: str) -> AbstractContextManager[ExecutionSession]: ...
+
+
+class NativePublicationTransport(Protocol):
+    """One synchronous fixed statement; return only positive terminal proof."""
+
+    def execute(self, request: NativePublicationRequest) -> NativePublicationCompletion: ...
