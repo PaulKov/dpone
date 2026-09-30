@@ -302,10 +302,9 @@ def test_release_sensitive_workflow_blobs_match_pr3a_implementation_base() -> No
         # v0.88.0 adds the pinned .NET toolchain and the fifth SqlClient
         # wheel/sdist pair to the immutable source-tag candidate set.
         "release.yml": "8822df1bc2b2b456bb736434895d66055649096e",
-        # v0.87.3 adds a fail-closed pip/Simple visibility barrier before the
-        # immutable Docker candidate build; this intentionally supersedes the
-        # earlier PR3A byte freeze without changing privileged GHCR jobs.
-        "runtime-image.yml": "14e11d4eeb9bfaa1fe6efeb2d19268ea3a2a6d6b",
+        # Build all five release distributions with the pinned .NET SDK.
+        # Privileged GHCR jobs and the existing visibility barrier are unchanged.
+        "runtime-image.yml": "440bb1550ae87daab735deb53dedb3145a8fba5c",
         "certification-release-summary.yml": "a2454065619ceaa5ea4e75fb04f35c799cc9fb9c",
         "route-certification-release.yml": "c4eae6a78493e8bdbf180a802e94021b82c2f095",
         "route-release-finalize.yml": "7a2a6674ffd59c5fb494b7ab1583f85b90868db8",

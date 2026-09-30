@@ -346,6 +346,11 @@ jobs:
       - name: Install release verification dependencies
         run: uv sync --all-extras
 
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@d4c94342e560b34958eacfc5d055d21461ed1c5d # v5.0.0
+        with:
+          dotnet-version: "10.0.x"
+
       - name: Create runtime evidence directory
         env:
           RUNTIME_EVIDENCE_DIR: ${{ runner.temp }}/dpone-runtime-image
@@ -364,6 +369,7 @@ jobs:
           uv build packages/dpone-native-accel --out-dir dist
           uv build packages/dpone-airflow-pack --out-dir dist
           uv build packages/apache-airflow-providers-dpone --out-dir dist
+          uv build packages/dpone-mssql-sqlclient --out-dir dist
           rm -f dist/.gitignore
           version="${GITHUB_REF_NAME#v}"
           uv run python tools/pypi_release_smoke_dist.py \

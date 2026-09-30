@@ -712,6 +712,12 @@ def test_runtime_image_candidate_is_digest_only_and_fully_certified_before_promo
 
     candidate = _run(_step(build, "Build exact runtime candidate distributions"))
     assert "uv build packages/apache-airflow-providers-dpone --out-dir dist" in candidate
+    assert "uv build packages/dpone-mssql-sqlclient --out-dir dist" in candidate
+    setup_dotnet = _step(build, "Set up .NET SDK")
+    assert setup_dotnet["uses"] == "actions/setup-dotnet@d4c94342e560b34958eacfc5d055d21461ed1c5d"
+    assert setup_dotnet["with"]["dotnet-version"] == "10.0.x"
+    build_order = [step["name"] for step in build["steps"]]
+    assert build_order.index("Set up .NET SDK") < build_order.index("Build exact runtime candidate distributions")
     public_identity = _run(_step(build, "Verify exact public wheel and sdist identities"))
     assert "set -euo pipefail" in public_identity
     assert "pypi_release_smoke_dist.py" in public_identity

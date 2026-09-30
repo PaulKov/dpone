@@ -157,6 +157,7 @@ def _stream_sdist_metadata(
         member_count = 0
         names: set[str] = set()
         metadata: bytes | None = None
+        auxiliary: bytes | None = None
         top_level: str | None = None
         total = 0
         for member in archive:
@@ -181,11 +182,14 @@ def _stream_sdist_metadata(
                 raise fail("PYPI_PREPUBLICATION_ARCHIVE_MEMBER_SIZE_INVALID", package=package)
             budget.authorize(member)
             if parts[-1] == "PKG-INFO":
-                if len(parts) != 2:
+                is_auxiliary = (
+                    len(parts) == 4 and parts[1] == "src" and parts[2] == package.replace("-", "_") + ".egg-info"
+                )
+                if len(parts) != 2 and not is_auxiliary:
                     raise fail("PYPI_PREPUBLICATION_CORE_METADATA_AMBIGUOUS", package=package)
                 if not member.isfile():
                     raise fail("PYPI_PREPUBLICATION_CORE_METADATA_NONREGULAR", package=package)
-                if metadata is not None:
+                if (auxiliary if is_auxiliary else metadata) is not None:
                     raise fail("PYPI_PREPUBLICATION_CORE_METADATA_AMBIGUOUS", package=package)
                 _metadata_parent(parts[0], package=package, version=version)
                 if member.size > MAX_CORE_METADATA_BYTES:
@@ -194,10 +198,16 @@ def _stream_sdist_metadata(
                 if metadata_stream is None:
                     raise fail("PYPI_PREPUBLICATION_CORE_METADATA_NONREGULAR", package=package)
                 with metadata_stream:
-                    metadata = _bounded_metadata_read(metadata_stream, expected_size=member.size, package=package)
+                    value = _bounded_metadata_read(metadata_stream, expected_size=member.size, package=package)
+                if is_auxiliary:
+                    auxiliary = value
+                else:
+                    metadata = value
         if member_count == 0:
             raise fail("PYPI_PREPUBLICATION_ARCHIVE_MEMBER_COUNT_INVALID")
-        if metadata is None:
+        # Setuptools retains this generated copy in src-layout sdists. It is
+        # accepted only when byte-identical to the sole authoritative root.
+        if metadata is None or (auxiliary is not None and auxiliary != metadata):
             raise fail("PYPI_PREPUBLICATION_CORE_METADATA_AMBIGUOUS", package=package)
         return metadata
 
