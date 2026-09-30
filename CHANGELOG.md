@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Fixed
+
+- Build the SqlClient companion with the pinned .NET SDK in runtime-image
+  candidate verification so the complete five-distribution inventory is present.
+- Accept the byte-identical setuptools `src/*.egg-info/PKG-INFO` copy while
+  retaining a single authoritative sdist root metadata file and rejecting
+  conflicting, duplicate, or foreign metadata.
+
 ## 0.88.0 - 2026-09-30
 
 ### Added
