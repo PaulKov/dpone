@@ -74,7 +74,9 @@ _EXECUTION_FIELDS = {
     "encoding_parallelism",
     "retained_work_capacity",
     "container_memory_limit_bytes",
-    "container_peak_memory_bytes",
+    "container_memory_swap_limit_bytes",
+    "container_oom_kill_disabled",
+    "container_sampled_cache_adjusted_memory_bytes",
     "container_image_sha256",
 }
 _REQUIRED_EXECUTIONS = {
@@ -220,9 +222,11 @@ def _valid_executions(value: object, image_digest: object) -> bool:
                     "encoding_parallelism",
                     "retained_work_capacity",
                     "container_memory_limit_bytes",
-                    "container_peak_memory_bytes",
+                    "container_memory_swap_limit_bytes",
+                    "container_sampled_cache_adjusted_memory_bytes",
                 )
             )
+            or type(item["container_oom_kill_disabled"]) is not bool
             or not _valid_execution_resources(item)
         ):
             return False
@@ -255,7 +259,9 @@ def _valid_execution_resources(item: dict[str, Any]) -> bool:
         and item["encoding_parallelism"] == 2
         and item["retained_work_capacity"] == expected_capacity
         and item["container_memory_limit_bytes"] == 2 << 30
-        and 0 < item["container_peak_memory_bytes"] <= item["container_memory_limit_bytes"]
+        and item["container_memory_swap_limit_bytes"] == 2 << 30
+        and item["container_oom_kill_disabled"] is False
+        and 0 < item["container_sampled_cache_adjusted_memory_bytes"] <= item["container_memory_limit_bytes"]
     )
 
 

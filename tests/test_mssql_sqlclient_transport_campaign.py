@@ -132,7 +132,9 @@ def _runner(tmp_path: Path, commit: str, tree: str = "e" * 40, image: str = "f" 
                         "encoding_parallelism": 2,
                         "retained_work_capacity": max(2, parallelism) + 1,
                         "container_memory_limit_bytes": 2 << 30,
-                        "container_peak_memory_bytes": 512 << 20,
+                        "container_memory_swap_limit_bytes": 2 << 30,
+                        "container_oom_kill_disabled": False,
+                        "container_sampled_cache_adjusted_memory_bytes": 512 << 20,
                         "container_image_sha256": image,
                     }
                     for scenario, fixture, rows, layout, parallelism in (
@@ -179,7 +181,7 @@ def test_campaign_rejects_runner_with_untrusted_resource_evidence(tmp_path: Path
     root = _complete_dir(tmp_path, module, commit)
     runner = _runner(tmp_path, commit)
     payload = json.loads(runner.read_text(encoding="utf-8"))
-    payload["executions"][0]["container_peak_memory_bytes"] = 0
+    payload["executions"][0]["container_sampled_cache_adjusted_memory_bytes"] = 0
     runner.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(ValueError, match="invalid_runner_receipt"):

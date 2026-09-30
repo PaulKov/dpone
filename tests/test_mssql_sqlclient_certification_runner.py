@@ -69,6 +69,15 @@ def test_runner_binds_every_execution_and_artifact_to_inspected_image(tmp_path: 
         return f"{len(created):012x}"
 
     monkeypatch.setattr(module, "_create_container", create)
+    monkeypatch.setattr(
+        module,
+        "_applied_resource_policy",
+        lambda *_args: {
+            "container_memory_limit_bytes": 2 << 30,
+            "container_memory_swap_limit_bytes": 2 << 30,
+            "container_oom_kill_disabled": False,
+        },
+    )
     monkeypatch.setattr(module, "_capture", lambda _command: f"sha256:{digest}\n")
     monkeypatch.setattr(module, "_run_attached", lambda *_args, **_kwargs: 456_789)
     monkeypatch.setattr(module, "_container_was_oom_killed", lambda *_args: False)
@@ -89,7 +98,7 @@ def test_runner_binds_every_execution_and_artifact_to_inspected_image(tmp_path: 
     assert result["schema_version"] == "dpone.mssql-sqlclient.certification-runner.v3"
     assert {image for image, _cell in created} == {f"sha256:{digest}"}
     assert result["execution_count"] == 7
-    assert {item["container_peak_memory_bytes"] for item in result["executions"]} == {456_789}
+    assert {item["container_sampled_cache_adjusted_memory_bytes"] for item in result["executions"]} == {456_789}
     wide_million = next(
         item
         for item in result["executions"]
@@ -100,6 +109,8 @@ def test_runner_binds_every_execution_and_artifact_to_inspected_image(tmp_path: 
     assert wide_million["max_pending"] == 1
     assert wide_million["retained_work_capacity"] == 3
     assert wide_million["container_memory_limit_bytes"] == 2 << 30
+    assert wide_million["container_memory_swap_limit_bytes"] == 2 << 30
+    assert wide_million["container_oom_kill_disabled"] is False
     assert len(result["evidence_artifacts"]) == 7
     assert json.loads(output.read_text()) == result
 
@@ -187,7 +198,43 @@ def test_runner_rejects_an_oom_killed_cell(tmp_path: Path, monkeypatch) -> None:
             container="a" * 12,
             cell=module.EXECUTION_CELLS[0],
             image_digest="c" * 64,
+            applied_resources={
+                "container_memory_limit_bytes": 2 << 30,
+                "container_memory_swap_limit_bytes": 2 << 30,
+                "container_oom_kill_disabled": False,
+            },
         )
+
+
+@pytest.mark.parametrize(
+    "host_config",
+    [
+        {"Memory": 0, "MemorySwap": 2 << 30, "OomKillDisable": False},
+        {"Memory": 2 << 30, "MemorySwap": 0, "OomKillDisable": False},
+        {"Memory": 2 << 30, "MemorySwap": 2 << 30, "OomKillDisable": True},
+    ],
+)
+def test_runner_rejects_unenforced_container_resource_policy(monkeypatch, host_config) -> None:
+    module = _module()
+    monkeypatch.setattr(module, "_inspect_container", lambda *_args: {"HostConfig": host_config})
+
+    with pytest.raises(ValueError, match="resource_policy_mismatch"):
+        module._applied_resource_policy("docker", "a" * 12, module.EXECUTION_CELLS[0])
+
+
+def test_runner_records_only_inspected_container_resource_policy(monkeypatch) -> None:
+    module = _module()
+    monkeypatch.setattr(
+        module,
+        "_inspect_container",
+        lambda *_args: {"HostConfig": {"Memory": 2 << 30, "MemorySwap": 2 << 30, "OomKillDisable": False}},
+    )
+
+    assert module._applied_resource_policy("docker", "a" * 12, module.EXECUTION_CELLS[0]) == {
+        "container_memory_limit_bytes": 2 << 30,
+        "container_memory_swap_limit_bytes": 2 << 30,
+        "container_oom_kill_disabled": False,
+    }
 
 
 @pytest.mark.parametrize(

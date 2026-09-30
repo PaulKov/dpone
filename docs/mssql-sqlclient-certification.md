@@ -73,9 +73,12 @@ The versioned campaign uses a 48 MiB encoded/IPC frame ceiling, one extra
 pending slot, two encoders, and up to two TDS writers. The wide profile adds an
 8,192-row ceiling: one million rows require at most 123 raw stages plus the one
 prepared-stage reservation under the 128-table limit. Each runner container has
-a 2 GiB cgroup limit. The runner samples its cgroup memory, records the observed
-peak and all resource settings in its v3 receipt, and rejects missing memory
-evidence or an OOM-killed cell. These limits apply to the synthetic campaign;
+a 2 GiB cgroup limit with swap disabled. Before execution, the runner verifies
+Docker's applied memory, memory-plus-swap, and OOM-killer settings. During the
+cell it samples Docker CLI's cache-adjusted memory usage and records the largest
+sample with the applied settings in its v3 receipt. Missing observations,
+setting drift, or an OOM-killed cell fails certification. This sampled value is
+not a cgroup high-water mark. These limits apply to the synthetic campaign;
 normal manifests keep their existing configurable defaults.
 
 | Failed phase | Exit | Files retained |
@@ -95,6 +98,6 @@ multiprocessing, or companion-process state from one fixture affecting another
 fixture's result.
 
 The image, transport evidence, and campaign schemas remain v2. The runner
-receipt is v3 because it binds the resource policy and observed container peak
-memory to every execution. Earlier runner receipts are rejected; rerun the
+receipt is v3 because it binds the inspected resource policy and sampled
+cache-adjusted container memory to every execution. Earlier runner receipts are rejected; rerun the
 producers rather than editing or translating evidence by hand.

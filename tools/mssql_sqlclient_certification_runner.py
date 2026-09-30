@@ -116,7 +116,16 @@ def run_campaign(
             container_image = _capture((docker, "inspect", "--format", "{{.Image}}", container)).strip()
             if container_image != immutable_image:
                 raise ValueError("sqlclient_runner.container_image_mismatch")
-            executions.append(_execute_container(docker=docker, container=container, cell=cell, image_digest=digest))
+            applied_resources = _applied_resource_policy(docker, container, cell)
+            executions.append(
+                _execute_container(
+                    docker=docker,
+                    container=container,
+                    cell=cell,
+                    image_digest=digest,
+                    applied_resources=applied_resources,
+                )
+            )
         finally:
             _run((docker, "rm", "--force", container), allow_failure=True)
 
@@ -214,7 +223,14 @@ def _create_container(
     return container
 
 
-def _execute_container(*, docker: str, container: str, cell: ExecutionCell, image_digest: str) -> dict[str, Any]:
+def _execute_container(
+    *,
+    docker: str,
+    container: str,
+    cell: ExecutionCell,
+    image_digest: str,
+    applied_resources: dict[str, int | bool],
+) -> dict[str, Any]:
     """Run one bounded cell and reject a cgroup OOM as failed certification."""
 
     try:
@@ -230,8 +246,31 @@ def _execute_container(*, docker: str, container: str, cell: ExecutionCell, imag
     return {
         **asdict(cell),
         "retained_work_capacity": cell.retained_work_capacity,
-        "container_peak_memory_bytes": peak_memory,
+        **applied_resources,
+        "container_sampled_cache_adjusted_memory_bytes": peak_memory,
         "container_image_sha256": image_digest,
+    }
+
+
+def _applied_resource_policy(docker: str, container: str, cell: ExecutionCell) -> dict[str, int | bool]:
+    """Require Docker to have applied the requested hard memory envelope."""
+
+    host = _inspect_container(docker, container).get("HostConfig")
+    if not isinstance(host, dict):
+        raise ValueError("sqlclient_runner.resource_policy_unavailable")
+    memory = host.get("Memory")
+    memory_swap = host.get("MemorySwap")
+    oom_kill_disabled = host.get("OomKillDisable")
+    if (
+        memory != cell.container_memory_limit_bytes
+        or memory_swap != cell.container_memory_limit_bytes
+        or oom_kill_disabled is not False
+    ):
+        raise ValueError("sqlclient_runner.resource_policy_mismatch")
+    return {
+        "container_memory_limit_bytes": memory,
+        "container_memory_swap_limit_bytes": memory_swap,
+        "container_oom_kill_disabled": oom_kill_disabled,
     }
 
 
@@ -262,6 +301,16 @@ def _inspect_image(docker: str, image: str) -> dict[str, Any]:
         raise ValueError("sqlclient_runner.image_inspect_failed") from error
     if not isinstance(value, list) or len(value) != 1 or not isinstance(value[0], dict):
         raise ValueError("sqlclient_runner.image_inspect_failed")
+    return value[0]
+
+
+def _inspect_container(docker: str, container: str) -> dict[str, Any]:
+    try:
+        value = json.loads(_capture((docker, "inspect", container)))
+    except json.JSONDecodeError as error:
+        raise ValueError("sqlclient_runner.container_inspect_failed") from error
+    if not isinstance(value, list) or len(value) != 1 or not isinstance(value[0], dict):
+        raise ValueError("sqlclient_runner.container_inspect_failed")
     return value[0]
 
 

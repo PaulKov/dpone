@@ -111,9 +111,11 @@ The versioned runner resource envelope is part of the certification authority:
 48 MiB maximum encoded/IPC frames, one additional pending slot, two encoder
 workers, up to two import workers, and a 2 GiB runner cgroup. The wide100 profile
 also caps frames at 8,192 rows, giving at most 123 raw stages for one million
-rows plus the prepared-stage reservation under the 128-table ceiling. The
-runner receipt records these settings and sampled peak container memory and
-fails closed when the sample is unavailable or Docker reports an OOM kill.
+rows plus the prepared-stage reservation under the 128-table ceiling. Before
+execution, the runner inspects Docker's applied memory, memory-plus-swap, and
+OOM-killer settings. Its receipt records them with the largest sampled Docker
+CLI cache-adjusted memory value; this polling metric is not a cgroup high-water
+mark. Setting drift, an unavailable sample, or an OOM kill fails closed.
 
 The force-kill cell has no time-based injection. Its independent SQL Server
 observer waits for an active `INSERT BULK` request whose per-attempt application
