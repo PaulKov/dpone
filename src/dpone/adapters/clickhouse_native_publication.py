@@ -14,6 +14,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
+from dpone.adapters.clickhouse_native_driver import isolate_native_logging
 from dpone.ports.clickhouse_publication_transport import (
     NativePublicationCompletion,
     NativePublicationError,
@@ -103,6 +104,7 @@ class DirectNativePublicationTransport:
             )
             try:
                 connection = client.connection
+                isolate_native_logging(connection)
                 connection.connect()
                 info = connection.server_info
                 version = (info.version_major, info.version_minor, info.version_patch)

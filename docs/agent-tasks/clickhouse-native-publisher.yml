@@ -22,9 +22,11 @@ owned_paths:
   - src/dpone/adapters/clickhouse_authority_sqlite.py
   - src/dpone/adapters/clickhouse_authority_execution_lock.py
   - src/dpone/adapters/clickhouse_native_publication.py
+  - src/dpone/adapters/clickhouse_native_driver.py
   - src/dpone/adapters/clickhouse_authority_publisher.py
   - tests/test_clickhouse_authority_execution_lock.py
   - tests/test_clickhouse_native_publication.py
+  - tests/test_clickhouse_native_driver.py
   - tests/test_clickhouse_authority_publisher.py
   - tests/integration/test_clickhouse_native_publication.py
   - tests/integration/clickhouse_native_publication_support.py

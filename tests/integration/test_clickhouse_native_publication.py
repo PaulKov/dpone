@@ -131,19 +131,25 @@ def test_exchange_effect_then_response_loss_is_never_replayed(case, fault):
 
 
 class _NeverSend:
+    def __init__(self):
+        self.attempts = 0
+
     def execute(self, request):
+        self.attempts += 1
         raise AssertionError("Recovery must not call transport")
 
 
 def _recover(path, operation, results):
     store = SQLitePublicationAuthority(path, "deployment")
-    service = AuthorityPublicationPublisher(store, LocalPublicationExclusion(store), _NeverSend())
+    transport = _NeverSend()
+    service = AuthorityPublicationPublisher(store, LocalPublicationExclusion(store), transport)
     try:
         service.close_and_drain(operation)
     except PublicationUnknown:
-        results.put("unknown")
+        outcome = "unknown"
     else:
-        results.put("closed")
+        outcome = "closed"
+    results.put((outcome, transport.attempts))
 
 
 def _recover_in_spawn(path, operation):
@@ -152,9 +158,10 @@ def _recover_in_spawn(path, operation):
     process = ctx.Process(target=_recover, args=(path, operation, results))
     process.start()
     try:
-        outcome = results.get(timeout=20)
+        outcome, attempts = results.get(timeout=20)
         process.join(20)
         assert process.exitcode == 0
+        assert attempts == 0, "Recovery attempted transport despite its reported outcome"
         return outcome
     finally:
         if process.is_alive():

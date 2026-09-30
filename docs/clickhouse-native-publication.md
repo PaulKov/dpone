@@ -162,6 +162,16 @@ messages suppress raw vendor error text. Library APIs do not print; CLI flags,
 exit-code changes and manifest activation are N/A. For diagnosis use a new
 redacted report path, not a fabricated receipt or arbitrary SQL probe.
 
+The pinned driver otherwise logs raw server LOG rows, query text and socket
+exceptions before the adapter can sanitize them. A private per-connection seam
+rebinds its eight audited Python logging methods with copied globals and a
+private disabled logger/log-block sink. It preserves the vendor decoder code,
+defaults and closures; no shared SDK class, module or application logger is
+changed. Unexpected method shape fails before connect. Tests exercise actual
+LOG dispatch, query serialization and socket-error logging, and verify an
+ordinary concurrent connection still logs normally. Re-audit this boundary
+before any driver upgrade; application-wide log suppression is not a substitute.
+
 ## Validation and remaining work
 
 Focused tests: `test_clickhouse_authority_execution_lock.py`,
@@ -169,6 +179,9 @@ Focused tests: `test_clickhouse_authority_execution_lock.py`,
 and the existing authority/kernel tests. They cover exact statements, native
 packet handling, driver serialization, real SQLite/process races, ACK loss and
 retained ownership. They are not live certification.
+`test_clickhouse_native_driver.py` covers the real-driver privacy boundary. The
+restart fixture reports attempted transport calls separately from its outcome;
+an exception translated into UNKNOWN cannot hide an attempted replay.
 
 The opt-in `tests/integration/test_clickhouse_native_publication.py` requires
 `DPONE_NATIVE_PUBLICATION_LIVE=1`, `DPONE_NATIVE_HOST` (literal IPv4), optional

@@ -50,9 +50,11 @@
 | `src/dpone/adapters/clickhouse_authority_sqlite.py` | Expose validated execution identity without new schema or grants |
 | `src/dpone/adapters/clickhouse_authority_execution_lock.py` | Stable private per-subject lock files and invocation-scoped exclusion |
 | `src/dpone/adapters/clickhouse_native_publication.py` | Explicit native connection, one send and packet completion |
+| `src/dpone/adapters/clickhouse_native_driver.py` | Private pinned per-connection logging isolation; unchanged vendor decoder and global loggers |
 | `src/dpone/adapters/clickhouse_authority_publisher.py` | Concrete authority/native profile bridge, original-intent validation and send/closure ordering |
 | `tests/test_clickhouse_authority_execution_lock.py` | Thread/process/inode/session tests |
 | `tests/test_clickhouse_native_publication.py` | Request, driver packet and lifecycle tests |
+| `tests/test_clickhouse_native_driver.py` | Real-driver LOG/socket/query privacy and unaffected ordinary connections |
 | `tests/test_clickhouse_authority_publisher.py` | Protected intent, CAS ambiguity, rendering and closure tests |
 | `tests/integration/test_clickhouse_native_publication.py` | Actual server effects and restart/fault evidence |
 | `tests/integration/clickhouse_native_publication_support.py` | Owned fixture and test-only fault relay; no shared fixture edits |
@@ -74,6 +76,15 @@ catalog/content evidence never crosses the transport port. Wire DTOs and their
 single transport protocol are colocated. This revises the new, unpublished
 request constructor and import path; existing released APIs and persisted
 profiles stay unchanged. No budget/baseline relaxation is involved.
+
+**Review remediation:** driver 0.2.10 logs raw server packets and connection
+errors inside the decoder/lifecycle. Isolate its audited Python logging methods
+on the privately owned connection before connect, with copied function globals
+and a private disabled logger/no-op log-block sink. Preserve the original code,
+defaults and closures; reject unexpected method shape. Never modify SDK classes,
+module globals or application loggers. Real-driver tests must prove suppression
+and unaffected ordinary concurrent connections. Restart tests independently
+report attempted transport calls; an exception alone is not a no-replay proof.
 
 ## Task 1: Authority-bound execution exclusion
 

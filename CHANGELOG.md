@@ -7,6 +7,8 @@
 - Unbound ClickHouse native publication building blocks add per-subject local
   execution exclusion, fixed REPLACE/EXCHANGE/RENAME requests, acknowledged
   send-entry ordering and successful-EndOfStream closure with no SQL replay.
+  Vendor packet/query/socket logging is isolated per protected connection;
+  ordinary application and driver connections keep their logging unchanged.
   Added process/ACK/packet tests, an opt-in owned Docker fault fixture, Python
   reference and quarantine runbook. Owner release, protected observation,
   candidate sealing, complete backend composition and ODBC activation remain

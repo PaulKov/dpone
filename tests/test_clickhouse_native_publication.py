@@ -114,6 +114,7 @@ def install_probe(monkeypatch, packets):
         return SimpleNamespace(connection=probe, disconnect=probe.disconnect)
 
     monkeypatch.setattr(clickhouse_driver, "Client", client)
+    monkeypatch.setattr(_api(), "isolate_native_logging", lambda connection: None)
     return probe, created
 
 
@@ -304,18 +305,21 @@ def test_real_driver_initialization_and_query_serialization(monkeypatch):
     wire = io.BytesIO()
     calls = []
 
-    def connect(connection):
+    def initialize(connection, host, port):
         calls.append("connect")
         connection.connected = True
         connection.server_info = ServerInfo("ClickHouse", 24, 8, 14, 54470, "UTC", "fixture", 54401)
         connection.context.server_info = connection.server_info
-        connection.socket = SimpleNamespace(getpeername=lambda: ("127.0.0.1", 9000))
+        connection.socket = SimpleNamespace(
+            getpeername=lambda: ("127.0.0.1", 9000),
+            shutdown=lambda how: calls.append("disconnect"),
+            close=lambda: None,
+        )
+        connection.fin = SimpleNamespace(read_one=lambda: 5)
         connection.fout = wire
         connection.block_out = BlockOutputStream(wire, connection.context)
 
-    monkeypatch.setattr(Connection, "connect", connect)
-    monkeypatch.setattr(Connection, "receive_packet", lambda self: packet(5))
-    monkeypatch.setattr(Connection, "disconnect", lambda self: calls.append("disconnect"))
+    monkeypatch.setattr(Connection, "_init_connection", initialize)
     original = request()
     _api().DirectNativePublicationTransport(endpoint()).execute(original)
     assert calls == ["connect", "disconnect"]

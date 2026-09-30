@@ -2,6 +2,7 @@
 
 import hashlib
 import multiprocessing
+import queue
 import sqlite3
 from dataclasses import replace
 from pathlib import Path
@@ -244,3 +245,20 @@ def test_documented_offline_example_closes_without_send(capsys):
     snippet = guide.read_text(encoding="utf-8").split("```python\n", 1)[1].split("```", 1)[0]
     exec(compile(snippet, str(guide), "exec"), {})
     assert capsys.readouterr().out == "closed_without_send True\n"
+
+
+def test_restart_probe_reports_send_attempt_even_when_error_becomes_unknown(tmp_path, monkeypatch):
+    from tests.integration.test_clickhouse_native_publication import AuthorityPublicationPublisher, _recover
+
+    store, grant = prepared_store(tmp_path)
+
+    def regressed_closure(service, operation_id):
+        try:
+            service._transport.execute(None)
+        except Exception:
+            raise PublicationUnknown("uncertain") from None
+
+    monkeypatch.setattr(AuthorityPublicationPublisher, "close_and_drain", regressed_closure)
+    results = queue.Queue()
+    _recover(Path(store.execution_identity().path), grant.operation_id, results)
+    assert results.get_nowait() == ("unknown", 1)
