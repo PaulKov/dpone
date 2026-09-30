@@ -10,6 +10,7 @@ accessible only to the authority owning this target.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
 from time import monotonic
@@ -24,9 +25,32 @@ from dpone.contracts.bounded_window import (
     WindowPlan,
 )
 from dpone.ports.bounded_window import ExclusiveWindowWriterGuard, WindowBinaryIngest, WindowMetadataStore
-from dpone.runtime.sinks.clickhouse_window_admission import validate_configuration, validate_target
-from dpone.runtime.sinks.clickhouse_window_admission import window_schema_fingerprint as window_schema_fingerprint
 from dpone.runtime.sinks.clickhouse_window_staging import WindowConnector, WindowIO, WindowStaging, identifier
+from dpone.runtime.sinks.clickhouse_window_staging import validate_target as validate_target
+from dpone.runtime.sinks.clickhouse_window_staging import window_schema_fingerprint as window_schema_fingerprint
+
+
+def validate_configuration(
+    schema: Sequence[tuple[str, str]],
+    *,
+    database: str,
+    table: str,
+    window_column: str,
+    target_id: str,
+    max_encoded_bytes: int,
+) -> None:
+    """Reject invalid target configuration before constructing any I/O resources."""
+    for name in (database, table, window_column, *(name for name, _ in schema)):
+        identifier(name)
+    if not schema or len({name for name, _ in schema}) != len(schema):
+        raise WindowContractError("Schema must contain unique columns")
+    window_type = dict(schema).get(window_column, "")
+    if not re.fullmatch(r"(?:Nullable\()?DateTime64\([0-6],\s*'UTC'\)\)?", window_type):
+        raise WindowContractError("Window column must be UTC DateTime64 with precision at most six")
+    if isinstance(max_encoded_bytes, bool) or not isinstance(max_encoded_bytes, int) or max_encoded_bytes <= 0:
+        raise WindowContractError("max_encoded_bytes must be a positive integer")
+    if not target_id:
+        raise WindowContractError("Physical target identity is required")
 
 
 class ClickHouseWindowTarget:
@@ -137,19 +161,7 @@ class ClickHouseWindowTarget:
         This is verified preparation evidence, not a fresh target row count.
         """
         self._identity(plan)
-        if generation != self.io.name(plan, "generation"):
-            raise WindowContractError("Generation does not belong to this run")
-        metadata = self.io.metadata_store.load(self.io.path(generation))
-        if metadata is None or metadata.get("identity") != [
-            plan.run_id,
-            self.io.schema_fingerprint,
-            self.io.physical_target,
-        ]:
-            raise WindowContractError("Verified generation metadata is unavailable")
-        count = metadata.get("count")
-        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
-            raise WindowContractError("Verified generation count is invalid")
-        return count
+        return self.io.generation_total(plan, generation)
 
     def generation_evidence(self, plan: WindowPlan, generation: str) -> dict[str, object]:
         """Read durable prepublication aggregates; no postcommit source or SQL reads.
@@ -159,14 +171,7 @@ class ClickHouseWindowTarget:
         Source metric equality is inferred from verified probabilistic typed parity.
         """
         self.generation_total(plan, generation)
-        metadata = self.io.metadata_store.load(self.io.path(generation))
-        evidence = metadata.get("evidence") if metadata else None
-        if metadata is None or not isinstance(evidence, dict):
-            raise WindowContractError("Verified generation aggregate evidence is unavailable")
-        evidence["publish_timing"] = metadata.get(
-            "publish_timing", {"status": "unavailable", "reason": "not_recorded_or_process_loss"}
-        )
-        return evidence
+        return self.io.generation_evidence(plan, generation)
 
     def prepare(self, plan: WindowPlan, receipts: Sequence[ChunkReceipt], lease: WindowLease) -> str:
         self._identity(plan, lease)
