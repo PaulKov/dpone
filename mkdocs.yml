@@ -555,6 +555,7 @@ nav:
       - Feature design - governed REST bulk delivery V1: feature-design-rest-api-sink-v1.md
       - Feature design - committed replay quality evidence: feature-design-committed-replay-quality-evidence.md
       - Feature design - declarative replay quality: feature-design-declarative-replay-quality.md
+      - Feature design - MSSQL publication authority: feature-design-mssql-publication-authority.md
       - Governed REST bulk-delivery threat model: rest-bulk-delivery-threat-model.md
       - Documentation standard: documentation-standard.md
       - Agent templates:
