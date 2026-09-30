@@ -10,10 +10,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
 from datetime import time as dt_time
-from decimal import Decimal, localcontext
+from decimal import Decimal
 from typing import Any
 
-from dpone.runtime.clickhouse_temporal_encoding import encode_temporal_integer
+from dpone.contracts import clickhouse_scalar_wire as wire
 from dpone.runtime.support.type_mapping.mssql_clickhouse import (
     MssqlClickHouseTypeMapper,
     MssqlClickHouseTypePolicy,
@@ -22,6 +22,9 @@ from dpone.runtime.support.type_mapping.mssql_clickhouse import (
 
 _EPOCH_DATE = date(1970, 1, 1)
 _EPOCH_DATETIME = datetime(1970, 1, 1, tzinfo=UTC)
+# Preserve historical imports while depending on one cohesive wire boundary.
+encode_temporal_integer = wire.encode_temporal_integer
+_decimal_precision_scale = wire._decimal_precision_scale
 
 
 @dataclass(frozen=True, slots=True)
@@ -133,22 +136,15 @@ def encode_clickhouse_string(value: Any) -> bytes:
         payload = bytes(value)
     else:
         payload = str(value).encode("utf-8")
-    return var_uint(len(payload)) + payload
+    return wire.encode_string(payload)
 
 
 def encode_clickhouse_uuid(value: Any) -> bytes:
-    raw = uuid.UUID(str(value)).bytes
-    return raw[:8][::-1] + raw[8:][::-1]
+    return wire.encode_uuid(uuid.UUID(str(value)))
 
 
 def var_uint(value: int) -> bytes:
-    output = bytearray()
-    current = int(value)
-    while current >= 0x80:
-        output.append((current & 0x7F) | 0x80)
-        current >>= 7
-    output.append(current)
-    return bytes(output)
+    return wire.var_uint(int(value))
 
 
 def unwrap_nullable(clickhouse_type: str) -> tuple[bool, str]:
@@ -245,59 +241,21 @@ def _time_text(value: dt_time, source_type: str) -> str:
 
 
 def _pack_integer(value: Any, root: str) -> bytes:
-    formats = {
-        "int8": "<b",
-        "uint8": "<B",
-        "int16": "<h",
-        "uint16": "<H",
-        "int32": "<i",
-        "uint32": "<I",
-        "int64": "<q",
-        "uint64": "<Q",
-    }
-    try:
-        return struct.pack(formats[root], int(value))
-    except struct.error:
-        raise ValueError("clickhouse_binary_numeric_out_of_range") from None
+    return wire.pack_integer(int(value), root)
 
 
 def _encode_decimal(value: Any, clickhouse_type: str) -> bytes:
-    precision, decimal_scale = _decimal_precision_scale(clickhouse_type)
-    width = 4 if precision <= 9 else 8 if precision <= 18 else 16 if precision <= 38 else 32
+    # Preserve declaration validation before source-value coercion.
+    _decimal_precision_scale(clickhouse_type)
     decimal_value = value if isinstance(value, Decimal) else Decimal(str(value))
-    if not 1 <= precision <= 76 or not 0 <= decimal_scale <= precision:
-        raise ValueError("ClickHouse Decimal precision/scale is invalid")
-    if not decimal_value.is_finite():
-        raise ValueError("ClickHouse Decimal requires a finite value")
-    if decimal_value and decimal_value.adjusted() >= precision - decimal_scale:
-        raise ValueError("clickhouse_binary_decimal_out_of_range: ClickHouse Decimal precision overflow")
-    with localcontext() as context:
-        context.prec = precision + 2
-        quantum = Decimal(1).scaleb(-decimal_scale)
-        exact = decimal_value.quantize(quantum)
-        if exact != decimal_value:
-            raise ValueError("clickhouse_binary_decimal_precision_loss: ClickHouse Decimal scale would lose precision")
-        scaled = int(exact.scaleb(decimal_scale))
-    return scaled.to_bytes(width, byteorder="little", signed=True)
-
-
-def _decimal_precision_scale(clickhouse_type: str) -> tuple[int, int]:
-    generic = re.fullmatch(r"Decimal\(\s*(\d+)\s*,\s*(\d+)\s*\)", clickhouse_type.strip(), re.IGNORECASE)
-    if generic:
-        return int(generic[1]), int(generic[2])
-    alias = re.fullmatch(r"Decimal(32|64|128|256)\(\s*(\d+)\s*\)", clickhouse_type.strip(), re.IGNORECASE)
-    if alias:
-        return {32: 9, 64: 18, 128: 38, 256: 76}[int(alias[1])], int(alias[2])
-    raise ValueError("ClickHouse Decimal declaration requires precision/scale or a supported width alias")
+    return wire.encode_decimal(decimal_value, clickhouse_type)
 
 
 def _encode_fixed_string(value: Any, clickhouse_type: str) -> bytes:
     length = _fixed_string_length(clickhouse_type)
     payload = value if isinstance(value, bytes | bytearray) else str(value).encode("utf-8")
     raw = bytes(payload)
-    if len(raw) > length:
-        raise ValueError(f"FixedString({length}) value is too long: {len(raw)} bytes.")
-    return raw + (b"\x00" * (length - len(raw)))
+    return wire.encode_fixed_string(raw, length)
 
 
 def _fixed_string_length(clickhouse_type: str) -> int:

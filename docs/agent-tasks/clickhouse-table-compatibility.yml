@@ -1,0 +1,192 @@
+schema_version: 1
+task_id: DPONE-CLICKHOUSE-TABLE-COMPATIBILITY
+title: Settings-aware protected ClickHouse publication with explicit compatibility policy
+goal: Implement the approved self-service amendment after plan review and prerequisite feasibility gates
+specification: docs/feature-design-clickhouse-table-compatibility.md
+base_commit: 5075a1e50ff7d1f3d670423fe196f970ab65e873
+integrator: root
+acceptance_criteria:
+  - The specification is approved and the revised plan is separately reviewed before execution
+  - Root remains sole writer with preserved Native execution and a fresh independent final reviewer
+  - Positive owned-Docker historical-default provenance and defensible whole-plan graph projection precede dependent production changes
+  - Preserve existing committed Tasks 1 and 2 and unfinished Task 3 without changing historical evidence
+  - Closed typed settings policy preserves verified existing settings without manual copies
+  - Unknown applicable compatibility blocks by default and warn only selects an independently verified alternative
+  - Shared unknowns, unknown settings, provenance gaps and uncertain effects always block or retain
+  - Actual preflight holds both physical-name locks through acknowledged enrollment and publication without an unlock window or nested flock
+  - Candidate CREATE completion and independent configuration readback precede the first source call
+  - Explicit v3 resolved enrollment and selected PREPARED are atomic on the original authority with v1 and v2 bytes and defaults unchanged
+  - Recovery is source-free and zero-replay with immutable mode, selection and explicit method-aware after-state
+  - All architecture gates pass without baseline relaxation, hidden dependencies or graph padding
+  - Exact-commit live evidence covers settings provenance, all four methods, warning behavior and activated faults
+  - Runnable documentation distinguishes staged Python capability from stock ODBC and production certification
+public_contract_impact:
+  level: compatible
+  surfaces: [Python API, observation v2, authority v3, guarded publication v3, diagnostic JSON, documentation]
+  migration_required: false
+owned_paths:
+  - src/dpone/adapters/clickhouse_deployment_epoch.py
+  - src/dpone/adapters/clickhouse_table_descriptor.py
+  - src/dpone/adapters/clickhouse_publication_codec_v3.py
+  - src/dpone/adapters/clickhouse_candidate_v3.py
+  - src/dpone/adapters/clickhouse_candidate_requests_v3.py
+  - src/dpone/adapters/clickhouse_publication_journal_v3.py
+  - src/dpone/adapters/clickhouse_authority_transitions.py
+  - src/dpone/adapters/clickhouse_authority_schema.py
+  - src/dpone/adapters/clickhouse_authority_storage.py
+  - src/dpone/adapters/clickhouse_authority_execution_lock.py
+  - src/dpone/adapters/clickhouse_observation_profile.py
+  - src/dpone/adapters/clickhouse_design_grammar.py
+  - src/dpone/adapters/clickhouse_candidate_sqlite.py
+  - src/dpone/adapters/clickhouse_candidate_requests.py
+  - src/dpone/adapters/clickhouse_publication_journal.py
+  - src/dpone/adapters/clickhouse_candidate_gateway.py
+  - src/dpone/adapters/clickhouse_native_candidate.py
+  - src/dpone/adapters/clickhouse_native_catalog.py
+  - src/dpone/adapters/clickhouse_authority_observer.py
+  - src/dpone/adapters/clickhouse_candidate_seal.py
+  - src/dpone/adapters/clickhouse_publication_readiness.py
+  - src/dpone/adapters/clickhouse_candidate_lifecycle.py
+  - src/dpone/adapters/clickhouse_guarded_backend.py
+  - src/dpone/adapters/clickhouse_authority_publisher.py
+  - src/dpone/adapters/clickhouse_publication_diagnostics.py
+  - src/dpone/runtime/sinks/clickhouse_guarded_publication_v3.py
+  - src/dpone/runtime/sinks/clickhouse_protected_publication.py
+  - tests/test_clickhouse_table_descriptor.py
+  - tests/test_clickhouse_compatibility_policy.py
+  - tests/test_clickhouse_compatibility_plan.py
+  - tests/test_clickhouse_deployment_epoch.py
+  - tests/test_clickhouse_observation_profile.py
+  - tests/test_clickhouse_design_grammar.py
+  - tests/test_clickhouse_candidate_v3.py
+  - tests/test_clickhouse_publication_codec_compatibility.py
+  - tests/test_clickhouse_namespace_session.py
+  - tests/test_clickhouse_candidate_processes.py
+  - tests/test_clickhouse_authority_processes.py
+  - tests/test_clickhouse_candidate_v3_transport.py
+  - tests/test_clickhouse_candidate_gateway.py
+  - tests/test_clickhouse_native_candidate.py
+  - tests/test_clickhouse_native_catalog.py
+  - tests/test_clickhouse_authority_observer.py
+  - tests/test_clickhouse_candidate_seal.py
+  - tests/test_clickhouse_guarded_publication_v3.py
+  - tests/test_clickhouse_guarded_backend.py
+  - tests/test_clickhouse_publication_readiness.py
+  - tests/test_clickhouse_protected_publication.py
+  - tests/test_clickhouse_compatibility_diagnostics.py
+  - tests/test_clickhouse_protected_publication_example.py
+  - tests/test_clickhouse_compatibility_reference.py
+  - tests/integration/clickhouse_table_compatibility_probe.py
+  - tests/integration/clickhouse_table_compatibility_support.py
+  - tests/integration/clickhouse_table_compatibility_faults.py
+  - tests/integration/test_clickhouse_table_compatibility_live.py
+  - examples/python/clickhouse_protected_publication.py
+  - tools/generate_clickhouse_compatibility_reference.py
+  - docs/clickhouse-protected-publication.md
+  - docs/tutorials/clickhouse-protected-publication.md
+  - docs/reference/clickhouse-table-compatibility.md
+  - docs/runbooks/clickhouse-publication-recovery.md
+  - docs/clickhouse-native-publication.md
+  - docs/clickhouse-publication-methods.md
+  - docs/clickhouse-authority-journal.md
+  - docs/runbooks/clickhouse-publication-closure.md
+integrator_owned_paths:
+  - src/dpone/contracts/clickhouse_table_descriptor.py
+  - src/dpone/contracts/clickhouse_compatibility.py
+  - src/dpone/contracts/clickhouse_publication_v3.py
+  - src/dpone/ports/clickhouse_deployment_epoch.py
+  - src/dpone/ports/clickhouse_protected_publication.py
+  - docs/feature-design-clickhouse-table-compatibility.md
+  - docs/feature-design-clickhouse-protected-publication.md
+  - docs/superpowers/plans/2026-09-30-clickhouse-table-compatibility.md
+  - docs/superpowers/plans/2026-09-30-clickhouse-protected-publication.md
+  - docs/agent-tasks/clickhouse-table-compatibility.yml
+  - docs/adr/0080-clickhouse-table-compatibility-policy.md
+  - docs/adr-index.md
+  - docs/architecture.md
+  - docs/quality-metrics.md
+  - CHANGELOG.md
+  - mkdocs.yml
+read_only_paths:
+  - src/dpone/contracts/clickhouse_authority.py
+  - src/dpone/contracts/clickhouse_candidate.py
+  - src/dpone/contracts/clickhouse_observation.py
+  - src/dpone/contracts/clickhouse_publication.py
+  - src/dpone/contracts/clickhouse_scalar_wire.py
+  - src/dpone/contracts/clickhouse_typed_multiset.py
+  - src/dpone/adapters/clickhouse_publication_codec.py
+  - src/dpone/adapters/clickhouse_native_publication.py
+  - src/dpone/adapters/clickhouse_native_driver.py
+  - src/dpone/adapters/clickhouse_authority_sqlite.py
+  - src/dpone/adapters/clickhouse_candidate_diagnostics.py
+  - src/dpone/runtime/sinks/clickhouse_guarded_publication.py
+  - src/dpone/ports/clickhouse_publication.py
+  - src/dpone/ports/clickhouse_publication_exclusion.py
+  - tests/test_clickhouse_evidence_compatibility.py
+  - tests/test_clickhouse_authority_sqlite.py
+  - tests/test_clickhouse_candidate_sqlite.py
+  - tests/test_clickhouse_guarded_publication.py
+  - tests/test_clickhouse_native_publication.py
+  - tests/test_clickhouse_authority_publisher.py
+  - docs/benchmarks/quality_budgets.yml
+  - docs/layer_metrics_baseline.json
+  - docs/module_size_baseline.json
+  - docs/adr/0078-method-aware-clickhouse-publication.md
+  - docs/adr/0079-protected-clickhouse-candidate-lifecycle.md
+  - docs/agent-tasks/clickhouse-protected-publication.yml
+forbidden_paths:
+  - src/dpone/contracts/clickhouse_table_descriptor.py
+  - src/dpone/contracts/clickhouse_compatibility.py
+  - src/dpone/contracts/clickhouse_publication_v3.py
+  - src/dpone/ports/clickhouse_deployment_epoch.py
+  - src/dpone/ports/clickhouse_protected_publication.py
+  - docs/feature-design-clickhouse-table-compatibility.md
+  - docs/feature-design-clickhouse-protected-publication.md
+  - docs/superpowers/plans/2026-09-30-clickhouse-table-compatibility.md
+  - docs/superpowers/plans/2026-09-30-clickhouse-protected-publication.md
+  - docs/agent-tasks/clickhouse-table-compatibility.yml
+  - docs/adr/0080-clickhouse-table-compatibility-policy.md
+  - docs/adr-index.md
+  - docs/architecture.md
+  - docs/quality-metrics.md
+  - CHANGELOG.md
+  - mkdocs.yml
+  - pyproject.toml
+  - uv.lock
+  - .github/workflows
+  - tests/conftest.py
+  - tests/integration/conftest.py
+shared_file_owner: root
+dependencies: [DPONE-CLICKHOUSE-PROTECTED-PUBLICATION]
+required_checks:
+  focused:
+    - RED then GREEN strict registry, descriptors, default provenance and method decision matrix
+    - Preview versus resolved versus selected plan identity and strict-warning scope tests
+    - Historical v1 and v2 golden codecs, default open and wrong-version refusal with unchanged bytes
+    - Two-name session races, binding, fork and inode checks
+    - Candidate source-admission sequence, seal and acknowledgement-loss recovery tests
+    - Source-free example, JSON exit codes, privacy and immutable diagnostics tests
+    - Generated reference freshness and task-contract ownership validation
+  broad:
+    - Change-aware selector, Ruff lint and format, mypy and full non-live pytest
+    - Import rules, layer metrics, strict cross-layer graph, clustering and exact-SHA module-size gates
+    - Docs links, generated references, compatibility, language contracts and isolated strict MkDocs
+  live:
+    - Fresh task-owned Docker Desktop controlled-bootstrap provenance with an existing-table positive case
+    - Exact commit and pinned image, server, driver and SQLite identities with checksummed evidence
+    - Actual settings and part-layout matrix and all four methods with rows, UUIDs and full configuration checks
+    - Real response loss, paused writer, cross-role concurrency, configuration drift and fresh-process zero-replay recovery
+    - Production ingress, TLS, host power-loss and full ODBC route remain UNVERIFIED
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - The revised implementation plan has not been reviewed by the maintainer.
+  - Historical-default provenance or structural feasibility prerequisite has not passed.
+  - A proposed action changes old semantic readers, weakens budgets or mutates historical evidence.
+  - A proposed action releases retained owners, cleans up candidates, enables a stock route or publishes a release.

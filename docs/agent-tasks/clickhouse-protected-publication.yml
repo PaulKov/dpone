@@ -1,0 +1,176 @@
+schema_version: 1
+task_id: DPONE-CLICKHOUSE-PROTECTED-PUBLICATION
+title: Protected candidate lifecycle, observation and backend composition
+goal: Implement the approved single-operation Python backend without replay, v1 migration or route activation
+specification: docs/feature-design-clickhouse-protected-publication.md
+base_commit: f46bdceef120894a5ad1cd8fab82bb4170c601ee
+integrator: root
+acceptance_criteria:
+  - Maintainer reviews the written implementation plan before any production edits
+  - Explicit v2 fresh enrollment preserves v1 defaults and original records without migration or replacement stores
+  - Target and candidate cross-role reservations are atomic and source access follows acknowledged readiness and enrollment
+  - Every CREATE and INSERT is registered, sent once and durably completed before irreversible candidate sealing
+  - Protected typed catalog and content observations replace synthetic fixture flags
+  - One bound execution session bridges the existing kernel and publisher without nested flock or a permission reconstructed from readback
+  - Pre-PREPARED restart is inspection-only and all recovery is source-free with zero SQL replay
+  - Runnable documentation and exact-commit owned Docker faults cover all four publication methods and retained uncertainty
+  - Root is the sole writer and a fresh independent reviewer checks the final implementation and any corrected findings
+  - No owner release, cleanup, checkpoint advancement, stock ODBC activation, merge or release is included
+public_contract_impact:
+  level: compatible
+  surfaces: [Python API, persisted authority v2, diagnostic JSON, documentation]
+  migration_required: false
+owned_paths:
+  - src/dpone/runtime/sinks/clickhouse_physical_types.py
+  - src/dpone/runtime/sinks/clickhouse_lineage_projection.py
+  - src/dpone/runtime/sinks/clickhouse_production_finalize.py
+  - tests/test_clickhouse_lineage_projection_contracts.py
+  - tests/test_clickhouse_production_finalize.py
+  - src/dpone/adapters/clickhouse_observation_profile.py
+  - src/dpone/adapters/clickhouse_design_grammar.py
+  - src/dpone/adapters/clickhouse_authority_schema.py
+  - src/dpone/adapters/clickhouse_publication_journal.py
+  - src/dpone/adapters/clickhouse_candidate_sqlite.py
+  - src/dpone/adapters/clickhouse_candidate_requests.py
+  - src/dpone/adapters/clickhouse_candidate_diagnostics.py
+  - src/dpone/adapters/clickhouse_candidate_gateway.py
+  - src/dpone/adapters/clickhouse_native_candidate.py
+  - src/dpone/adapters/clickhouse_native_catalog.py
+  - src/dpone/adapters/clickhouse_authority_observer.py
+  - src/dpone/adapters/clickhouse_candidate_seal.py
+  - src/dpone/adapters/clickhouse_guarded_backend.py
+  - src/dpone/adapters/clickhouse_candidate_lifecycle.py
+  - src/dpone/adapters/clickhouse_publication_readiness.py
+  - src/dpone/adapters/clickhouse_authority_storage.py
+  - src/dpone/adapters/clickhouse_authority_execution_lock.py
+  - src/dpone/adapters/clickhouse_authority_publisher.py
+  - src/dpone/runtime/sinks/clickhouse_protected_publication.py
+  - tests/test_clickhouse_observation_profile.py
+  - tests/test_clickhouse_design_grammar.py
+  - tests/test_clickhouse_evidence_compatibility.py
+  - tests/test_clickhouse_candidate_sqlite.py
+  - tests/test_clickhouse_candidate_processes.py
+  - tests/test_clickhouse_candidate_diagnostics.py
+  - tests/test_clickhouse_candidate_gateway.py
+  - tests/test_clickhouse_native_candidate.py
+  - tests/test_clickhouse_authority_observer.py
+  - tests/test_clickhouse_native_catalog.py
+  - tests/test_clickhouse_candidate_seal.py
+  - tests/test_clickhouse_guarded_backend.py
+  - tests/test_clickhouse_protected_publication.py
+  - tests/test_clickhouse_publication_readiness.py
+  - tests/test_clickhouse_authority_execution_lock.py
+  - tests/test_clickhouse_authority_publisher.py
+  - tests/test_clickhouse_protected_publication_example.py
+  - tests/integration/test_clickhouse_protected_publication.py
+  - tests/integration/clickhouse_protected_publication_support.py
+  - tests/integration/clickhouse_protected_publication_faults.py
+  - examples/python/clickhouse_protected_publication.py
+  - docs/tutorials/clickhouse-protected-publication.md
+  - docs/clickhouse-protected-publication.md
+  - docs/runbooks/clickhouse-publication-recovery.md
+  - docs/clickhouse-authority-journal.md
+  - docs/clickhouse-native-publication.md
+  - docs/runbooks/clickhouse-publication-closure.md
+integrator_owned_paths:
+  - src/dpone/contracts/clickhouse_candidate.py
+  - src/dpone/contracts/clickhouse_observation.py
+  - src/dpone/contracts/clickhouse_scalar_wire.py
+  - src/dpone/contracts/clickhouse_typed_multiset.py
+  - src/dpone/ports/clickhouse_observation.py
+  - src/dpone/ports/clickhouse_candidate.py
+  - src/dpone/ports/clickhouse_publication_exclusion.py
+  - src/dpone/adapters/clickhouse_authority_sqlite.py
+  - src/dpone/runtime/clickhouse_binary_encoding.py
+  - src/dpone/runtime/clickhouse_temporal_encoding.py
+  - src/dpone/runtime/sinks/clickhouse_window_evidence.py
+  - docs/feature-design-clickhouse-protected-publication.md
+  - docs/feature-design-clickhouse-dpone-only-authority.md
+  - docs/clickhouse-publication-methods.md
+  - docs/architecture.md
+  - docs/adr/0079-protected-clickhouse-candidate-lifecycle.md
+  - docs/adr-index.md
+  - docs/superpowers/plans/2026-09-30-clickhouse-protected-publication.md
+  - docs/agent-tasks/clickhouse-protected-publication.yml
+  - docs/quality-metrics.md
+  - docs/module_size_baseline.json
+  - CHANGELOG.md
+  - mkdocs.yml
+read_only_paths:
+  - src/dpone/ports/clickhouse_publication.py
+  - src/dpone/contracts/clickhouse_publication.py
+  - src/dpone/contracts/clickhouse_authority.py
+  - src/dpone/adapters/clickhouse_publication_codec.py
+  - src/dpone/adapters/clickhouse_native_publication.py
+  - src/dpone/adapters/clickhouse_native_driver.py
+  - src/dpone/runtime/sinks/clickhouse_guarded_publication.py
+  - tests/test_clickhouse_authority_sqlite.py
+  - tests/test_clickhouse_authority_processes.py
+  - tests/test_clickhouse_guarded_publication.py
+  - tests/test_clickhouse_native_publication.py
+  - docs/benchmarks/quality_budgets.yml
+  - docs/layer_metrics_baseline.json
+  - docs/adr/0078-method-aware-clickhouse-publication.md
+forbidden_paths:
+  - src/dpone/contracts/clickhouse_candidate.py
+  - src/dpone/contracts/clickhouse_observation.py
+  - src/dpone/contracts/clickhouse_scalar_wire.py
+  - src/dpone/contracts/clickhouse_typed_multiset.py
+  - src/dpone/ports/clickhouse_observation.py
+  - src/dpone/ports/clickhouse_candidate.py
+  - src/dpone/ports/clickhouse_publication_exclusion.py
+  - src/dpone/adapters/clickhouse_authority_sqlite.py
+  - src/dpone/runtime/clickhouse_binary_encoding.py
+  - src/dpone/runtime/clickhouse_temporal_encoding.py
+  - src/dpone/runtime/sinks/clickhouse_window_evidence.py
+  - docs/feature-design-clickhouse-protected-publication.md
+  - docs/feature-design-clickhouse-dpone-only-authority.md
+  - docs/clickhouse-publication-methods.md
+  - docs/architecture.md
+  - docs/adr/0079-protected-clickhouse-candidate-lifecycle.md
+  - docs/adr-index.md
+  - docs/superpowers/plans/2026-09-30-clickhouse-protected-publication.md
+  - docs/agent-tasks/clickhouse-protected-publication.yml
+  - docs/quality-metrics.md
+  - docs/module_size_baseline.json
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - tests/conftest.py
+  - tests/integration/conftest.py
+shared_file_owner: root
+dependencies: [DPONE-CLICKHOUSE-NATIVE-PUBLISHER]
+required_checks:
+  focused:
+    - Characterize unchanged technical-column names, types, catalog injection and SCD2 overrides before same-domain policy consolidation
+    - RED then GREEN strict design and typed evidence tests with old producer golden vectors unchanged
+    - V1 compatibility and v2 namespace, CAS, ambiguous ACK and fresh-process tests
+    - Native candidate request, privacy and no-retry tests
+    - Protected observation, immutable seal and session-bound backend tests
+    - Source-free recovery, source exhaustion and runnable example tests
+    - Task contract validation and plan-to-file ownership consistency
+  broad:
+    - Change-aware validation selector, Ruff lint and format, mypy
+    - Import rules, layer metrics and exact-SHA module size with no debt growth
+    - Full non-live pytest suite with skip reasons preserved
+    - Docs links, generated references, language contracts and strict MkDocs
+    - Refresh generated metrics only through their producer and verify freshness
+  live:
+    - Owned Docker Desktop Linux actual candidate lifecycle and all publication methods on exact final commit
+    - Actual native response-loss, paused writer, catalog drift and fresh-process recovery with zero source or SQL replay
+    - Record source tree, image, server, driver, SQLite and activated faults; checksum all evidence
+    - Production ingress, TLS, power-loss and full ODBC route remain UNVERIFIED
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - The written implementation plan has not been reviewed by the maintainer.
+  - The pinned server grammar or type behavior requires weakening the approved profile.
+  - A proposed action would mutate old evidence, migrate v1, release owners or enable a stock route.
