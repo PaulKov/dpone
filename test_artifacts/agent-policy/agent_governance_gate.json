@@ -273,8 +273,8 @@
     }
   ],
   "control_surface_changed": true,
-  "generated_at": "2026-09-30T08:47:17+00:00",
-  "head_commit": "ec5f0a7acfca525f1fde4c83970c4c2f4e1e195c",
+  "generated_at": "2026-09-30T09:01:13+00:00",
+  "head_commit": "e710e529a0cb995fd12b506f904272e245ca1190",
   "risks": [
     "AG-001",
     "AG-002",

@@ -22,6 +22,8 @@
 - Accept bounded zero-row and partial persisted-hash observations only during
   interrupted-writer recovery while retaining exact row-count and digest checks
   for successful loads.
+- Declare the version parser used by SqlClient composition as a base runtime
+  dependency so the standard `dpone` wheel keeps CLI startup self-contained.
 
 ## 0.87.4 - 2026-09-29
 

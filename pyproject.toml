@@ -51,6 +51,7 @@ dependencies = [
   "ijson>=3.3.0",
   "jsonschema>=4.23,<5",
   "dpone-airflow-pack==0.88.0",
+  "packaging>=24,<27",
 ]
 
 [project.scripts]
