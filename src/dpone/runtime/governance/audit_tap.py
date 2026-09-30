@@ -47,6 +47,19 @@ class RuntimeLoadStepAuditCollector:
         return [_record_to_jsonable(record) for record in _latest_records(self.records)]
 
 
+def bind_selected_audit_storage(
+    current: LoadStepAuditStorage | None, selected: LoadStepAuditStorage
+) -> LoadStepAuditStorage:
+    """Retain a collector and enforce one selected durable store by identity."""
+
+    if isinstance(current, RuntimeLoadStepAuditCollector):
+        current.bind_delegate(selected)
+        return current
+    if current is None or current is selected:
+        return selected
+    raise RuntimeConfigurationError("Selected runtime audit conflicts with governance storage")
+
+
 def _latest_records(records: list[LoadStepAuditRecord]) -> tuple[LoadStepAuditRecord, ...]:
     latest: dict[tuple[str, str, str, str], LoadStepAuditRecord] = {}
     for record in records:

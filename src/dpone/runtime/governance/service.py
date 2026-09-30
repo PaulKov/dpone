@@ -14,7 +14,6 @@ from collections.abc import Mapping
 from datetime import datetime, timezone
 from typing import Any
 
-from dpone.contracts import RuntimeConfigurationError
 from dpone.contracts.quality_failure import (
     QualityGateFailure as _QualityGateFailure,
 )
@@ -97,14 +96,9 @@ class LoadGovernanceService:
     def bind_audit_storage(self, audit_storage: LoadStepAuditStorage) -> None:
         """Bind selected metadata storage without silently retaining another sink."""
 
-        from dpone.runtime.governance.audit_tap import RuntimeLoadStepAuditCollector
+        from dpone.runtime.governance.audit_tap import bind_selected_audit_storage
 
-        if isinstance(self._audit_storage, RuntimeLoadStepAuditCollector):
-            self._audit_storage.bind_delegate(audit_storage)
-        elif self._audit_storage is None or self._audit_storage is audit_storage:
-            self._audit_storage = audit_storage
-        else:
-            raise RuntimeConfigurationError("Selected runtime audit conflicts with governance storage")
+        self._audit_storage = bind_selected_audit_storage(self._audit_storage, audit_storage)
 
     def run_pre_hooks(
         self,
