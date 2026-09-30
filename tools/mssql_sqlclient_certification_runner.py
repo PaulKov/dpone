@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -28,16 +29,41 @@ class ExecutionCell:
     row_count: int
     layout_version: int
     import_parallelism: int
+    max_rows: int
+    max_bytes: int = 48 << 20
+    max_pending: int = 1
+    max_staging_tables: int = 128
+    encoding_parallelism: int = 2
+    container_memory_limit_bytes: int = 2 << 30
+
+    @property
+    def retained_work_capacity(self) -> int:
+        """Bound concurrently retained encode/import work for this cell."""
+
+        return max(self.encoding_parallelism, self.import_parallelism) + self.max_pending
+
+
+def _cell(
+    scenario: str,
+    fixture_id: str,
+    row_count: int,
+    layout_version: int,
+    import_parallelism: int,
+) -> ExecutionCell:
+    """Create one cell with a width-aware, explicitly bounded resource policy."""
+
+    max_rows = 5_000 if scenario == "force_kill_recovery" else 8_192 if fixture_id.startswith("wide100-") else 65_536
+    return ExecutionCell(scenario, fixture_id, row_count, layout_version, import_parallelism, max_rows)
 
 
 EXECUTION_CELLS = (
-    ExecutionCell("success", "narrow-sqlclient-v1", 10_000, 1, 1),
-    ExecutionCell("success", "wide100-sqlclient-v1", 10_000, 1, 1),
-    ExecutionCell("success", "narrow-sqlclient-v1", 10_000, 2, 2),
-    ExecutionCell("success", "wide100-sqlclient-v1", 10_000, 2, 2),
-    ExecutionCell("success", "narrow-sqlclient-v1", 1_000_000, 2, 2),
-    ExecutionCell("success", "wide100-sqlclient-v1", 1_000_000, 2, 2),
-    ExecutionCell("force_kill_recovery", "wide100-sqlclient-v1", 10_000, 2, 2),
+    _cell("success", "narrow-sqlclient-v1", 10_000, 1, 1),
+    _cell("success", "wide100-sqlclient-v1", 10_000, 1, 1),
+    _cell("success", "narrow-sqlclient-v1", 10_000, 2, 2),
+    _cell("success", "wide100-sqlclient-v1", 10_000, 2, 2),
+    _cell("success", "narrow-sqlclient-v1", 1_000_000, 2, 2),
+    _cell("success", "wide100-sqlclient-v1", 1_000_000, 2, 2),
+    _cell("force_kill_recovery", "wide100-sqlclient-v1", 10_000, 2, 2),
 )
 
 
@@ -90,8 +116,7 @@ def run_campaign(
             container_image = _capture((docker, "inspect", "--format", "{{.Image}}", container)).strip()
             if container_image != immutable_image:
                 raise ValueError("sqlclient_runner.container_image_mismatch")
-            _run_attached((docker, "start", "--attach", container))
-            executions.append({**asdict(cell), "container_image_sha256": digest})
+            executions.append(_execute_container(docker=docker, container=container, cell=cell, image_digest=digest))
         finally:
             _run((docker, "rm", "--force", container), allow_failure=True)
 
@@ -99,7 +124,7 @@ def run_campaign(
     if len(artifacts) != 7:
         raise ValueError("sqlclient_runner.evidence_closure_mismatch")
     result = {
-        "schema_version": "dpone.mssql-sqlclient.certification-runner.v2",
+        "schema_version": "dpone.mssql-sqlclient.certification-runner.v3",
         "status": "PASS",
         "source_commit_sha": receipt["source_commit_sha"],
         "source_tree_oid": receipt["source_tree_oid"],
@@ -132,6 +157,10 @@ def _create_container(
         network,
         "--platform",
         "linux/amd64",
+        "--memory",
+        str(cell.container_memory_limit_bytes),
+        "--memory-swap",
+        str(cell.container_memory_limit_bytes),
         "--mount",
         f"type=bind,src={evidence_dir},dst=/evidence",
         "--env",
@@ -150,6 +179,16 @@ def _create_container(
         f"DPONE_SQLCLIENT_CERT_LAYOUT_VERSION={cell.layout_version}",
         "--env",
         f"DPONE_SQLCLIENT_CERT_IMPORT_PARALLELISM={cell.import_parallelism}",
+        "--env",
+        f"DPONE_SQLCLIENT_CERT_MAX_ROWS={cell.max_rows}",
+        "--env",
+        f"DPONE_SQLCLIENT_CERT_MAX_BYTES={cell.max_bytes}",
+        "--env",
+        f"DPONE_SQLCLIENT_CERT_MAX_PENDING={cell.max_pending}",
+        "--env",
+        f"DPONE_SQLCLIENT_CERT_MAX_STAGING_TABLES={cell.max_staging_tables}",
+        "--env",
+        f"DPONE_SQLCLIENT_CERT_ENCODING_PARALLELISM={cell.encoding_parallelism}",
     ]
     if cell.scenario == "force_kill_recovery":
         command.extend(("--env", "DPONE_SQLCLIENT_FORCE_KILL=1"))
@@ -173,6 +212,27 @@ def _create_container(
     if not re.fullmatch(r"[0-9a-f]{12,64}", container):
         raise RuntimeError("sqlclient_runner.container_create_failed")
     return container
+
+
+def _execute_container(*, docker: str, container: str, cell: ExecutionCell, image_digest: str) -> dict[str, Any]:
+    """Run one bounded cell and reject a cgroup OOM as failed certification."""
+
+    try:
+        peak_memory = _run_attached((docker, "start", "--attach", container), docker=docker, container=container)
+    except RuntimeError:
+        if _container_was_oom_killed(docker, container):
+            raise RuntimeError("sqlclient_runner.cell_oom_killed") from None
+        raise
+    if _container_was_oom_killed(docker, container):
+        raise RuntimeError("sqlclient_runner.cell_oom_killed")
+    if peak_memory <= 0:
+        raise RuntimeError("sqlclient_runner.memory_observation_unavailable")
+    return {
+        **asdict(cell),
+        "retained_work_capacity": cell.retained_work_capacity,
+        "container_peak_memory_bytes": peak_memory,
+        "container_image_sha256": image_digest,
+    }
 
 
 def _image_receipt(path: Path) -> dict[str, Any]:
@@ -212,10 +272,42 @@ def _capture(command: tuple[str, ...]) -> str:
     return result.stdout
 
 
-def _run_attached(command: tuple[str, ...]) -> None:
-    result = subprocess.run(command, check=False)
-    if result.returncode != 0:
+def _run_attached(command: tuple[str, ...], *, docker: str, container: str) -> int:
+    """Run an attached container while sampling its cgroup memory use."""
+
+    process = subprocess.Popen(command)
+    peak = 0
+    while process.poll() is None:
+        peak = max(peak, _container_memory_bytes(docker, container))
+        time.sleep(0.25)
+    peak = max(peak, _container_memory_bytes(docker, container))
+    if process.returncode != 0:
         raise RuntimeError("sqlclient_runner.cell_failed")
+    return peak
+
+
+def _container_memory_bytes(docker: str, container: str) -> int:
+    result = subprocess.run(
+        (docker, "stats", "--no-stream", "--format", "{{.MemUsage}}", container),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return 0
+    return _memory_bytes(result.stdout.partition("/")[0].strip())
+
+
+def _memory_bytes(value: str) -> int:
+    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)\s*(B|KiB|MiB|GiB)", value)
+    if match is None:
+        return 0
+    scale = {"B": 1, "KiB": 1 << 10, "MiB": 1 << 20, "GiB": 1 << 30}[match.group(2)]
+    return int(float(match.group(1)) * scale)
+
+
+def _container_was_oom_killed(docker: str, container: str) -> bool:
+    return _capture((docker, "inspect", "--format", "{{.State.OOMKilled}}", container)).strip() == "true"
 
 
 def _run(command: tuple[str, ...], *, allow_failure: bool = False) -> None:

@@ -10,6 +10,8 @@ or SLO.
 
 - clean Git worktree at the intended commit;
 - Docker with Linux amd64 execution support;
+- a dedicated Docker VM with at least 8 GiB assigned and no unrelated heavy
+  workloads; the repository SQL Server profile defaults to a 2 GiB engine cap;
 - a reachable synthetic SQL Server on a named Docker network;
 - an empty access-controlled output directory;
 - the six `DPONE_IT_MSSQL_*` variables required by the live fixture;
@@ -67,6 +69,15 @@ container network namespace settles; readiness time is excluded from transport
 phase timings. Exhausting the readiness deadline fails the cell and therefore
 the complete campaign.
 
+The versioned campaign uses a 48 MiB encoded/IPC frame ceiling, one extra
+pending slot, two encoders, and up to two TDS writers. The wide profile adds an
+8,192-row ceiling: one million rows require at most 123 raw stages plus the one
+prepared-stage reservation under the 128-table limit. Each runner container has
+a 2 GiB cgroup limit. The runner samples its cgroup memory, records the observed
+peak and all resource settings in its v3 receipt, and rejects missing memory
+evidence or an OOM-killed cell. These limits apply to the synthetic campaign;
+normal manifests keep their existing configurable defaults.
+
 | Failed phase | Exit | Files retained |
 |---|---:|---|
 | image build or identity check | non-zero | Docker may retain build cache/image; `image.json` is absent |
@@ -83,5 +94,7 @@ Each fixture runs in a fresh container and Python process. This prevents ODBC,
 multiprocessing, or companion-process state from one fixture affecting another
 fixture's result.
 
-All four certification schemas are v2. v1 candidate receipts are rejected;
-rerun the producers rather than editing or translating evidence by hand.
+The image, transport evidence, and campaign schemas remain v2. The runner
+receipt is v3 because it binds the resource policy and observed container peak
+memory to every execution. Earlier runner receipts are rejected; rerun the
+producers rather than editing or translating evidence by hand.

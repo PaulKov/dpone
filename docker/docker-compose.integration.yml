@@ -192,7 +192,7 @@ services:
       # explicit cap SQL Server can claim almost the whole VM and the kernel
       # may kill it during wide-route certification instead of letting the
       # engine spill intermediate work to disk.
-      MSSQL_MEMORY_LIMIT_MB: ${DPONE_IT_MSSQL_MEMORY_LIMIT_MB:-3072}
+      MSSQL_MEMORY_LIMIT_MB: ${DPONE_IT_MSSQL_MEMORY_LIMIT_MB:-2048}
     ports:
       - "${DPONE_IT_MSSQL_PORT_FORWARD:-51433}:1433"
     healthcheck:

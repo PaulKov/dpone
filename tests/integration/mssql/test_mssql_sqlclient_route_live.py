@@ -59,6 +59,20 @@ def test_sqlclient_transport_certification_matrix(tmp_path: Path, fixture_id: st
 
     case = sqlclient_live_case(fixture_id)
     force_kill = os.environ.get("DPONE_SQLCLIENT_FORCE_KILL") == "1"
+    expected_max_rows = 5_000 if force_kill else 8_192 if fixture_id == "wide100-sqlclient-v1" else 65_536
+    max_rows = int(os.environ.get("DPONE_SQLCLIENT_CERT_MAX_ROWS", str(expected_max_rows)))
+    max_bytes = int(os.environ.get("DPONE_SQLCLIENT_CERT_MAX_BYTES", str(48 << 20)))
+    max_pending = int(os.environ.get("DPONE_SQLCLIENT_CERT_MAX_PENDING", "1"))
+    max_staging_tables = int(os.environ.get("DPONE_SQLCLIENT_CERT_MAX_STAGING_TABLES", "128"))
+    encoding_parallelism = int(os.environ.get("DPONE_SQLCLIENT_CERT_ENCODING_PARALLELISM", "2"))
+    if (max_rows, max_bytes, max_pending, max_staging_tables, encoding_parallelism) != (
+        expected_max_rows,
+        48 << 20,
+        1,
+        128,
+        2,
+    ):
+        pytest.fail("SqlClient certification resource policy does not match the versioned campaign")
     target = mssql_connector()
     wait_until_ready("mssql SqlClient certification target", lambda: target.get_records("SELECT 1"))
     suffix = uuid.uuid4().hex[:12]
@@ -125,13 +139,13 @@ def test_sqlclient_transport_certification_matrix(tmp_path: Path, fixture_id: st
     limits = NativeChunkLimits(
         max_total_encoded_bytes=16 << 30,
         stage_allocated_bytes_stop_threshold=32 << 30,
-        max_rows=5_000 if force_kill else 65_536,
-        max_bytes=256 << 20,
+        max_rows=max_rows,
+        max_bytes=max_bytes,
         max_row_bytes=1 << 20,
-        max_pending=2,
-        max_staging_tables=128,
+        max_pending=max_pending,
+        max_staging_tables=max_staging_tables,
         parallelism=2 if force_kill else 1,
-        encoding_parallelism=2,
+        encoding_parallelism=encoding_parallelism,
         import_parallelism=import_parallelism,
     )
     context = compose_native_stage_context(
