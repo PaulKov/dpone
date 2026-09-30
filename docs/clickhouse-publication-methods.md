@@ -24,6 +24,9 @@ storage/CAS building blocks. The [one-shot native publisher](clickhouse-native-p
 adds local execution exclusion and conservative transport closure. Protected
 observation, candidate sealing, owner release and production composition remain
 separate, unimplemented gates; no complete backend is bundled.
+The [protected-publication supplement](feature-design-clickhouse-protected-publication.md)
+documents the proposed next lifecycle/observer/backend increment. Its RESEARCHED
+status does not enable the feature or change existing v1 journal behavior.
 
 ## Selection policy
 

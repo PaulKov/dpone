@@ -556,6 +556,7 @@ nav:
       - Feature design - declarative replay quality: feature-design-declarative-replay-quality.md
       - Feature design - guarded ClickHouse publication method: feature-design-clickhouse-publication-method.md
       - Feature design - dpone-only ClickHouse authority: feature-design-clickhouse-dpone-only-authority.md
+      - Feature design - protected ClickHouse publication: feature-design-clickhouse-protected-publication.md
       - ClickHouse authority journal foundation: clickhouse-authority-journal.md
       - ClickHouse one-shot native publisher: clickhouse-native-publication.md
       - ClickHouse transport closure runbook: runbooks/clickhouse-publication-closure.md
