@@ -108,6 +108,7 @@ jobs:
           mkdir -p "${CERT_ROOT}/route-evidence" "${RUNNER_TEMP}/sqlclient-junit"
           route_test() {
             docker run --rm \
+              --user "$(id -u):$(id -g)" \
               --network docker_default \
               --platform linux/amd64 \
               --memory 2g --memory-swap 2g \

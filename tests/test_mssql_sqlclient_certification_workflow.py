@@ -28,6 +28,7 @@ def test_native_sqlclient_certification_workflow_is_exact_commit_and_fail_closed
     assert "test_clickhouse_mssql_default_native_runtime_live.py" in steps
     assert "DPONE_SQLCLIENT_CERT_LAYOUT_VERSION" in steps
     assert "DPONE_CERTIFICATION_IMAGE_SHA256" in steps
+    assert '--user "$(id -u):$(id -g)"' in steps
     assert "assert_junit_executed.py" in steps
     assert "--min-passed 1 --max-skipped 0" in steps
     assert "--min-passed 3 --max-skipped 0" in steps
