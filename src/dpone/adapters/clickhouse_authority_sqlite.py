@@ -20,6 +20,7 @@ from dpone.adapters.clickhouse_authority_storage import AuthorityStorage, Author
 from dpone.contracts.clickhouse_authority import (
     AuthorityConflict,
     AuthorityError,
+    AuthorityStorageIdentity,
     AuthoritySubject,
     DispatchGrant,
     OperationBinding,
@@ -70,6 +71,11 @@ class SQLitePublicationAuthority:
         require_text(deployment_id)
         with _storage_errors():
             AuthorityStorage.provision(path, deployment_id)
+
+    def execution_identity(self) -> AuthorityStorageIdentity:
+        """Return checked local identity without provisioning or granting dispatch."""
+        with _storage_errors():
+            return self._storage.execution_identity()
 
     def acquire(self, operation_id: str, subject: AuthoritySubject, candidate: str) -> OperationBinding:
         binding = OperationBinding(operation_id, subject, candidate, 1)

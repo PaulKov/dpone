@@ -17,6 +17,16 @@ class AuthorityConflict(AuthorityError):
     """An existing owner or irreversible transition conflicts with this request."""
 
 
+@dataclass(frozen=True)
+class AuthorityStorageIdentity:
+    """Local validated store identity, not a grant or portable recovery receipt."""
+
+    path: str
+    device: int
+    inode: int
+    deployment_id: str
+
+
 def require_text(value: str) -> None:
     """Reject ambiguous identity rather than trimming or coercing it."""
     if type(value) is not str or not value or value != value.strip() or "\x00" in value:

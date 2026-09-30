@@ -14,6 +14,8 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
+from dpone.contracts.clickhouse_authority import AuthorityStorageIdentity
+
 SCHEMA_VERSION = "dpone.clickhouse.authority.v1"
 _SIDECAR_SUFFIXES = ("-wal", "-shm", "-journal")
 _SCHEMA = """
@@ -112,6 +114,11 @@ class AuthorityStorage:
             sidecar = Path(str(self.path) + suffix)
             if sidecar.exists() or sidecar.is_symlink():
                 _private(sidecar, directory=False)
+
+    def execution_identity(self) -> AuthorityStorageIdentity:
+        """Verify the existing database before deriving its local exclusion key."""
+        with self.connection():
+            return AuthorityStorageIdentity(str(self.path), *self._identity, self.deployment_id)
 
     @contextmanager
     def connection(self) -> Iterator[sqlite3.Connection]:

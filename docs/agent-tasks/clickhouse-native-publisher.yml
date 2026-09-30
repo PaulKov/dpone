@@ -1,0 +1,97 @@
+schema_version: 1
+task_id: DPONE-CLICKHOUSE-NATIVE-PUBLISHER
+title: One-shot native ClickHouse publisher and conservative closure
+goal: Implement authority-bound local exclusion and one native publication without replay or route activation
+specification: docs/feature-design-clickhouse-dpone-only-authority.md
+base_commit: 343dec2597b1360dbeac8823c48f7241a242e442
+integrator: root
+acceptance_criteria:
+  - All dispatch uses the original protected binding and acknowledged volatile grant
+  - Per-subject execution exclusion cannot be selected by endpoint alias or caller lock path
+  - Lost send-entry acknowledgement emits zero network calls
+  - Exactly one fixed statement and positively consumed successful native EndOfStream precede terminal persistence
+  - Faults and process death retain uncertain transport and target ownership without replay
+  - Actual owned Docker tests prove mutation effects and response-loss quarantine on the frozen candidate
+  - Observer, candidate sealing, owner release, ODBC activation and release remain outside this increment
+public_contract_impact:
+  level: compatible
+  surfaces: [Python API, documentation]
+  migration_required: false
+owned_paths:
+  - src/dpone/adapters/clickhouse_authority_storage.py
+  - src/dpone/adapters/clickhouse_authority_sqlite.py
+  - src/dpone/adapters/clickhouse_authority_execution_lock.py
+  - src/dpone/adapters/clickhouse_native_publication.py
+  - src/dpone/runtime/sinks/clickhouse_authority_publisher.py
+  - tests/test_clickhouse_authority_execution_lock.py
+  - tests/test_clickhouse_native_publication.py
+  - tests/test_clickhouse_authority_publisher.py
+  - tests/integration/test_clickhouse_native_publication.py
+  - tests/integration/clickhouse_native_publication_support.py
+  - docs/clickhouse-native-publication.md
+  - docs/runbooks/clickhouse-publication-closure.md
+  - docs/clickhouse-authority-journal.md
+integrator_owned_paths:
+  - src/dpone/contracts/clickhouse_authority.py
+  - src/dpone/contracts/clickhouse_native_publication.py
+  - src/dpone/ports/clickhouse_publication_transport.py
+  - docs/feature-design-clickhouse-dpone-only-authority.md
+  - docs/clickhouse-publication-methods.md
+  - docs/superpowers/plans/2026-09-30-clickhouse-native-publisher.md
+  - docs/agent-tasks/clickhouse-native-publisher.yml
+  - docs/quality-metrics.md
+  - CHANGELOG.md
+  - mkdocs.yml
+read_only_paths:
+  - src/dpone/ports/clickhouse_publication.py
+  - src/dpone/contracts/clickhouse_publication.py
+  - src/dpone/runtime/sinks/clickhouse_guarded_publication.py
+  - src/dpone/adapters/clickhouse_publication_codec.py
+  - tests/test_clickhouse_authority_sqlite.py
+  - tests/test_clickhouse_authority_processes.py
+  - tests/test_clickhouse_guarded_publication.py
+  - docs/adr/0078-method-aware-clickhouse-publication.md
+forbidden_paths:
+  - src/dpone/contracts/clickhouse_authority.py
+  - src/dpone/contracts/clickhouse_native_publication.py
+  - src/dpone/ports/clickhouse_publication_transport.py
+  - docs/feature-design-clickhouse-dpone-only-authority.md
+  - docs/clickhouse-publication-methods.md
+  - docs/superpowers/plans/2026-09-30-clickhouse-native-publisher.md
+  - docs/agent-tasks/clickhouse-native-publisher.yml
+  - docs/quality-metrics.md
+  - pyproject.toml
+  - uv.lock
+  - .github/workflows
+  - CHANGELOG.md
+  - mkdocs.yml
+  - tests/conftest.py
+  - tests/integration/conftest.py
+shared_file_owner: root
+dependencies: [DPONE-CLICKHOUSE-AUTHORITY-FOUNDATION]
+required_checks:
+  focused:
+    - Native request and packet lifecycle unit tests
+    - Authority-bound thread and fresh-process exclusion tests
+    - Grant consumption and lost-ack closure tests with real SQLite
+    - Existing authority, codec, kernel and legacy retry-safety tests
+  broad:
+    - Change-aware validation selector
+    - Ruff lint and format, mypy, import rules
+    - Layer metrics and exact-commit module size
+    - Full non-live pytest suite
+    - Documentation, generated references, language contracts and strict MkDocs
+  live:
+    - Owned Docker Desktop Linux direct ClickHouse method and native response-loss tests
+    - Source, driver, image, server and fault-activation identity recorded
+    - Whole-route and deployment security certification remain UNVERIFIED
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - The new written implementation plan has not been reviewed by the maintainer.
