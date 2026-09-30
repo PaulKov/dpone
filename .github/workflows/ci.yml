@@ -804,7 +804,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: uv sync --locked --all-extras
+        # This contract suite does not exercise the Linux-only companion. Avoid
+        # native build side effects before the exact-source cleanliness receipt.
+        run: uv sync --locked --all-extras --no-install-package dpone-mssql-sqlclient
       - name: Run parser serialization scheduling and interval contracts
         run: |
           set -euo pipefail
@@ -893,7 +895,9 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: uv sync --locked --all-extras
+        # This PostgreSQL/ClickHouse smoke does not exercise the Linux-only
+        # companion. Keep its exact-source receipt free of native build output.
+        run: uv sync --locked --all-extras --no-install-package dpone-mssql-sqlclient
       - name: Record public service image identities
         run: |
           set -euo pipefail

@@ -31,6 +31,7 @@
     "docs/mssql-sqlclient-installation.md",
     "docs/mssql-sqlclient-reference.md",
     "docs/mssql-sqlclient-transport.md",
+    "docs/quality-metrics.md",
     "docs/reference/manifest-schemas.md",
     "docs/release.md",
     "docs/source-sink-matrix.md",
@@ -137,6 +138,7 @@
     "tests/integration/mssql/test_clickhouse_mssql_target_local_runtime_live.py",
     "tests/integration/mssql/test_mssql_sqlclient_route_live.py",
     "tests/pypi_prepublication_test_support.py",
+    "tests/test_agent_policy_select_checks.py",
     "tests/test_clickhouse_native_source.py",
     "tests/test_github_workflow_governance.py",
     "tests/test_load_governance_manifest_contracts.py",
@@ -270,8 +272,8 @@
     }
   ],
   "control_surface_changed": true,
-  "generated_at": "2026-09-30T08:19:39+00:00",
-  "head_commit": "84ec08fe4374ed9fcd87c8c265ab997ac890d216",
+  "generated_at": "2026-09-30T08:41:00+00:00",
+  "head_commit": "d63ec3bc2551f25f64c7be5685d3e874d4950f84",
   "risks": [
     "AG-001",
     "AG-002",

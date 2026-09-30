@@ -65,6 +65,8 @@ def test_smoke_is_synthetic_and_checks_actual_nonempty_junit():
     assert smoke["env"]["DPONE_RUN_INTEGRATION"] == "1"
     assert smoke["env"]["DPONE_IT_CH_HTTP_PORT"] == "8123"
     for name in ("acceptance-contracts", "bounded-window-smoke"):
+        install = next(step for step in jobs[name]["steps"] if step.get("name") == "Install dependencies")
+        assert install["run"] == "uv sync --locked --all-extras --no-install-package dpone-mssql-sqlclient"
         scripts = "\n".join(step.get("run", "") for step in jobs[name]["steps"])
         assert "--junitxml=" in scripts
         assert "--verify-junit" in scripts
