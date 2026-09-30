@@ -14,7 +14,7 @@ was accepted on 2026-09-30. For the new binding it supersedes this page's
 no-SETTINGS profile, unchanged-selector assumption and new-enrollment storage
 version. Other invariants and historical versions remain unchanged. The revised
 [implementation plan](superpowers/plans/2026-09-30-clickhouse-table-compatibility.md)
-still needs review before settings-aware production changes.
+has been separately approved; its prerequisite gates precede settings-aware production changes.
 
 ## Executive summary
 

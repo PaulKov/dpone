@@ -107,4 +107,4 @@ New ADRs should include status, context, decision, consequences, and links to re
 
 - [ADR 0079: Protected ClickHouse candidate lifecycle and explicit authority v2 (Accepted for staged implementation)](adr/0079-protected-clickhouse-candidate-lifecycle.md)
 
-- [ADR 0080: Separate ClickHouse configuration identity and method compatibility (Accepted for staged design)](adr/0080-clickhouse-table-compatibility-policy.md)
+- [ADR 0080: Separate ClickHouse configuration identity and method compatibility (Accepted for staged implementation)](adr/0080-clickhouse-table-compatibility-policy.md)

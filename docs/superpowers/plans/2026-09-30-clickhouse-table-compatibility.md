@@ -10,7 +10,7 @@
 
 **Spec:** [Approved table-compatibility amendment](../../feature-design-clickhouse-table-compatibility.md), [protected-publication parent](../../feature-design-clickhouse-protected-publication.md), [ADR 0080](../../adr/0080-clickhouse-table-compatibility-policy.md).
 
-**Status:** READY FOR PLAN REVIEW. The maintainer approved the written specification on 2026-09-30. This revised plan has not yet been approved or executed. Native execution in this session remains selected; no new execution-method choice is needed.
+**Status:** APPROVED; Task 1 structural feasibility FAILED. The maintainer separately approved this written plan and its path contract with `approve` after commit `9553698e8374df4e4af0c5c2a4e4cc0f4cd9acda`. Native execution remains selected; root is the sole writer. Dependent production implementation has not started. The execution record below distinguishes observed failure from hypothetical projections.
 
 **Base:** `5075a1e50ff7d1f3d670423fe196f970ab65e873`, branch `codex/clickhouse-native-publisher-locale-base`, PR #249. The [new task contract](../../agent-tasks/clickhouse-table-compatibility.yml) takes precedence only for this increment after plan review.
 
@@ -150,6 +150,39 @@ creation. This does not prove resistance to a malicious same-user administrator.
   may be introduced merely to change graph denominators.
 - [ ] Commit the probe and its reviewed conclusions, preserve raw immutable
   artifacts, and update PR #249. Task 2 is blocked if either prerequisite fails.
+
+### Task 1 execution record: structural prerequisite not passed
+
+The structural branch was checked before creating the live provenance fixture.
+The repository's actual strict tests returned two FAIL and two PASS in 19.90 s.
+The failed tests are the current-repository clustering and pre-release
+cross-layer-budget checks in `tests/test_architecture_fitness_gate.py`.
+
+| Graph | Clustering | Cross-layer ratio | Runtime-to-contracts edges |
+|---|---|---|---|
+| Observed preserved working tree | 0.1834111671 | 0.3008428359 | 214 |
+| Hypothetical named-module implementation | 0.1853563479 | 0.3034645206 | 218 |
+| Hypothetical shared-CAS extraction | 0.1852286488 | 0.3034943070 | 218 |
+
+The observed values exceed the existing 0.182 clustering and 0.300 strict ratio
+limits. Projections use the repository producers with an explicit 21-module
+import map; they are not measurements of unwritten code, a universal lower
+bound or proof that every possible architecture fails. They do not establish
+the required passing whole-plan design. The proposed CAS extraction alone does
+not repair the plan. Future SLOC envelopes remain estimates.
+
+Local reproducible evidence is in
+`test_artifacts/clickhouse-table-compatibility-20260930-structural/`:
+`architecture_projection.py`, `architecture-projection.json` and
+`architecture-baseline.log`. The JSON identifies HEAD plus every working-tree
+Python source hash, including the preserved uncommitted candidate work.
+
+Task 1 is incomplete. Docker Desktop availability was checked, but no new
+container was created and no live probe was run: provenance is SKIP/UNVERIFIED,
+not PASS. No settings-aware production source, thresholds, baselines or old
+evidence were changed. The next implementation decision needs a concrete
+cohesive boundary redesign and amended exact path ownership; changing a module's
+layer label or allowing two more imports alone is not a demonstrated solution.
 
 ## Task 2: Typed settings, descriptors and deterministic policy
 
@@ -539,7 +572,7 @@ Task 3; CREATE/INSERT → Task 4; seal/selection/recovery → Task 5; self-servi
 diagnostics → Task 6; documentation/certification/rollout → Task 7. Each Review
 Focus case has an owning regression test. No old evidence becomes new evidence.
 
-The specification is approved; this plan still requires maintainer review.
-After review, execute Native with root as sole writer. Task 1 is an explicit
+The specification and this plan are approved. Execute Native with root as sole
+writer. Task 1 is an explicit
 feasibility gate: provenance and graph compliance are not yet certified, and a
 failed result must not be silently treated as permission for later tasks.

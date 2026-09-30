@@ -1,6 +1,6 @@
 # ADR 0080: Separate ClickHouse configuration identity and method compatibility
 
-- Status: Accepted for staged design; implementation plan awaiting review
+- Status: Accepted for staged implementation; approved plan prerequisites in progress
 - Date: 2026-09-30
 - Approval: maintainer approval of the written table-compatibility specification
 

@@ -1,7 +1,7 @@
 # Feature design: self-service ClickHouse table compatibility
 
 - Status: APPROVED
-- Implementation: [revised Native plan](superpowers/plans/2026-09-30-clickhouse-table-compatibility.md) and [path contract](agent-tasks/clickhouse-table-compatibility.yml), awaiting separate plan review
+- Implementation: [approved Native plan](superpowers/plans/2026-09-30-clickhouse-table-compatibility.md) and [path contract](agent-tasks/clickhouse-table-compatibility.yml); structural prerequisite failed, dependent implementation not started
 - Decision: [ADR 0080](adr/0080-clickhouse-table-compatibility-policy.md)
 - Owner: dpone maintainers
 - Issue: settings-aware amendment to PR #249
@@ -44,8 +44,9 @@ after reviewing commit `5075a1e50ff7d1f3d670423fe196f970ab65e873`, including
 the default-block/optional-warn boundary. This amendment replaces the parent's
 no-SETTINGS profile, unchanged-selector assumption and new-enrollment storage
 version for the new binding; other safety rules stay. Approval is not evidence
-of implementation or certification. The revised implementation plan requires
-separate review before production edits.
+of implementation or certification. The revised implementation plan at commit
+`9553698e8374df4e4af0c5c2a4e4cc0f4cd9acda` was subsequently separately approved.
+Its provenance and structural feasibility gates precede dependent production edits.
 
 ## Personas and customer journey
 
@@ -698,9 +699,10 @@ reverse EXCHANGE, target ALTER or new operation over retained names.
 
 ## Agent execution boundaries
 
-Root is the sole integrator/shared-file owner. This turn writes only this
-specification, its navigation/backlink and design-review evidence; it does not
-expand the existing implementation contract or mark it approved.
+Root is the sole integrator/shared-file owner. The approved implementation plan
+and exact path contract govern execution; area names below are not independent
+write authorization. Its structural prerequisite has not passed, so no
+dependent settings-aware production implementation is authorized to proceed.
 
 | Role | Future owned scope after a reviewed path contract | Read-only | Forbidden |
 |---|---|---|---|
@@ -724,7 +726,7 @@ No worker may interpret this area list as a wildcard write authorization.
 - [x] Test, certification, documentation, rollout and rollback criteria exist.
 - [x] Implementation ownership and required plan amendment are explicit.
 - [x] Maintainer approves this written specification as `APPROVED`.
-- [ ] Revised implementation plan and exact path contract are separately reviewed.
+- [x] Revised implementation plan and exact path contract are separately reviewed.
 
-Approved for implementation planning. Implementation, live certification,
+Approved for staged implementation subject to the plan's prerequisites. Implementation, live certification,
 production readiness and release readiness are not established by this document.
