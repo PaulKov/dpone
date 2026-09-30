@@ -1,0 +1,36 @@
+schema_version: 1
+task_id: DPONE-PUBLICATION-V2
+title: Guarded method-aware ClickHouse publication
+goal: Implement a safe reusable kernel without weakening existing route gates
+specification: docs/feature-design-clickhouse-publication-method.md
+base_commit: 5e69077fd79e6c5870a6e2e6da4d7f274c0562ae
+integrator: root
+acceptance_criteria:
+  - Method selection never retains stale full-refresh partitions
+  - Recovery never dispatches a second DDL
+  - Existing v1 receipts and runtime defaults remain unchanged
+public_contract_impact:
+  level: compatible
+  surfaces: [Python API, documentation]
+  migration_required: false
+owned_paths:
+  - src/dpone/contracts/clickhouse_publication.py
+  - src/dpone/ports/clickhouse_publication.py
+  - src/dpone/runtime/sinks/clickhouse_guarded_publication.py
+  - tests/test_clickhouse_guarded_publication.py
+  - docs/feature-design-clickhouse-publication-method.md
+  - docs/clickhouse-publication-methods.md
+integrator_owned_paths: [docs, CHANGELOG.md, mkdocs.yml]
+read_only_paths: [src, tests]
+forbidden_paths: [pyproject.toml, uv.lock, .github/workflows]
+shared_file_owner: root
+dependencies: []
+required_checks:
+  focused: [pytest tests/test_clickhouse_guarded_publication.py]
+  broad: [ruff, mypy, architecture, docs, non-live pytest]
+  live: [UNVERIFIED until concrete backend and approved environment exist]
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Missing protected backend prevents production activation
