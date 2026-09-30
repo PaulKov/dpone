@@ -22,6 +22,8 @@ from dpone.contracts.mssql_generic_transaction_names import (
     TARGET_IDENTITY_REGISTRY_TABLE,
     TARGET_IDENTITY_REGISTRY_TRIGGER,
 )
+from dpone.manifest.clickhouse_raw_snapshot_policy import native_source_snapshot_policy
+from dpone.manifest.errors import ManifestConfigurationError
 from dpone.manifest.mssql_native_policy import (
     native_import_backend,
     native_limits,
@@ -30,14 +32,58 @@ from dpone.manifest.mssql_native_policy import (
 )
 
 
+def validate_source_snapshot_plan(config: Any, source_type: str, sink_type: str) -> None:
+    """Reject an explicit snapshot on an incompatible route before generic planning."""
+    native = config.options.get("native_transfer")
+    if not isinstance(native, Mapping) or "source_snapshot" not in native:
+        return
+    try:
+        snapshot = native_source_snapshot_policy(config)
+    except ValueError as error:
+        raise ManifestConfigurationError(
+            "mssql_native.source_snapshot_mode_invalid: source.options.native_transfer.source_snapshot "
+            "requires mode=query_visible, or mode=exact_raw_rows with "
+            "replica_scope=single_server|connected_replica; additional fields are not allowed."
+        ) from error
+    wire, execution = native.get("wire"), native.get("execution")
+    chunking = execution.get("chunking") if isinstance(execution, Mapping) else None
+    route_supported = (
+        source_type == "clickhouse"
+        and sink_type == "mssql"
+        and isinstance(wire, Mapping)
+        and wire.get("mode") == "typed_binary"
+        and wire.get("binary_format") == "mssql_native"
+        and isinstance(chunking, Mapping)
+        and chunking.get("mode") == "bounded_stream"
+    )
+    if "source_snapshot" in native and not route_supported:
+        raise ManifestConfigurationError(
+            "mssql_native.source_snapshot_route_unsupported: source_snapshot requires the "
+            "ClickHouse to MSSQL typed_binary/mssql_native route with bounded_stream chunking."
+        )
+    if snapshot.mode != "exact_raw_rows":
+        return
+    try:
+        target_local = native_verification_backend(config).value == "target_local"
+    except ValueError:
+        target_local = False
+    if not target_local:
+        raise ManifestConfigurationError(
+            "mssql_native.raw_snapshot_requires_target_local_verification: set "
+            "source.options.native_transfer.execution.verification_backend=target_local "
+            "to retain the durable identity and source-free recovery required by exact_raw_rows."
+        )
+
+
 def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
     """Replace generic transfer projections only for the complete native opt-in."""
     native = config.options.get("native_transfer")
     if not isinstance(native, Mapping):
         return
+    snapshot = native_source_snapshot_policy(config)
     wire, execution = native.get("wire"), native.get("execution")
     chunking = execution.get("chunking") if isinstance(execution, Mapping) else None
-    if not (
+    route_supported = (
         plan["source"]["type"] == "clickhouse"
         and plan["sink"]["type"] == "mssql"
         and isinstance(wire, Mapping)
@@ -45,7 +91,8 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
         and wire.get("binary_format") == "mssql_native"
         and isinstance(chunking, Mapping)
         and chunking.get("mode") == "bounded_stream"
-    ):
+    )
+    if not route_supported:
         return
     if not isinstance(execution, Mapping):
         return
@@ -81,6 +128,13 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
         authored["verification_strategy"] = (
             "persisted_hash_and_mutation_watermark" if layout_version == 2 else "canonical_target_readback"
         )
+    if "source_snapshot" in native:
+        authored["source_snapshot"] = {
+            "mode": snapshot.mode,
+            "replica_scope": snapshot.replica_scope,
+            "authority": "declared",
+            "live_observation": "not_run",
+        }
     if "verification_backend" in execution:
         verifier = native_verification_backend(config)
         authored["verification_backend"] = verifier.value

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from types import TracebackType
 from typing import Any, Literal
 
@@ -63,3 +64,24 @@ class ClickHouseSchemaStabilityGuard:
 
 
 __all__ = ["ClickHouseSchemaStabilityGuard"]
+
+
+def source_identifier(value: str) -> str:
+    """Quote only the existing closed native source identifier grammar."""
+    if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", value):
+        raise ValueError("mssql_native.source_identifier_invalid")
+    return f"`{value}`"
+
+
+def admit_source_type(value: str) -> None:
+    """Retain the lossless native type allowlist for both source modes."""
+    normalized = value
+    if normalized.startswith("Nullable(") and normalized.endswith(")"):
+        normalized = normalized[9:-1]
+    if re.fullmatch(r"(?:U?Int(?:8|16|32|64)|Float(?:32|64)|String|UUID|Date|Date32|Bool)", normalized):
+        return
+    if re.fullmatch(r"Decimal\((?:[1-9]|[12][0-9]|3[0-8]),\s*\d+\)", normalized):
+        return
+    if re.fullmatch(r"DateTime(?:\('UTC'\))?|DateTime64\([0-6](?:,\s*'UTC')?\)", normalized):
+        return
+    raise ValueError("mssql_native.source_type_unsupported")

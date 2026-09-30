@@ -2,8 +2,19 @@
 
 ## Unreleased
 
+### Added
+
+- Add explicit `exact_raw_rows` source semantics for bounded native delivery
+  from ReplacingMergeTree, preserving query-visible versions and duplicates
+  without `FINAL`. A pinned native TLS session binds relation, read settings,
+  policies and part provenance to existing target-local identity and EOF
+  evidence; recovery validates this evidence before target access and does not
+  reopen the source. Existing plain MergeTree defaults remain unchanged.
+
 ### Fixed
 
+- Forward a configured ClickHouse `ca_cert` to the native driver's CA option,
+  preserving certificate and hostname verification for private authorities.
 - Build the SqlClient companion with the pinned .NET SDK in runtime-image
   candidate verification so the complete five-distribution inventory is present.
 - Accept the byte-identical setuptools `src/*.egg-info/PKG-INFO` copy while

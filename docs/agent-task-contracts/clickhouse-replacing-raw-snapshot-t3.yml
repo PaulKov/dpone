@@ -1,0 +1,51 @@
+schema_version: 1
+task_id: "DPONE-CH-RAW-SNAPSHOT-T3"
+title: "Bind raw snapshot identity and source-free recovery"
+goal: "Carry the frozen raw profile through existing native identity, EOF metadata, count parity, and recovery."
+specification: "docs/feature-specs/clickhouse-replacing-raw-snapshot.md"
+base_commit: "28aea0d9439ab3f24e0fb39800a041a6b6d661ed"
+integrator: "root integrator"
+acceptance_criteria:
+  - "Omitted mode keeps legacy source binding, recovery-plan v1/v2, identity, and completion bytes unchanged."
+  - "Exact mode atomically co-binds the versioned marker, bounded EOF extension, and existing verified receipts."
+  - "Source EOF rows equal stage-complete rows and workload digest uses existing verified native_typed_sum values."
+  - "Pre-EOF custody settlement remains available; sealed recovery validates before runtime bindings or target connection and never opens source."
+public_contract_impact:
+  level: compatible
+  surfaces: ["MSSQL native durable identity, EOF metadata, and recovery"]
+  migration_required: false
+owned_paths:
+  - src/dpone/runtime/mssql_native_application_assembly.py
+  - src/dpone/runtime/mssql_native_recovery_composition.py
+  - src/dpone/runtime/sinks/mssql_native_completed_payload.py
+  - src/dpone/runtime/sinks/mssql_native_prepare.py
+  - src/dpone/runtime/sinks/mssql_native_staged_load.py
+  - src/dpone/app/mssql_native_recovery_application.py
+  - tests/test_mssql_native_application.py
+  - tests/test_mssql_native_recovery_inspection.py
+  - tests/test_mssql_native_raw_snapshot_recovery.py
+integrator_owned_paths: []
+read_only_paths:
+  - docs/feature-specs/clickhouse-replacing-raw-snapshot.md
+  - src/dpone/contracts/clickhouse_raw_snapshot.py
+  - src/dpone/manifest/clickhouse_raw_snapshot_policy.py
+  - src/dpone/runtime/sources/clickhouse_native_source.py
+  - src/dpone/contracts/mssql_native_verification.py
+  - src/dpone/adapters/mssql_native_recovery_plan.py
+  - src/dpone/adapters/mssql_native_recovery_journal.py
+forbidden_paths: [pyproject.toml, uv.lock, CHANGELOG.md, mkdocs.yml, .github/workflows, src/dpone/schema, tests/conftest.py]
+shared_file_owner: "root integrator"
+dependencies: ["T1 frozen interfaces and hashes", "T2 frozen source signatures and artifact attributes"]
+required_checks:
+  focused: ["uv run pytest tests/test_mssql_native_application.py tests/test_mssql_native_recovery_inspection.py tests/test_mssql_native_raw_snapshot_recovery.py tests/test_mssql_native_persisted_recovery.py -q"]
+  broad: ["uv run ruff check owned paths", "uv run mypy --config-file mypy.ini owned production modules", "uv run dpone docs check-import-rules", "uv run dpone docs check-layer-metrics --baseline docs/layer_metrics_baseline.json", "uv run dpone docs check-module-size with exact base/head"]
+  live: []
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - "Required edit falls outside owned_paths."
+  - "Approved specification is missing or contradicted."
+  - "Public-contract impact is larger than declared."
+  - "A live check requires unapproved credentials or environment."
+  - "Another writer owns the same semantic contract."

@@ -150,6 +150,7 @@ class ClickHouseConnector(AbstractConnector):
                 send_receive_timeout=self.send_receive_timeout,
                 client_name=self.application_name,
                 settings=self.settings or None,
+                **({"ca_certs": self.ca_cert} if self.ca_cert else {}),
             )
         return self._client
 

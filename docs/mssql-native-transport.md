@@ -93,12 +93,109 @@ omits `strategy.window` and replaces the complete target under its existing
 catalog-preservation policy. Do not combine a native window with legacy
 `partition` options.
 
-Only one local plain `MergeTree` table in an `Atomic` database is admitted. The
+By default, only one local plain `MergeTree` table in an `Atomic` database is admitted. The
 mandatory source `schema_guard_factory` must exclude ALTER, RENAME, EXCHANGE,
 DROP/recreate and relevant access-policy changes from metadata admission until
 source cleanup. It does not need to freeze ordinary DML. A no-op context manager
 is suitable only for synthetic tests. The source records the nonzero table UUID
 and one query ID. A query ID is not a reusable snapshot token.
+
+### Exact raw rows from ReplacingMergeTree
+
+The opt-in source selector preserves the multiset returned by one ordinary
+non-`FINAL` query. Use the
+[raw snapshot example](../examples/native/clickhouse-replacing-to-mssql-native.yaml):
+
+```yaml
+source:
+  options:
+    native_transfer:
+      source_snapshot:
+        mode: exact_raw_rows
+        replica_scope: single_server
+      execution:
+        verification_backend: target_local
+```
+
+`single_server` requires `ReplacingMergeTree`; `connected_replica` requires
+`ReplicatedReplacingMergeTree` and a directly connected, identified replica.
+Both require an `Atomic` database. Shared engines, views, Distributed tables,
+custom SQL and ambiguous endpoints fail admission. BCP remains the default;
+the existing SqlClient selector and resource limits are independent. Set
+`execution.verification_backend: target_local` for raw mode: its durable v2
+identity is required for source-free recovery. Raw mode with Python readback
+fails before I/O; legacy manifests retain their defaults.
+
+Raw mode also inherits the [target-local layout matrix](#target-local-p1-layout-matrix).
+For example, a ReplacingMergeTree `is_deleted UInt8` column normally maps to
+`tinyint`, which this verifier does not admit. Preserve its values through an
+explicit lossless `bigint` target mapping and provision the matching target:
+
+```yaml
+sink:
+  options:
+    physical_design:
+      columns:
+        is_deleted:
+          target_type:
+            mssql: bigint
+```
+
+The schema planner validates that mapping; it does not bypass target admission.
+Other unsupported wire types require their own supported mapping or a separately
+qualified verifier extension. Raw mode cannot fall back to Python readback.
+
+Use a direct native TLS connection with certificate and hostname verification;
+set the connection's `ca_cert` when the server uses a private CA. The raw session
+has one host and rejects automatic reconnect or replica rotation. Its catalog
+permission must expose relation, column, policy, settings, mutation and part
+metadata. Missing permissions or unsupported metadata fail before success.
+
+The physical inventory is bounded to 8,192 active parts. A bounded window must
+use `toYYYYMM`, `toYYYYMMDD` or `toDate` on its UTC time column as the partition
+expression; unsupported partition expressions fail admission. Patch partitions
+are included conservatively. Timezone-less timestamp window columns require
+proven UTC server and session calendars; explicitly UTC timestamp columns are
+independent of those defaults. Inherited `limit`, `offset` and `extremes` are
+neutralized and sorting overflow throws. Unsupported additional table/result
+filters are rejected, never cleared; normal row policies remain enforced.
+Use the stable error codes and remediation in
+[raw snapshot troubleshooting](errors/DPONE_MSSQL_NATIVE_SOURCE_SNAPSHOT_UNSUPPORTED.md).
+
+Raw rows are the query-visible versions that still exist when the SELECT
+acquires its snapshot. Background merges may already have removed older
+versions. dpone preserves identical duplicates and treats version and deletion
+marker columns as ordinary values. It does not run `FINAL`, deduplicate, or
+reconstruct insertion history. Normal access policies, lightweight-delete masks
+and supported patch parts still apply.
+
+Start with `dpone plan examples/native/clickhouse-replacing-to-mssql-native.yaml
+--format json`. Planning reports declared semantics and pending live admission;
+it performs no credential lookup or network access. Supply the normal explicit
+UTC execution interval when running the example. Runtime checks the exact
+source relation, schema, TLS authority, settings, policies and replica before
+the data query. Pipeline `check --connections` is configuration-only and is not
+a source snapshot certificate.
+
+At EOF, `completion_metadata.source_snapshot_v1` binds the bounded source
+profile and EOF descriptors to the existing verified stage receipts. Hidden
+part provenance is removed before target encoding. Physical part checksums
+describe storage; the typed multiset digest verifies delivered values.
+`endpoint_authority_agreement` means the observed endpoints agree; it does not
+prove the absence of an intermediate change or equality with another replica.
+
+Before EOF, settle the existing writer and target custody before starting a new
+invocation. Unknown custody remains held. After verified EOF, recovery validates
+the selector, source marker, descriptor hashes, schema, window and row count
+before opening the target; it never reconnects to ClickHouse. Use the existing
+native recovery commands below. Removing the selector affects future runs only
+and does not authorize cleanup of an uncertain publication.
+
+Certification of this new source mode is **UNVERIFIED** until its own exact-build
+synthetic route, TLS, replica and recovery matrix is retained. Existing plain
+MergeTree or writer-only receipts do not certify raw snapshot support. See the
+[approved source contract](feature-specs/clickhouse-replacing-raw-snapshot.md)
+for the required cells and limitations.
 
 The finite source types include scalar integers through UInt64, float, Decimal
 through precision 38, String, UUID, Date/Date32 and UTC DateTime/DateTime64 through

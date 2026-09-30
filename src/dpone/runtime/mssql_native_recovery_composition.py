@@ -11,6 +11,7 @@ from dpone.runtime.etl.mssql_transaction_admission import ADMISSION_OPTION
 from dpone.runtime.etl.mssql_transaction_request import live_target_coordinates
 from dpone.runtime.governance.quality_execution import QualityExecutionSnapshot
 from dpone.runtime.mssql_native_application import _digest, _NativeRuntimeAssembly
+from dpone.runtime.sinks.mssql_native_completed_payload import validate_raw_snapshot_recovery
 from dpone.runtime.state.mssql_generic_transaction import MssqlGenericTransactionState
 from dpone.runtime.state.mssql_route_preflight import resolve_atomic_mssql_target
 from dpone.runtime.storage_policy import RuntimeStoragePolicy, StoragePreflightService
@@ -27,4 +28,5 @@ __all__ = [
     "_digest",
     "live_target_coordinates",
     "resolve_atomic_mssql_target",
+    "validate_raw_snapshot_recovery",
 ]

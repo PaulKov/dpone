@@ -144,7 +144,7 @@ class MssqlNativeStagedLoadService:
         """Probe publication first; no source or target stage read after commit."""
         from dpone.runtime.sinks.mssql_native_completed_payload import authenticate_recovery_admission
 
-        admission = authenticate_recovery_admission(context, admission)
+        admission = authenticate_recovery_admission(context, admission, config=load_config)
         from dpone.runtime.sinks.load_result import AtomicCommitOutcome
         from dpone.runtime.sinks.mssql_receipt_projection import load_result_from_mssql_receipt
         from dpone.runtime.sinks.strategies.mssql.mssql_transaction_finalization_evidence import (

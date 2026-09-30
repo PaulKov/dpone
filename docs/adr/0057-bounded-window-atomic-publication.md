@@ -107,3 +107,38 @@ finalizer with an authored half-open interval. Its target receipt is resolved
 before any source-free recovery can consider republishing. This does not extend
 the ClickHouse generation-exchange adapter or certify a live SQL Server route.
 See the [composition and recovery guide](../mssql-native-transport.md).
+
+### ReplacingMergeTree raw source extension
+
+The [approved raw snapshot contract](../feature-specs/clickhouse-replacing-raw-snapshot.md)
+adds explicit `exact_raw_rows` source semantics to the same bounded MSSQL route.
+One direct, non-`FINAL` SELECT preserves query-visible version multiplicity and
+normal policy, patch and delete-mask visibility. A connected replica is a local
+snapshot authority, not a cluster-wide freshness guarantee.
+
+Freeze its sanitized profile before constructing the chunk identity. Bind it
+through the existing opaque source-query field with a versioned raw marker;
+seal the bounded EOF descriptor in existing atomic completion metadata. Keep
+recovery-plan versions 1 and 2 and all omitted-mode bytes unchanged. Validate
+the marker, descriptor, schema, window and completed count before source-free
+recovery opens the target. Pre-EOF custody settlement remains available without
+an EOF descriptor, and unknown custody still excludes a new invocation.
+
+This varies source admission and provenance only. BCP/SqlClient staging,
+publication, verification and recovery authorities remain shared. Physical
+before/after agreement is diagnostic evidence; it is not a durable reusable
+source token or proof that no intermediate source change occurred.
+
+The plain query strategy owns its existing metadata admission, rendering and
+lazy row stream separately from raw provenance. The source dispatcher retains
+artifact, guard and lifecycle ownership. This removes newly introduced coupling
+without changing legacy query bytes or cleanup behavior.
+
+The reviewed raw-source extension adds seven inward runtime-to-contract edges
+over its integration base (214 to 221). The layer snapshot is regenerated with
+the documented producer: 10,057 internal edges, 3,017 cross-layer edges and
+cross-layer ratio 0.299990057. Clustering is 0.181818577 and passes the unchanged
+hard budget; directed cycle membership is unchanged. These measurements explain
+the snapshot update and do not create new thresholds, exclusions or debt caps.
+The source owns snapshot-mode dispatch; assembly consumes its optional profile
+instead of parsing the selector again. Legacy profile resolution performs no I/O.
