@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from collections.abc import Callable, Generator, Iterable, Iterator, Sequence
 from contextlib import contextmanager
@@ -22,13 +23,12 @@ from dpone.contracts.bounded_window import (
 from dpone.ports.bounded_window import ExclusiveWindowWriterGuard, WindowBinaryIngest, WindowMetadataStore
 from dpone.runtime.clickhouse_rowbinary import ClickHouseRowBinaryEncoder
 from dpone.runtime.sinks.clickhouse_window_evidence import TypedMultiset
+from dpone.runtime.sinks.clickhouse_window_queries import WindowQueryReader, read_window_metrics
 
 
-class WindowConnector(Protocol):
+class WindowConnector(WindowQueryReader, Protocol):
     """Fresh per-operation ClickHouse connection with streaming readback."""
 
-    def get_records(self, query: str, *, as_dict: bool = False) -> list[Any]: ...
-    def get_records_iterator(self, query: str) -> Iterator[Any]: ...
     def execute_query(self, query: str) -> Any: ...
     def close(self) -> None: ...
 
@@ -42,6 +42,46 @@ def identifier(value: str) -> str:
 
 def literal(value: str) -> str:
     return "'" + value.replace("\\", "\\\\").replace("'", "\\'") + "'"
+
+
+def window_schema_fingerprint(schema: Sequence[tuple[str, str]]) -> str:
+    """Canonical v1 hash of ordered physical ClickHouse names and type strings."""
+    return hashlib.sha256(json.dumps([1, list(schema)], separators=(",", ":")).encode()).hexdigest()
+
+
+def validate_target(io: WindowIO) -> None:
+    """Reject topology or schema capabilities that cannot preserve visible rows.
+
+    The owning target checks plan identity and writer authority first. This
+    inspection performs no mutations.
+    """
+    with io.connection() as connector:
+        database = connector.get_records(f"SELECT engine FROM system.databases WHERE name = {literal(io.database)}")
+        if database != [("Atomic",)]:
+            raise WindowContractError("Window publication requires a local Atomic database")
+        rows = connector.get_records(
+            f"SELECT engine, create_table_query, dependencies_database, dependencies_table FROM system.tables WHERE database = {literal(io.database)} AND name = {literal(io.table)}"
+        )
+        if len(rows) != 1 or rows[0][0] != "MergeTree" or rows[0][2] or rows[0][3]:
+            raise WindowContractError("Window target requires plain MergeTree without dependencies")
+        if re.search(r"\b(TTL|PROJECTION)\b", str(rows[0][1]), re.IGNORECASE):
+            raise WindowContractError("TTL and projections are unsupported for window publication")
+        columns = connector.get_records(
+            f"SELECT name, type, default_kind FROM system.columns WHERE database = {literal(io.database)} AND table = {literal(io.table)} ORDER BY position"
+        )
+        if tuple((str(row[0]), str(row[1])) for row in columns) != io.schema or any(row[2] for row in columns):
+            raise WindowContractError("Physical schema differs or contains computed columns")
+        mutations = connector.get_records(
+            f"SELECT count() FROM system.mutations WHERE database = {literal(io.database)} AND table = {literal(io.table)} AND NOT is_done"
+        )
+        if mutations != [(0,)]:
+            raise WindowContractError("Target has active mutations")
+        policies = connector.get_records(
+            f"SELECT count() FROM system.row_policies WHERE database IN ({literal(io.database)}, '*') "
+            f"AND table IN ({literal(io.table)}, '*')"
+        )
+        if policies != [(0,)]:
+            raise WindowContractError("Row policies may hide target data; window publication is unsupported")
 
 
 @dataclass(frozen=True)
@@ -91,6 +131,37 @@ class WindowIO:
 
     def path(self, name: str) -> Path:
         return self.work_dir / f"{name}.json"
+
+    def generation_total(self, plan: WindowPlan, generation: str) -> int:
+        """Read verified preparation count after the target validates plan identity."""
+        if generation != self.name(plan, "generation"):
+            raise WindowContractError("Generation does not belong to this run")
+        metadata = self.metadata_store.load(self.path(generation))
+        if metadata is None or metadata.get("identity") != [
+            plan.run_id,
+            self.schema_fingerprint,
+            self.physical_target,
+        ]:
+            raise WindowContractError("Verified generation metadata is unavailable")
+        count = metadata.get("count")
+        if isinstance(count, bool) or not isinstance(count, int) or count < 0:
+            raise WindowContractError("Verified generation count is invalid")
+        return count
+
+    def generation_evidence(self, plan: WindowPlan, generation: str) -> dict[str, object]:
+        """Read stored aggregates after the target's generation_total validation.
+
+        This second metadata read preserves existing recovery behavior; neither
+        method inspects current target rows or determines publication status.
+        """
+        metadata = self.metadata_store.load(self.path(generation))
+        evidence = metadata.get("evidence") if metadata else None
+        if metadata is None or not isinstance(evidence, dict):
+            raise WindowContractError("Verified generation aggregate evidence is unavailable")
+        evidence["publish_timing"] = metadata.get(
+            "publish_timing", {"status": "unavailable", "reason": "not_recorded_or_process_loss"}
+        )
+        return evidence
 
     def encoder(self) -> ClickHouseRowBinaryEncoder:
         return ClickHouseRowBinaryEncoder(
@@ -150,44 +221,18 @@ class WindowIO:
     def metrics(
         self, connector: WindowConnector, table: str, start: datetime, end: datetime, *, window_only: bool = False
     ) -> dict[str, Any]:
-        """Read server aggregates; histogram size scales with window calendar days."""
+        """Read server aggregates through the read-only query capability."""
         column = identifier(self.window_column)
         predicate = self.predicate(start, end)
-        where = f" WHERE {predicate}" if window_only else ""
-        null_sql = ", ".join(f"countIf(isNull({identifier(name)}))" for name, _ in self.schema)
-        aggregate = connector.get_records(
-            f"SELECT count(), minOrNull({column}), maxOrNull({column}), "
-            f"countIf(isNull({column}) OR NOT {predicate}), {null_sql} "
-            f"FROM {self.qualified(table)}{where}"
-        )[0]
-
-        def timestamp(value: Any) -> str | None:
-            if value is None:
-                return None
-            if value.tzinfo is None:
-                value = value.replace(tzinfo=timezone.utc)  # noqa: UP017
-            return value.isoformat()
-
-        day_where = where + (" AND " if where else " WHERE ") + f"isNotNull({column})"
-        day_rows = connector.get_records_iterator(
-            f"SELECT formatDateTime({column}, '%Y-%m-%d', 'UTC'), count() FROM {self.qualified(table)}"
-            f"{day_where} GROUP BY formatDateTime({column}, '%Y-%m-%d', 'UTC') "
-            f"ORDER BY formatDateTime({column}, '%Y-%m-%d', 'UTC')"
+        columns = tuple((name, identifier(name)) for name, _ in self.schema)
+        return read_window_metrics(
+            connector,
+            table_sql=self.qualified(table),
+            column_sql=column,
+            predicate_sql=predicate,
+            columns=columns,
+            window_only=window_only,
         )
-        try:
-            days = {str(day): int(count) for day, count in day_rows}
-        finally:
-            close = getattr(day_rows, "close", None)
-            if close:
-                close()
-        return {
-            "row_count": int(aggregate[0]),
-            "min_window_utc": timestamp(aggregate[1]),
-            "max_window_utc": timestamp(aggregate[2]),
-            "outside_window": int(aggregate[3]),
-            "null_counts": {name: int(count) for (name, _), count in zip(self.schema, aggregate[4:], strict=True)},
-            "utc_day_counts": days,
-        }
 
 
 class WindowStaging:

@@ -5,8 +5,8 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import Any
 
-from dpone.contracts.technical_columns import TechnicalColumnCatalog, TechnicalColumnRole
 from dpone.runtime.governance.ports import StagedLoadHandle
+from dpone.runtime.sinks.clickhouse_physical_types import ClickHouseTechnicalColumnPolicy
 from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.merge_policy import (
     MergePolicy,
@@ -103,7 +103,7 @@ class ClickHouseProductionFinalizer:
         return max(0, before - self._sink._count(load_config))
 
     def _soft_delete_missing_keys(self, load_config: Any, staging: Any, unique_key: Sequence[str]) -> int:
-        deleted_at = TechnicalColumnCatalog().name(TechnicalColumnRole.DELETED_AT)
+        deleted_at = ClickHouseTechnicalColumnPolicy().deleted_at_name
         where = (
             f"`{deleted_at}` IS NULL AND NOT ("
             f"{self._sink._staging_finalizer.key_in_staging_condition(staging, unique_key)})"
@@ -240,11 +240,11 @@ class _Scd2Columns:
     @classmethod
     def from_config(cls, load_config: Any) -> _Scd2Columns:
         options = _strategy_options(load_config, "scd2")
-        catalog = TechnicalColumnCatalog()
+        valid_to, is_current, row_hash = ClickHouseTechnicalColumnPolicy().scd2_column_names(options)
         return cls(
-            valid_to=str(options.get("valid_to_column", catalog.name(TechnicalColumnRole.VALID_TO_AT))),
-            is_current=str(options.get("current_flag_column", catalog.name(TechnicalColumnRole.IS_CURRENT))),
-            row_hash=str(options.get("row_hash_column", catalog.name(TechnicalColumnRole.ROW_HASH))),
+            valid_to=valid_to,
+            is_current=is_current,
+            row_hash=row_hash,
             delete_policy=str(options.get("delete_policy", "expire")),
         )
 

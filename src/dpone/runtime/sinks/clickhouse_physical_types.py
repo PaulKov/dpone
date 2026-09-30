@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -25,6 +25,51 @@ class ClickHouseSourceTypeMapper(Protocol):
 
     def resolve_column(self, column: str, source_type: str) -> Any:
         """Return an object exposing a ClickHouse type decision."""
+
+
+@dataclass(frozen=True, slots=True)
+class ClickHouseTechnicalColumnPolicy:
+    """One ClickHouse owner of framework names, types and naming overrides.
+
+    Projection and finalization consume semantic decisions, not independent
+    copies of the technical-column catalog or ClickHouse type table. Injected
+    catalogs retain the existing lineage extension point.
+    """
+
+    catalog: TechnicalColumnCatalog = field(default_factory=TechnicalColumnCatalog)
+
+    @property
+    def row_id_name(self) -> str:
+        return self.catalog.name(TechnicalColumnRole.ROW_ID)
+
+    @property
+    def deleted_at_name(self) -> str:
+        return self.catalog.name(TechnicalColumnRole.DELETED_AT)
+
+    def lineage_schema(self, existing: Collection[str], *, include_row_id: bool = False) -> tuple[tuple[str, str], ...]:
+        """Ordered missing lineage columns with the canonical physical types."""
+        roles = [
+            TechnicalColumnRole.RUN_ID,
+            TechnicalColumnRole.LOAD_ID,
+            TechnicalColumnRole.LOADED_AT,
+            TechnicalColumnRole.EXTRACTED_AT,
+        ]
+        if include_row_id:
+            roles.append(TechnicalColumnRole.ROW_ID)
+        names = {column.lower() for column in existing}
+        return tuple(
+            (self.catalog.name(role), _CLICKHOUSE_TECHNICAL_TYPES[role])
+            for role in roles
+            if self.catalog.name(role).lower() not in names
+        )
+
+    def scd2_column_names(self, options: Mapping[str, object]) -> tuple[str, str, str]:
+        """Preserve configured overrides and the existing string coercion."""
+        return (
+            str(options.get("valid_to_column", self.catalog.name(TechnicalColumnRole.VALID_TO_AT))),
+            str(options.get("current_flag_column", self.catalog.name(TechnicalColumnRole.IS_CURRENT))),
+            str(options.get("row_hash_column", self.catalog.name(TechnicalColumnRole.ROW_HASH))),
+        )
 
 
 @dataclass(frozen=True, slots=True)

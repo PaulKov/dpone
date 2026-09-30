@@ -22,6 +22,36 @@ from dpone.runtime.sinks.load_result import LoadResult
 from dpone.runtime.sinks.merge_policy import MergePolicy
 
 
+def test_scd2_column_defaults_and_explicit_overrides_are_unchanged():
+    from dpone.runtime.sinks.clickhouse_production_finalize import _Scd2Columns
+
+    default = _Scd2Columns.from_config(SimpleNamespace(options={}))
+    assert (default.valid_to, default.is_current, default.row_hash, default.delete_policy) == (
+        "__dpone__valid_to_at",
+        "__dpone__is_current",
+        "__dpone__row_hash",
+        "expire",
+    )
+    custom = _Scd2Columns.from_config(
+        SimpleNamespace(
+            options={
+                "scd2": {
+                    "valid_to_column": "end",
+                    "current_flag_column": "current",
+                    "row_hash_column": "hash",
+                    "delete_policy": "ignore",
+                }
+            }
+        )
+    )
+    assert (custom.valid_to, custom.is_current, custom.row_hash, custom.delete_policy) == (
+        "end",
+        "current",
+        "hash",
+        "ignore",
+    )
+
+
 class FakeConnector:
     def __init__(self, *, null_keys: int = 0, duplicate_keys: int = 0) -> None:
         self.queries: list[str] = []
