@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
 from dpone.ports.clickhouse_cluster_publication import contracts
@@ -22,6 +23,61 @@ class ClickHouseClusterPublicationDdl:
 
     def publication_query_digest(self, record: contracts.AuthorityRecord, *, cluster: str) -> str:
         return contracts.ddl_query_digest(_publication_sql(record, cluster))
+
+    def prove_no_prior_publication(
+        self, record: contracts.AuthorityRecord, *, cluster: str, operation_started_at: datetime
+    ) -> bool:
+        """Corroborate strict PREPARED authority with negative DDL observations.
+
+        A pre-start log row and current logging setting do not prove continuous
+        historical logging. The caller must independently prove initial-version
+        strict authority and all-writer admission. Any observed prior DDL or
+        unavailable observation fails closed.
+        """
+        if not record.authority_write_id:
+            return False
+        hosts = set(self._catalog.inventory(cluster).hosts)
+        params = {
+            "cluster": cluster,
+            "started_at": operation_started_at,
+            "query_id_pattern": f"dpone-cluster-ddl-{record.operation_id[:20]}-%",
+            "publication_query": _publication_sql(record, cluster),
+        }
+        try:
+            settings = self._connector.get_records(
+                "SELECT hostName(), value FROM clusterAllReplicas(%(cluster)s, system.settings) "
+                "WHERE name = 'log_queries'",
+                params,
+            )
+            if {str(host) for host, value in settings if str(value) == "1"} != hosts or len(settings) != len(hosts):
+                return False
+            coverage = self._connector.get_records(
+                "SELECT hostName(), min(event_time) FROM clusterAllReplicas(%(cluster)s, system.query_log) "
+                "WHERE event_time <= %(started_at)s GROUP BY hostName()",
+                params,
+            )
+            if {str(host) for host, _ in coverage} != hosts or len(coverage) != len(hosts):
+                return False
+            if any(start is None or start > operation_started_at for _, start in coverage):
+                return False
+            prior = self._connector.get_records(
+                "SELECT hostName(), count() FROM clusterAllReplicas(%(cluster)s, system.query_log) "
+                "WHERE query_id LIKE %(query_id_pattern)s GROUP BY hostName()",
+                params,
+            )
+            active = self._connector.get_records(
+                "SELECT hostName(), count() FROM clusterAllReplicas(%(cluster)s, system.processes) "
+                "WHERE query_id LIKE %(query_id_pattern)s GROUP BY hostName()",
+                params,
+            )
+            queued = self._connector.get_records(
+                "SELECT count() FROM clusterAllReplicas(%(cluster)s, system.distributed_ddl_queue) "
+                "WHERE query = %(publication_query)s",
+                params,
+            )
+            return not prior and not active and len(queued) == 1 and int(queued[0][0]) == 0
+        except Exception:
+            return False
 
     def cleanup_query_digest(self, record: contracts.AuthorityRecord, *, cluster: str) -> str:
         return contracts.ddl_query_digest(_cleanup_sql(record, cluster))

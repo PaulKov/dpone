@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Any, Protocol
 
 from dpone.contracts import clickhouse_cluster_publication as contracts
@@ -27,6 +28,7 @@ class ClusterPublicationCatalogPort(Protocol):
 
 
 class ClusterPublicationAuthorityPort(Protocol):
+    def supports_linearizable_dispatch_permit(self) -> bool: ...
     def read_versioned(self, target_key: str) -> contracts.VersionedAuthorityRecord | None: ...
     def create_if_absent(self, record: contracts.AuthorityRecord) -> contracts.AuthorityMutationResult: ...
     def compare_and_swap(
@@ -39,6 +41,9 @@ class ClusterPublicationBootstrapPort(Protocol):
 
 
 class ClusterPublicationDdlPort(Protocol):
+    def prove_no_prior_publication(
+        self, record: contracts.AuthorityRecord, *, cluster: str, operation_started_at: datetime
+    ) -> bool: ...
     def publication_query_digest(self, record: contracts.AuthorityRecord, *, cluster: str) -> str: ...
     def cleanup_query_digest(self, record: contracts.AuthorityRecord, *, cluster: str) -> str: ...
     def dispatch_publication(

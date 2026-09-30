@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Guarded original-operation ClickHouse `PREPARED` publication recovery. A
+  read-only preflight, owner-private restart plan, exact confirmation digest,
+  strict KeeperMap dispatch permit and replica/DDL reconciliation prevent blind
+  `EXCHANGE` retries. Legacy ReplacingMergeTree authority and operations lacking
+  strict-origin evidence remain blocked; this does not migrate existing data.
+
 ## 0.88.0 - 2026-09-30
 
 ### Added
