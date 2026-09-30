@@ -1,13 +1,13 @@
 {
   "snapshot": {
-    "cross_layer_edges": 3018,
-    "cross_layer_ratio": 0.30005965400676077,
+    "cross_layer_edges": 3017,
+    "cross_layer_ratio": 0.29999005667694145,
     "excluded_layers": [
       "dpone.compat"
     ],
-    "internal_edges": 10058,
+    "internal_edges": 10057,
     "intra_layer_edges": 7040,
-    "intra_layer_ratio": 0.6999403459932392,
+    "intra_layer_ratio": 0.7000099433230585,
     "layers": 58,
     "max_cross_layer_flow": 221,
     "package_name": "dpone",

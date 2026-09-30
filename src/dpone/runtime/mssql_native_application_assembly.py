@@ -13,7 +13,6 @@ from dpone.adapters.bounded_window_sqlite import SQLiteWindowStore
 from dpone.adapters.mssql_native_chunks_journal import NativeChunkJournal
 from dpone.adapters.mssql_native_recovery_plan import persist_mssql_native_recovery_plan
 from dpone.contracts.clickhouse_raw_snapshot import raw_source_query_binding
-from dpone.manifest.clickhouse_raw_snapshot_policy import native_source_snapshot_policy
 from dpone.manifest.mssql_native_policy import (
     native_import_backend,
     native_limits,
@@ -77,12 +76,9 @@ class _NativeRuntimeAssembly:
                 self.source.connector, value.source_schema, value.source_table
             ),
         )
-        self.snapshot_profile = None
+        self.snapshot_profile = self.native_source.snapshot_profile(config)
         source_query_id = None
-        if native_source_snapshot_policy(config).mode == "exact_raw_rows":
-            self.snapshot_profile = self.native_source.snapshot_profile(config)
-            if self.snapshot_profile is None:
-                raise ValueError("mssql_native.source_snapshot_profile_required")
+        if self.snapshot_profile is not None:
             if (
                 self.snapshot_profile.relation_uuid != self.preplan.source_relation_identity
                 or tuple((name, dtype) for name, dtype, _ in self.snapshot_profile.ordered_schema)

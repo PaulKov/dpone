@@ -136,7 +136,9 @@ without changing legacy query bytes or cleanup behavior.
 
 The reviewed raw-source extension adds seven inward runtime-to-contract edges
 over its integration base (214 to 221). The layer snapshot is regenerated with
-the documented producer: 10,058 internal edges, 3,018 cross-layer edges and
-cross-layer ratio 0.300059654. Clustering is 0.181818385 and passes the unchanged
+the documented producer: 10,057 internal edges, 3,017 cross-layer edges and
+cross-layer ratio 0.299990057. Clustering is 0.181818577 and passes the unchanged
 hard budget; directed cycle membership is unchanged. These measurements explain
 the snapshot update and do not create new thresholds, exclusions or debt caps.
+The source owns snapshot-mode dispatch; assembly consumes its optional profile
+instead of parsing the selector again. Legacy profile resolution performs no I/O.

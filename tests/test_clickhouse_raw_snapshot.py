@@ -151,6 +151,17 @@ def source(connector):
     return ClickHouseNativeSource(connector, schema_guard_factory=lambda cfg: nullcontext())
 
 
+def test_raw_profile_acquisition_cannot_silently_fall_back_to_legacy(monkeypatch):
+    connector = RawConnector()
+    instance = source(connector)
+    monkeypatch.setattr(
+        "dpone.runtime.sources.clickhouse_native_source.RawSnapshot.acquire_profile", lambda *_args: None
+    )
+    with pytest.raises(ValueError, match="mssql_native.source_snapshot_profile_required"):
+        instance.snapshot_profile(raw_config())
+    assert not connector.selects
+
+
 def extract(connector, value=None):
     from dpone.contracts.clickhouse_raw_snapshot import raw_source_query_binding
 

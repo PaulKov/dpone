@@ -1,6 +1,6 @@
 # ClickHouse Replacing Raw Snapshot Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Add an opt-in, exact query-visible non-`FINAL` snapshot for `ReplacingMergeTree` while preserving every legacy native-route byte and recovery invariant.
 
@@ -38,11 +38,11 @@
 - Produces frozen `ClickHouseRawSourceEofV1(vendor_query_id_sha256: str, rows: int, touched_part_coverage_sha256: str, before_physical_profile_sha256: str, after_physical_profile_sha256: str, endpoint_authority_agreement: bool)`; both models provide `document()`, strict `from_document(value: object)`, and `sha256`.
 - Produces `raw_source_query_binding(legacy_source_binding_sha256: str, profile: ClickHouseRawSnapshotProfileV1) -> str`, `raw_source_query_binding_version(value: str) -> int | None`, `raw_snapshot_extension(binding: str, profile: ClickHouseRawSnapshotProfileV1, eof: ClickHouseRawSourceEofV1) -> dict[str, object]`, and `restore_raw_snapshot_extension(value: object, *, binding: str, completed_rows: int) -> tuple[ClickHouseRawSnapshotProfileV1, ClickHouseRawSourceEofV1]`.
 
-- [ ] Write failing tests for closed selector fields, omission, exact constants, canonical round trips/digests, lowercase 64-hex validation, marker domain separation, unknown marker version, bounded extension preimages, row parity, and extra/missing/tampered fields.
-- [ ] Run `uv run pytest tests/test_clickhouse_raw_snapshot_contracts.py tests/test_clickhouse_raw_snapshot_policy.py -q`; require RED for missing interfaces.
-- [ ] Implement only these pure contracts and parser; use existing canonical JSON helpers and stable error codes from the spec.
-- [ ] Re-run focused tests, Ruff on owned files, mypy on owned production modules, import rules, layer metrics, and module-size gate; require PASS.
-- [ ] Freeze exported signatures and file hashes for Tasks 2 and 3; commit only owned paths.
+- [x] Write failing tests for closed selector fields, omission, exact constants, canonical round trips/digests, lowercase 64-hex validation, marker domain separation, unknown marker version, bounded extension preimages, row parity, and extra/missing/tampered fields.
+- [x] Run `uv run pytest tests/test_clickhouse_raw_snapshot_contracts.py tests/test_clickhouse_raw_snapshot_policy.py -q`; require RED for missing interfaces.
+- [x] Implement only these pure contracts and parser; use existing canonical JSON helpers and stable error codes from the spec.
+- [x] Re-run focused tests, Ruff on owned files, mypy on owned production modules, import rules, layer metrics, and module-size gate; require PASS.
+- [x] Freeze exported signatures and file hashes for Tasks 2 and 3; commit only owned paths.
 
 ### Task 2: ClickHouse admission, one-query extraction, and provenance
 
@@ -53,11 +53,11 @@
 - Adds `ClickHouseNativeSource.snapshot_profile(config: Any) -> ClickHouseRawSnapshotProfileV1 | None` and extends `extract(config: Any, *, query_id: str | None = None, expected_profile: ClickHouseRawSnapshotProfileV1 | None = None, source_query_binding: str | None = None) -> ExtractResult`.
 - Exact-raw artifacts expose `raw_snapshot_profile: ClickHouseRawSnapshotProfileV1`, `raw_snapshot_eof: ClickHouseRawSourceEofV1` after EOF, and `source_query_binding: str`; legacy artifacts preserve current attributes and behavior.
 
-- [ ] Write RED tests for exact engine parsing, replica-scope combinations, schema/default/type gates, reserved virtual names, effective settings, policy/role/profile drift, hidden provenance stripping, duplicates/nulls/empty windows, and legacy byte/query behavior.
-- [ ] Add deterministic barrier tests for insert/merge/update/patch/delete-mask changes between preflight, query acquisition, and EOF; assert query-visible patch/mask behavior and endpoint agreement only when checksum profiles match.
-- [ ] Implement profile acquisition before business rows, exact query rendering from bound shape/projection/typed params, one native SELECT, bounded physical profiles, and cleanup/cancellation without source DDL or fallback.
-- [ ] Run `uv run pytest tests/test_clickhouse_native_source.py tests/test_clickhouse_raw_snapshot.py -q`, then Ruff, mypy, import/layer/module-size gates; require PASS.
-- [ ] Record live route certification as N/A for this writer because Task 4 owns it; commit only owned paths.
+- [x] Write RED tests for exact engine parsing, replica-scope combinations, schema/default/type gates, reserved virtual names, effective settings, policy/role/profile drift, hidden provenance stripping, duplicates/nulls/empty windows, and legacy byte/query behavior.
+- [x] Add deterministic barrier tests for insert/merge/update/patch/delete-mask changes between preflight, query acquisition, and EOF; assert query-visible patch/mask behavior and endpoint agreement only when checksum profiles match.
+- [x] Implement profile acquisition before business rows, exact query rendering from bound shape/projection/typed params, one native SELECT, bounded physical profiles, and cleanup/cancellation without source DDL or fallback.
+- [x] Run `uv run pytest tests/test_clickhouse_native_source.py tests/test_clickhouse_raw_snapshot.py -q`, then Ruff, mypy, import/layer/module-size gates; require PASS.
+- [x] Record live route certification as N/A for this writer because Task 4 owns it; commit only owned paths.
 
 ### Task 3: Runtime identity, EOF binding, and source-free recovery
 
@@ -69,11 +69,11 @@
 - `completion_metadata()` adds `source_snapshot_v1` only for exact raw EOF; recovery validation consumes marker, extension, phase/action, schema/window, and completed rows before target binding.
 - Adds `require_raw_snapshot_row_count(payload: Any, complete: NativeStageComplete) -> None` and `validate_raw_snapshot_recovery(config: Any, *, identity: NativeVerificationIdentityV2, projection: Mapping[str, Any], action: str) -> None` in `mssql_native_completed_payload.py`.
 
-- [ ] Write RED golden tests proving omitted-mode identity/recovery-plan/completion bytes are unchanged and no recovery-plan v3 exists.
-- [ ] Write RED tests for profile-before-identity ordering, atomic bounded EOF extension, post-stage source/count parity, existing verified-sum workload digest, and missing/extra/unknown/tampered selector-marker-extension combinations.
-- [ ] Write RED recovery tests proving pre-EOF custody settlement stays available, sealed EOF resume rejects before `ensure_runtime_bindings`/target connection, and valid recovery performs zero source connections.
-- [ ] Implement marker injection, EOF metadata production, post-complete count check, and early recovery validation without changing journal serialization or publication ordering.
-- [ ] Run the three owned test modules plus `tests/test_mssql_native_persisted_recovery.py`, then Ruff, mypy, import/layer/module-size gates; require PASS and commit only owned paths.
+- [x] Write RED golden tests proving omitted-mode identity/recovery-plan/completion bytes are unchanged and no recovery-plan v3 exists.
+- [x] Write RED tests for profile-before-identity ordering, atomic bounded EOF extension, post-stage source/count parity, existing verified-sum workload digest, and missing/extra/unknown/tampered selector-marker-extension combinations.
+- [x] Write RED recovery tests proving pre-EOF custody settlement stays available, sealed EOF resume rejects before `ensure_runtime_bindings`/target connection, and valid recovery performs zero source connections.
+- [x] Implement marker injection, EOF metadata production, post-complete count check, and early recovery validation without changing journal serialization or publication ordering.
+- [x] Run the three owned test modules plus `tests/test_mssql_native_persisted_recovery.py`, then Ruff, mypy, import/layer/module-size gates; require PASS and commit only owned paths.
 
 ### Task 4: Integrator schema, UX, documentation, and certification
 
@@ -81,8 +81,8 @@
 
 **Interfaces:** Consumes final Task 1 schema/constants and Tasks 2–3 behavior; no delegated writer changes shared semantic files.
 
-- [ ] Add RED schema/example/docs contract tests for closed `source_snapshot`, omission compatibility, credential-free plan/doctor, and connection/live-only observations.
-- [ ] Integrate schema, generated references, route matrix, ADR, user guide, runbook, errors, example, changelog, and navigation with runnable discovery→run→evidence→recovery CJM.
+- [x] Add RED schema/example/docs contract tests for closed `source_snapshot`, omission compatibility, credential-free plan/doctor, and connection/live-only observations.
+- [x] Integrate schema, generated references, route matrix, ADR, user guide, runbook, errors, example, changelog, and navigation with runnable discovery→run→evidence→recovery CJM.
 - [ ] Run narrow/wide BCP and SqlClient synthetic route/recovery matrices, including pinned replica/TLS when available; record exact-commit evidence and truthful SKIP/UNVERIFIED cells.
 - [ ] Run change-aware checks, full non-live suite, docs strict build, packaging as applicable, and fresh independent correctness/recovery/data-loss review.
 - [ ] Reconcile findings, update spec status/evidence only from producers, and prepare the single integration commit/PR.

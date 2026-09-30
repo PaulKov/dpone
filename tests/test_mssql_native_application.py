@@ -182,8 +182,10 @@ def test_default_assembly_forwards_existing_sqlclient_writer_observer(monkeypatc
     assert captured["write_observer"] == writer_observations.append
 
 
-@pytest.mark.parametrize("schema_changed", [False, True])
-def test_raw_profile_is_frozen_before_plan_and_forwarded_to_extract(tmp_path, monkeypatch, schema_changed):
+@pytest.mark.parametrize("raw_mode,schema_changed", [(True, False), (True, True), (False, False)])
+def test_snapshot_profile_is_resolved_before_plan_and_preserves_legacy_binding(
+    tmp_path, monkeypatch, raw_mode, schema_changed
+):
     from dpone.contracts.clickhouse_raw_snapshot import raw_source_query_binding
     from dpone.runtime import mssql_native_application_assembly as assembly_module
     from tests.test_mssql_native_raw_snapshot_recovery import _config, _payload
@@ -198,11 +200,16 @@ def test_raw_profile_is_frozen_before_plan_and_forwarded_to_extract(tmp_path, mo
 
         def snapshot_profile(self, config):
             events.append("profile")
-            return profile
+            return profile if raw_mode else None
 
-        def extract(self, config, *, expected_profile, source_query_binding):
-            assert expected_profile is profile
-            assert source_query_binding == raw_source_query_binding(legacy.source_query_id, profile)
+        def extract(self, config, **snapshot_options):
+            if raw_mode:
+                assert snapshot_options["expected_profile"] is profile
+                assert snapshot_options["source_query_binding"] == raw_source_query_binding(
+                    legacy.source_query_id, profile
+                )
+            else:
+                assert snapshot_options == {}
             events.append("extract")
             return SimpleNamespace(
                 artifact=payload.artifact,
@@ -219,6 +226,8 @@ def test_raw_profile_is_frozen_before_plan_and_forwarded_to_extract(tmp_path, mo
         return real_plan(*args, **kwargs)
 
     config = _config()
+    if not raw_mode:
+        config.options["native_transfer"].pop("source_snapshot")
     preplan = SimpleNamespace(
         source_relation_identity=profile.relation_uuid,
         source_schema_sha256=bytes.fromhex(legacy.schema_fingerprint),
@@ -249,7 +258,9 @@ def test_raw_profile_is_frozen_before_plan_and_forwarded_to_extract(tmp_path, mo
         assert events == ["profile"]
         return
     assembly = _NativeRuntimeAssembly(process, config)
-    assert assembly.plan.source_query_id == raw_source_query_binding(legacy.source_query_id, profile)
+    assert assembly.plan.source_query_id == (
+        raw_source_query_binding(legacy.source_query_id, profile) if raw_mode else legacy.source_query_id
+    )
     with assembly._source(config, None):
         pass
     assert events == ["profile", "plan", "extract"]

@@ -90,7 +90,10 @@ class ClickHouseNativeSource:
         try:
             if self._raw_snapshot is None:
                 self._raw_snapshot = RawSnapshot(self.connector, config)
-            return self._raw_snapshot.acquire_profile(config)
+            profile = self._raw_snapshot.acquire_profile(config)
+            if profile is None:
+                raise ValueError("mssql_native.source_snapshot_profile_required")
+            return profile
         except BaseException as primary:
             try:
                 self.connector.connection.disconnect()
