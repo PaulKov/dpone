@@ -13,6 +13,10 @@
   replay and cloned sinks, validates the SQL endpoint on every owned session,
   and rejects unsupported selections before source I/O. Existing manifests
   retain their backend selection.
+- Add the internal owner-private, bounded atomic plan-file adapter for the
+  upcoming publication operator workflow. Concurrent writers cannot overwrite
+  an existing plan; ambiguous directory-sync outcomes preserve completed
+  evidence for readback. Operator commands are not yet activated.
 
 ### Fixed
 
