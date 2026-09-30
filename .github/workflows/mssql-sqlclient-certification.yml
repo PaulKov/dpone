@@ -145,7 +145,7 @@ jobs:
           uv run python tools/ci/assert_junit_executed.py \
             --junit "${RUNNER_TEMP}/sqlclient-junit/default-runtime.xml" \
             --sanitized-junit-output "${CERT_ROOT}/route-evidence/default-runtime.xml" \
-            --min-passed 3 --max-skipped 0 \
+            --min-passed 13 --max-skipped 0 \
             --profile sqlclient-default-runtime --commit-sha "${GITHUB_SHA}" \
             --evidence-json "${CERT_ROOT}/route-evidence/default-runtime-execution.json"
 

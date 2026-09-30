@@ -111,7 +111,7 @@ The approved certification environment requires a native x86-64 Linux Docker
 daemon. ARM emulation remains useful for diagnosis but cannot certify this
 route. Runner receipt v4 records the daemon architecture; campaign v3 requires
 `amd64`. The exact-master GitHub workflow runs the seven transport cells and
-five full-route cases in the same immutable image, rejects skipped route tests,
+fifteen full-route cases in the same immutable image, rejects skipped route tests,
 and retains their receipts. SQL Server uses a 3 GiB engine cap on a host with at
 least 8 GiB available. This changes certification authority only; the selected
 writer and runtime invocation contracts are unchanged.

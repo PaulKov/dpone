@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import json
 import os
+import shutil
+import signal
 import sys
 import textwrap
 import time
@@ -67,7 +70,8 @@ def _companion(tmp_path: Path) -> Path:
     script.write_text(
         textwrap.dedent(
             f"""
-            import json, os, struct, subprocess, sys, time
+            import json, os, stat, struct, subprocess, sys, time
+            from pathlib import Path
 
             def read_frame(stream):
                 header = stream.read(4)
@@ -91,6 +95,14 @@ def _companion(tmp_path: Path) -> Path:
                 secret_payload = read_frame(stream)
             request = json.loads(request_payload)
             credentials = json.loads(secret_payload)
+            if '--home-marker' in sys.argv:
+                marker = Path(sys.argv[sys.argv.index('--home-marker') + 1])
+                home = Path(os.environ['HOME'])
+                assert home.is_absolute() and home.is_dir()
+                assert stat.S_IMODE(home.stat().st_mode) == 0o700
+                probe = home / 'writable'
+                probe.write_text('ok')
+                marker.write_text(json.dumps({{'home': str(home), 'environment': sorted(os.environ)}}))
             if mode == 'success':
                 assert credentials['password'] == {SECRET!r}
                 assert {SECRET!r} not in ' '.join(sys.argv)
@@ -183,6 +195,114 @@ def test_supervisor_projects_secret_only_through_inherited_pipe(tmp_path: Path) 
     assert observation.input_rows_consumed == 7
     assert observation.writer_identity_sha256 == WRITER_ID
     assert observation.runtime_identity_sha256 == RUNTIME_ID
+
+
+@pytest.mark.parametrize("mode", ["success", "failure"])
+def test_supervisor_gives_child_isolated_private_home_and_removes_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mode: str
+) -> None:
+    marker = tmp_path / "child-home"
+    monkeypatch.setenv("HOME", str(tmp_path / "ambient-home"))
+    monkeypatch.setenv("DPONE_TEST_PARENT_SECRET", SECRET)
+
+    _writer(tmp_path, mode, "--home-marker", str(marker)).write(_request(tmp_path), deadline=_deadline())
+
+    child = json.loads(marker.read_text())
+    child_home = Path(child["home"])
+    assert set(child["environment"]) <= {
+        "PATH",
+        "DOTNET_NOLOGO",
+        "DOTNET_CLI_TELEMETRY_OPTOUT",
+        "HOME",
+        "LC_CTYPE",
+        "__CF_USER_TEXT_ENCODING",
+    }
+    assert "DPONE_TEST_PARENT_SECRET" not in child["environment"]
+    assert child_home != Path(os.environ["HOME"])
+    assert not child_home.exists()
+
+
+def test_supervisor_removes_isolated_home_after_timeout(tmp_path: Path) -> None:
+    marker = tmp_path / "child-home"
+
+    observation = _writer(tmp_path, "sleep", "--home-marker", str(marker)).write(
+        _request(tmp_path), deadline=_deadline(2.0)
+    )
+
+    assert observation.classification == "timeout"
+    assert marker.exists()
+    child = json.loads(marker.read_text())
+    assert not Path(child["home"]).exists()
+
+
+def test_supervisor_removes_isolated_home_after_launch_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    launched_environment = {}
+
+    def fail_launch(*_args, **kwargs):
+        launched_environment.update(kwargs["env"])
+        raise OSError("synthetic launch failure")
+
+    monkeypatch.setattr("dpone.runtime.mssql_sqlclient_process.subprocess.Popen", fail_launch)
+
+    observation = _writer(tmp_path, "success").write(_request(tmp_path), deadline=_deadline())
+
+    assert observation.classification == "custody_lost"
+    assert not Path(launched_environment["HOME"]).exists()
+
+
+def test_supervisor_classifies_private_home_cleanup_failure(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    private_home = tmp_path / "private-home"
+
+    def create_home(**_kwargs: object) -> str:
+        private_home.mkdir(mode=0o700)
+        return str(private_home)
+
+    def fail_cleanup(_path: str) -> None:
+        raise OSError("synthetic cleanup failure with private path")
+
+    monkeypatch.setattr("dpone.runtime.mssql_sqlclient_process.mkdtemp", create_home)
+    monkeypatch.setattr("dpone.runtime.mssql_sqlclient_process.shutil.rmtree", fail_cleanup)
+
+    observation = _writer(tmp_path, "success").write(_request(tmp_path), deadline=_deadline())
+
+    assert observation.classification == "cleanup_failed"
+    assert str(private_home) not in repr(observation)
+
+
+def test_supervisor_retains_private_home_while_child_settlement_is_unknown(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = tmp_path / "child-home"
+    started: list[int] = []
+    writer = MssqlSqlClientStageWriter(
+        (
+            sys.executable,
+            str(_companion(tmp_path)),
+            "--mode",
+            "sleep",
+            "--home-marker",
+            str(marker),
+        ),
+        credentials_provider=lambda _request: _credentials(),
+        writer_identity_sha256=WRITER_ID,
+        runtime_identity_sha256=RUNTIME_ID,
+        cleanup_reserve_seconds=0.25,
+        process_started=lambda process_id, _request: started.append(process_id),
+    )
+    monkeypatch.setattr("dpone.runtime.mssql_sqlclient_process._terminate_group", lambda *_args, **_kwargs: False)
+
+    observation = writer.write(_request(tmp_path), deadline=_deadline(2.0))
+
+    assert observation.classification == "cleanup_failed"
+    assert len(started) == 1
+    child_home = Path(json.loads(marker.read_text())["home"])
+    assert child_home.is_dir()
+    os.kill(started[0], 0)
+    try:
+        os.killpg(started[0], signal.SIGKILL)
+        os.waitpid(started[0], 0)
+    finally:
+        shutil.rmtree(child_home)
 
 
 def test_supervisor_reports_started_process_for_external_liveness_observation(tmp_path: Path) -> None:

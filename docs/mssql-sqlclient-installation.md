@@ -31,7 +31,7 @@ returns a closed readiness document with stable `blocker_codes`.
    a different writer or layout identity.
 
 Candidate certification v1 receipts are not migration inputs. Version 0.88.0
-requires v2 image, runner, cell, and campaign receipts regenerated from the
+requires image/cell v2, runner v4, and campaign v3 receipts regenerated from the
 exact clean commit.
 
 ## Remove or roll back
@@ -61,3 +61,14 @@ grant.
 | `mssql_sqlclient.artifact_identity_mismatch` | Replace the changed package tree; never bypass the digest. |
 | `mssql_sqlclient.application_identity_unverified` | Replace the image; Python and C# session identity do not agree. |
 | `mssql_sqlclient.companion_unavailable` | Inspect the image and reinstall the exact package. |
+
+## Container user and temporary home
+
+The companion supports a non-root numeric UID without an `/etc/passwd` entry.
+For each writer launch, the supervisor supplies a private writable `HOME` with
+mode `0700`, then removes it after the process has settled. If process termination
+cannot be confirmed, the directory is retained and cleanup remains unresolved.
+This lets SqlClient
+initialize its TLS support without inheriting the host user's home or credentials.
+The runtime must be able to create temporary directories; no operator-supplied
+`HOME` or shared writable home is required.

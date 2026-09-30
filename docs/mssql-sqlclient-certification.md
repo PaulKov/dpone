@@ -45,7 +45,12 @@ The workflow rejects a different checkout, event commit, branch, or non-native
 Docker architecture. It builds the immutable image, runs all seven transport
 cells, then checks the complete synthetic ClickHouse → MSSQL route for both
 layouts and default-runtime success, interrupted extraction, and recovery after
-publication. JUnit gates require all five route cases to execute without skips.
+publication. JUnit gates require all fifteen route cases to execute without skips. The default
+runtime matrix includes raw and prepared stage mutation rejection for INSERT,
+UPDATE, DELETE, TRUNCATE, and same-count DELETE plus INSERT. Its small schema
+exercises nullable and non-nullable framing for every SqlClient type, including
+NULL and signed bigint extrema. Each injected mutation must block publication
+and reject source-free resume while retaining custody for operator inspection.
 The retained `mssql-sqlclient-certification-<run>-<attempt>` artifact contains
 image, runner, campaign, and route receipts. Require the entire workflow to
 succeed; `campaign.json` alone certifies only the seven transport cells.
