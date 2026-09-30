@@ -10,21 +10,24 @@ import re
 import secrets
 import sqlite3
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict, replace
 from pathlib import Path
 
-from dpone.adapters.clickhouse_authority_storage import AuthorityStorage
-from dpone.adapters.clickhouse_publication_codec import decode_record, encode_record
+from dpone.adapters import clickhouse_publication_codec as codec
+from dpone.adapters.clickhouse_authority_storage import AuthorityStorage, AuthorityStorageError
 from dpone.contracts.clickhouse_authority import (
     AuthorityConflict,
     AuthorityError,
     AuthoritySubject,
     DispatchGrant,
-    JournalEntry,
     OperationBinding,
     TransportState,
+    require_text,
 )
 from dpone.contracts.clickhouse_publication import (
+    JournalEntry,
     PublicationIntent,
     PublicationObservation,
     PublicationRecord,
@@ -32,22 +35,48 @@ from dpone.contracts.clickhouse_publication import (
 )
 
 
+@contextmanager
+def _storage_errors() -> Iterator[None]:
+    try:
+        yield
+    except AuthorityStorageError as error:
+        raise AuthorityError("Authority storage unavailable; retain ownership") from error
+
+
+def _encode(record: PublicationRecord) -> str:
+    try:
+        return codec.encode_record(record)
+    except codec.PublicationRecordCodecError as error:
+        raise AuthorityError("Invalid durable publication record") from error
+
+
+def _decode(payload: str) -> PublicationRecord:
+    try:
+        return codec.decode_record(payload)
+    except codec.PublicationRecordCodecError as error:
+        raise AuthorityError("Invalid durable publication record") from error
+
+
 class SQLitePublicationAuthority:
     """Explicitly provisioned local authority. No expiry, handoff or release API."""
 
     def __init__(self, path: Path, deployment_id: str) -> None:
-        self._storage = AuthorityStorage(path, deployment_id)
+        require_text(deployment_id)
+        with _storage_errors():
+            self._storage = AuthorityStorage(path, deployment_id)
 
     @staticmethod
     def provision(path: Path, deployment_id: str) -> None:
-        AuthorityStorage.provision(path, deployment_id)
+        require_text(deployment_id)
+        with _storage_errors():
+            AuthorityStorage.provision(path, deployment_id)
 
     def acquire(self, operation_id: str, subject: AuthoritySubject, candidate: str) -> OperationBinding:
         binding = OperationBinding(operation_id, subject, candidate, 1)
         if subject.deployment_id != self._storage.deployment_id:
             raise AuthorityError("Foreign deployment")
         payload = json.dumps(asdict(subject), sort_keys=True, separators=(",", ":"))
-        with self._storage.transaction() as db:
+        with _storage_errors(), self._storage.transaction() as db:
             existing = db.execute("SELECT 1 FROM operations WHERE operation_id=?", (operation_id,)).fetchone()
             if existing:
                 if self._binding(db, operation_id) != binding:
@@ -61,7 +90,7 @@ class SQLitePublicationAuthority:
                 "INSERT INTO operations(operation_id,subject_key,candidate,query_id) VALUES (?,?,?,?)",
                 (operation_id, subject.key, candidate, query_id),
             )
-            db.execute("INSERT INTO history VALUES (?,0,'acquire','not_started',NULL)", (operation_id,))
+            db.execute("INSERT INTO history VALUES (?,0,'acquire','not_started',NULL,NULL,NULL)", (operation_id,))
         return binding
 
     @staticmethod
@@ -81,7 +110,7 @@ class SQLitePublicationAuthority:
             raise AuthorityError("Invalid original binding") from error
 
     def binding(self, operation_id: str) -> OperationBinding:
-        with self._storage.connection() as db:
+        with _storage_errors(), self._storage.connection() as db:
             return self._binding(db, operation_id)
 
     @staticmethod
@@ -99,7 +128,7 @@ class SQLitePublicationAuthority:
         binding = self._binding(db, row["operation_id"])
         if row["record"] is None:
             return None
-        record = decode_record(row["record"])
+        record = _decode(row["record"])
         expected = (binding.subject.server_id, binding.subject.database, binding.subject.target, binding.candidate)
         if (
             record.intent.operation_id != binding.operation_id
@@ -110,21 +139,24 @@ class SQLitePublicationAuthority:
         intent = json.dumps(asdict(record.intent), sort_keys=True, separators=(",", ":"))
         if intent != row["intent"]:
             raise AuthorityError("Stored immutable intent changed")
-        return JournalEntry(record, row["revision"])
+        try:
+            return JournalEntry(record, row["revision"])
+        except ValueError as error:
+            raise AuthorityError("Invalid durable publication revision") from error
 
     def prepare(self, binding: OperationBinding, intent: PublicationIntent) -> JournalEntry:
         """Create an exact immutable intent, never adopt a divergent retry."""
-        payload = encode_record(PublicationRecord(intent, PublicationState.PREPARED))
+        payload = _encode(PublicationRecord(intent, PublicationState.PREPARED))
         expected = (binding.subject.server_id, binding.subject.database, binding.subject.target, binding.candidate)
         if intent.operation_id != binding.operation_id or intent.before.subject != expected:
             raise AuthorityConflict("Intent does not belong to the retained subject")
-        with self._storage.transaction() as db:
+        with _storage_errors(), self._storage.transaction() as db:
             if self._binding(db, binding.operation_id) != binding:
                 raise AuthorityConflict("Stale binding")
             row = self._row(db, binding.operation_id)
             entry = self._entry(db, row)
             if entry is not None:
-                if encode_record(entry.record) != payload:
+                if _encode(entry.record) != payload:
                     raise AuthorityConflict("Preparation cannot replace an existing record")
                 return entry
             self._update(
@@ -139,7 +171,7 @@ class SQLitePublicationAuthority:
 
     def read(self, operation_id: str) -> JournalEntry | None:
         """Read a registered operation's record; no grant is exposed."""
-        with self._storage.connection() as db:
+        with _storage_errors(), self._storage.connection() as db:
             return self._entry(db, self._row(db, operation_id))
 
     @staticmethod
@@ -154,14 +186,24 @@ class SQLitePublicationAuthority:
             raise AuthorityConflict("Authority revision changed")
         payload = str(changes.get("record", row["record"]))
         digest = hashlib.sha256(payload.encode()).hexdigest()
+        observed = changes.get("observed")
+        observation_digest = hashlib.sha256(str(observed).encode()).hexdigest() if observed is not None else None
         db.execute(
-            "INSERT INTO history VALUES (?,?,?,?,?)",
-            (row["operation_id"], revision, event, changes.get("transport", row["transport"]), digest),
+            "INSERT INTO history VALUES (?,?,?,?,?,?,?)",
+            (
+                row["operation_id"],
+                revision,
+                event,
+                changes.get("transport", row["transport"]),
+                digest,
+                observed,
+                observation_digest,
+            ),
         )
 
     def claim(self, entry: JournalEntry) -> DispatchGrant | None:
         """Only a positively acknowledged fresh CAS returns its volatile secret."""
-        with self._storage.transaction() as db:
+        with _storage_errors(), self._storage.transaction() as db:
             row = self._row(db, entry.record.intent.operation_id)
             current = self._entry(db, row)
             if (
@@ -177,7 +219,7 @@ class SQLitePublicationAuthority:
                 db,
                 row,
                 "claim",
-                {"record": encode_record(claimed), "grant_hash": hashlib.sha256(grant.secret.encode()).hexdigest()},
+                {"record": _encode(claimed), "grant_hash": hashlib.sha256(grant.secret.encode()).hexdigest()},
             )
         return grant
 
@@ -197,7 +239,7 @@ class SQLitePublicationAuthority:
 
     def begin_send(self, grant: DispatchGrant) -> None:
         """Spend the sole send permission before any network bytes may be sent."""
-        with self._storage.transaction() as db:
+        with _storage_errors(), self._storage.transaction() as db:
             row = self._grant_row(db, grant)
             if row["transport"] != TransportState.NOT_STARTED:
                 raise AuthorityConflict("Send permission is already consumed or closed")
@@ -205,7 +247,7 @@ class SQLitePublicationAuthority:
 
     def close_without_send(self, operation_id: str) -> None:
         """Compete with send entry; never infer no send from a failed transport."""
-        with self._storage.transaction() as db:
+        with _storage_errors(), self._storage.transaction() as db:
             row = self._row(db, operation_id)
             if self._entry(db, row) is None:
                 raise AuthorityError("Prepare an intent before closing publication")
@@ -218,7 +260,7 @@ class SQLitePublicationAuthority:
             )
 
     def transport_state(self, operation_id: str) -> TransportState:
-        with self._storage.connection() as db:
+        with _storage_errors(), self._storage.connection() as db:
             row = self._row(db, operation_id)
             self._entry(db, row)
             return TransportState(row["transport"])
@@ -227,7 +269,7 @@ class SQLitePublicationAuthority:
         """Persist a trusted publisher's completion; this store cannot prove EOS."""
         if type(completion_digest) is not str or not re.fullmatch("[0-9a-f]{64}", completion_digest):
             raise AuthorityError("Expected canonical completion digest")
-        with self._storage.transaction() as db:
+        with _storage_errors(), self._storage.transaction() as db:
             row = self._grant_row(db, grant)
             if row["transport"] == TransportState.CLOSED_TERMINAL and row["completion_digest"] == completion_digest:
                 return
@@ -249,8 +291,8 @@ class SQLitePublicationAuthority:
             raise AuthorityConflict("Foreign resolution subject")
         observation = json.dumps(asdict(observed), sort_keys=True, separators=(",", ":"), allow_nan=False)
         resolved = replace(entry.record, state=state)
-        payload = encode_record(resolved)
-        with self._storage.transaction() as db:
+        payload = _encode(resolved)
+        with _storage_errors(), self._storage.transaction() as db:
             row = self._row(db, entry.record.intent.operation_id)
             if self._entry(db, row) != entry:
                 raise AuthorityConflict("Stale resolution revision")
@@ -273,12 +315,12 @@ class SQLitePublicationAuthority:
 
     def diagnostics(self, operation_id: str) -> dict[str, object]:
         """Redacted original history, never a dispatch grant or recovery input."""
-        with self._storage.transaction() as db:
+        with _storage_errors(), self._storage.transaction() as db:
             row = self._row(db, operation_id)
             binding = self._binding(db, operation_id)
             entry = self._entry(db, row)
             history = db.execute(
-                "SELECT revision,event,transport,record_digest FROM history WHERE operation_id=? ORDER BY revision",
+                "SELECT revision,event,transport,record_digest,observation_digest FROM history WHERE operation_id=? ORDER BY revision",
                 (operation_id,),
             ).fetchall()
             return {
@@ -294,7 +336,11 @@ class SQLitePublicationAuthority:
                 "completion_digest": row["completion_digest"],
                 "owner_retained": True,
                 "history": [
-                    dict(zip(("revision", "event", "transport", "record_digest"), item, strict=True))
+                    dict(
+                        zip(
+                            ("revision", "event", "transport", "record_digest", "observation_digest"), item, strict=True
+                        )
+                    )
                     for item in history
                 ],
             }

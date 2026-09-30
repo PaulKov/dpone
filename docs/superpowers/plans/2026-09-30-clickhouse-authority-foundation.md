@@ -53,6 +53,7 @@
 | Path | Responsibility |
 |---|---|
 | `src/dpone/contracts/clickhouse_authority.py` | Canonical subject, binding, transport states, grant and errors |
+| `src/dpone/contracts/clickhouse_publication.py` | Revisioned `JournalEntry` beside existing publication values; no change to method choice |
 | `src/dpone/adapters/clickhouse_publication_codec.py` | Strict versioned canonical serialization of existing publication records |
 | `src/dpone/adapters/clickhouse_authority_storage.py` | Create-once/open-existing storage, identity and transaction lifecycle |
 | `src/dpone/adapters/clickhouse_authority_sqlite.py` | Ownership, immutable preparation, claim/send/close/resolution CAS |
@@ -63,7 +64,17 @@
 
 If storage and state policy cannot remain cohesive within existing budgets, stop
 and revise this map before adding arbitrary `part_1` modules. Do not import
-runtime classes into adapters; errors and value types live in contracts.
+runtime classes into adapters; public authority errors and values live in contracts.
+Private storage/codec failures stay local and are translated at the authority boundary.
+
+Review amendment (2026-09-30): the integrator also owns
+`src/dpone/contracts/clickhouse_publication.py` solely to place the new
+`JournalEntry` beside `PublicationRecord`. Existing publication values, method
+choice and kernel interfaces remain unchanged. This separates revisioned
+publication snapshots from ownership capabilities; no compatibility reexports
+or new generic modules are added. Direct invalid `JournalEntry` values raise
+`ValueError`, consistent with the publication contract; invalid persisted values
+surface as `AuthorityError`. These APIs have not been released.
 
 ## Task 1: Immutable identity and strict record codec
 

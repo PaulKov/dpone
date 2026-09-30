@@ -5,15 +5,15 @@ from dataclasses import replace
 
 import pytest
 
-from dpone.adapters.clickhouse_publication_codec import decode_record, encode_record
+from dpone.adapters.clickhouse_publication_codec import PublicationRecordCodecError, decode_record, encode_record
 from dpone.contracts.clickhouse_authority import (
     AuthorityError,
     AuthoritySubject,
     DispatchGrant,
-    JournalEntry,
     OperationBinding,
 )
 from dpone.contracts.clickhouse_publication import (
+    JournalEntry,
     PublicationObservation,
     PublicationRecord,
     PublicationState,
@@ -74,14 +74,20 @@ def test_corrupt_record_rejected(path, value):
     for key in path[:-1]:
         node = node[key]
     node[path[-1]] = value
-    with pytest.raises(AuthorityError):
+    with pytest.raises(PublicationRecordCodecError):
         decode_record(json.dumps(payload))
 
 
 @pytest.mark.parametrize("payload", ['{"state":"prepared","state":"claimed"}', '{"x":NaN}', "[]", "null"])
 def test_duplicate_keys_and_nonfinite_or_wrong_shape_rejected(payload):
-    with pytest.raises(AuthorityError):
+    with pytest.raises(PublicationRecordCodecError):
         decode_record(payload)
+
+
+def test_codec_encoding_uses_its_own_validation_error():
+    record = example_record()
+    with pytest.raises(PublicationRecordCodecError):
+        encode_record(replace(record, intent=replace(record.intent, method="invalid")))
 
 
 def test_subject_identity_excludes_endpoint_alias_and_table_uuid():
@@ -105,5 +111,5 @@ def test_binding_rejects_reused_target_as_candidate():
 
 def test_grant_repr_redacts_secret_and_entry_requires_revision():
     assert "private-token" not in repr(DispatchGrant("deployment:one", 1, "private-token"))
-    with pytest.raises(AuthorityError):
+    with pytest.raises(ValueError):
         JournalEntry(example_record(), True)

@@ -6,7 +6,6 @@ import json
 from dataclasses import asdict
 from typing import Any
 
-from dpone.contracts.clickhouse_authority import AuthorityError
 from dpone.contracts.clickhouse_publication import (
     PublicationIntent,
     PublicationObservation,
@@ -15,6 +14,10 @@ from dpone.contracts.clickhouse_publication import (
     PublicationTable,
     choose_publication,
 )
+
+
+class PublicationRecordCodecError(ValueError):
+    """Malformed or noncanonical serialized publication data, independent of storage."""
 
 
 def _object(value: Any, keys: str) -> dict[str, Any]:
@@ -105,7 +108,7 @@ def decode_record(payload: str) -> PublicationRecord:
             raise ValueError("Invalid claim history")
         return PublicationRecord(intent, state, claimed)
     except (TypeError, ValueError, KeyError, RecursionError) as error:
-        raise AuthorityError("Invalid durable publication record") from error
+        raise PublicationRecordCodecError("Invalid durable publication record") from error
 
 
 def encode_record(record: PublicationRecord) -> str:
@@ -120,4 +123,4 @@ def encode_record(record: PublicationRecord) -> str:
             raise ValueError("Noncanonical publication record")
         return payload
     except (TypeError, ValueError, RecursionError) as error:
-        raise AuthorityError("Invalid durable publication record") from error
+        raise PublicationRecordCodecError("Invalid durable publication record") from error

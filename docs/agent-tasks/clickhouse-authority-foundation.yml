@@ -26,6 +26,7 @@ owned_paths:
   - tests/test_clickhouse_authority_processes.py
   - docs/clickhouse-authority-journal.md
 integrator_owned_paths:
+  - src/dpone/contracts/clickhouse_publication.py
   - docs/feature-design-clickhouse-dpone-only-authority.md
   - docs/superpowers/plans/2026-09-30-clickhouse-authority-foundation.md
   - docs/agent-tasks/clickhouse-authority-foundation.yml
@@ -34,7 +35,6 @@ integrator_owned_paths:
   - CHANGELOG.md
   - mkdocs.yml
 read_only_paths:
-  - src/dpone/contracts/clickhouse_publication.py
   - src/dpone/ports/clickhouse_publication.py
   - src/dpone/runtime/sinks/clickhouse_guarded_publication.py
   - src/dpone/adapters/bounded_window_sqlite.py
@@ -42,6 +42,7 @@ read_only_paths:
   - docs/import-rules.md
   - docs/engineering-standards.md
 forbidden_paths:
+  - src/dpone/contracts/clickhouse_publication.py
   - pyproject.toml
   - uv.lock
   - .github/workflows

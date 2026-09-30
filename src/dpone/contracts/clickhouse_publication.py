@@ -91,6 +91,20 @@ class PublicationRecord:
     schema_version: str = "dpone.clickhouse.guarded-publication.v2"
 
 
+@dataclass(frozen=True)
+class JournalEntry:
+    """Exact durable publication revision for CAS; not execution authority."""
+
+    record: PublicationRecord
+    revision: int
+
+    def __post_init__(self) -> None:
+        if type(self.revision) is not int or not 0 < self.revision <= (1 << 63) - 1:
+            raise ValueError("Expected a positive SQLite revision")
+        if not isinstance(self.record, PublicationRecord):
+            raise ValueError("Expected a publication record")
+
+
 def choose_publication(operation_id: str, observed: PublicationObservation) -> PublicationIntent:
     """Choose only from complete protected evidence; never force partition DDL."""
     if not isinstance(operation_id, str) or not operation_id.strip():

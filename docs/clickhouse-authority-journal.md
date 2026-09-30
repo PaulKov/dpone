@@ -18,6 +18,11 @@ mounts are not a certified production authority. Docker named-volume tests prove
 process behavior, not power-loss durability. All future target mutation ingress
 must use the same authority; the journal cannot enforce database grants itself.
 
+The platform must first durably provision the private authority directory;
+the journal does not create missing directories. Authority filenames cannot end
+in SQLite's `-wal`, `-shm` or `-journal` suffixes. Provisioning refuses occupied
+sidecar names and preserves those files for investigation.
+
 Provision once, separately from ordinary startup. The example deliberately uses
 a temporary private directory for learning, not production durability:
 
@@ -56,6 +61,14 @@ registered server identity rather than letting each caller invent its own alias.
 Database, target and candidate use simple SQL identifiers. Operation IDs require
 the exact deployment prefix followed by `:` and a nonempty operation suffix.
 
+Direct `clickhouse_publication_codec.encode_record` / `decode_record` calls raise
+`PublicationRecordCodecError` (a `ValueError`) for malformed records. The authority
+adapter translates that validation failure into `AuthorityError`, preserving the
+cause and retaining ownership. Serialization does not decide recovery policy.
+`JournalEntry` lives in `dpone.contracts.clickhouse_publication`; invalid direct
+construction raises `ValueError`. Invalid persisted snapshots and private storage
+failures are translated to `AuthorityError` by the authority adapter.
+
 ## API and state reference
 
 | API | Meaning and restrictions |
@@ -75,7 +88,10 @@ the exact deployment prefix followed by `:` and a nonempty operation suffix.
 | `diagnostics` / `write_diagnostics` | Redacted original metadata/history; reports cannot be imported as authority |
 
 Every durable mutation increments the revision. Reload after closure before
-resolution. A terminal record is historical evidence, not proof of the current
+resolution. Each resolution appends its canonical observation and digest to
+immutable history, including when UNKNOWN is later resolved; the latest value
+does not replace that history. Diagnostics expose only observation digests.
+A terminal record is historical evidence, not proof of the current
 contents of ClickHouse. Terminal resolution never releases ownership; this
 increment therefore cannot perform a second operation on the same target.
 

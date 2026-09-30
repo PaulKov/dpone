@@ -23,11 +23,13 @@ def _transition(path, barrier, results, grant):
     try:
         if grant is None:
             store.close_without_send("deployment:one")
+            results.put(("closed", 0))
         else:
             store.begin_send(grant)
-        results.put(True)
+            # Test-side transmission sentinel is reachable only after send ACK.
+            results.put(("sent", 1))
     except AuthorityConflict:
-        results.put(False)
+        results.put(("blocked", 0))
 
 
 def _crash(path, phase):
@@ -80,8 +82,13 @@ def test_send_and_close_have_one_durable_winner(tmp_path):
     for process in processes:
         process.start()
     _join(processes)
-    assert sorted([results.get(timeout=5), results.get(timeout=5)]) == [False, True]
-    assert store.transport_state("deployment:one") in {TransportState.MAY_HAVE_SENT, TransportState.CLOSED_WITHOUT_SEND}
+    outcomes = [results.get(timeout=5), results.get(timeout=5)]
+    state = store.transport_state("deployment:one")
+    if state == TransportState.MAY_HAVE_SENT:
+        assert sorted(outcomes) == [("blocked", 0), ("sent", 1)]
+    else:
+        assert state == TransportState.CLOSED_WITHOUT_SEND
+        assert sorted(outcomes) == [("blocked", 0), ("closed", 0)]
     with pytest.raises(AuthorityConflict):
         store.begin_send(grant)
     results.close()

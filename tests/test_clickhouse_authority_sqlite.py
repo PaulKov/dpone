@@ -10,6 +10,8 @@ from pathlib import Path
 import pytest
 
 from dpone.adapters.clickhouse_authority_sqlite import SQLitePublicationAuthority
+from dpone.adapters.clickhouse_authority_storage import AuthorityStorageError
+from dpone.adapters.clickhouse_publication_codec import PublicationRecordCodecError
 from dpone.contracts.clickhouse_authority import (
     AuthorityConflict,
     AuthorityError,
@@ -325,7 +327,7 @@ def test_diagnostics_cannot_occupy_authority_sidecar_path(authority, tmp_path):
 
 def test_aborted_sqlite_write_rolls_back_without_losing_owner(authority):
     prepared(authority)
-    with pytest.raises(AuthorityError):
+    with pytest.raises(AuthorityStorageError):
         with authority._storage.transaction() as db:
             db.execute("UPDATE operations SET revision=99 WHERE operation_id='deployment:one'")
             db.execute("INSERT INTO missing_table VALUES (1)")
@@ -335,7 +337,7 @@ def test_aborted_sqlite_write_rolls_back_without_losing_owner(authority):
 
 def test_sqlite_full_rolls_back_without_losing_original_record(authority):
     entry = prepared(authority)
-    with pytest.raises(AuthorityError) as failure:
+    with pytest.raises(AuthorityStorageError) as failure:
         with authority._storage.transaction() as db:
             pages = db.execute("PRAGMA page_count").fetchone()[0]
             db.execute(f"PRAGMA max_page_count={pages}")
@@ -349,3 +351,86 @@ def test_documented_first_use_example():
     guide = Path(__file__).resolve().parents[1] / "docs" / "clickhouse-authority-journal.md"
     example = guide.read_text().split("```python\n", 1)[1].split("```", 1)[0]
     exec(compile(example, str(guide), "exec"), {})
+
+
+@pytest.mark.parametrize("suffix", ["-wal", "-shm", "-journal"])
+def test_provision_preserves_occupied_sidecar_namespace(tmp_path, suffix):
+    path = tmp_path / "authority.db"
+    existing = tmp_path / (path.name + suffix)
+    existing.write_bytes(b"retained data")
+    with pytest.raises(AuthorityError):
+        SQLitePublicationAuthority.provision(path, "deployment")
+    assert existing.read_bytes() == b"retained data"
+    assert not path.exists()
+
+
+@pytest.mark.parametrize("suffix", ["-wal", "-shm", "-journal"])
+def test_authority_basename_cannot_use_sqlite_sidecar_suffix(tmp_path, suffix):
+    path = tmp_path / ("authority.db" + suffix)
+    with pytest.raises(AuthorityError):
+        SQLitePublicationAuthority.provision(path, "deployment")
+    assert not path.exists()
+
+
+def test_provision_requires_platform_owned_existing_directory(tmp_path):
+    path = tmp_path / "not_provisioned" / "authority.db"
+    with pytest.raises(AuthorityError):
+        SQLitePublicationAuthority.provision(path, "deployment")
+    assert not path.parent.exists()
+
+
+def test_resolution_history_retains_each_immutable_observation(authority):
+    completed_transport(authority)
+    entry = authority.read("deployment:one")
+    before = entry.record.intent.before
+    uncertain = replace(before, target=replace(before.target, content_digest="d" * 64))
+    unknown = authority.resolve(entry, PublicationState.UNKNOWN, uncertain)
+    authority.resolve(unknown, PublicationState.NOT_PUBLISHED, before)
+    with authority._storage.connection() as db:
+        observations = db.execute("SELECT observed FROM history WHERE event='resolve' ORDER BY revision").fetchall()
+        assert [json.loads(row[0])["target"]["content_digest"] for row in observations] == [
+            "d" * 64,
+            before.target.content_digest,
+        ]
+        with pytest.raises(sqlite3.IntegrityError):
+            db.execute("UPDATE history SET observed=NULL WHERE event='resolve'")
+
+
+def test_authority_translates_codec_encode_error(authority):
+    binding = authority.acquire("deployment:one", subject(), "candidate")
+    with pytest.raises(AuthorityError) as failure:
+        authority.prepare(binding, replace(example_record().intent, method="invalid"))
+    assert isinstance(failure.value.__cause__, PublicationRecordCodecError)
+    assert authority.read("deployment:one") is None
+
+
+def test_authority_translates_codec_decode_error(authority):
+    prepared(authority)
+    with authority._storage.transaction() as db:
+        db.execute("UPDATE operations SET record='{}'")
+    with pytest.raises(AuthorityError) as failure:
+        authority.read("deployment:one")
+    assert isinstance(failure.value.__cause__, PublicationRecordCodecError)
+
+
+def test_authority_translates_invalid_persisted_revision(authority):
+    prepared(authority)
+    with authority._storage.transaction() as db:
+        db.execute("UPDATE operations SET revision=0")
+    with pytest.raises(AuthorityError) as failure:
+        authority.read("deployment:one")
+    assert isinstance(failure.value.__cause__, ValueError)
+
+
+def test_storage_failure_cannot_leak_a_claim_grant(authority, monkeypatch):
+    entry = prepared(authority)
+
+    def fail_storage():
+        raise AuthorityStorageError("injected storage failure")
+
+    with monkeypatch.context() as scoped:
+        scoped.setattr(authority._storage, "_check_identity", fail_storage)
+        with pytest.raises(AuthorityError) as failure:
+            authority.claim(entry)
+        assert isinstance(failure.value.__cause__, AuthorityStorageError)
+    assert authority.read("deployment:one") == entry

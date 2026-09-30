@@ -8,8 +8,6 @@ import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from dpone.contracts.clickhouse_publication import PublicationRecord
-
 
 class AuthorityError(RuntimeError):
     """Authority is unavailable or invalid; retain resources and stop admission."""
@@ -96,16 +94,3 @@ class DispatchGrant:
         require_text(self.operation_id)
         require_positive(self.epoch)
         require_text(self.secret)
-
-
-@dataclass(frozen=True)
-class JournalEntry:
-    """Exact durable revision used for CAS; loading it grants no execution."""
-
-    record: PublicationRecord
-    revision: int
-
-    def __post_init__(self) -> None:
-        require_positive(self.revision)
-        if not isinstance(self.record, PublicationRecord):
-            raise AuthorityError("Expected a publication record")
