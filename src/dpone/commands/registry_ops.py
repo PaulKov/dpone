@@ -9,6 +9,7 @@ from . import (
     integration_matrix_report_cmd,
     ops_cmd,
     ops_object_storage_cmd,
+    prepared_recovery_cmd,
     release_summary_cmd,
 )
 from .base import Command
@@ -320,6 +321,7 @@ def operations_group() -> Command:
             "pre-release-checklist", ops_cmd.register_pre_release_checklist_parser, ops_cmd.cmd_pre_release_checklist
         ),
         ops_object_storage_cmd.object_storage_group(),
+        prepared_recovery_cmd.prepared_recovery_group(),
     ]
 
     def build(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:

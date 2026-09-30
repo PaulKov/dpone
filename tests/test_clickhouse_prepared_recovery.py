@@ -428,6 +428,18 @@ def test_completed_operation_replays_receipt_without_dispatch() -> None:
     assert ddl.dispatches == 1
 
 
+def test_completed_replay_accepts_new_strict_cas_write_identity() -> None:
+    plan, service, authority, ddl = _execution_case()
+    service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    authority.current = replace(
+        authority.current,
+        record=replace(authority.current.record, authority_write_id="final-strict-cas-write"),
+    )
+    receipt = service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert receipt.authority.phase is AuthorityPhase.COMPLETED
+    assert ddl.dispatches == 1
+
+
 def test_completed_replay_rejects_missing_replica() -> None:
     plan, service, authority, ddl = _execution_case()
     service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
@@ -438,10 +450,37 @@ def test_completed_replay_rejects_missing_replica() -> None:
     assert ddl.dispatches == 1
 
 
+def test_completed_replay_rejects_foreign_ddl_identity() -> None:
+    plan, service, authority, ddl = _execution_case()
+    service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    authority.current = replace(
+        authority.current,
+        record=replace(authority.current.record, ddl_correlation_token="foreign-token"),
+    )
+    with pytest.raises(ClusterPublicationError, match="AUTHORITY_CONFLICT"):
+        service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert ddl.dispatches == 1
+
+
 def test_reentry_after_dispatch_reconciles_without_second_ddl() -> None:
     plan, service, authority, ddl = _execution_case()
     dispatched = plan.record.dispatching(token=plan.token, query_digest=plan.query_digest)
     authority.current = VersionedAuthorityRecord(dispatched, plan.authority_version + 1)
+    ddl.catalog.published = True
+    ddl.last_token = plan.token
+    ddl.dispatches = 1
+    receipt = service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert receipt.authority.phase is AuthorityPhase.COMPLETED
+    assert ddl.dispatches == 1
+
+
+def test_reentry_during_cleanup_does_not_repeat_publication() -> None:
+    plan, service, authority, ddl = _execution_case()
+    dispatched = plan.record.dispatching(token=plan.token, query_digest=plan.query_digest)
+    authority.current = VersionedAuthorityRecord(
+        replace(dispatched, phase=AuthorityPhase.CLEANUP_DISPATCHING, dispatch_epoch=2, ddl_entry="query-1"),
+        plan.authority_version + 2,
+    )
     ddl.catalog.published = True
     ddl.last_token = plan.token
     ddl.dispatches = 1
