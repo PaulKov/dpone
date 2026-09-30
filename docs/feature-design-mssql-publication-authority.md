@@ -157,6 +157,95 @@ configuration or account-right changes are an implicit part of this feature.
 Rollback after dispatch stops admissions and reconciles; it never rewinds
 authority, removes evidence or reactivates an old writer over the new state.
 
+## Retirement and fresh-load amendment
+
+**Status: scope authorized on 2026-09-30; written amendment pending review.**
+This section extends, but does not activate or weaken, the approved adoption
+contract above. The operator authorized retirement of a proven unpublished
+legacy preparation, preserving history, followed by a new load and new quality
+evaluation. No retirement command or runtime transition is implemented yet.
+
+### Intent and alternatives
+
+When a historical source snapshot and its authenticated quality capsule no
+longer exist, do not manufacture replay proof from an audit report. Keep the
+existing adoption-to-publication path blocked. The selected alternative is to
+retire the unpublished intent without publishing its candidate, then perform a
+fresh full extraction under the current approved policy. Remaining blocked is
+the fallback whenever non-publication or writer exclusion cannot be proven.
+Deleting the old authority, labelling the old run successful, and importing it
+as native strict history are rejected.
+
+### Admission and immutable plan
+
+The read-only retirement plan binds the original all-replica authority bytes
+and versions, operation, target/candidate UUIDs and schemas, replica inventory,
+destination service/environment/binding, and deployment-owned freeze/drain
+evidence. Only PREPARED is eligible; any publication/cleanup dispatch identity
+or later phase is rejected. The candidate must remain unpublished everywhere: the target must
+still be the exact predecessor, or absent for an original first publication,
+and the candidate must retain its exact generation identity.
+
+Require complete, attributable DDL observations for the original operation
+through the drained observation boundary. A PREPARED label, empty current DDL
+queue or unchanged row count alone is insufficient. A coverage gap, unavailable
+replica, pending request, active mutation, unknown outcome, or inability to
+exclude an old/restarted/manual writer blocks the operation. Freeze evidence
+must come from the admitted deployment observation path, identify its scope and
+validity, and cover all writers; an operator-supplied `frozen: true` is not proof.
+
+Immediately before apply, revalidate the exact observations, plan digest and
+freeze validity. Hold exclusion through destination readback and deployment of
+the single new binding. This remains a cooperative managed-writer guarantee,
+not a fence against arbitrary privileged SQL. No server settings or account
+rights changes are introduced.
+
+### Retirement is not successful publication
+
+Use a distinct versioned `RETIRED_UNPUBLISHED` terminal state with
+`legacy_retired` provenance in the MSSQL catalog. Preserve original bytes and
+their digest in its immutable event; leave the legacy ClickHouse record and
+candidate untouched. Do not issue a publication/cleanup permit, set a committed
+receipt, advance a data checkpoint, clear a historical Airflow failure, delete
+the candidate, or label missing quality as passed.
+
+Insert the retired slot and event in one acknowledged SQL transaction only if
+the destination slot is absent. An existing exact retirement is read-only
+idempotent success; a different existing slot is a conflict. A lost commit ACK
+is UNKNOWN, not permission to repeat the insert. Resolve it by exact slot/event
+readback, including all provenance and plan bindings. Native create/CAS must
+not be an alternative way to forge a retirement event.
+
+A fresh operation may acquire that same target slot only through CAS from the
+exact admitted retirement, with a new operation ID and a freshly checked
+unchanged target generation. It starts PREPARED without any old dispatch permit
+or quality capsule. The old operation ID is permanently ineligible for replay
+as a successful load. Preserve the retirement event when later phases advance;
+do not rewrite imported history as native history.
+
+### Public behavior and acceptance
+
+Proposed `publication-authority retire plan|apply` delegates to a shared
+application service. Plan never mutates a database; apply requires the exact
+plan digest. Versioned redacted results distinguish `retired_unpublished` from
+`publication_completed`; exit 0 means only the requested retirement mode was
+verified, 2 means a proven block, and 1 means failure or unknown outcome. Local
+plan files use the existing private atomic file adapter. A file digest is not
+deployment evidence or permission to dispatch.
+
+Tests must reject mixed replica generations, historical DDL coverage gaps,
+expired/changed freezes, a restart between plan and apply, destination
+conflicts, forged native/imported provenance, repeated old operation IDs and
+lost SQL acknowledgements. Concurrency tests require one retirement winner and
+one fresh-operation CAS winner. Measure zero ClickHouse mutations during
+retirement and no synthetic quality success; verify the fresh load follows the
+ordinary source/stage/quality/publication/outcome lifecycle.
+
+Independent review and isolated live fault tests precede release and cutover.
+After migration, keep scheduling paused for one complete fresh DAG run and DQ;
+only then restore the existing schedule and verify its first regular run. A
+verified retirement alone never satisfies workload acceptance.
+
 ## Architecture and alternatives
 
 Pure binding/adoption models live in contracts; the MSSQL adapter and catalog
