@@ -8,6 +8,7 @@ from typing import Any
 from dpone.contracts.mssql_native_chunks import NativeChunkLimits
 from dpone.contracts.mssql_native_verification import NativeImportBackend, NativeVerificationBackend
 from dpone.contracts.rolling_window import FrozenRollingWindow, RollingWindowSpec
+from dpone.manifest.clickhouse_raw_snapshot_policy import native_source_snapshot_policy
 
 
 def _native(config: Any) -> Mapping[str, Any]:
@@ -26,8 +27,10 @@ def native_requested(config: Any) -> bool:
     wire = value.get("wire", {})
     execution = value.get("execution", {})
     chunking = execution.get("chunking", {}) if isinstance(execution, Mapping) else {}
-    return (isinstance(wire, Mapping) and wire.get("binary_format") == "mssql_native") or (
-        isinstance(chunking, Mapping) and chunking.get("mode") == "bounded_stream"
+    return (
+        "source_snapshot" in value
+        or (isinstance(wire, Mapping) and wire.get("binary_format") == "mssql_native")
+        or (isinstance(chunking, Mapping) and chunking.get("mode") == "bounded_stream")
     )
 
 
@@ -123,6 +126,11 @@ def validate_native_config(config: Any) -> None:
     verifier = native_verification_backend(config)
     importer = native_import_backend(config)
     layout_version = native_sqlclient_layout_version(config)
+    if (
+        native_source_snapshot_policy(config).mode == "exact_raw_rows"
+        and verifier is not NativeVerificationBackend.TARGET_LOCAL
+    ):
+        raise ValueError("mssql_native.raw_snapshot_requires_target_local_verification")
     if importer is NativeImportBackend.MSSQL_SQLCLIENT and verifier is not NativeVerificationBackend.TARGET_LOCAL:
         raise ValueError("mssql_native.sqlclient_requires_target_local_verification")
     execution = value.get("execution")

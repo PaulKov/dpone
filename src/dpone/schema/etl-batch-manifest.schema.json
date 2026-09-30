@@ -6657,8 +6657,55 @@
         },
         "snapshot": {
           "$ref": "#/definitions/native_transfer_snapshot_policy"
+        },
+        "source_snapshot": {
+          "$ref": "#/definitions/clickhouse_source_snapshot_policy"
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["source_snapshot"],
+            "properties": {
+              "source_snapshot": {
+                "required": ["mode"],
+                "properties": {"mode": {"const": "exact_raw_rows"}}
+              }
+            }
+          },
+          "then": {
+            "required": ["execution"],
+            "properties": {
+              "execution": {
+                "required": ["verification_backend"],
+                "properties": {"verification_backend": {"const": "target_local"}}
+              }
+            }
+          }
+        }
+      ]
+    },
+    "clickhouse_source_snapshot_policy": {
+      "description": "Declared ClickHouse source semantics. Exact raw rows preserve query-visible versions and multiplicity without FINAL; live admission proves the engine and replica scope.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": {"const": "query_visible"}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "replica_scope"],
+          "properties": {
+            "mode": {"const": "exact_raw_rows"},
+            "replica_scope": {"enum": ["single_server", "connected_replica"]}
+          }
+        }
+      ]
     },
     "native_transfer_snapshot_policy": {
       "type": "object",

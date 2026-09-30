@@ -46,6 +46,25 @@ def test_strict_limits_and_legacy_admission():
     assert not native_requested(SimpleNamespace(options={}))
 
 
+def test_raw_selector_cannot_fall_back_without_complete_native_route():
+    value = SimpleNamespace(options={"native_transfer": {"source_snapshot": {"mode": "exact_raw_rows"}}})
+    assert native_requested(value)
+    with pytest.raises(ValueError, match="mssql_native.wire_required"):
+        validate_native_config(value)
+
+
+@pytest.mark.parametrize("backend", ["bcp", "mssql_sqlclient"])
+def test_exact_raw_snapshot_requires_durable_target_local_recovery(backend):
+    value = config()
+    native = value.options["native_transfer"]
+    native["source_snapshot"] = {"mode": "exact_raw_rows", "replica_scope": "single_server"}
+    native["execution"]["import_backend"] = backend
+    with pytest.raises(ValueError, match="mssql_native.raw_snapshot_requires_target_local_verification"):
+        validate_native_config(value)
+    native["execution"]["verification_backend"] = "target_local"
+    validate_native_config(value)
+
+
 def test_verification_backend_is_closed_and_omission_preserves_v1() -> None:
     value = config()
     assert native_verification_backend(value).value == "python_readback"

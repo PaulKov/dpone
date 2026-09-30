@@ -180,3 +180,76 @@ def test_default_assembly_forwards_existing_sqlclient_writer_observer(monkeypatc
     assert binding.stage_context is context
     assert captured["observer"] is observer
     assert captured["write_observer"] == writer_observations.append
+
+
+@pytest.mark.parametrize("schema_changed", [False, True])
+def test_raw_profile_is_frozen_before_plan_and_forwarded_to_extract(tmp_path, monkeypatch, schema_changed):
+    from dpone.contracts.clickhouse_raw_snapshot import raw_source_query_binding
+    from dpone.runtime import mssql_native_application_assembly as assembly_module
+    from tests.test_mssql_native_raw_snapshot_recovery import _config, _payload
+
+    payload, legacy = _payload()
+    profile = payload.artifact.raw_snapshot_profile
+    events = []
+
+    class Source:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def snapshot_profile(self, config):
+            events.append("profile")
+            return profile
+
+        def extract(self, config, *, expected_profile, source_query_binding):
+            assert expected_profile is profile
+            assert source_query_binding == raw_source_query_binding(legacy.source_query_id, profile)
+            events.append("extract")
+            return SimpleNamespace(
+                artifact=payload.artifact,
+                relation_schema=payload.relation_schema,
+                relation_dialect=None,
+                extraction_lifecycle=None,
+            )
+
+    real_plan = assembly_module._chunk_plan
+
+    def plan(*args, **kwargs):
+        assert events == ["profile"]
+        events.append("plan")
+        return real_plan(*args, **kwargs)
+
+    config = _config()
+    preplan = SimpleNamespace(
+        source_relation_identity=profile.relation_uuid,
+        source_schema_sha256=bytes.fromhex(legacy.schema_fingerprint),
+        target_column_types=payload.schema,
+        column_mapping=(),
+        target_mutation_plan=None,
+    )
+    config.options[assembly_module.ADMISSION_OPTION] = payload.mssql_transaction_admission
+    config.options[assembly_module.MSSQL_SCHEMA_PREPLAN_OPTION] = preplan
+    source = SimpleNamespace(
+        connector=object(),
+        fetch_schema_projection=lambda c: SimpleNamespace(
+            relation_schema=payload.relation_schema, relation_metadata=None, projected_schema=(("id", "Int64", False),)
+        ),
+    )
+    process = SimpleNamespace(source_obj=source, sink_obj=SimpleNamespace(connector=object()), raw_config={})
+    policy = SimpleNamespace(work_dir=tmp_path / "work", checkpoint_dir=tmp_path / "state")
+    monkeypatch.setattr(assembly_module, "ClickHouseNativeSource", Source)
+    monkeypatch.setattr(assembly_module, "_chunk_plan", plan)
+    monkeypatch.setattr(assembly_module.RuntimeStoragePolicy, "from_sources", lambda **kw: policy)
+    monkeypatch.setattr(assembly_module.StoragePreflightService, "check", lambda *a: SimpleNamespace(passed=True))
+    monkeypatch.setattr(_NativeRuntimeAssembly, "_initialize_runtime", lambda *a, **kw: None)
+    payload.artifact.terminate = lambda outcome: SimpleNamespace(cleanup_succeeded=True)
+    if schema_changed:
+        preplan.source_schema_sha256 = b"x" * 32
+        with pytest.raises(ValueError, match="source_snapshot_schema_changed"):
+            _NativeRuntimeAssembly(process, config)
+        assert events == ["profile"]
+        return
+    assembly = _NativeRuntimeAssembly(process, config)
+    assert assembly.plan.source_query_id == raw_source_query_binding(legacy.source_query_id, profile)
+    with assembly._source(config, None):
+        pass
+    assert events == ["profile", "plan", "extract"]

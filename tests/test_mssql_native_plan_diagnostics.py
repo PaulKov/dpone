@@ -1,6 +1,8 @@
 """Invalid native stage limits use the CLI's configuration-error boundary."""
 
+import json
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -97,3 +99,83 @@ def test_unrelated_value_error_is_not_reclassified(monkeypatch, message):
     monkeypatch.setattr(ExecutionPlanService, "plan_manifest", fail)
     with pytest.raises(ValueError, match=message):
         main(["plan", "unused.yaml"])
+
+
+@pytest.mark.parametrize("output_format", FORMATS)
+def test_raw_snapshot_plan_declares_semantics_without_network(tmp_path, monkeypatch, capsys, output_format):
+    raw = yaml.safe_load(SAMPLE.read_text())
+    native = raw["defaults"]["source"]["options"]["native_transfer"]
+    native["source_snapshot"] = {"mode": "exact_raw_rows", "replica_scope": "single_server"}
+    native["execution"]["verification_backend"] = "target_local"
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw))
+
+    def deny_network(*args, **kwargs):
+        raise AssertionError("static planning attempted network access")
+
+    monkeypatch.setattr(socket.socket, "connect", deny_network)
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as error:
+        main(["plan", str(path), "--format", output_format])
+    assert error.value.code == 0
+    result = capsys.readouterr()
+    assert not result.err
+    assert "exact_raw_rows" in result.out
+    assert "single_server" in result.out
+    if output_format == "json":
+        plan = json.loads(result.out)
+        assert plan["mssql_native"]["source_snapshot"] == {
+            "mode": "exact_raw_rows",
+            "replica_scope": "single_server",
+            "authority": "declared",
+            "live_observation": "not_run",
+        }
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize("selector", [None, {}, {"mode": "final"}, {"mode": "exact_raw_rows"}])
+def test_invalid_raw_snapshot_selector_is_configuration_error(tmp_path, monkeypatch, capsys, caplog, selector):
+    raw = yaml.safe_load(SAMPLE.read_text())
+    raw["defaults"]["source"]["options"]["native_transfer"]["source_snapshot"] = selector
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw))
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as error:
+        main(["plan", str(path), "--format", "json"])
+    assert error.value.code == 2
+    assert "mssql_native.source_snapshot_mode_invalid" in caplog.text
+    assert "Traceback" not in caplog.text
+    assert not capsys.readouterr().out
+    assert list(tmp_path.iterdir()) == [path]
+
+
+@pytest.mark.parametrize(
+    "invalid", ["missing_verifier", "python_readback", "target_lcoal", None, "wrong_wire", "wrong_chunking"]
+)
+def test_raw_snapshot_plan_rejects_unsupported_execution(tmp_path, monkeypatch, capsys, caplog, invalid):
+    raw = yaml.safe_load(SAMPLE.read_text())
+    native = raw["defaults"]["source"]["options"]["native_transfer"]
+    native["source_snapshot"] = {"mode": "exact_raw_rows", "replica_scope": "single_server"}
+    native["execution"]["verification_backend"] = "target_local"
+    raw["defaults"]["sink"]["strategy"] = {"mode": "full_refresh"}
+    expected = "mssql_native.raw_snapshot_requires_target_local_verification"
+    if invalid == "missing_verifier":
+        del native["execution"]["verification_backend"]
+    elif invalid in ("python_readback", "target_lcoal", None):
+        native["execution"]["verification_backend"] = invalid
+    else:
+        expected = "mssql_native.source_snapshot_route_unsupported"
+        if invalid == "wrong_wire":
+            native["wire"]["mode"] = "auto"
+        else:
+            native["execution"]["chunking"]["mode"] = "none"
+    path = tmp_path / "manifest.yaml"
+    path.write_text(yaml.safe_dump(raw))
+    monkeypatch.chdir(tmp_path)
+    with pytest.raises(SystemExit) as error:
+        main(["plan", str(path), "--format", "json"])
+    assert error.value.code == 2
+    assert expected in caplog.text
+    assert "Traceback" not in caplog.text
+    assert not capsys.readouterr().out
+    assert list(tmp_path.iterdir()) == [path]

@@ -472,3 +472,30 @@ def test_public_cli_registers_confirmed_manifest_bound_mutations(
     assert calls[0][1]["action"] == action
     assert calls[0][1]["confirmed"] is True
     assert json.loads(capsys.readouterr().out)["state"] == "RETIRED"
+
+
+@pytest.mark.parametrize("version", [1, 2, 3])
+def test_raw_feature_does_not_introduce_recovery_plan_v3(tmp_path, version):
+    identity = _identity()
+    path = tmp_path / "state.sqlite"
+    _database(path, identity, _projection(identity))
+    plan = {
+        "schema_version": version,
+        "kind": f"dpone.mssql-native-recovery-plan.v{version}",
+        "invocation_id": identity.invocation_key,
+        "schema": [["id", "bigint"]],
+        "recovery_authority_v1": {"sealed": True},
+    }
+    if version != 1:
+        plan["window"] = None
+    with sqlite3.connect(path) as database:
+        database.execute(
+            "INSERT INTO window_records VALUES (?,?,?)",
+            (f"mssql-native/recovery-plan-v1/{identity.invocation_key}", 1, json.dumps(plan)),
+        )
+    reader = MssqlNativeRecoveryJournalReader(path)
+    if version == 3:
+        with pytest.raises(ValueError, match="recovery_plan_invalid"):
+            reader.load(identity.invocation_key)
+    else:
+        assert reader.load(identity.invocation_key).recovery_plan == plan

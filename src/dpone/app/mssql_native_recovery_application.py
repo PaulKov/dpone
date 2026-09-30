@@ -30,6 +30,7 @@ from dpone.runtime.mssql_native_recovery_composition import (
     _NativeRuntimeAssembly,
     live_target_coordinates,
     resolve_atomic_mssql_target,
+    validate_raw_snapshot_recovery,
 )
 
 _RECOVERY_LEASE_TTL = timedelta(hours=1)
@@ -61,6 +62,9 @@ class MssqlNativeRecoveryApplication:
 
         config = self._restore_window(
             process.load_config, snapshot.recovery_plan, snapshot.identity.plan.window_fingerprint
+        )
+        validate_raw_snapshot_recovery(
+            config, identity=snapshot.identity, projection=snapshot.projection, action=action
         )
         validate_native_config(config)
         if not QualityExecutionSnapshot.from_load_config(config).is_inert():

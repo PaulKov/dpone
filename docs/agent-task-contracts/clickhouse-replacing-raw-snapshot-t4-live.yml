@@ -1,0 +1,71 @@
+schema_version: 1
+task_id: DPONE-CH-RAW-SNAPSHOT-T4-LIVE
+title: Synthetic raw snapshot live route fixtures
+goal: Create reusable isolated live tests covering raw source route correctness and
+  recovery; root runs exact-build certification.
+specification: docs/feature-specs/clickhouse-replacing-raw-snapshot.md
+base_commit: 28aea0d9439ab3f24e0fb39800a041a6b6d661ed
+integrator: root integrator
+acceptance_criteria:
+- Public schema and examples expose only the closed selector and preserve omission
+  compatibility.
+- Plan/doctor remain credential-free; connection and live observations occur only
+  in explicit check modes/runtime.
+- User docs cover discovery, prerequisites, raw-vs-FINAL semantics, evidence, failure
+  recovery, rollback, and replica limits.
+- Synthetic narrow/wide BCP and SqlClient route, concurrency, recovery, TLS, and replica
+  cells produce truthful exact-commit evidence.
+public_contract_impact:
+  level: compatible
+  surfaces:
+  - manifest JSON schema
+  - ClickHouse to MSSQL route documentation
+  - route certification evidence
+  migration_required: false
+owned_paths:
+- tests/integration/mssql/test_clickhouse_replacing_raw_snapshot_live.py
+- tests/integration/mssql/clickhouse_raw_snapshot_live_support.py
+- tests/test_clickhouse_raw_snapshot_live_cases.py
+integrator_owned_paths: []
+read_only_paths:
+- docs/feature-specs/clickhouse-replacing-raw-snapshot.md
+- src/dpone
+- tests/integration/mssql/test_clickhouse_mssql_default_native_runtime_live.py
+forbidden_paths:
+- src
+- tools
+- docs
+- pyproject.toml
+- uv.lock
+- CHANGELOG.md
+- mkdocs.yml
+- .github/workflows
+- tests/conftest.py
+shared_file_owner: root integrator
+dependencies:
+- T1/T2/T3 approved signatures; implementation under review, root will integrate
+required_checks:
+  focused:
+  - ruff check owned paths
+  - ruff format --check owned paths
+  - pytest tests/test_clickhouse_raw_snapshot_live_cases.py -q
+  broad: []
+  live: []
+required_outputs:
+- implementation
+- tests
+- documentation_impact
+- completion_report
+completion_statuses:
+  allowed:
+  - PASS
+  - FAIL
+  - SKIP
+  - N/A
+  - UNVERIFIED
+stop_conditions:
+- Required edit falls outside owned_paths.
+- Approved specification is missing or contradicted.
+- Public-contract impact is larger than declared.
+- A live check requires unapproved credentials or environment.
+- Another writer owns the same semantic contract.
