@@ -19,6 +19,10 @@
 
 ### Fixed
 
+- Expose optional delivery and SqlClient writer observers through the default
+  native runtime factory so qualification can measure the normal manifest path
+  without changing durable evidence or publication behavior.
+
 - Give each SqlClient child a private temporary home so encrypted connections
   work under non-root numeric container UIDs without a passwd entry. Keep the
   child environment restricted and remove the home after process settlement.

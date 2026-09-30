@@ -6,6 +6,7 @@ import os
 import uuid
 from datetime import datetime
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 from tests.integration.mssql.mssql_live_support import clickhouse_connector, mssql_connector
@@ -16,8 +17,14 @@ from dpone.adapters.mssql_native_recovery_journal import MssqlNativeRecoveryJour
 from dpone.app.mssql_native_recovery_application import MssqlNativeRecoveryApplication
 from dpone.config.load_config import LoadConfig
 from dpone.config.load_strategy import LoadStrategy
+from dpone.contracts.mssql_native_stage_writer import NativeStageWriteObservation
 from dpone.runtime.lineage.audit import LoadIdentityService
-from dpone.runtime.mssql_native_application import MssqlNativeApplicationRuntime, _NativeRuntimeAssembly
+from dpone.runtime.mssql_native_application import (
+    DefaultMssqlNativeRuntimeFactory,
+    MssqlNativeApplicationRuntime,
+    _NativeRuntimeAssembly,
+)
+from dpone.runtime.native_delivery_observations import BoundedNativeDeliveryObserver
 from dpone.runtime.process_logging import etl_logger
 from dpone.runtime.sources.clickhouse import ClickHouseSource
 from dpone.runtime.sources.clickhouse_native_source import NativeQueryArtifact
@@ -75,7 +82,7 @@ def test_default_native_runtime_executes_hydrated_route(
         ) as route:
             sink = route.sink(logger=etl_logger)
             source = ClickHouseSource(source_connector, sink.logger, sink_connector=target_connector)
-            execution = {
+            execution: dict[str, Any] = {
                 "import_backend": import_backend,
                 "verification_backend": "target_local",
                 "chunking": {"mode": "bounded_stream", "checkpointing": "resumable", "parallelism": 1},
@@ -213,9 +220,37 @@ def test_default_native_runtime_executes_hydrated_route(
                     )
                     assert recovered["state"] in expected_states
             else:
-                result = MssqlNativeApplicationRuntime(process).run(config, owner=f"default-{suffix}")
+                observer = BoundedNativeDeliveryObserver()
+                writer_observations: list[NativeStageWriteObservation] = []
+                runtime = DefaultMssqlNativeRuntimeFactory(
+                    observer_factory=lambda: observer,
+                    write_observer=writer_observations.append,
+                )(process)
+                result = runtime.run(config, owner=f"default-{suffix}")
                 assert result.status == "success"
                 assert result.extracted_rows == 4
+                observations = observer.snapshot()["observations"]
+                phases = {item["phase"] for item in observations}
+                assert {
+                    "frame_build",
+                    "raw_verify",
+                    "metadata_project",
+                    "prepare_insert",
+                    "prepared_verify",
+                    "publish",
+                } <= phases
+                source_metrics = [
+                    item["metrics"]["source_read_work_seconds"]
+                    for item in observations
+                    if "source_read_work_seconds" in item["metrics"]
+                ]
+                assert source_metrics and all(metric["availability"] == "measured" for metric in source_metrics)
+                if import_backend == "mssql_sqlclient":
+                    assert writer_observations
+                    assert all(item.classification == "success" for item in writer_observations)
+                    assert all(item.metrics.write_seconds is not None for item in writer_observations)
+                else:
+                    assert writer_observations == []
             actual = target_connector.get_records(
                 f"SELECT [row_key],[ratio],[text_value],[happened_at],[nullable_key],"
                 f"[required_ratio],[required_text],[required_at] FROM [dbo].[{target_table}] ORDER BY [row_key]"
