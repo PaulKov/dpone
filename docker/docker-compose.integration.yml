@@ -188,6 +188,11 @@ services:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
       MSSQL_SA_PASSWORD: ${DPONE_IT_MSSQL_PASSWORD:-Dp0ne.Strong.Pw.2026!}
+      # Keep the database inside a bounded share of the Docker VM. Without an
+      # explicit cap SQL Server can claim almost the whole VM and the kernel
+      # may kill it during wide-route certification instead of letting the
+      # engine spill intermediate work to disk.
+      MSSQL_MEMORY_LIMIT_MB: ${DPONE_IT_MSSQL_MEMORY_LIMIT_MB:-3072}
     ports:
       - "${DPONE_IT_MSSQL_PORT_FORWARD:-51433}:1433"
     healthcheck:

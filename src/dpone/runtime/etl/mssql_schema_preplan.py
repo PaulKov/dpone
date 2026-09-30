@@ -85,6 +85,7 @@ class MssqlSchemaPreplan:
     column_mapping: tuple[tuple[str, str], ...] = ()
     retained_catalog: tuple[ColumnDef, ...] = ()
     physical_report: dict[str, Any] | None = None
+    source_relation_identity: str | None = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.source_schema_sha256, bytes) or len(self.source_schema_sha256) != 32:
@@ -104,6 +105,7 @@ class MssqlSchemaPreplanner:
     ) -> MssqlSchemaPreplan:
         options = SchemaEvolutionRuntimeOptions.from_load_options(getattr(load_config, "options", {}) or {})
         source_projection = _source_projection(source, load_config)
+        source_relation_identity = getattr(source_projection, "relation_identity", None)
         source_columns = _source_columns(source_projection)
         _reject_observed_reserved_columns(source_columns)
         source_digest = schema_columns_sha256(source_columns)
@@ -154,6 +156,7 @@ class MssqlSchemaPreplanner:
                     "blockers": [],
                     "executed": [],
                 },
+                source_relation_identity=source_relation_identity,
             )
         if not options.enabled:
             try:
@@ -190,6 +193,7 @@ class MssqlSchemaPreplanner:
                 source_digest=source_digest,
                 mutation_plan=mutation_plan,
                 final_columns=tuple(target_columns),
+                source_relation_identity=source_relation_identity,
             )
         if not target_columns:
             raise blocked_schema_evolution(
@@ -228,6 +232,7 @@ class MssqlSchemaPreplanner:
                 source_digest=source_digest,
                 mutation_plan=mutation_plan,
                 final_columns=tuple(target_columns),
+                source_relation_identity=source_relation_identity,
             )
         governed = OnlineSchemaPlanner().plan(
             schema_plan=schema_plan,
@@ -268,6 +273,7 @@ class MssqlSchemaPreplanner:
             final_columns=tuple(expected_after.column_defs),
             column_mapping=tuple(schema_plan.column_mapping.items()),
             retained_catalog=tuple(target_columns),
+            source_relation_identity=source_relation_identity,
         )
 
 
@@ -281,6 +287,7 @@ def _with_physical_design(
     final_columns: tuple[ColumnDef, ...],
     column_mapping: tuple[tuple[str, str], ...] = (),
     retained_catalog: tuple[ColumnDef, ...] = (),
+    source_relation_identity: str | None = None,
 ) -> MssqlSchemaPreplan:
     physical = plan_existing_mssql_physical_design(
         load_config,
@@ -296,6 +303,7 @@ def _with_physical_design(
         column_mapping,
         retained_catalog,
         dict(physical.report) if physical.report is not None else None,
+        source_relation_identity,
     )
 
 

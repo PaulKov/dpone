@@ -105,7 +105,7 @@ Steps:
     shard partition for each required Python version.
 11. Fail-closed validate all exact-head receipts; Python 3.12 combines the
     eight raw coverage inputs and applies the existing ratchet once.
-12. Build all four distributions during preflight and upload combined coverage.
+12. Build all five distributions during preflight and upload combined coverage.
 
 See [CI quality performance evidence](ci-performance-evidence.md) for the
 receipt contract and the hosted p95 procedure.
@@ -525,7 +525,7 @@ Artifacts:
 | Ordinary publish mode | PyPI Trusted Publishing only |
 | Token fallback | None; no automatic same-version or `skip-existing` recovery |
 
-The controller builds its own four-package/eight-archive inventory and verifies
+The controller builds its own five-package/ten-archive inventory and verifies
 public filenames and hashes. It does not create a GitHub Release or runtime
 image. Source `.github/workflows/release.yml` remains a separate tag-triggered
 workflow; its handoff message neither publishes to PyPI nor dispatches the

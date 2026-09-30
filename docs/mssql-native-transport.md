@@ -1,8 +1,10 @@
 # Bounded native ClickHouse to MSSQL transport
 
-This opt-in Python composition API loads one ClickHouse query through bounded
-native BCP files, verifies independent staging tables, and publishes once through
-the existing MSSQL transaction finalizer. It supports `full_refresh` and an
+This opt-in route loads one ClickHouse query through bounded native files,
+imports independent staging tables with BCP or `Microsoft.Data.SqlClient`, and
+publishes once through the existing MSSQL transaction finalizer. The standard
+`dpone run` composition is available for inert quality policy; deployments with
+authored quality gates must inject their quality executor. It supports `full_refresh` and an
 explicit UTC `partition_replace` window. Existing character-spool routes retain
 their defaults. Retained evidence for dpone 0.80.0 at commit
 `6ae541d38ac223327d7edb23510859df91173bda` establishes scoped local Docker
@@ -14,11 +16,12 @@ remain **UNVERIFIED**. These results do not certify a new deployment.
 
 ## Choose the verification backend
 
-| Authored value | Effective path | Identity and journal | Compatibility |
-|---|---|---|---|
-| omitted | BCP plus Python business-row readback | v1 | Existing behavior is unchanged |
-| `python_readback` | BCP plus Python business-row readback | v1 | Explicit form of existing behavior |
-| `target_local` | Supervised BCP plus aggregate-only SQL Server verification | v2 | Opt-in; no fallback to v1 inside the invocation |
+| Verification | Import | Effective path | Identity and journal | Compatibility |
+|---|---|---|---|---|
+| omitted | BCP | BCP plus Python business-row readback | v1 | Existing behavior is unchanged |
+| `python_readback` | BCP | BCP plus Python business-row readback | v1 | Explicit form of existing behavior |
+| `target_local` | BCP | Supervised BCP plus aggregate-only SQL Server verification | v2 | Opt-in; no fallback to v1 inside the invocation |
+| `target_local` | `mssql_sqlclient` | `SqlBulkCopy` plus session-bound aggregate verification | v2 | Optional Linux x64 companion; no fallback to BCP |
 
 The optimized selector belongs under `native_transfer.execution`:
 
@@ -26,6 +29,8 @@ The optimized selector belongs under `native_transfer.execution`:
 native_transfer:
   execution:
     verification_backend: target_local
+    import_backend: mssql_sqlclient
+    layout_version: 2
 ```
 
 Start with
@@ -36,33 +41,41 @@ and inspect the resolved contract without opening connections:
 uv run dpone plan examples/native/clickhouse-to-mssql-target-local.yaml --format json
 ```
 
-The `mssql_native` plan must report `status=composition_required`,
-`verification_backend=target_local`, `verification_identity_version=2`, and
-`writer_proof_capability=bcp-supervised-stage-barrier-v1`. Its required
+The `mssql_native` plan reports `verification_backend=target_local`,
+`verification_identity_version=2`, the selected writer capability and layout.
+Its required
 dependencies include `stable_target_custody`, `supervised_bcp_writer`, and
-`target_local_digest`. The example is a planning artifact. Direct `dpone run`
-cannot supply deployment-owned connections, durable state, or the
-`NativeMssqlRuntime` composition authority.
+`target_local_digest`. Direct `dpone run` hydrates the declared connections,
+uses the configured durable runtime storage roots, and composes the native state
+machine. A deployment-owned runtime remains required when authored quality
+policies are present.
 
 ```mermaid
 flowchart LR
     CH[Bounded ClickHouse query] --> FILES[Sealed native files]
-    FILES --> BCP[Supervised BCP]
+    FILES --> SELECT{Explicit writer}
+    SELECT -->|default| BCP[Supervised BCP]
+    SELECT -->|mssql_sqlclient| TDS[SqlBulkCopy companion]
+    TDS --> LOCK[Session grant lock]
     BCP --> BARRIER[Held exact-stage barrier]
+    LOCK --> BARRIER
     BARRIER --> RAW[Aggregate raw digest]
     RAW --> PREP[Prepared aggregate verification]
     PREP --> PUB[Atomic publication]
     BCP -->|ambiguous outcome| UNKNOWN[UNKNOWN]
+    TDS -->|lost acknowledgement| UNKNOWN
     UNKNOWN --> CUSTODY[Retained target custody]
 ```
 
 ## Prepare and configure
 
-The platform owner supplies dedicated connections, durable fenced state, source
-DDL exclusion, target writer exclusion, transaction admission, quality checking,
-evidence persistence and source checkpoint persistence. A manifest cannot supply
-these capabilities. The ordinary runner rejects this mode with
-`mssql_native.composition_required` unless its `native_runtime_factory` is set.
+The platform owner supplies dedicated connections, durable fenced storage,
+source DDL exclusion, target writer exclusion and the transaction-state catalog.
+The standard composition supplies transaction admission, source/schema binding,
+target-local custody, operational evidence and stateless checkpoint ordering.
+Set `runtime.storage.work_dir` and `checkpoint_dir` to storage that survives the
+worker process and is available to the recovery operator. A local ephemeral path
+cannot provide restart recovery.
 
 The YAML example is for plan inspection; execution requires the platform
 capabilities described below. Use [the native example](../examples/native/clickhouse-to-mssql-native.yaml)
@@ -279,53 +292,20 @@ configured worker count as measured overlap.
 
 ## Diagnose and recover
 
-| Persisted state | Action |
-|---|---|
-| Partial extraction/staging | Settle owned attempts; report `reextract_required`; start a new invocation from a new complete query |
-| `stage_complete` | Reverify contiguous receipts and prepare without reopening ClickHouse |
-| Publication `preparing` | Reconcile the owned prepared table and rebuild from completed chunks |
-| Publication `prepared` | Reverify, run quality, then publish once |
-| Publication `publishing` | Inspect the exact target commit receipt first; unknown outcome retains resources and blocks replay |
-| Publication `published` | Persist evidence, then advance source state |
-| `evidence-complete` | Retry idempotent state advancement |
-| `succeeded` | Retry owned cleanup without source reads or republishing |
+Every target-local invocation seals schema and transaction authority before
+ClickHouse business-row I/O. Read-only inspection needs only the durable SQLite
+journal. Live recovery actions require the original manifest selector and
+explicit confirmation; they reconnect only to MSSQL and never reopen the source.
 
-### Target-local incidents and custody
+Follow the [MSSQL native recovery runbook](mssql-native-recovery.md) for the
+complete `inspect`, `inspect-all`, `reconcile`, `resume`, and `retire` commands,
+state-to-action matrix, outputs, exit codes, safe retries, and escalation.
 
-`UNKNOWN` retains target custody across lease expiry. Held v2 custody blocks
-both v2 and rollback v1 invocations before source or writer I/O. Only a durable,
-acknowledged and reaped BCP success may enter observation-only exact-stage
-barrier recovery; stage contents cannot reconstruct missing positive process
-authority.
-
-A pre-EOF source failure requires re-extraction. Fully verified stages may be
-retired only after durable non-publication proof. Post-EOF verified receipts may
-resume preparation without reopening ClickHouse. Custody releases only after
-proved publication plus complete cleanup, verified empty completion, or complete
-authorized non-publication retirement.
-
-After a crash following raw or prepared-stage deletion, dpone treats
-`OBJECT_ID() IS NULL` as absence authority only for a `dbo` or `sysadmin`
-recovery principal that can distinguish absence from metadata denial. Prepared
-cleanup also locks and rechecks the exact object ID and ownership property,
-then proves post-drop absence before raw-stage cleanup or custody release. A
-least-privilege principal keeps custody held for elevated or manual recovery.
-Unresolved `UNKNOWN` currently
-requires escalation through the deployment's composed recovery authority; P1
-does not ship the proposed public recovery CLI. Operationally exclude older
-binaries while any v2 custody record remains held.
-
-The closed event format is generated as
-[`dpone.mssql-native-writer-state.v2`](reference/manifest-schemas.md). Its
-`mssql_sqlclient` backend value is reserved for P2 and is not a P1 manifest
-selector.
-
-Chunk phases and publication phases are nested journal records. `stage_complete`
-is one CAS after EOF, contiguous verification and completion metadata. A verified
-individual chunk does not authorize publication. Up to two import retries reuse immutable bytes after previous-writer settlement
-when the importer classifies a failure as `WindowTransientError`. Unclassified
-vendor errors stop the run. Cancellation, exhausted
-retries and lease loss cannot manufacture EOF or a target success receipt.
+`UNKNOWN` retains custody across lease expiry. Held v2 custody blocks both v2
+and rollback v1 invocations. Publication outcome is reconciled from the exact
+transaction receipt before any replay, cleanup, or custody release. Layout-v2
+recovery also binds its persisted hash and mutation-watermark identity, as
+decided in [ADR 0077](adr/0077-mssql-persisted-hash-layout-v2.md).
 
 For a first deployment, run admitted synthetic NULL, duplicate, Unicode, Decimal,
 empty-window and outside-window invariance cases in an explicitly approved

@@ -37,7 +37,10 @@ def test_single_query_preserves_duplicates_without_count_or_offset():
     value.source_schema = "synthetic"
     value.source_table = "events"
     result = ClickHouseNativeSource(connector, schema_guard_factory=lambda cfg: nullcontext()).extract(value)
+    assert result.extraction_lifecycle is not None
+    assert result.extraction_lifecycle.require_acquired().snapshot_authority == "clickhouse.query-snapshot.v1"
     assert list(result.artifact.iter_native_rows()) == [{"value": 2**64 - 1}, {"value": 2**64 - 1}]
+    assert result.extraction_lifecycle.require_completed().complete
     assert len(connector.selects) == 1
     assert "OFFSET" not in connector.selects[0][0]
     assert result.artifact.rows_exported == 2
@@ -138,6 +141,30 @@ def test_schema_failure_preserves_primary_when_stream_close_fails():
     with pytest.raises(ValueError, match="schema_changed") as failure:
         list(result.artifact.iter_native_rows())
     assert any("iterator cleanup failed" in note for note in failure.value.__notes__)
+
+
+def test_schema_stability_guard_detects_catalog_change() -> None:
+    from dpone.runtime.sources.clickhouse_native_guard import ClickHouseSchemaStabilityGuard
+
+    class CatalogConnector:
+        def __init__(self) -> None:
+            self.changed = False
+
+        def get_records(self, _query, params=None, as_dict=False):
+            assert params == {"database": "synthetic", "table": "events"}
+            return [
+                {
+                    "uuid": "11111111-1111-4111-8111-111111111111",
+                    "metadata_version": 2 if self.changed else 1,
+                }
+            ]
+
+    connector = CatalogConnector()
+    guard = ClickHouseSchemaStabilityGuard(connector, "synthetic", "events")
+    guard.__enter__()
+    connector.changed = True
+    with pytest.raises(ValueError, match="source_schema_changed"):
+        guard.__exit__(None, None, None)
 
 
 def test_window_parameters_keep_microseconds_and_force_complete_query():

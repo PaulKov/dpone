@@ -704,7 +704,7 @@ version if new bytes are required.
 
 ### Build and metadata failures
 
-Use the [four-package local build and archive checks](../release.md#pre-release-checks)
+Use the [five-package local build and archive checks](../release.md#pre-release-checks)
 in a clean disposable checkout. Common causes are a missing/mismatched source
 tag, inconsistent project versions, missing distributions, invalid metadata,
 publisher mismatch, or an already occupied PyPI version.

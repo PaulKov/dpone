@@ -132,6 +132,35 @@ def test_explicit_batch_root_quality_replaces_legacy_defaults_quality(tmp_path: 
     assert compiled[0].raw_config["quality"] == root_quality
 
 
+def test_batch_root_runtime_storage_reaches_every_compiled_process(tmp_path: Path) -> None:
+    runtime = {
+        "storage": {
+            "profile": "mounted_volume",
+            "work_dir": "/var/lib/dpone/work",
+            "evidence_dir": "/var/lib/dpone/evidence",
+            "checkpoint_dir": "/var/lib/dpone/checkpoints",
+            "debug_dir": "/var/lib/dpone/debug",
+        }
+    }
+    compiled = BatchManifestCompiler().compile(
+        {
+            "kind": "dpone.batch.v1",
+            "runtime": runtime,
+            "defaults": {
+                "name": "orders",
+                "source": {"type": "postgres", "connection_ref": "source"},
+                "sink": {"type": "clickhouse", "connection_ref": "sink"},
+            },
+            "schemas": {"public": {"tables": ["orders"]}},
+        },
+        manifest_path=tmp_path / "pipeline.yaml",
+    )
+
+    assert compiled[0].raw_config["runtime"] == runtime
+    load_config = LoadConfigBuilder().build(compiled[0].raw_config)
+    assert load_config.options["runtime_storage"] == runtime["storage"]
+
+
 @pytest.mark.parametrize("endpoint", ["source", "sink"])
 def test_load_config_builder_rejects_misplaced_endpoint_quality(endpoint: str) -> None:
     config = {

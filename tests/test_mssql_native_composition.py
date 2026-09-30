@@ -1,7 +1,8 @@
 """Concrete context assembly owns independent sessions and rejects wrong database."""
 
 from contextlib import contextmanager
-from threading import Event
+from dataclasses import replace
+from threading import Barrier, Event, Lock, get_ident
 from types import SimpleNamespace
 
 import pytest
@@ -94,6 +95,90 @@ def test_composed_importers_are_independent_and_closed(tmp_path):
     assert len(closed) == 2
     with pytest.raises(ValueError, match="database_mismatch"):
         context.capacity_check(1)
+
+
+def test_allocation_probe_uses_its_own_target_session(tmp_path, monkeypatch):
+    target = SimpleNamespace()
+    probe = SimpleNamespace(closed=False)
+    observed = []
+
+    @contextmanager
+    def connection():
+        try:
+            yield probe
+        finally:
+            probe.closed = True
+
+    def allocated_bytes(connector, database):
+        observed.append((connector, database))
+        return 4096
+
+    monkeypatch.setattr("dpone.runtime.sinks.mssql_native_composition.native_stage_allocated_bytes", allocated_bytes)
+    context = compose_native_stage_context(
+        store=SimpleNamespace(assert_lease=lambda lease: None),
+        plan=SimpleNamespace(run_id="synthetic"),
+        lease=object(),
+        wire_contract=build_mssql_bcp_native_contract(schema=[("value", "int")], query="SELECT synthetic"),
+        limits=native_limits(config()),
+        work_dir=tmp_path,
+        target_connector=target,
+        importer_connection=connection,
+        bcp_options_factory=BcpOptions,
+        database="synthetic",
+        schema="dbo",
+        row_source=lambda: iter(()),
+        journal_factory=lambda: None,
+        cancelled=Event(),
+        required_target_headroom_bytes=1024,
+    )
+
+    assert context.executor.allocation_observer() == 4096
+    assert observed == [(probe, "synthetic")]
+    assert probe.closed is True
+
+
+def test_receipt_reverification_uses_bounded_independent_target_sessions(tmp_path, monkeypatch):
+    connectors = []
+
+    @contextmanager
+    def connection():
+        connector = SimpleNamespace(get_records=lambda sql: [("synthetic",)])
+        connectors.append(connector)
+        yield connector
+
+    limits = replace(native_limits(config()), import_parallelism=2)
+    context = compose_native_stage_context(
+        store=SimpleNamespace(assert_lease=lambda lease: None),
+        plan=SimpleNamespace(run_id="synthetic"),
+        lease=object(),
+        wire_contract=build_mssql_bcp_native_contract(schema=[("value", "int")], query="SELECT synthetic"),
+        limits=limits,
+        work_dir=tmp_path,
+        target_connector=SimpleNamespace(),
+        importer_connection=connection,
+        bcp_options_factory=BcpOptions,
+        database="synthetic",
+        schema="dbo",
+        row_source=lambda: iter(()),
+        journal_factory=lambda: None,
+        cancelled=Event(),
+        required_target_headroom_bytes=1024,
+    )
+    rendezvous = Barrier(2)
+    lock = Lock()
+    workers = []
+
+    def inspect(self, plan, receipt, lease):
+        del plan, receipt, lease
+        with lock:
+            workers.append(get_ident())
+        rendezvous.wait(timeout=5)
+
+    monkeypatch.setattr(MssqlNativeChunkImporter, "inspect", inspect)
+    context.verify_receipts((object(), object()))
+
+    assert len(set(workers)) == 2
+    assert len(connectors) == 2
 
 
 def test_preparation_rejects_reused_target_without_closing_it(tmp_path):
@@ -322,3 +407,53 @@ def test_target_local_layout_admits_narrow_and_wide100_at_composition(tmp_path, 
     )
 
     assert context.wire_contract is wire
+
+
+def test_sqlclient_composition_requires_and_injects_exact_selected_writer(tmp_path):
+    wire = build_mssql_bcp_native_contract(schema=[("value", "bigint")], query="SELECT synthetic")
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", wire.type_layout_hash)
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "mssql_sqlclient",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+        writer_proof_capability="sqlclient-session-applock-v1",
+    )
+    store = SQLiteWindowStore(tmp_path / "state.sqlite", clock=lambda: 1.0)
+    lease = store.acquire("target", "owner", 60)
+    arguments = dict(
+        store=store,
+        plan=plan,
+        lease=lease,
+        wire_contract=wire,
+        limits=native_limits(config()),
+        work_dir=tmp_path,
+        target_connector=SimpleNamespace(),
+        importer_connection=lambda: pytest.fail("not opened"),
+        bcp_options_factory=BcpOptions,
+        database="synthetic",
+        schema="dbo",
+        row_source=lambda: iter(()),
+        journal_factory=lambda: None,
+        cancelled=Event(),
+        required_target_headroom_bytes=1024,
+        verification_identity=identity,
+    )
+    with pytest.raises(ValueError, match="stage_writer_selection_mismatch"):
+        compose_native_stage_context(**arguments)
+
+    writer = SimpleNamespace(write=lambda *args, **kwargs: None)
+
+    @contextmanager
+    def connection():
+        yield SimpleNamespace(get_records=lambda sql: [("synthetic",)])
+
+    arguments["importer_connection"] = connection
+    context = compose_native_stage_context(**arguments, native_stage_writer=writer)
+    with context.executor.importer_factory() as importer:
+        assert importer._target_local_attempt.writer is writer
+        assert importer._target_local_attempt.max_row_bytes == native_limits(config()).max_row_bytes

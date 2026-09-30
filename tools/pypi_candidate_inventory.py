@@ -41,7 +41,9 @@ __all__ = [
     "validate_distribution_inventory",
 ]
 
-EXPECTED_DISTRIBUTIONS = frozenset("apache-airflow-providers-dpone dpone dpone-airflow-pack dpone-native-accel".split())
+EXPECTED_DISTRIBUTIONS = frozenset(
+    "apache-airflow-providers-dpone dpone dpone-airflow-pack dpone-mssql-sqlclient dpone-native-accel".split()
+)
 _HASH_CHUNK_BYTES = 1024 * 1024
 _METADATA_FIELDS = ("st_dev", "st_ino", "st_mode", "st_nlink", "st_size", "st_mtime_ns", "st_ctime_ns")
 _IDENTIFIER_HASH_FACTORY = hashlib.sha256
@@ -344,7 +346,7 @@ def validate_distribution_inventory(
     *,
     expected_version: str,
 ) -> tuple[str, ...]:
-    """Validate the complete four-package candidate set before network access."""
+    """Validate the complete five-package candidate set before network access."""
 
     blockers = [
         f"PYPI_CANDIDATE_{kind}_COUNT_MISMATCH: expected={expected} actual={actual}"

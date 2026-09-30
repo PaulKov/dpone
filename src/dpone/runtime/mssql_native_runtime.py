@@ -16,10 +16,13 @@ from time import monotonic
 from typing import TYPE_CHECKING, Any
 
 from dpone.adapters.mssql_native_custody import NativeTargetCustody
-from dpone.contracts.bounded_window import WindowContractError, WindowLease
 from dpone.contracts.process_types import ProcessResult
-from dpone.manifest.mssql_native_policy import native_verification_backend, validate_native_config
-from dpone.ports.bounded_window import WindowStore
+from dpone.manifest.mssql_native_policy import (
+    native_import_backend,
+    native_verification_backend,
+    validate_native_config,
+)
+from dpone.ports.mssql_native import WindowContractError, WindowLease, WindowStore
 from dpone.runtime.governance.ports import StagedLoadHandle
 from dpone.runtime.mssql_native_chunks_observations import NativeDeliverySession, delivery_session
 from dpone.runtime.sinks.load_result import LoadResult
@@ -77,6 +80,7 @@ class NativeMssqlRuntime:
         """Resume target receipts before any source factory; never replay unknown commit."""
         validate_native_config(load_config)
         verification_backend = native_verification_backend(load_config)
+        import_backend = native_import_backend(load_config)
         self.preflight(load_config)
         started = monotonic()
         lease = self.store.acquire(self.target_id, owner, self.lease_ttl)
@@ -95,6 +99,8 @@ class NativeMssqlRuntime:
             if target_local:
                 if binding_identity is None or context_identity is None or binding_identity != context_identity:
                     raise WindowContractError("mssql_native.verification_identity_mismatch")
+                if binding_identity.import_backend != import_backend.value:
+                    raise WindowContractError("mssql_native.import_backend_identity_mismatch")
             elif binding_identity is not None or context_identity is not None:
                 raise WindowContractError("mssql_native.verification_identity_mismatch")
             custody = self.custody_factory(self.store, self.target_id)

@@ -7,7 +7,7 @@ from hashlib import sha256
 from pathlib import Path
 from threading import Lock
 
-from dpone.ports.mssql_native_writer import (
+from dpone.ports.mssql_native import (
     BCP_STAGE_PROOF,
     NativeStageProcessProof,
     NativeStageWriteGrant,

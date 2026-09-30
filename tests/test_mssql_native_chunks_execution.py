@@ -23,9 +23,11 @@ class Target:
         self.receipts, self.files, self.settled = {}, [], []
         self.lock = Lock()
         self.active, self.peak = 0, 0
+        self.sessions = 0
 
     @contextmanager
     def factory(self):
+        self.sessions += 1
         yield self
 
     def allocated_bytes(self):
@@ -245,6 +247,31 @@ def test_target_local_empty_query_completes_without_attempt_or_writer(tmp_path):
     assert result.rows == 0 and result.receipts == ()
     assert journal.data["events"] == {}
     assert target.files == []
+
+
+def test_target_local_import_receipt_is_not_scanned_twice_before_journal_verification(tmp_path):
+    class BarrierVerifiedTarget(Target):
+        def inspect(self, plan, receipt, lease):
+            pytest.fail("barrier-verified target-local receipt was scanned twice")
+
+    target = BarrierVerifiedTarget()
+    executor, plan, lease, contract = setup(tmp_path, target)
+    executor._target_local = True
+
+    result = executor.stage(plan, iter([(7,)]), contract, lease)
+
+    assert result.rows == 1
+    assert len(result.receipts) == 1
+
+
+def test_injected_allocation_observer_avoids_extra_importer_connection(tmp_path):
+    target = Target()
+    executor, plan, lease, contract = setup(tmp_path, target)
+    executor.allocation_observer = lambda: 0
+
+    executor.stage(plan, iter([(7,)]), contract, lease)
+
+    assert target.sessions == 1
 
 
 def test_target_local_failure_hook_runs_after_workers_settle(tmp_path):

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable, Iterator
+from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from hashlib import sha256
 from typing import TYPE_CHECKING, Any
@@ -11,8 +12,12 @@ from typing import TYPE_CHECKING, Any
 from dpone.adapters.mssql_native_capacity import require_native_target_capacity
 from dpone.adapters.mssql_native_chunks_journal_v2 import NativeChunkJournalV2
 from dpone.adapters.mssql_native_custody import NativeTargetCustody
-from dpone.adapters.mssql_native_guard import native_exact_stage_barrier, native_stage_writer_scope
-from dpone.ports.mssql_native_chunks import NativeChunkReceipt
+from dpone.adapters.mssql_native_guard import (
+    native_exact_stage_barrier,
+    native_stage_writer_scope,
+    sqlclient_exact_stage_barrier,
+)
+from dpone.ports.mssql_native import SQLCLIENT_SESSION_PROOF, NativeChunkReceipt
 from dpone.runtime.mssql_native_capacity import require_native_spool_capacity
 from dpone.runtime.mssql_native_chunks import BoundedNativeChunks, WindowOutcomeUnknown
 from dpone.runtime.mssql_native_chunks_files import discard_native_files, verify_native_file
@@ -22,7 +27,11 @@ from dpone.runtime.mssql_native_encoder import MssqlNativeEncoder
 if TYPE_CHECKING:
     from dpone.ports.native_delivery_observer import NativeDeliveryObserver
 from dpone.runtime.sinks.mssql_native_bcp_writer import MssqlNativeBcpWriter
-from dpone.runtime.sinks.mssql_native_import import MssqlNativeChunkImporter, native_attempt_table_name
+from dpone.runtime.sinks.mssql_native_import import (
+    MssqlNativeChunkImporter,
+    native_attempt_table_name,
+    native_stage_allocated_bytes,
+)
 from dpone.runtime.sinks.mssql_native_prepare import NativeStageContext
 from dpone.runtime.sinks.mssql_native_target_digest import require_target_local_raw_layout
 from dpone.runtime.sinks.mssql_native_target_local_import import NativeTargetLocalAttempt
@@ -49,6 +58,8 @@ def compose_native_stage_context(
     observer: NativeDeliveryObserver | NativeDeliverySession | None = None,
     verification_identity: Any = None,
     target_local_timeout_seconds: int = 3600,
+    native_stage_writer: Any = None,
+    persisted_hash_layout: bool = False,
 ) -> NativeStageContext:
     """Wire independently owned importer sessions and real capacity/owner checks.
 
@@ -68,10 +79,29 @@ def compose_native_stage_context(
         raise ValueError("mssql_native.invalid_v2_identity")
     if type(target_local_timeout_seconds) is not int or target_local_timeout_seconds < 1:
         raise ValueError("mssql_native.invalid_barrier_timeout")
+    sqlclient_selected = (
+        verification_identity is not None and verification_identity.writer_proof_capability == SQLCLIENT_SESSION_PROOF
+    )
+    if sqlclient_selected != (native_stage_writer is not None):
+        raise ValueError("mssql_native.stage_writer_selection_mismatch")
+    if type(persisted_hash_layout) is not bool or (persisted_hash_layout and not sqlclient_selected):
+        raise ValueError("mssql_native.persisted_hash_layout_selection")
     v2_journal = (
         NativeChunkJournalV2(store, lease, verification_identity) if verification_identity is not None else None
     )
     custody = NativeTargetCustody(store, plan.target_id) if v2_journal is not None else None
+
+    def recovery_bindings(admission: Any) -> Any:
+        if verification_identity is None:
+            return None
+        from dpone.contracts.mssql_native_recovery_authority import compose_mssql_native_recovery_bindings
+
+        return compose_mssql_native_recovery_bindings(
+            admission,
+            verification_identity=verification_identity,
+            state_store=store,
+            work_root=work_dir,
+        )
 
     def selected_journal() -> Any:
         return v2_journal if v2_journal is not None else journal_factory()
@@ -102,16 +132,39 @@ def compose_native_stage_context(
                     )
                     return process.wait_supervised()
 
+                writer = native_stage_writer if sqlclient_selected else MssqlNativeBcpWriter(launch)
+                if sqlclient_selected:
+
+                    def sqlclient_barrier(stage: str, grant: str, check: Callable[[], None]) -> Any:
+                        return sqlclient_exact_stage_barrier(
+                            connector,
+                            stage,
+                            grant_token_sha256=grant,
+                            timeout_seconds=target_local_timeout_seconds,
+                            assert_identity=check,
+                        )
+
+                    selected_barrier: Callable[..., Any] = sqlclient_barrier
+
+                else:
+
+                    def bcp_barrier(stage: str, check: Callable[[], None]) -> Any:
+                        return native_exact_stage_barrier(
+                            connector, stage, timeout_seconds=target_local_timeout_seconds, assert_identity=check
+                        )
+
+                    selected_barrier = bcp_barrier
+
                 target_local = NativeTargetLocalAttempt(
                     v2_journal,
                     custody,
-                    MssqlNativeBcpWriter(launch),
-                    lambda stage, check: native_exact_stage_barrier(
-                        connector, stage, timeout_seconds=target_local_timeout_seconds, assert_identity=check
-                    ),
+                    writer,
+                    selected_barrier,
                     WindowOutcomeUnknown,
                     verify_native_file,
                     target_local_timeout_seconds,
+                    timeout_seconds=target_local_timeout_seconds,
+                    max_row_bytes=limits.max_row_bytes,
                 )
             yield MssqlNativeChunkImporter(
                 connector,
@@ -127,12 +180,21 @@ def compose_native_stage_context(
                 ),
                 target_digest_contract=wire_contract if target_local is not None else None,
                 target_local_attempt=target_local,
+                persisted_hash_layout=persisted_hash_layout,
             )
 
     def verify(receipts: tuple[Any, ...]) -> None:
-        with importer_factory() as importer:
-            for receipt in receipts:
+        def inspect(receipt: Any) -> None:
+            with importer_factory() as importer:
                 importer.inspect(plan, receipt, lease)
+
+        workers = min(len(receipts), limits.effective_import_parallelism)
+        if workers <= 1:
+            for receipt in receipts:
+                inspect(receipt)
+            return
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="dpone-native-verify") as executor:
+            tuple(executor.map(inspect, receipts))
 
     def cleanup(receipts: tuple[Any, ...]) -> None:
         with importer_factory() as importer:
@@ -155,7 +217,7 @@ def compose_native_stage_context(
         if not projection["chunks"] and (projection["events"] or projection["nonces"]):
             return False
         if any(
-            events[-1]["event"] not in {"VERIFIED", "FAILED_RETIRABLE", "RETIRED"}
+            events[-1]["event"] not in {"VERIFIED", "PARTIAL_PROVED", "FAILED_RETIRABLE", "RETIRED"}
             for events in projection["events"].values()
         ):
             return False
@@ -168,10 +230,26 @@ def compose_native_stage_context(
         journal.record_nonpublication(proof, assert_nonpublication=assert_nonpublication)
         for ordinal in sorted(map(int, projection["chunks"])):
             chunk = projection["chunks"][str(ordinal)]
-            if projection["events"][chunk["attempt_id"]][-1]["event"] == "RETIRED":
+            terminal = projection["events"][chunk["attempt_id"]][-1]
+            if terminal["event"] == "RETIRED":
                 continue
-            receipt = NativeChunkReceipt(**chunk["receipt"])
             with importer_factory() as importer:
+                if chunk["receipt"] is None:
+                    attempt_id = chunk["attempt_id"]
+                    table = importer.table_name(plan, attempt_id)
+                    artifact = chunk["file"]
+                    receipt = NativeChunkReceipt(
+                        ordinal,
+                        attempt_id,
+                        importer.qualified(table),
+                        artifact["rows"],
+                        artifact["encoded_bytes"],
+                        artifact["file_sha256"],
+                        artifact["typed_digest"],
+                        {"native_object_id": terminal["stage_binding"]["object_id"]},
+                    )
+                else:
+                    receipt = NativeChunkReceipt(**chunk["receipt"])
                 journal.retire_verified(
                     ordinal,
                     receipt.attempt_id,
@@ -231,6 +309,14 @@ def compose_native_stage_context(
                     raise
                 primary.add_note(f"native preparation session cleanup failed: {type(error).__name__}")
 
+    def allocated_bytes() -> int:
+        """Observe staging pressure through an independently owned session."""
+
+        with importer_connection() as connector:
+            if connector is target_connector:
+                raise ValueError("mssql_native.allocation_session_reused")
+            return native_stage_allocated_bytes(connector, database)
+
     return NativeStageContext(
         plan=plan,
         wire_contract=wire_contract,
@@ -244,6 +330,7 @@ def compose_native_stage_context(
             if v2_journal is not None
             else None,
             on_failed_stage=retire_failed_stage if v2_journal is not None else None,
+            allocation_observer=allocated_bytes,
         ),
         observer=observations,
         lease=lease,
@@ -258,4 +345,6 @@ def compose_native_stage_context(
         cancelled=cancelled,
         verification_identity=verification_identity,
         target_local_timeout_seconds=target_local_timeout_seconds,
+        recovery_bindings=recovery_bindings if verification_identity is not None else None,
+        persisted_hash_layout=persisted_hash_layout,
     )

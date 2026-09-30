@@ -8,6 +8,7 @@ from . import (
     normalize_cmd,
     perf_cmd,
     profile_cmd,
+    runtime_mssql_sqlclient_cmd,
     runtime_native_accel_cmd,
     runtime_storage_cmd,
     state_cmd,
@@ -171,6 +172,21 @@ def runtime_group() -> Command:
         ],
         subdest="runtime_native_accel_cmd",
     )
+    mssql_sqlclient = CommandGroup(
+        name="mssql-sqlclient",
+        help="Optional Microsoft.Data.SqlClient companion diagnostics",
+        build_parser=lambda subparsers: subparsers.add_parser(
+            "mssql-sqlclient", help="Optional Microsoft.Data.SqlClient companion diagnostics"
+        ),
+        subcommands=[
+            FuncCommand(
+                "doctor",
+                runtime_mssql_sqlclient_cmd.register_doctor_parser,
+                runtime_mssql_sqlclient_cmd.cmd_runtime_mssql_sqlclient_doctor,
+            )
+        ],
+        subdest="runtime_mssql_sqlclient_cmd",
+    )
 
     def build(subparsers: argparse._SubParsersAction) -> argparse.ArgumentParser:
         return subparsers.add_parser("runtime", help="Runtime execution utilities")
@@ -179,6 +195,6 @@ def runtime_group() -> Command:
         name="runtime",
         help="Runtime execution utilities",
         build_parser=build,
-        subcommands=[storage, native_accel],
+        subcommands=[storage, native_accel, mssql_sqlclient],
         subdest="runtime_cmd",
     )

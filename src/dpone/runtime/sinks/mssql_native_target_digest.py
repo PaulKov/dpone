@@ -102,6 +102,8 @@ def build_prepared_target_digest_sql(
     business_contract: SourceNativeWireContract,
     full_contract: SourceNativeWireContract,
     expected_rows: int,
+    *,
+    include_mutation_watermark: bool = False,
 ) -> str:
     """Compile business and full prepared digests with a finite metadata allowance.
 
@@ -143,6 +145,7 @@ def build_prepared_target_digest_sql(
         expected_rows,
         (("business_hash", business_fields), ("full_hash", full_fields)),
         null_metadata=null_metadata,
+        mutation_watermark=include_mutation_watermark,
     )
 
 
@@ -152,6 +155,7 @@ def _build_sql(
     hashes: tuple[tuple[str, tuple[str, ...]], ...],
     *,
     null_metadata: tuple[str, ...] = (),
+    mutation_watermark: bool = False,
 ) -> str:
     # Each APPLY owns a shallow expression while the final hash concatenates
     # only aliases. SQL Server materializes fixed-size hashes, never row payloads.
@@ -167,6 +171,8 @@ def _build_sql(
     if null_metadata:
         invalid = " OR ".join(f"s.{_quote_column(name)} IS NOT NULL" for name in null_metadata)
         selections.append(f"CONVERT(bit, CASE WHEN {invalid} THEN 1 ELSE 0 END) AS invalid_metadata")
+    if mutation_watermark:
+        selections.append("CONVERT(binary(8), s.[__dpone__mutation_version]) AS mutation_watermark")
     projected = ",\n    ".join(selections)
     applies = "\n".join(
         f"CROSS APPLY (VALUES ({chunk})) AS {name}_chunk_{index}(payload)"
@@ -194,7 +200,8 @@ def _build_sql(
         f"{guard}"
         "SELECT COUNT_BIG(*) AS rows, "
         f"CONVERT(bit, CASE WHEN COUNT_BIG(*) > {expected_rows} THEN 1 ELSE 0 END) AS count_overflow,\n    "
-        f"{limbs}\nFROM #dpone_target_hashes;\n"
+        + ("MAX(mutation_watermark) AS mutation_watermark,\n    " if mutation_watermark else "")
+        + f"{limbs}\nFROM #dpone_target_hashes;\n"
         "DROP TABLE #dpone_target_hashes;"
     )
 
@@ -232,6 +239,20 @@ def decode_prepared_target_digest_row(row: Any, *, expected_rows: int) -> Prepar
         decode_target_digest_row((*head, *values[2:10]), expected_rows=expected_rows),
         decode_target_digest_row((*head, *values[10:18]), expected_rows=expected_rows),
     )
+
+
+def decode_prepared_target_digest_with_watermark(row: Any, *, expected_rows: int) -> tuple[PreparedTargetDigests, int]:
+    """Decode prepared digests plus their same-scan rowversion watermark."""
+    values = _row_values(row, 19)
+    watermark = values[2]
+    if expected_rows == 0 and watermark is None:
+        mutation = 0
+    elif type(watermark) is bytes and len(watermark) == 8:
+        mutation = int.from_bytes(watermark, "big")
+    else:
+        raise ValueError("mssql_native.persisted_hash_watermark")
+    digest_values = (*values[:2], *values[3:])
+    return decode_prepared_target_digest_row(digest_values, expected_rows=expected_rows), mutation
 
 
 def decode_target_digest_row(row: Any, *, expected_rows: int) -> TargetDigest:

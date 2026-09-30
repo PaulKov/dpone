@@ -1,0 +1,438 @@
+{
+  "business_column_count": 100,
+  "columns": [
+    {
+      "name": "c000",
+      "type": "bigint"
+    },
+    {
+      "name": "c001",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c002",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c003",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c004",
+      "type": "bigint"
+    },
+    {
+      "name": "c005",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c006",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c007",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c008",
+      "type": "bigint"
+    },
+    {
+      "name": "c009",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c010",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c011",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c012",
+      "type": "bigint"
+    },
+    {
+      "name": "c013",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c014",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c015",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c016",
+      "type": "bigint"
+    },
+    {
+      "name": "c017",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c018",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c019",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c020",
+      "type": "bigint"
+    },
+    {
+      "name": "c021",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c022",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c023",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c024",
+      "type": "bigint"
+    },
+    {
+      "name": "c025",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c026",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c027",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c028",
+      "type": "bigint"
+    },
+    {
+      "name": "c029",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c030",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c031",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c032",
+      "type": "bigint"
+    },
+    {
+      "name": "c033",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c034",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c035",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c036",
+      "type": "bigint"
+    },
+    {
+      "name": "c037",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c038",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c039",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c040",
+      "type": "bigint"
+    },
+    {
+      "name": "c041",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c042",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c043",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c044",
+      "type": "bigint"
+    },
+    {
+      "name": "c045",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c046",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c047",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c048",
+      "type": "bigint"
+    },
+    {
+      "name": "c049",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c050",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c051",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c052",
+      "type": "bigint"
+    },
+    {
+      "name": "c053",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c054",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c055",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c056",
+      "type": "bigint"
+    },
+    {
+      "name": "c057",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c058",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c059",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c060",
+      "type": "bigint"
+    },
+    {
+      "name": "c061",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c062",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c063",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c064",
+      "type": "bigint"
+    },
+    {
+      "name": "c065",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c066",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c067",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c068",
+      "type": "bigint"
+    },
+    {
+      "name": "c069",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c070",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c071",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c072",
+      "type": "bigint"
+    },
+    {
+      "name": "c073",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c074",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c075",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c076",
+      "type": "bigint"
+    },
+    {
+      "name": "c077",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c078",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c079",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c080",
+      "type": "bigint"
+    },
+    {
+      "name": "c081",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c082",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c083",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c084",
+      "type": "bigint"
+    },
+    {
+      "name": "c085",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c086",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c087",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c088",
+      "type": "bigint"
+    },
+    {
+      "name": "c089",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c090",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c091",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c092",
+      "type": "bigint"
+    },
+    {
+      "name": "c093",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c094",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c095",
+      "type": "datetime2(6) nullable"
+    },
+    {
+      "name": "c096",
+      "type": "bigint"
+    },
+    {
+      "name": "c097",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "c098",
+      "type": "nvarchar(max)"
+    },
+    {
+      "name": "c099",
+      "type": "datetime2(6) nullable"
+    }
+  ],
+  "fixture_id": "wide100-sqlclient-v1",
+  "generator_version": "mssql-sqlclient-synthetic-v1",
+  "max_row_bytes": 1048576,
+  "row_counts": [
+    10000,
+    1000000
+  ],
+  "rules": {
+    "duplicate": "every thirteenth row repeats its predecessor",
+    "null": "nullable column j is null when (source_row+i) % 11 == 0",
+    "text_lengths": [
+      0,
+      1,
+      31,
+      255,
+      4095,
+      65535
+    ],
+    "text_skew": {
+      "common_cycle": [
+        0,
+        1,
+        31,
+        255
+      ],
+      "one_4095_value_every_rows": 257,
+      "one_65535_value_every_rows": 65536
+    }
+  },
+  "schema_sha256": "b43c680f14d37c6ea52715898647dbc13ad1d454933945ad2d79d9063358c080",
+  "schema_version": 1,
+  "seed": 20260927,
+  "source": "deterministic-synthetic-only"
+}

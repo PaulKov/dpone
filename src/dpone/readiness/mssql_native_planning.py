@@ -9,7 +9,25 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from dpone.manifest.mssql_native_policy import native_limits, native_verification_backend
+from dpone.contracts.mssql_generic_transaction_names import (
+    ATTEMPT_TABLE,
+    ATTEMPT_TRIGGER,
+    FENCE_TABLE,
+    FENCE_TRIGGER,
+    GENERIC_TRANSACTION_CATALOG_VERSION,
+    OPERATION_TABLE,
+    OPERATION_TRIGGER,
+    RECEIPT_TABLE,
+    RECEIPT_TRIGGER,
+    TARGET_IDENTITY_REGISTRY_TABLE,
+    TARGET_IDENTITY_REGISTRY_TRIGGER,
+)
+from dpone.manifest.mssql_native_policy import (
+    native_import_backend,
+    native_limits,
+    native_sqlclient_layout_version,
+    native_verification_backend,
+)
 
 
 def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
@@ -32,14 +50,16 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
     if not isinstance(execution, Mapping):
         return
     limits = native_limits(config)
+    importer = native_import_backend(config)
     authored: dict[str, Any] = {
-        "status": "composition_required",
+        "status": "live_preflight_required",
         "live_preflight": "not_run",
         "source_query_count": 1,
         "source_projection": "catalog_columns_explicitly_named",
         "offset_pagination": False,
         "parallelism_scope": "native_encoding_and_file_import",
         "transport": "bounded_native_files",
+        "import_backend": importer.value,
         "limits": limits.to_dict(),
         "spool_payload_bound": limits.spool_payload_bound,
         "spool_bound_scope": "encoded_payload_only_excludes_driver_and_server_memory",
@@ -55,15 +75,39 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
             "quality_evidence_state_callbacks",
         ],
     }
+    if importer.value == "mssql_sqlclient":
+        layout_version = native_sqlclient_layout_version(config)
+        authored["layout_version"] = layout_version
+        authored["verification_strategy"] = (
+            "persisted_hash_and_mutation_watermark" if layout_version == 2 else "canonical_target_readback"
+        )
     if "verification_backend" in execution:
         verifier = native_verification_backend(config)
         authored["verification_backend"] = verifier.value
         authored["verification_identity_version"] = verifier.identity_version
         if verifier.value == "target_local":
-            authored["writer_proof_capability"] = "bcp-supervised-stage-barrier-v1"
-            authored["required_dependencies"].extend(
-                ["stable_target_custody", "supervised_bcp_writer", "target_local_digest"]
+            authored["writer_proof_capability"] = (
+                "sqlclient-session-applock-v1"
+                if importer.value == "mssql_sqlclient"
+                else "bcp-supervised-stage-barrier-v1"
             )
+            writer_dependency = (
+                "verified_sqlclient_companion" if importer.value == "mssql_sqlclient" else "supervised_bcp_writer"
+            )
+            authored["required_dependencies"].extend(
+                ["stable_target_custody", writer_dependency, "target_local_digest"]
+            )
+            authored["admission"] = {
+                "schema_version": 2,
+                "kind": "dpone.mssql-native-admission.v2",
+                "status": "blocked",
+                "import_backend": importer.value,
+                "verification_backend": verifier.value,
+                "identity_version": verifier.identity_version,
+                "capability_id": authored["writer_proof_capability"],
+                "blockers": ["mssql_native.live_preflight_required"],
+                "warnings": ["mssql_native.live_preflight_not_run"],
+            }
     if "encoding_parallelism" in authored["limits"]:
         authored["stage_concurrency"] = {
             "encoding_parallelism": limits.effective_encoding_parallelism,
@@ -71,7 +115,25 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
             "retained_work_capacity": limits.retained_work_capacity,
         }
     plan["mssql_native"] = authored
-    plan["bulk_path"] = "clickhouse_bounded_mssql_native_bcp"
+    plan["state"] = {
+        **plan["state"],
+        "catalog": f"generic_mssql_transaction_v{GENERIC_TRANSACTION_CATALOG_VERSION}",
+        "tables": {
+            "target_identity_registry": TARGET_IDENTITY_REGISTRY_TABLE,
+            "target_fence": FENCE_TABLE,
+            "load_attempt": ATTEMPT_TABLE,
+            "load_operation": OPERATION_TABLE,
+            "load_receipt": RECEIPT_TABLE,
+        },
+        "triggers": {
+            "target_identity_registry": TARGET_IDENTITY_REGISTRY_TRIGGER,
+            "target_fence": FENCE_TRIGGER,
+            "load_attempt": ATTEMPT_TRIGGER,
+            "load_operation": OPERATION_TRIGGER,
+            "load_receipt": RECEIPT_TRIGGER,
+        },
+    }
+    plan["bulk_path"] = f"clickhouse_bounded_mssql_native_{importer.value}"
     # These generic stream/snapshot optimizers do not govern this executor.
     for key in ("native_transfer_execution", "native_transfer_transport", "native_transfer_snapshot_optimization"):
         plan[key] = {}
@@ -89,9 +151,9 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
         "selected_transport": "bounded_native_files",
         "certification_mode": "unverified",
         "certification_status": "unverified",
-        "release_gate": "composition_required",
+        "release_gate": "live_preflight_required",
         "fallback_chain": [],
-        "blockers": ["composition_required"],
+        "blockers": [],
         "warnings": ["live_preflight_not_run"],
     }
     plan["source_impact"] = [
@@ -113,7 +175,7 @@ def project_mssql_native(plan: dict[str, Any], config: Any) -> None:
         decision = dict(intelligence.get("decision") or {})
         decision["native_transfer_plan"] = {
             "export_method": "one_clickhouse_query",
-            "ingest_method": "bounded_mssql_native_bcp",
+            "ingest_method": f"bounded_mssql_native_{importer.value}",
             "finalizer": "existing_target_transaction_with_commit_receipt",
             "partitioning": {"strategy": "one_authored_scope", "column": authored["publication_scope"].get("column")},
         }

@@ -1,0 +1,54 @@
+{
+  "business_column_count": 4,
+  "columns": [
+    {
+      "name": "event_id",
+      "type": "bigint"
+    },
+    {
+      "name": "metric",
+      "type": "float(53) nullable"
+    },
+    {
+      "name": "payload",
+      "type": "nvarchar(max) nullable"
+    },
+    {
+      "name": "occurred_at",
+      "type": "datetime2(6)"
+    }
+  ],
+  "fixture_id": "narrow-sqlclient-v1",
+  "generator_version": "mssql-sqlclient-synthetic-v1",
+  "max_row_bytes": 1048576,
+  "row_counts": [
+    10000,
+    1000000
+  ],
+  "rules": {
+    "duplicate": "every thirteenth row repeats its predecessor",
+    "null": "nullable column j is null when (source_row+i) % 11 == 0",
+    "text_lengths": [
+      0,
+      1,
+      31,
+      255,
+      4095,
+      65535
+    ],
+    "text_skew": {
+      "common_cycle": [
+        0,
+        1,
+        31,
+        255
+      ],
+      "one_4095_value_every_rows": 257,
+      "one_65535_value_every_rows": 65536
+    }
+  },
+  "schema_sha256": "0abfa1ccfc12f815e03d401e099d478509d087c857b65ee162b884944ea7a7a6",
+  "schema_version": 1,
+  "seed": 20260927,
+  "source": "deterministic-synthetic-only"
+}

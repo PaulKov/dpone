@@ -269,11 +269,14 @@ def test_release_workflow_builds_and_verifies_complete_candidate_set() -> None:
     github_release = _job(workflow, "github-release")
 
     build_command = _run(_step(build, "Build all release distributions"))
+    dotnet_setup = _step(build, "Set up .NET 10 for the SqlClient companion")
+    assert str(dotnet_setup["uses"]).startswith("actions/setup-dotnet@")
     for command in (
         "uv build",
         "uv build packages/dpone-native-accel --out-dir dist",
         "uv build packages/dpone-airflow-pack --out-dir dist",
         "uv build packages/apache-airflow-providers-dpone --out-dir dist",
+        "uv build packages/dpone-mssql-sqlclient --out-dir dist",
         "rm -f dist/.gitignore",
     ):
         assert command in build_command
@@ -299,6 +302,7 @@ def test_release_workflow_builds_and_verifies_complete_candidate_set() -> None:
         "dpone",
         "dpone-native-accel",
         "dpone-airflow-pack",
+        "dpone-mssql-sqlclient",
         "apache-airflow-providers-dpone",
     ):
         assert package in local_smoke

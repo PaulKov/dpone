@@ -5,7 +5,30 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
-from dpone.contracts.mssql_native_writer import BCP_STAGE_PROOF, NativeStageWriteGrant, NativeStageWriteOutcome
+from dpone.contracts.mssql_native_stage_writer import (
+    NativeStageColumnMapping,
+    NativeStageWriteMetrics,
+    NativeStageWriteObservation,
+    NativeStageWriteRequest,
+    OperationDeadline,
+)
+from dpone.contracts.mssql_native_writer import (
+    BCP_STAGE_PROOF,
+    SQLCLIENT_SESSION_PROOF,
+    NativeStageWriteGrant,
+    NativeStageWriteOutcome,
+)
+
+
+class NativeStageWriter(Protocol):
+    """Write one sealed input to one exact owned stage under one deadline."""
+
+    def write(
+        self,
+        request: NativeStageWriteRequest,
+        *,
+        deadline: OperationDeadline,
+    ) -> NativeStageWriteObservation: ...
 
 
 class NativeStageBulkWriter(Protocol):
@@ -25,8 +48,15 @@ class NativeStageProcessProof(Protocol):
 
 __all__ = [
     "BCP_STAGE_PROOF",
+    "SQLCLIENT_SESSION_PROOF",
     "NativeStageBulkWriter",
     "NativeStageProcessProof",
+    "NativeStageColumnMapping",
+    "NativeStageWriter",
+    "NativeStageWriteMetrics",
+    "NativeStageWriteObservation",
+    "NativeStageWriteRequest",
     "NativeStageWriteGrant",
     "NativeStageWriteOutcome",
+    "OperationDeadline",
 ]

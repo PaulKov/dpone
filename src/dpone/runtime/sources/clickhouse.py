@@ -39,6 +39,7 @@ class ClickHouseFetchedSchema:
     relation_schema: tuple[tuple[str, str], ...]
     projected_schema: tuple[tuple[str, str, bool], ...]
     relation_metadata: tuple[SourceColumnProvenance, ...]
+    relation_identity: str | None = None
 
 
 class ClickHouseSource(AbstractSource):
@@ -195,10 +196,23 @@ class ClickHouseSource(AbstractSource):
             )
             for name, dtype in schema
         )
+        relation_identity = None
+        from dpone.manifest.mssql_native_policy import native_requested
+
+        if native_requested(load_config):
+            rows = self.connector.get_records(
+                "SELECT toString(uuid) AS uuid FROM system.tables WHERE database=%(database)s AND name=%(table)s",
+                {"database": load_config.source_schema, "table": load_config.source_table},
+                as_dict=True,
+            )
+            if len(rows) != 1 or not str(rows[0].get("uuid") or "").strip():
+                raise RuntimeError("mssql_native.source_uuid_required")
+            relation_identity = str(rows[0]["uuid"])
         return ClickHouseFetchedSchema(
             relation_schema=schema,
             projected_schema=tuple((column.name, column.declared_type, bool(column.nullable)) for column in metadata),
             relation_metadata=metadata,
+            relation_identity=relation_identity,
         )
 
     def _resolve_strategy(self, load_config: LoadConfig) -> SourceStrategy:

@@ -1,6 +1,6 @@
 # Release
 
-This is the current maintainer runbook for the four dpone PyPI distributions.
+This is the current maintainer runbook for the five dpone PyPI distributions.
 It separates source readiness, authorized publication, and read-only observation
 of a version that is already published.
 
@@ -12,13 +12,13 @@ As reviewed on 2026-08-28, the sole ordinary PyPI publisher is
 It builds from `PaulKov/dpone` tag `vX.Y.Z`; it does not accept a repository,
 source SHA, ref, package, or artifact path from the caller.
 
-The approved authority and implementation were checked at controller commit
-`3b6ff638e2dbefc092447c584084a75ac72fd117`:
+The approved authority and five-package implementation were checked at controller
+commit `c2c877d02441899ee55509b1cb596db0bfecbfd2`:
 
-- [Approved OIDC publisher specification](https://github.com/PaulKov/dpone-release-controller/blob/3b6ff638e2dbefc092447c584084a75ac72fd117/docs/feature-specs/oidc-pypi-release-controller.md).
-- [Active publisher contract](https://github.com/PaulKov/dpone-release-controller/blob/3b6ff638e2dbefc092447c584084a75ac72fd117/config/oidc-pypi-publisher.json).
-- [Publication workflow](https://github.com/PaulKov/dpone-release-controller/blob/3b6ff638e2dbefc092447c584084a75ac72fd117/.github/workflows/pypi-release.yml).
-- [Controller operating guide and retrospective verifier](https://github.com/PaulKov/dpone-release-controller/blob/3b6ff638e2dbefc092447c584084a75ac72fd117/README.md).
+- [Approved OIDC publisher specification](https://github.com/PaulKov/dpone-release-controller/blob/c2c877d02441899ee55509b1cb596db0bfecbfd2/docs/feature-specs/oidc-pypi-release-controller.md).
+- [Active publisher contract](https://github.com/PaulKov/dpone-release-controller/blob/c2c877d02441899ee55509b1cb596db0bfecbfd2/config/oidc-pypi-publisher.json).
+- [Publication workflow](https://github.com/PaulKov/dpone-release-controller/blob/c2c877d02441899ee55509b1cb596db0bfecbfd2/.github/workflows/pypi-release.yml).
+- [Controller operating guide and retrospective verifier](https://github.com/PaulKov/dpone-release-controller/blob/c2c877d02441899ee55509b1cb596db0bfecbfd2/README.md).
 
 Re-observe the controller revision and workflow permission boundary before a
 new release. Routine releases do not require a manual inspection of PyPI Trusted
@@ -82,10 +82,10 @@ commit, operation, and approval in the
 
 1. Merge the source/version changes through normal required checks; preserve
    the immutable merge receipt described below.
-2. Confirm all four project versions and internal dependency pins match the
+2. Confirm all five project versions and internal dependency pins match the
    chosen version. A complete release has one wheel and one sdist each for
-   `dpone`, `dpone-native-accel`, `dpone-airflow-pack`, and
-   `apache-airflow-providers-dpone`.
+   `dpone`, `dpone-native-accel`, `dpone-airflow-pack`,
+   `dpone-mssql-sqlclient`, and `apache-airflow-providers-dpone`.
 3. Validate the exact source identity, required checks, changed-scope evidence,
    and annotated tag. Do not move or replace an existing release tag.
 4. Check the controller revision and workflow permission boundary. Manual PyPI
@@ -98,7 +98,7 @@ commit, operation, and approval in the
 
 ### Trusted Publisher configuration
 
-The existing OIDC publisher uses this configured tuple for all four PyPI projects:
+The existing OIDC publisher uses this configured tuple for all five PyPI projects:
 
 | Setting | Required value |
 | --- | --- |
@@ -129,7 +129,7 @@ their own authorization; never print or persist credentials in evidence.
 
 Select checks using `tools/agent_policy/select_checks.py` and the changed scope.
 Keep local build smoke separate from the bytes later built by the controller.
-In a clean disposable checkout with an empty `dist/`, reproduce the four-package
+In a clean disposable checkout with an empty `dist/`, reproduce the five-package
 build and inspect its archives:
 
 ```bash
@@ -138,6 +138,7 @@ uv build
 uv build packages/dpone-native-accel --out-dir dist
 uv build packages/dpone-airflow-pack --out-dir dist
 uv build packages/apache-airflow-providers-dpone --out-dir dist
+uv build packages/dpone-mssql-sqlclient --out-dir dist
 rm -f dist/.gitignore
 uv run python tools/pypi_release_smoke_dist.py \
   --dist-dir dist --expected-version X.Y.Z --inventory-only --format json
@@ -216,8 +217,8 @@ gh workflow run pypi-rehearsal.yml \
   -f version=X.Y.Z
 ```
 
-It builds and checks eight archives, re-downloads and hashes the inventory,
-installs the four retained wheels, and runs `pip check` and `dpone --help`.
+It builds and checks ten archives, re-downloads and hashes the inventory,
+installs the five retained wheels, and runs `pip check` and `dpone --help`.
 It has no OIDC, publishing action, or publishing environment. Retain
 `dpone-pypi-rehearsal-X.Y.Z` and
 `dpone-pypi-rehearsal-receipt-X.Y.Z`; the latter contains
@@ -244,12 +245,12 @@ Do not issue a duplicate production dispatch just to discover its status.
 The actual sequence is build → publish → verify-published:
 
 1. Check out the fixed dpone tag; compare the root project name/version and
-   build the four distributions. Validate metadata and the eight-file set.
+   build the five distributions. Validate metadata and the ten-file set.
 2. Retain `dpone-pypi-X.Y.Z` and `dpone-pypi-manifest-X.Y.Z` with
    `overwrite: false`. The manifest is `release-manifest.json` with schema
    `dpone.pypi-release-manifest.v1`.
 3. Publish only those built files through the OIDC-only artifact job.
-4. Compare exact filenames and SHA-256 hashes against all four
+4. Compare exact filenames and SHA-256 hashes against all five
    version-specific PyPI JSON endpoints. Public verification uses bounded
    retries (up to ten observations, six seconds apart).
 
@@ -285,7 +286,7 @@ The verifier makes
 fixed read-only GitHub/PyPI requests, checks the annotated tag and successful
 publisher run, artifact identity/non-expiry, and exact public filenames,
 hashes, sizes, and non-yanked state. It then creates a temporary environment,
-installs the four retained wheels, runs `pip check` and `dpone --help`, and
+installs the five retained wheels, runs `pip check` and `dpone --help`, and
 writes `fresh_install.log` beside the atomic JSON receipt only when the install
 stage is reached. It also prints the JSON result to stdout. A failed early
 verification has no fresh install transcript; a leftover log from another

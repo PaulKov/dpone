@@ -1,0 +1,66 @@
+{
+  "$id": "https://dpone.dev/schemas/dpone.mssql-native-admission.v2.schema.json",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "additionalProperties": false,
+  "properties": {
+    "blockers": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    },
+    "capability_id": {
+      "enum": [
+        "bcp-supervised-stage-barrier-v1",
+        "sqlclient-session-applock-v1"
+      ]
+    },
+    "identity_version": {
+      "const": 2
+    },
+    "import_backend": {
+      "enum": [
+        "bcp",
+        "mssql_sqlclient"
+      ]
+    },
+    "kind": {
+      "const": "dpone.mssql-native-admission.v2"
+    },
+    "schema_version": {
+      "const": 2
+    },
+    "status": {
+      "enum": [
+        "ready",
+        "blocked"
+      ]
+    },
+    "verification_backend": {
+      "const": "target_local"
+    },
+    "warnings": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+        "type": "string"
+      },
+      "type": "array",
+      "uniqueItems": true
+    }
+  },
+  "required": [
+    "blockers",
+    "capability_id",
+    "identity_version",
+    "import_backend",
+    "kind",
+    "schema_version",
+    "status",
+    "verification_backend",
+    "warnings"
+  ],
+  "title": "dpone MSSQL native admission v2",
+  "type": "object"
+}

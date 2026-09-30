@@ -24,8 +24,10 @@ def runtime(
     quality_fails=False,
     observer=None,
     explicit_security_dependencies=True,
+    cleanup_fails_once=False,
 ):
     events = []
+    cleanup_failures = 0
 
     class Journal(NativeChunkJournalV2):
         # This interaction fake keeps publication callbacks observable while
@@ -77,7 +79,11 @@ def runtime(
             events.append("cleanup")
 
         def cleanup_recovered(self, *args):
+            nonlocal cleanup_failures
             events.append("cleanup-recovered")
+            if cleanup_fails_once and cleanup_failures == 0:
+                cleanup_failures += 1
+                raise RuntimeError("cleanup interrupted after durable success")
 
         def abort(self, *args):
             events.append("abort")
@@ -323,6 +329,46 @@ def test_target_local_claims_before_resume_and_releases_after_cleanup(tmp_path):
     assert value.run(cfg, owner="invocation").status == "success"
     assert events.index("custody-claimed") < events.index("resume") < events.index("source")
     assert custody.inspect(value.store.acquire("target", "inspect", 60)).release_reason == "published_cleanup"
+
+
+def test_target_local_retries_cleanup_after_durable_success_before_releasing_custody(tmp_path):
+    value, events, journal = runtime(tmp_path, recovered=True, cleanup_fails_once=True)
+    cfg = config()
+    cfg.options["native_transfer"]["execution"]["verification_backend"] = "target_local"
+    plan = NativeChunkPlan("run", "target", "query", "window", "schema", "wire")
+    identity = NativeVerificationIdentityV2(
+        plan,
+        "bcp",
+        NativeVerificationBackend.TARGET_LOCAL,
+        "a" * 64,
+        "b" * 64,
+        "c" * 64,
+        "mssql-native-sha256-sum-v1",
+        "d" * 64,
+    )
+    journal.identity = identity
+    original_bindings = value.bindings
+
+    def bindings(*args):
+        bound = original_bindings(*args)
+        bound.stage_context.plan = plan
+        bound.stage_context.verification_identity = identity
+        return NativeRuntimeBindings(bound.service, bound.stage_context, bound.admission, identity)
+
+    value.bindings = bindings
+    custody = NativeTargetCustody(value.store, "target")
+    with pytest.raises(RuntimeError, match="cleanup interrupted"):
+        value.run(cfg, owner="first")
+    inspection_lease = value.store.acquire("target", "inspect", 60)
+    assert custody.inspect(inspection_lease).state == "held"
+    value.store.release(inspection_lease)
+
+    assert value.run(cfg, owner="recovery").status == "success"
+    inspection_lease = value.store.acquire("target", "inspect-again", 60)
+    assert custody.inspect(inspection_lease).state == "clear"
+    value.store.release(inspection_lease)
+    assert events.count("cleanup-recovered") == 2
+    assert "source" not in events
 
 
 def test_target_local_source_open_failure_requests_zero_stage_nonpublication(tmp_path):

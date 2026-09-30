@@ -61,16 +61,22 @@ def test_fresh_public_state_passes_with_deterministic_closed_receipt(tmp_path: P
         "summary",
     }
     assert payload["summary"] == {
-        "candidate_count": 8,
+        "candidate_count": 10,
         "existing_exact_count": 0,
-        "pending_upload_count": 8,
+        "pending_upload_count": 10,
         "publication_mode": "fresh",
     }
     assert payload["publication"] == _context(module).to_payload()
     assert payload["candidate_inventory_sha256"] == hashlib.sha256(inventory.read_bytes()).hexdigest()
-    assert [item["release_state"] for item in payload["observations"]] == ["VERSION_ABSENT"] * 4
+    assert [item["release_state"] for item in payload["observations"]] == ["VERSION_ABSENT"] * 5
     assert [item["package"] for item in payload["observations"]] == sorted(
-        {"apache-airflow-providers-dpone", "dpone", "dpone-airflow-pack", "dpone-native-accel"}
+        {
+            "apache-airflow-providers-dpone",
+            "dpone",
+            "dpone-airflow-pack",
+            "dpone-mssql-sqlclient",
+            "dpone-native-accel",
+        }
     )
     assert all(
         item["endpoint_url"] == f"https://pypi.org/pypi/{item['package']}/{VERSION}/json"
@@ -106,13 +112,13 @@ def test_exact_subset_and_complete_set_are_safe_resume_states(tmp_path: Path) ->
     ).to_payload()
 
     assert subset["summary"] == {
-        "candidate_count": 8,
+        "candidate_count": 10,
         "existing_exact_count": 3,
-        "pending_upload_count": 5,
+        "pending_upload_count": 7,
         "publication_mode": "resume",
     }
     assert complete["summary"]["publication_mode"] == "idempotent"
-    assert complete["summary"]["existing_exact_count"] == 8
+    assert complete["summary"]["existing_exact_count"] == 10
 
 
 class _StabilityClock:
@@ -131,7 +137,7 @@ class _StabilityClock:
 
 
 class _RoundFetcher:
-    def __init__(self, fetchers: list[Any], *, packages_per_round: int = 4) -> None:
+    def __init__(self, fetchers: list[Any], *, packages_per_round: int = 5) -> None:
         self.fetchers = fetchers
         self.packages_per_round = packages_per_round
         self.calls = 0

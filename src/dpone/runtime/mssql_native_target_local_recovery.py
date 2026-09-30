@@ -91,7 +91,9 @@ def recover_target_local_staging(
                 continue
             if terminal["event"] in {"FAILED_RETIRABLE", "RETIRED"}:
                 continue
-            if (
+            import_backend = getattr(getattr(journal, "identity", None), "import_backend", "bcp")
+            recoverable_sqlclient = import_backend == "mssql_sqlclient" and terminal["event"] == "UNKNOWN"
+            if recoverable_sqlclient or (
                 terminal["event"] in {"WRITER_TERMINAL", "UNKNOWN", "QUIESCENT", "VERIFIED"}
                 and terminal["observation"]["writer_outcome"] == "success"
             ):
@@ -99,6 +101,11 @@ def recover_target_local_staging(
                 file = encoded_file_factory(directory / f"{ordinal}.native", **artifact)
                 recovered_receipt = importer.recover_positive(plan, file, attempt_id, lease)
                 recovered = journal.data
+                if recovered_receipt is None:
+                    recovered_events = () if recovered is None else recovered["events"].get(attempt_id, ())
+                    if not recovered_events or recovered_events[-1]["event"] != "PARTIAL_PROVED":
+                        raise failures.outcome_unknown("mssql_native.recovery_postcondition_unproved")
+                    continue
                 recovered_chunk = None if recovered is None else recovered["chunks"].get(str(ordinal))
                 recovered_events = () if recovered is None else recovered["events"].get(attempt_id, ())
                 durable_receipt = None if recovered_chunk is None else recovered_chunk.get("receipt")
@@ -112,7 +119,7 @@ def recover_target_local_staging(
                 ):
                     raise failures.outcome_unknown("mssql_native.recovery_postcondition_unproved")
                 continue
-            if terminal["event"] == "UNKNOWN":
+            if terminal["event"] == "UNKNOWN" and import_backend == "bcp":
                 journal.retain_bcp_incident(ordinal, attempt_id)
             raise failures.outcome_unknown("mssql_native.target_local_pre_eof_custody_retained")
     if on_failed_stage is not None and on_failed_stage(journal):

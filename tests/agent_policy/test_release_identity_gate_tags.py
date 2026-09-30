@@ -28,6 +28,7 @@ def test_accepts_annotated_tag_exact_commit_and_synchronized_packages(
         "apache-airflow-providers-dpone": "1.2.3",
         "dpone": "1.2.3",
         "dpone-airflow-pack": "1.2.3",
+        "dpone-mssql-sqlclient": "1.2.3",
         "dpone-native-accel": "1.2.3",
     }
     assert report.blockers == ()

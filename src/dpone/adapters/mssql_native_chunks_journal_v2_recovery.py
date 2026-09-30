@@ -115,6 +115,110 @@ def recover_bcp_verified(
         return receipt
 
 
+def recover_sqlclient_verified(
+    journal: Any,
+    ordinal: int,
+    attempt_id: str,
+    *,
+    barrier: Callable[[], AbstractContextManager[Any]],
+    observe: Callable[[], tuple[dict[str, Any], NativeChunkReceipt]],
+) -> NativeChunkReceipt:
+    """Reconcile an uncertain SqlClient attempt only under its session lock."""
+    data = journal._staging(allow_recovery=True)
+    events = data["events"].get(attempt_id, [])
+    if (
+        journal.identity.import_backend != "mssql_sqlclient"
+        or not events
+        or events[-1]["event"] not in {"WRITER_TERMINAL", "UNKNOWN", "QUIESCENT", "VERIFIED"}
+        or not events[-1]["writer_binding"]
+    ):
+        raise WindowContractError("mssql_native.sqlclient_recovery_proof_missing")
+    with barrier():
+        observation, receipt = observe()
+        if (
+            observation.get("writer_outcome") != "success"
+            or observation.get("quiescence") != "proved"
+            or observation.get("row_count") != events[-1]["artifact_binding"]["rows"]
+            or observation.get("count_overflow") is not False
+            or not matches_native_receipt(journal.identity, receipt, events[-1])
+        ):
+            raise WindowContractError("mssql_native.sqlclient_recovery_proof_missing")
+        previous = events[-1]
+        if previous["event"] in {"WRITER_TERMINAL", "UNKNOWN"}:
+            journal._append(
+                data,
+                ordinal,
+                attempt_id,
+                "QUIESCENT",
+                previous["artifact_binding"],
+                previous["stage_binding"],
+                previous["writer_binding"],
+                observation,
+                allow_recovery=True,
+            )
+            data = journal._staging(allow_recovery=True)
+            previous = data["events"][attempt_id][-1]
+        if previous["event"] == "QUIESCENT":
+            journal._append(
+                data,
+                ordinal,
+                attempt_id,
+                "VERIFIED",
+                previous["artifact_binding"],
+                previous["stage_binding"],
+                previous["writer_binding"],
+                observation,
+                allow_recovery=True,
+            )
+        journal._commit_verified_receipt(receipt, allow_recovery=True)
+        return receipt
+
+
+def observe_sqlclient_partial(
+    journal: Any,
+    ordinal: int,
+    attempt_id: str,
+    *,
+    barrier: Callable[[], AbstractContextManager[Any]],
+    observe: Callable[[], dict[str, Any]],
+) -> dict[str, Any]:
+    """Persist a bounded partial-stage proof after excluding the writer session."""
+    data = journal._staging(allow_recovery=True)
+    events = data["events"].get(attempt_id, [])
+    if (
+        journal.identity.import_backend != "mssql_sqlclient"
+        or not events
+        or events[-1]["event"] != "UNKNOWN"
+        or not events[-1]["writer_binding"]
+    ):
+        raise WindowContractError("mssql_native.sqlclient_recovery_proof_missing")
+    with barrier():
+        observation = observe()
+        expected = events[-1]["artifact_binding"]["rows"]
+        rows = observation.get("row_count")
+        if (
+            observe() != observation
+            or observation.get("quiescence") != "proved"
+            or type(rows) is not int
+            or not 0 <= rows < expected
+            or observation.get("count_overflow") is not False
+            or observation.get("limbs") is None
+        ):
+            raise WindowContractError("mssql_native.sqlclient_partial_proof_missing")
+        previous = events[-1]
+        return journal._append(
+            data,
+            ordinal,
+            attempt_id,
+            "PARTIAL_PROVED",
+            previous["artifact_binding"],
+            previous["stage_binding"],
+            previous["writer_binding"],
+            observation,
+            allow_recovery=True,
+        )
+
+
 def retain_bcp_incident(journal: Any, ordinal: int, attempt_id: str) -> dict[str, Any]:
     """Retain an ambiguous BCP attempt without stage classification or replay."""
     data = journal._staging(allow_recovery=True)
@@ -144,7 +248,8 @@ def record_nonpublication(journal: Any, proof_sha256: str, *, assert_nonpublicat
         or data["complete"] is not None
         or (not data["chunks"] and (data["events"] or data["nonces"]))
         or any(
-            data["events"][chunk["attempt_id"]][-1]["event"] not in {"VERIFIED", "FAILED_RETIRABLE", "RETIRED"}
+            data["events"][chunk["attempt_id"]][-1]["event"]
+            not in {"VERIFIED", "PARTIAL_PROVED", "FAILED_RETIRABLE", "RETIRED"}
             for chunk in data["chunks"].values()
         )
     ):
@@ -166,10 +271,10 @@ def retire_verified(journal: Any, ordinal: int, attempt_id: str, *, drop_exact_o
     if not any(item.get("kind") == "pre_eof_nonpublication" for item in data["rollback_history"]):
         raise WindowContractError("mssql_native.nonpublication_proof_missing")
     chunk = data["chunks"].get(str(ordinal))
-    if chunk is None or chunk["attempt_id"] != attempt_id or chunk["phase"] != "verified":
+    if chunk is None or chunk["attempt_id"] != attempt_id or chunk["phase"] not in {"staging", "verified"}:
         raise WindowContractError("mssql_native.verified_stage_required")
     previous = data["events"][attempt_id][-1]
-    if previous["event"] == "VERIFIED":
+    if previous["event"] in {"VERIFIED", "PARTIAL_PROVED"}:
         journal._append(
             data,
             ordinal,
@@ -237,6 +342,30 @@ class BcpRecoveryMixin:
         """Retain an ambiguous BCP attempt without classifying its stage."""
         with self._lock:
             return retain_bcp_incident(self, ordinal, attempt_id)
+
+    def recover_sqlclient_verified(
+        self,
+        ordinal: int,
+        attempt_id: str,
+        *,
+        barrier: Callable[[], AbstractContextManager[Any]],
+        observe: Callable[[], tuple[dict[str, Any], NativeChunkReceipt]],
+    ) -> NativeChunkReceipt:
+        """Reconcile content only after acquiring the grant-bound session lock."""
+        with self._lock:
+            return recover_sqlclient_verified(self, ordinal, attempt_id, barrier=barrier, observe=observe)
+
+    def observe_sqlclient_partial(
+        self,
+        ordinal: int,
+        attempt_id: str,
+        *,
+        barrier: Callable[[], AbstractContextManager[Any]],
+        observe: Callable[[], dict[str, Any]],
+    ) -> dict[str, Any]:
+        """Persist only a bounded partial result under the grant lock."""
+        with self._lock:
+            return observe_sqlclient_partial(self, ordinal, attempt_id, barrier=barrier, observe=observe)
 
     def record_nonpublication(self, proof_sha256: str, *, assert_nonpublication: Callable[[], None]) -> None:
         """Persist invocation-level exclusion proof before verified retirement."""

@@ -51,6 +51,7 @@ def repository(tmp_path: Path, *, version: str = "1.2.3") -> Path:
                 'dependencies = ["dpone-airflow-pack==1.2.3"]',
                 "[project.optional-dependencies]",
                 'accel = ["dpone-native-accel==1.2.3"]',
+                'mssql-sqlclient = ["dpone-mssql-sqlclient==1.2.3"]',
             ]
         ),
     )
@@ -64,6 +65,12 @@ def repository(tmp_path: Path, *, version: str = "1.2.3") -> Path:
         tmp_path,
         "packages/dpone-airflow-pack/pyproject.toml",
         name="dpone-airflow-pack",
+        version=version,
+    )
+    write_project(
+        tmp_path,
+        "packages/dpone-mssql-sqlclient/pyproject.toml",
+        name="dpone-mssql-sqlclient",
         version=version,
     )
     write_project(

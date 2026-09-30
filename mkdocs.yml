@@ -183,6 +183,14 @@ nav:
       - Adaptive native transfer: native-transfer-industrial-runtime.md
       - Atomic rolling windows: rolling-window.md
       - MSSQL native transport: mssql-native-transport.md
+      - MSSQL SqlClient transport:
+          - Overview: mssql-sqlclient-transport.md
+          - Install and maintain: mssql-sqlclient-installation.md
+          - Contract reference: mssql-sqlclient-reference.md
+          - Architecture: mssql-sqlclient-architecture.md
+          - Diagnostics: mssql-sqlclient-diagnostics.md
+          - Synthetic certification: mssql-sqlclient-certification.md
+      - MSSQL native recovery: mssql-native-recovery.md
       - Delivery acceleration:
           - Overview and first success: delivery-acceleration/index.md
           - Observations and comparison: delivery-acceleration/observations.md
@@ -673,6 +681,8 @@ nav:
       - ADR 0073: adr/0073-durable-committed-replay-quality.md
       - ADR 0074: adr/0074-declarative-replay-target-completion.md
       - ADR 0075: adr/0075-mssql-columnar-range-parallelism.md
+      - ADR 0076: adr/0076-mssql-sqlclient-companion-boundary.md
+      - ADR 0077: adr/0077-mssql-persisted-hash-layout-v2.md
 
 extra:
   generator: false

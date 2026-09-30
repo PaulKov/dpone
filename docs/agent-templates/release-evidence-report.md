@@ -74,8 +74,8 @@ evidence is `UNVERIFIED` and blocks `GO`.
 
 ## Publication observation
 
-For each of `dpone`, `dpone-native-accel`, `dpone-airflow-pack`, and
-`apache-airflow-providers-dpone`, retain original wheel/sdist filenames and
+For each of `dpone`, `dpone-native-accel`, `dpone-airflow-pack`,
+`dpone-mssql-sqlclient`, and `apache-airflow-providers-dpone`, retain original wheel/sdist filenames and
 hashes. Record controller run URL/attempt, artifact IDs/names/provider digests,
 retention/expiry, original distribution ZIP, `release-manifest.json`, and
 `verify-published` logs/conclusion. That job does not upload a separate JSON

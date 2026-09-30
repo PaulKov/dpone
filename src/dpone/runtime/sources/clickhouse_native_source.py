@@ -14,6 +14,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from dpone.manifest.mssql_native_policy import native_window, validate_native_config
+from dpone.runtime.extraction_lifecycle import ExtractionLifecycleAuthority
 from dpone.runtime.sources.clickhouse_native_values import projection, restore, temporal
 from dpone.runtime.sources.extract_result import ExtractResult
 from dpone.runtime.streaming_rows import StreamingRowsArtifact
@@ -136,20 +137,31 @@ class ClickHouseNativeSource:
             }
         query_id = query_id or "dpone-native-" + uuid4().hex
         rows = self._rows(query, query_params, query_id, schema)
+        lifecycle = ExtractionLifecycleAuthority()
+        lifecycle.acquire_snapshot(
+            snapshot_authority="clickhouse.query-snapshot.v1",
+            source_token=source_uuid,
+        )
 
         def cleanup() -> None:
             try:
-                self.connector.connection.disconnect()
+                guard.__exit__(None, None, None)
             finally:
                 primary = sys.exc_info()[1]
                 try:
-                    guard.__exit__(None, None, None)
+                    self.connector.connection.disconnect()
                 except BaseException as cleanup_error:
                     if primary is None:
                         raise
-                    primary.add_note(f"native source guard cleanup failed: {type(cleanup_error).__name__}")
+                    primary.add_note(f"native source disconnect failed: {type(cleanup_error).__name__}")
 
-        artifact = NativeQueryArtifact(rows, query_id=query_id, cleanup=cleanup, source_relation_uuid=source_uuid)
+        artifact = NativeQueryArtifact(
+            rows,
+            query_id=query_id,
+            cleanup=cleanup,
+            source_relation_uuid=source_uuid,
+        )
+        artifact.bind_extraction_lifecycle(lifecycle)
         return ExtractResult(
             artifact, schema, relation_schema=schema, relation_dialect=SourceRelationDialect.CLICKHOUSE
         )

@@ -13,8 +13,19 @@ from dpone.runtime.native_wire_mssql import build_mssql_bcp_native_contract
 from dpone.runtime.sinks.mssql_native_import import MssqlNativeChunkImporter
 
 
-def importer(tmp_path, *, vendor=2, server_rows=(1, 1), rejected=False, target_digest_contract=None, dtype="int"):
+def importer(
+    tmp_path,
+    *,
+    vendor=2,
+    server_rows=(1, 1),
+    rejected=False,
+    target_digest_contract=None,
+    dtype="int",
+    persisted_hash_layout=False,
+):
     class Connector:
+        queries = []
+
         def quote_identifier(self, name):
             return f"[{name}]"
 
@@ -31,6 +42,7 @@ def importer(tmp_path, *, vendor=2, server_rows=(1, 1), rejected=False, target_d
             pass
 
         def execute_query(self, query, params=()):
+            self.queries.append(query)
             if "sp_addextendedproperty" in query:
                 self.owner = params[0]
 
@@ -67,6 +79,7 @@ def importer(tmp_path, *, vendor=2, server_rows=(1, 1), rejected=False, target_d
         assert_lease=lambda lease: None,
         mutation_scope=lambda plan, attempt, lease: nullcontext(),
         target_digest_contract=target_digest_contract,
+        persisted_hash_layout=persisted_hash_layout,
     )
     path = tmp_path / "data.bin"
     path.write_bytes(encode({"n": 1}) * 2)
@@ -80,6 +93,43 @@ def importer(tmp_path, *, vendor=2, server_rows=(1, 1), rejected=False, target_d
         value.digest_rows(({"n": 1}, {"n": 1}))[1],
     )
     return value, plan, file
+
+
+def test_persisted_hash_layout_creates_closed_technical_columns_and_fixed_width_queries(tmp_path):
+    contract = build_mssql_bcp_native_contract(schema=[("n", "bigint")], query="SELECT n")
+    value, plan, _ = importer(
+        tmp_path,
+        target_digest_contract=contract,
+        dtype="bigint",
+        persisted_hash_layout=True,
+    )
+
+    value._create_owned_stage(plan, "attempt", "stage")
+    ddl = value.connector.queries[0]
+    assert "[__dpone__native_row_hash] binary(32) NOT NULL" in ddl
+    assert "[__dpone__mutation_version] rowversion NOT NULL" in ddl
+
+    value.connector.get_records = lambda sql, params=(): [(0, 0, None, *([0] * 8))]
+    observed, _ = value._target_digest_observation("stage", 0)
+    assert (observed.rows, observed.mutation_watermark) == (0, 0)
+
+    value.connector.get_records = lambda sql, params=(): [(0, None)]
+    repeat = value._repeat_mutation_watermark("stage", 0)
+    assert (repeat.rows, repeat.mutation_watermark) == (0, 0)
+
+
+@pytest.mark.parametrize("reported", ["timestamp", "rowversion", " TIMESTAMP "])
+def test_framework_rowversion_alias_is_normalized_without_broadening_business_types(reported):
+    column = SimpleNamespace(name="__dpone__mutation_version", dtype=reported, nullable=False)
+    assert MssqlNativeChunkImporter._normalize_stage_column(column) == (
+        "__dpone__mutation_version",
+        "timestamp",
+        False,
+    )
+    with pytest.raises(ValueError, match="unsupported MSSQL physical type"):
+        MssqlNativeChunkImporter._normalize_stage_column(
+            SimpleNamespace(name="business_timestamp", dtype="timestamp", nullable=False)
+        )
 
 
 def test_native_attempt_verifies_duplicates_and_consumed_file_evidence(tmp_path):

@@ -15,6 +15,14 @@ from dpone.runtime.etl.backfill_process_runtime import BackfillProcessLanePayloa
 from dpone.runtime.route_runtime_factory import RouteCapabilityRuntimeFactory
 
 
+def test_default_native_runtime_constructor_composes_supported_factory() -> None:
+    from dpone.runtime.mssql_native_application import DefaultMssqlNativeRuntimeFactory
+
+    runner = DefaultProcessRunner.with_default_native_runtime()
+
+    assert isinstance(runner._native_runtime_factory, DefaultMssqlNativeRuntimeFactory)
+
+
 def test_default_process_runner_exposes_runtime_evidence_details(monkeypatch) -> None:
     started_at = datetime(2026, 7, 11, 12, 0, tzinfo=UTC)
 
