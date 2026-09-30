@@ -29,7 +29,7 @@ approves the design, not implementation completion or production certification.
 The parent remains approved; its v1 foundation contract is preserved alongside
 the explicit new v2 boundary. The previously selected Native execution method
 remains unchanged. The [implementation plan](superpowers/plans/2026-09-30-clickhouse-protected-publication.md)
-requires review before production edits.
+was separately reviewed and approved on 2026-09-30 before production edits.
 
 ## Personas and customer journey
 
@@ -471,6 +471,41 @@ cleanup, checkpoint/evidence finalization and full route certification.
 
 ## Approval checklist
 
+### Staged implementation: closed input/evidence profile
+
+The first increment supplies `CandidateColumn`, `CandidateDesign` and
+`ObservationLimits` in `dpone.contracts.clickhouse_observation`, plus
+`ProtectedObservationProfile` in `dpone.adapters.clickhouse_observation_profile`.
+It validates inputs locally; it does not read ClickHouse or certify publication.
+The complete protected journey below remains dependent on the later plan tasks.
+
+Supply exact immutable tuples and built-in scalar values. Integer inputs exclude
+bool; float inputs must be finite, and Float32 must round-trip without rounding.
+Timestamps use built-in `datetime` with immutable `datetime.timezone` at UTC;
+normalize other timezone implementations explicitly before admission. DateTime64
+supports scales 0–6 without truncation. Decimal width aliases normalize to
+`Decimal(9, S)`, `Decimal(18, S)` or `Decimal(38, S)`; other precisions reject.
+Byte-valued String preserves invalid UTF-8; FixedString pads zero suffixes.
+
+All eight limits are explicit. `encode_row` enforces the encoded row bound;
+`validate_batch` also enforces cumulative encoded bytes and row count before
+allocating each wire payload. No limit truncates data. Batch-order payload
+identity hashes an eight-byte unsigned little-endian length plus canonical bytes
+per row. Multiset identity remains order independent with count/null multiplicity
+and the unchanged `rowbinary-sha256-sum-v1` algorithm.
+
+`render_candidate_create` and `parse_table_design` in
+`dpone.adapters.clickhouse_design_grammar` share the closed design DTO. Object
+name/UUID are separate from design identity. Unknown clauses, expressions,
+comments and trailing statements reject rather than being removed. This grammar
+still requires actual pinned-server verification in the observation increment.
+
+Legacy runtime encoding imports remain available and preserve prior coercion,
+wire bytes and multiset digests through shared contract primitives. No CLI,
+manifest, stock route, authority schema default or release version changes here.
+
+### Design approval
+
 - [x] Existing approved deployment decisions are preserved.
 - [x] New v2/non-migration compatibility boundary is explicit.
 - [x] Candidate admission, closure, seal and pre-PREPARED failure behavior are defined.
@@ -478,4 +513,4 @@ cleanup, checkpoint/evidence finalization and full route certification.
 - [x] Research distinguishes platform facts from dpone design obligations.
 - [x] Tests, evidence, documentation, rollout and ownership are specified.
 - [x] Maintainer approves this written supplement (2026-09-30).
-- [ ] Detailed implementation plan is written and reviewed before production edits.
+- [x] Detailed implementation plan is written and reviewed before production edits (2026-09-30).

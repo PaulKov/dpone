@@ -10,6 +10,27 @@ from dpone.runtime.lineage.options import LineageOptions
 from dpone.runtime.sinks.clickhouse_lineage_projection import ClickHouseSinkSideLineageProjector
 
 
+def test_projection_catalog_injection_preserves_names_types_and_order():
+    from dpone.contracts.technical_columns import TechnicalColumnCatalog, TechnicalColumnRole
+    from dpone.runtime.sinks.clickhouse_lineage_projection import _missing_core_lineage, _ProjectionPlan
+
+    class Catalog(TechnicalColumnCatalog):
+        def name(self, role):
+            return "custom_row_id" if role == TechnicalColumnRole.ROW_ID else super().name(role)
+
+    config = _load_config(unique_key="id", options={"lineage": {"enabled": True, "preset": "bulk_standard"}})
+    plan = _ProjectionPlan.from_config(
+        config, SimpleNamespace(has_feature=lambda _: True), Catalog(), (("__DPONE__RUN_ID", "String"),)
+    )
+    assert plan.schema_columns == (
+        ("__dpone__load_id", "String"),
+        ("__dpone__loaded_at", "DateTime64(6, 'UTC')"),
+        ("__dpone__extracted_at", "DateTime64(6, 'UTC')"),
+        ("custom_row_id", "String"),
+    )
+    assert _missing_core_lineage((("__DPONE__RUN_ID", "String"),)) == plan.schema_columns[:-1]
+
+
 def test_clickhouse_sink_side_projection_defers_existing_target_lineage_columns() -> None:
     connector = _ClickHouseConnector()
     sink = _ClickHouseProjectionSink(connector, target_exists=True)

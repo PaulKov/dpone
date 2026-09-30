@@ -10,7 +10,7 @@
 
 **Spec:** [Approved protected-publication supplement](../../feature-design-clickhouse-protected-publication.md), [parent authority design](../../feature-design-clickhouse-dpone-only-authority.md), [ADR 0079](../../adr/0079-protected-clickhouse-candidate-lifecycle.md).
 
-**Status:** AWAITING PLAN REVIEW. The written specification was approved on 2026-09-30; that approval is not approval of this subsequently written plan. Execution method: Native, already selected. No production changes have begun.
+**Status:** APPROVED. The maintainer separately confirmed this written plan on 2026-09-30, after approval of the specification. Execution method: Native, already selected. Implementation progress is recorded below; approval is not completion or certification.
 
 **Base:** `f46bdceef120894a5ad1cd8fab82bb4170c601ee`, existing branch `codex/clickhouse-native-publisher-locale-base`, PR #249. Scope and shared ownership are in the [task contract](../../agent-tasks/clickhouse-protected-publication.yml).
 
@@ -31,6 +31,35 @@
 - All `uv run` implementation commands below use `--frozen --extra postgres --extra gcp --extra columnar --extra dbt-mssql --extra accel --extra clickhouse`; preserve the existing environment and lockfile.
 
 ## Review Focus
+
+### Execution ruling: unchanged technical-column policy consolidation
+
+The initial implementation exposed a missed coupling constraint: the existing
+runtime-to-contracts flow was already 214, its current permitted cap. Relocating
+shared wire/evidence implementations adds three genuine dependencies (217).
+Changing import syntax does not remove them. Budget and baseline relaxation is
+not permitted.
+
+The root integrator extends Task 1's internal, behavior-neutral ownership to
+`src/dpone/runtime/sinks/clickhouse_physical_types.py`,
+`clickhouse_lineage_projection.py`, `clickhouse_production_finalize.py` and the
+existing lineage-contract/finalizer tests named in the task contract. Consolidate
+the duplicated ClickHouse technical-column name/type decisions in the existing
+physical-type policy owner, retaining injected catalogs, exact output names,
+types, order, overrides and SQL. No strategy behavior changes or unrelated
+incremental-route refactoring is included. Characterization tests precede edits.
+
+The temporal compatibility import may delegate through the existing binary
+encoding module, preserving its function object and errors; test its formerly
+smaller import path for optional-SDK/import-time-I/O regressions. The combined
+graph projection is 214, not proof: run the actual gates after implementation.
+Task 5 should genuinely consume port/kernel values rather than add unnecessary
+runtime model construction. Its combined public status can belong to the runtime
+API; annotation-only imports are not execution dependencies. Recheck actual
+coupling and type-hint behavior then. This ruling changes no public behavior,
+publication authority or deployment/release scope.
+
+### Original risk review
 
 1. A target name reused as another operation's candidate, including through a different store inventory entry, must block before source access (Task 2).
 2. Admission closed while an accepted writer is paused must neither lose its rows nor permit late registration or false sealing (Tasks 2–3).
@@ -138,19 +167,19 @@ compatibility modules. Tests: `tests/test_clickhouse_observation_profile.py`,
   retain historic coercion before calling them. Do not relocate MSSQL policy
   imports into contracts or duplicate the binary algorithms.
 
-- [ ] Write RED tests for the exact approved scalar allowlist, empty/duplicate
+- [x] Write RED tests for the exact approved scalar allowlist, empty/duplicate
   rows, NULL versus empty/zero, negative floating zero, binary NUL/invalid UTF-8,
   FixedString zero suffix, Decimal range/scale, UTC date boundaries and precision
   loss. Assert DateTime64(7), Decimal256, NaN/Inf and nested types fail.
-- [ ] Pin `test_legacy_evidence_vectors_unchanged` before refactoring: same row
+- [x] Pin `test_legacy_evidence_vectors_unchanged` before refactoring: same row
   bytes, digests, imports and exceptions for existing window/native vectors.
   Use injected hash collisions to prove count/null multiplicity is retained,
   not to assert collision-free content equality.
-- [ ] Write grammar tests for quoted names containing punctuation, escaped
+- [x] Write grammar tests for quoted names containing punctuation, escaped
   quotes, empty keys, primary-key prefix, supported partitions and complete
   consumption. Assert DEFAULT/TTL/codecs/projections/indices/comments/SETTINGS,
   arbitrary expressions and trailing SQL are rejected.
-- [ ] Run the three focused files; retain actual missing-API/behavior failures.
+- [x] Run the three focused files; retain actual missing-API/behavior failures.
   In `test_float64_nonfinite_is_rejected`, construct a one-column Float64
   profile with explicit limits and pin these assertions:
 
@@ -159,14 +188,14 @@ compatibility modules. Tests: `tests/test_clickhouse_observation_profile.py`,
       profile.encode_row((float("nan"),))
   assert profile.encode_row((-0.0,)) != profile.encode_row((0.0,))
   ```
-- [ ] Implement the interfaces. Strict input types: bool only for Bool, int
+- [x] Implement the interfaces. Strict input types: bool only for Bool, int
   excluding bool for integers, finite float for floating types, bytes or UTF-8
   str for String/FixedString, UUID, Decimal, date and aware UTC datetime.
   Float32 input must round-trip exactly at its declared precision, including
   sign. Reject nonzero submicrosecond extensions and lossy time/decimal coercion.
   Normalize only documented server type aliases, including Decimal width aliases
   rendered as Decimal(9/18/38, scale); do not broaden the approved profile.
-- [ ] Run focused tests plus existing binary/RowBinary/window tests selected by
+- [x] Run focused tests plus existing binary/RowBinary/window tests selected by
   `rg --files tests` for those modules; all old vectors must pass unchanged.
   Run Ruff, mypy and import-rule checks for the new boundary.
 - [ ] Commit the scoped green task and immediately update/attach its PR. Do not
@@ -653,5 +682,5 @@ ODBC route certification remain unfinished after this plan is implemented.
 Plan self-review: all supplement sections map to Tasks 1–6; every Review Focus
 item has an owning negative test; public method names and DTOs above are shared
 by reference, not redefined per task. File ownership is explicit and Native
-single-writer execution is preserved. This plan now requires maintainer review
-before `executing-plans` or production-code edits.
+single-writer execution is preserved. The maintainer reviewed and approved this
+plan before `executing-plans` production-code edits began.

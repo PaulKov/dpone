@@ -4,6 +4,13 @@
 
 ### Added
 
+- Protected ClickHouse publication now has staged closed-design and typed-input
+  building blocks: immutable explicit limits, lossless scalar validation,
+  complete CREATE parsing, deterministic profile identity and bounded batch
+  evidence. Existing binary encoders and window multiset digests retain their
+  byte format through shared primitives. This increment does not provide a live
+  observer, sealed candidate, complete backend or enabled ODBC range route.
+
 - Unbound ClickHouse native publication building blocks add per-subject local
   execution exclusion, fixed REPLACE/EXCHANGE/RENAME requests, acknowledged
   send-entry ordering and successful-EndOfStream closure with no SQL replay.

@@ -21,6 +21,11 @@ public_contract_impact:
   surfaces: [Python API, persisted authority v2, diagnostic JSON, documentation]
   migration_required: false
 owned_paths:
+  - src/dpone/runtime/sinks/clickhouse_physical_types.py
+  - src/dpone/runtime/sinks/clickhouse_lineage_projection.py
+  - src/dpone/runtime/sinks/clickhouse_production_finalize.py
+  - tests/test_clickhouse_lineage_projection_contracts.py
+  - tests/test_clickhouse_production_finalize.py
   - src/dpone/adapters/clickhouse_observation_profile.py
   - src/dpone/adapters/clickhouse_design_grammar.py
   - src/dpone/adapters/clickhouse_authority_schema.py
@@ -139,6 +144,7 @@ shared_file_owner: root
 dependencies: [DPONE-CLICKHOUSE-NATIVE-PUBLISHER]
 required_checks:
   focused:
+    - Characterize unchanged technical-column names, types, catalog injection and SCD2 overrides before same-domain policy consolidation
     - RED then GREEN strict design and typed evidence tests with old producer golden vectors unchanged
     - V1 compatibility and v2 namespace, CAS, ambiguous ACK and fresh-process tests
     - Native candidate request, privacy and no-retry tests
