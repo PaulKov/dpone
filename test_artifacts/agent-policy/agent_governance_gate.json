@@ -139,6 +139,7 @@
     "tests/integration/mssql/test_mssql_sqlclient_route_live.py",
     "tests/pypi_prepublication_test_support.py",
     "tests/test_agent_policy_select_checks.py",
+    "tests/test_ci_shadow_pr3a_dependabot_and_sync.py",
     "tests/test_clickhouse_native_source.py",
     "tests/test_github_workflow_governance.py",
     "tests/test_load_governance_manifest_contracts.py",
@@ -272,8 +273,8 @@
     }
   ],
   "control_surface_changed": true,
-  "generated_at": "2026-09-30T08:41:00+00:00",
-  "head_commit": "d63ec3bc2551f25f64c7be5685d3e874d4950f84",
+  "generated_at": "2026-09-30T08:45:00+00:00",
+  "head_commit": "efb0ba830fecaebf6264923ea6650334c627f2c5",
   "risks": [
     "AG-001",
     "AG-002",

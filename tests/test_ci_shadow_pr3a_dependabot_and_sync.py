@@ -82,11 +82,23 @@ def test_only_the_declared_ci_project_sync_steps_become_locked() -> None:
         ("quality-preflight", "Install dependencies", "uv sync --locked --all-extras"),
         ("quality-shards", "Install dependencies", "uv sync --locked --all-extras"),
         ("quality", "Install dependencies", "uv sync --locked --all-extras"),
-        ("doctor-import-windows", "Install dependencies", "uv sync --locked --all-extras"),
+        (
+            "doctor-import-windows",
+            "Install dependencies",
+            "uv sync --locked --all-extras --no-install-package dpone-mssql-sqlclient",
+        ),
         ("postgres-xmin", "Install dependencies", "uv sync --locked --all-extras"),
         ("acceptance-plan", "Install dependencies", "uv sync --locked --all-extras"),
-        ("acceptance-contracts", "Install dependencies", "uv sync --locked --all-extras"),
-        ("bounded-window-smoke", "Install dependencies", "uv sync --locked --all-extras"),
+        (
+            "acceptance-contracts",
+            "Install dependencies",
+            "uv sync --locked --all-extras --no-install-package dpone-mssql-sqlclient",
+        ),
+        (
+            "bounded-window-smoke",
+            "Install dependencies",
+            "uv sync --locked --all-extras --no-install-package dpone-mssql-sqlclient",
+        ),
     ]
     assert pages_syncs == [("build", "Install docs dependencies", "uv sync --locked")]
     assert _sync_steps(WORKFLOWS / "airflow-pack-compat.yml") == []
