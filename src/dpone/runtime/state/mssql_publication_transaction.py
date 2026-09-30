@@ -10,9 +10,10 @@ from __future__ import annotations
 
 from collections.abc import Callable, Sequence
 from contextlib import suppress
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
-from dpone.ports.mssql_publication import PublicationSessionFactory, PublicationSqlCursor
+if TYPE_CHECKING:
+    from dpone.ports.mssql_publication import PublicationSessionFactory, PublicationSqlCursor
 
 _Result = TypeVar("_Result")
 

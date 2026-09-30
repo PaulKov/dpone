@@ -48,9 +48,7 @@ class _Authority:
 
         permit = None
         if desired.phase.value.endswith("DISPATCHING"):
-            permit = DispatchPermit(
-                desired.target_key, desired.operation_id, desired.fence_token, desired.dispatch_epoch
-            )
+            permit = DispatchPermit.for_record(desired)
         return AuthorityMutationResult(AuthorityMutationStatus.VERIFIED, self.current, permit)
 
 

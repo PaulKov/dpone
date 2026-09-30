@@ -34,6 +34,7 @@ from dpone.runtime.postgres_xmin_execution import (
     PostgresXminExecutionMode,
     postgres_xmin_execution_policy,
 )
+from dpone.runtime.publication_authority_composition import build_runtime_publication_provider
 from dpone.runtime.quality_replay_contracts import validate_replay_configuration
 from dpone.runtime.source_materialization_location import bind_source_materialization_location
 from dpone.runtime.storage_policy import RuntimeStoragePolicy
@@ -77,6 +78,9 @@ class DefaultRuntimeHydrator:
             load_config=load_config,
             context=context,
         )
+        publication_provider = build_runtime_publication_provider(
+            connection=connections.publication_authority, binding=connections.publication_binding
+        )
         apply_connection_database_defaults(load_config=load_config, connections=connections)
         bind_source_materialization_location(load_config=load_config, connections=connections)
         runtime_storage_policy = RuntimeStoragePolicy.from_sources(
@@ -112,6 +116,9 @@ class DefaultRuntimeHydrator:
                 proxy_connection=connections.proxy,
                 shared_bq_connector=state_bindings.shared_bq_connector,
                 runtime_storage_policy=runtime_storage_policy,
+                **(
+                    {"publication_authority_provider": publication_provider} if publication_provider is not None else {}
+                ),
             )
         else:
             state_bindings = self._state_bootstrap.build(

@@ -108,12 +108,7 @@ class ClickHouseKeeperMapAuthority:
             return contracts.AuthorityMutationResult(contracts.AuthorityMutationStatus.CONFLICT, observed=observed)
         permit = None
         if desired.phase in {contracts.AuthorityPhase.DISPATCHING, contracts.AuthorityPhase.CLEANUP_DISPATCHING}:
-            permit = contracts.DispatchPermit(
-                target_key=desired.target_key,
-                operation_id=desired.operation_id,
-                fence_token=desired.fence_token,
-                dispatch_epoch=desired.dispatch_epoch,
-            )
+            permit = contracts.DispatchPermit.for_record(desired)
         return contracts.AuthorityMutationResult(
             contracts.AuthorityMutationStatus.VERIFIED, observed=observed, permit=permit
         )

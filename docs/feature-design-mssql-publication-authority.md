@@ -11,11 +11,12 @@ deployment coordinates. Approval is not implementation or live certification.
 
 ## Implementation availability
 
-This branch currently provides the unactivated binding, catalog admission and
-native SQL authority adapter. Public manifests still reject the proposed option;
-no existing workload switches backend. Legacy adoption, shared runtime wiring,
-operator commands and end-to-end ClickHouse recovery acceptance remain required
-before activation. Do not configure this option against a released runtime.
+This branch currently provides the unactivated binding, catalog admission,
+native SQL authority adapter, and shared normal/replay runtime composition.
+Public manifests still reject the proposed option; no existing workload switches
+backend. Legacy adoption, prepared-recovery integration, operator commands and
+end-to-end ClickHouse recovery acceptance remain required before activation.
+Do not configure this option against a released runtime.
 
 The local opt-in test
 `tests/integration/clickhouse_cluster/test_mssql_publication_authority_live.py`
@@ -61,6 +62,26 @@ Binding identity additionally binds the resolved non-secret SQL endpoint and
 database/schema. Endpoint drift requires a reviewed cutover, not an empty new
 authority. Service identity is deployment-governed, not guessed from DNS aliases.
 
+The verified connection registry carries a non-secret `publication_authority`
+policy with `service_id`, `environment` and `endpoint_identity_sha256`. Catalog
+setup must review this pin independently of runtime alias resolution. The
+endpoint digest is canonical SHA-256 over contract
+`dpone.mssql-publication-endpoint.v1`, SQL `SERVERPROPERTY('ServerName')`,
+`DB_NAME()` and the canonical database GUID from `sys.database_recovery_status`.
+The runtime checks it on the catalog observer and on every dedicated SQL session.
+An unavailable identity observation or a changed endpoint fails closed; rotating
+credentials or aliases does not change the storage slot. Failover that changes
+the admitted server identity requires reviewed re-admission, not automatic trust.
+
+Runtime connection resolution selects this reference even with disabled xmin
+state. SQL catalog admission occurs before constructing source/sink objects.
+The normal publication service, durable-quality store and cloned sink share an
+explicit provider with `for_database` and read-only readiness; no selected MSSQL
+path constructs the legacy ClickHouse authority bootstrap. Independent sessions
+avoid committing or rolling back a caller's business transaction. Legacy
+manifests retain their prior composition. Unsupported local/external or non-full-
+refresh selections fail before transport instead of silently falling back.
+
 Proposed operator commands are `publication-authority schema plan|apply` and
 `adopt plan|apply`; they delegate to application services shared with Python.
 Plan is read-only; apply requires the exact plan digest and environment
@@ -92,6 +113,13 @@ reconstructs it. After any ambiguous dispatch, only reconcile existing token,
 query digest and replica generations. Do not retry EXCHANGE or reclaim a slot
 by TTL. Apply the same durable ordering to cleanup intents. Require physical,
 replica and original quality evidence before COMPLETED.
+
+The process-local permit binds the complete intended publication payload except
+the SQL acknowledgement's write UUID. The DDL adapter additionally verifies its
+phase and rendered SQL digest, then consumes the permit under a process lock
+before invoking transport. Consumption is shared across adapter instances and is
+not undone after a transport exception. This is an internal capability, not a
+serialized credential: constructing a new permit from a readback is forbidden.
 
 This is at-most-once dispatch among participating writers, not an atomic
 transaction spanning SQL Server and ClickHouse. A crash after intent commit

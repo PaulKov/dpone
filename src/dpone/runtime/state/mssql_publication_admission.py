@@ -1,5 +1,9 @@
 """Read-only exact admission of the v1 SQL Server publication catalog."""
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
 from dpone.adapters.mssql_publication_catalog_ddl import (
     EVENT_COLUMNS,
     EVENT_TABLE,
@@ -8,7 +12,9 @@ from dpone.adapters.mssql_publication_catalog_ddl import (
     immutable_event_trigger,
     quote_identifier,
 )
-from dpone.ports.mssql_publication import PublicationAuthorityBinding, PublicationCatalogReader
+
+if TYPE_CHECKING:
+    from dpone.ports.mssql_publication import PublicationAuthorityBinding, PublicationCatalogReader
 
 
 def require_publication_catalog(connector: PublicationCatalogReader, *, binding: PublicationAuthorityBinding) -> None:

@@ -101,11 +101,7 @@ class MssqlPublicationAuthority:
             return c.AuthorityMutationResult(c.AuthorityMutationStatus.OUTCOME_UNKNOWN)
         if not won:
             return c.AuthorityMutationResult(c.AuthorityMutationStatus.CONFLICT, observed=observed)
-        permit = (
-            c.DispatchPermit(written.target_key, written.operation_id, written.fence_token, written.dispatch_epoch)
-            if dispatch
-            else None
-        )
+        permit = c.DispatchPermit.for_record(written) if dispatch else None
         return c.AuthorityMutationResult(c.AuthorityMutationStatus.VERIFIED, observed=observed, permit=permit)
 
     def _decode_receipt(self, rows: list[tuple[Any, ...]], target_key: str) -> tuple[bool, c.VersionedAuthorityRecord]:

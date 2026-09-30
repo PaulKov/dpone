@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from concurrent.futures import ThreadPoolExecutor
 from threading import Barrier
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 
@@ -173,6 +173,58 @@ def test_lost_commit_ack_keeps_intent_but_cannot_grant_permit(catalog):
     readback = store.read_versioned(current.record.target_key)
     assert readback.version == 2 and readback.record.phase is Phase.DISPATCHING
     assert store.compare_and_swap(current, desired).permit is None
+
+
+def test_real_composition_uses_admitted_registry_endpoint_for_every_session(catalog):
+    from dpone.contracts.runtime_connection import ResolvedBindingConnection, ResolvedConnectionDescriptor
+    from dpone.runtime.credentials.config import CredentialsConfig
+    from dpone.runtime.publication_authority_composition import build_publication_authority
+
+    connector, binding, _ = catalog
+    server, database, guid = connector.get_records(
+        "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')),DB_NAME(),"
+        "CONVERT(varchar(36),database_guid) FROM sys.database_recovery_status WHERE database_id=DB_ID()"
+    )[0]
+    pin = digest_payload(
+        {
+            "contract": "dpone.mssql-publication-endpoint.v1",
+            "server": server,
+            "database": database,
+            "database_guid": str(UUID(guid)),
+        }
+    )
+    resolved = ResolvedBindingConnection(
+        CredentialsConfig(
+            host=os.environ["DPONE_IT_MSSQL_HOST"],
+            port=int(os.environ["DPONE_IT_MSSQL_PORT"]),
+            database=database,
+            username=os.environ["DPONE_IT_MSSQL_USER"],
+            password=os.environ["DPONE_IT_MSSQL_PASSWORD"],
+            trust_server_certificate="yes",
+            query_timeout=30,
+        ),
+        {},
+        ResolvedConnectionDescriptor(
+            "mssql",
+            {
+                "database": database,
+                "schema": "dbo",
+                "publication_authority": {
+                    "service_id": binding.service_id,
+                    "environment": binding.environment,
+                    "endpoint_identity_sha256": pin,
+                },
+            },
+        ),
+    )
+    store = build_publication_authority(connection=resolved, binding=binding, environment=binding.environment)
+    created = store.create_if_absent(record())
+    assert created.status is Status.VERIFIED
+    assert store.read_versioned(created.observed.record.target_key) == created.observed
+    dispatching = created.observed.record.dispatching(token="real-composition", query_digest="a" * 64)
+    dispatched = store.compare_and_swap(created.observed, dispatching)
+    assert dispatched.status is Status.VERIFIED and dispatched.permit is not None
+    assert store.read_versioned(dispatching.target_key) == dispatched.observed
 
 
 def test_event_unique_write_id_rolls_back_second_slot(catalog):

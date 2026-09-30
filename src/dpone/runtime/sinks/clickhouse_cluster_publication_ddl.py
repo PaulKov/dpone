@@ -29,7 +29,13 @@ class ClickHouseClusterPublicationDdl:
     def dispatch_publication(
         self, record: contracts.AuthorityRecord, permit: contracts.DispatchPermit, *, cluster: str
     ) -> None:
-        self._require_permit(record, permit)
+        self._require_permit(
+            record,
+            permit,
+            contracts.AuthorityPhase.DISPATCHING,
+            self.publication_query_digest(record, cluster=cluster),
+            record.ddl_query_digest,
+        )
         if not record.ddl_correlation_token:
             raise ValueError("cluster publication correlation token is missing")
         self._execute_once(_publication_sql(record, cluster), record.ddl_correlation_token, permit)
@@ -37,7 +43,13 @@ class ClickHouseClusterPublicationDdl:
     def drop_predecessor(
         self, record: contracts.AuthorityRecord, permit: contracts.DispatchPermit, *, cluster: str
     ) -> None:
-        self._require_permit(record, permit)
+        self._require_permit(
+            record,
+            permit,
+            contracts.AuthorityPhase.CLEANUP_DISPATCHING,
+            self.cleanup_query_digest(record, cluster=cluster),
+            record.cleanup_query_digest,
+        )
         if not record.cleanup_correlation_token:
             raise ValueError("cluster cleanup correlation token is missing")
         self._execute_once(_cleanup_sql(record, cluster), record.cleanup_correlation_token, permit)
@@ -51,15 +63,21 @@ class ClickHouseClusterPublicationDdl:
     def _execute_once(self, sql: str, token: str, permit: contracts.DispatchPermit) -> None:
         settings = {**_DDL_SETTINGS, "log_comment": token}
         query_id = f"dpone-cluster-ddl-{permit.operation_id[:20]}-{permit.dispatch_epoch}"
+        permit.consume()
         self._connector.connection.execute(sql, settings=settings, query_id=query_id)
 
     @staticmethod
-    def _require_permit(record: contracts.AuthorityRecord, permit: contracts.DispatchPermit) -> None:
+    def _require_permit(
+        record: contracts.AuthorityRecord,
+        permit: contracts.DispatchPermit,
+        phase: contracts.AuthorityPhase,
+        actual_digest: str,
+        expected_digest: str | None,
+    ) -> None:
         if (
-            permit.target_key != record.target_key
-            or permit.operation_id != record.operation_id
-            or permit.fence_token != record.fence_token
-            or permit.dispatch_epoch != record.dispatch_epoch
+            permit != contracts.DispatchPermit.for_record(record)
+            or record.phase is not phase
+            or actual_digest != expected_digest
         ):
             raise ValueError("cluster publication dispatch permit does not match authority")
 
