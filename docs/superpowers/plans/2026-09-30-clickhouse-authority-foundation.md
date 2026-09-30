@@ -10,7 +10,7 @@
 
 **Spec:** [Approved dpone-only authority specification](../../feature-design-clickhouse-dpone-only-authority.md).
 
-**Status:** Written for maintainer review. Recommended execution: Native, one integrator writes these tightly coupled contracts and one fresh reviewer checks the completed increment. Specification approval is recorded; plan/execution review is pending.
+**Status:** APPROVED for Native execution by the maintainer on 2026-09-30. One integrator implements the tasks; a fresh independent reviewer checks the completed increment.
 
 ## Scope and global constraints
 
@@ -247,5 +247,4 @@ physical observation, writer join/seal and actual kernel composition are explici
 later increments, not omitted completion claims. No independent production
 release, cleanup, HA or automatic unknown-outcome recovery is authorized here.
 
-Maintainer review must confirm this scoped plan and choose Native or
-Subagent-driven execution before implementation begins.
+Maintainer confirmed this scoped plan and Native execution before implementation.

@@ -340,7 +340,7 @@ review; then separate route finalization and activation work.
 - [x] Independent architecture, certification and UX input reconciled.
 - [x] Single-host/no-HA and conservative unknown-outcome availability accepted.
 - [x] Maintainer approves this written specification for implementation.
-- [ ] Detailed implementation plan and path-scoped task contract approved.
+- [x] Durable-foundation plan and path-scoped task contract approved (Native execution).
 - [ ] Implementation, exact-commit review and live certification complete.
 
 First executable planning increment:
