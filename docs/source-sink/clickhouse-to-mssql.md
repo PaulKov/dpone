@@ -213,7 +213,7 @@ flowchart TD
     J --> K["Advance state only after success"]
 ```
 
-## Legacy strategy behavior
+## Strategy behavior
 
 - `full_refresh`: only for small or bounded reference tables. For large event tables it is a red flag unless the source predicate bounds the run.
 - `incremental_append`: rejected before source or target I/O. Do not schedule it
