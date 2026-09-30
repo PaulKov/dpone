@@ -8,18 +8,24 @@ from datetime import UTC, datetime
 import pytest
 
 from dpone.contracts.clickhouse_cluster_publication import (
+    AuthorityMutationResult,
+    AuthorityMutationStatus,
     AuthorityPhase,
     AuthorityRecord,
     ClusterInventory,
     ClusterPublicationError,
     ClusterReplica,
+    DispatchPermit,
     GenerationIdentity,
+    QueueEntry,
+    QueueHostResult,
     ReplicaGeneration,
     VersionedAuthorityRecord,
     digest_payload,
 )
 from dpone.runtime.sinks.clickhouse_cluster_publication_ddl import ClickHouseClusterPublicationDdl
-from dpone.runtime.sinks.clickhouse_prepared_recovery import plan_prepared_recovery
+from dpone.runtime.sinks.clickhouse_cluster_publication_receipt import ClusterFullRefreshReceipt
+from dpone.runtime.sinks.clickhouse_prepared_recovery import PreparedRecoveryService, plan_prepared_recovery
 
 
 def _identity(name: str, *, schema: str = "schema") -> GenerationIdentity:
@@ -38,6 +44,8 @@ class Catalog:
         self.target = _identity("old")
         self.candidate = _identity("new")
         self.rows = 2
+        self.published = False
+        self.missing_host = False
 
     def inventory(self, cluster: str) -> ClusterInventory:
         return self.inventory_value
@@ -51,7 +59,13 @@ class Catalog:
     def generations(
         self, cluster: str, database: str, target: str, candidate: str, hosts: tuple[str, ...]
     ) -> tuple[ReplicaGeneration, ...]:
-        return tuple(ReplicaGeneration(host, self.target, self.candidate, row_count=self.rows) for host in hosts)
+        target_identity, candidate_identity = (
+            (self.candidate, self.target) if self.published else (self.target, self.candidate)
+        )
+        observed_hosts = hosts[:1] if self.missing_host else hosts
+        return tuple(
+            ReplicaGeneration(host, target_identity, candidate_identity, row_count=self.rows) for host in observed_hosts
+        )
 
 
 class Authority:
@@ -130,6 +144,14 @@ def test_plan_accepts_exact_prepared_generation() -> None:
     public = str(plan.to_public_dict())
     assert "original-operation" not in public and "'new'" not in public and "'old'" not in public
     assert authority.mutations == ddl.dispatches == 0
+
+
+def test_plan_identity_is_stable_across_read_only_preflights() -> None:
+    catalog, authority, ddl = _case()
+    first = _plan(catalog, authority, ddl)
+    second = _plan(catalog, authority, ddl)
+    assert first.token == second.token
+    assert first.plan_digest == second.plan_digest
 
 
 def test_plan_rejects_schema_digest_drift() -> None:
@@ -281,3 +303,156 @@ def test_real_ddl_proof_accepts_strict_origin_and_complete_negative_history() ->
         cluster="cluster",
         operation_started_at=datetime(2026, 9, 27, 10, 7, tzinfo=UTC),
     )
+
+
+class MutationAuthority(Authority):
+    def __init__(self, record: AuthorityRecord, *, strict: bool = True) -> None:
+        super().__init__(record)
+        self.strict = strict
+        self.status = AuthorityMutationStatus.VERIFIED
+
+    def supports_linearizable_dispatch_permit(self) -> bool:
+        return self.strict
+
+    def compare_and_swap(self, current: VersionedAuthorityRecord, desired: AuthorityRecord) -> AuthorityMutationResult:
+        self.mutations += 1
+        if self.status is not AuthorityMutationStatus.VERIFIED:
+            return AuthorityMutationResult(self.status)
+        self.current = VersionedAuthorityRecord(desired, current.version + 1)
+        permit = DispatchPermit(desired.target_key, desired.operation_id, desired.fence_token, desired.dispatch_epoch)
+        return AuthorityMutationResult(AuthorityMutationStatus.VERIFIED, self.current, permit)
+
+
+class RecoveryDdl(Ddl):
+    def __init__(self, catalog: Catalog) -> None:
+        super().__init__()
+        self.catalog = catalog
+        self.raise_after_dispatch = False
+        self.last_token: str | None = None
+
+    def dispatch_publication(self, record: AuthorityRecord, permit: DispatchPermit, *, cluster: str) -> None:
+        self.dispatches += 1
+        self.last_token = record.ddl_correlation_token
+        self.catalog.published = True
+        if self.raise_after_dispatch:
+            raise TimeoutError("acknowledgement lost")
+
+    def find_entries(self, cluster: str, token: str) -> tuple[QueueEntry, ...]:
+        return (
+            QueueEntry(
+                "query-1",
+                "query-digest",
+                token,
+                tuple(QueueHostResult(host, "Finished", 0, "") for host in self.catalog.inventory_value.hosts),
+            ),
+        )
+
+    def read_entry(self, cluster: str, entry: str) -> QueueEntry | None:
+        return self.find_entries(cluster, self.last_token or "missing")[0] if entry == "query-1" else None
+
+
+class RecoveryPublication:
+    def __init__(self, authority: MutationAuthority) -> None:
+        self.authority = authority
+
+    def reconcile(self, current: VersionedAuthorityRecord, cluster: str) -> ClusterFullRefreshReceipt:
+        committed = replace(current.record, phase=AuthorityPhase.COMMITTED, ddl_entry="query-1")
+        self.authority.current = VersionedAuthorityRecord(committed, current.version + 1)
+        return ClusterFullRefreshReceipt.from_authority(self.authority.current, cluster)
+
+    def cleanup(self, receipt: ClusterFullRefreshReceipt) -> None:
+        current = self.authority.current
+        self.authority.current = VersionedAuthorityRecord(
+            replace(current.record, phase=AuthorityPhase.COMPLETED), current.version + 1
+        )
+
+
+def _execution_case(*, strict: bool = True):
+    catalog, initial, _ = _case()
+    authority = MutationAuthority(initial.current.record, strict=strict)
+    ddl = RecoveryDdl(catalog)
+    plan = _plan(catalog, authority, ddl)
+    publication = RecoveryPublication(authority)
+    service = PreparedRecoveryService(catalog, authority, ddl, publication.reconcile, publication.cleanup)
+    return plan, service, authority, ddl
+
+
+def test_execute_refuses_legacy_authority() -> None:
+    plan, service, authority, ddl = _execution_case(strict=False)
+    with pytest.raises(ClusterPublicationError, match="AUTHORITY_UNSAFE"):
+        service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert authority.mutations == ddl.dispatches == 0
+
+
+def test_execute_rejects_stale_plan() -> None:
+    plan, service, authority, ddl = _execution_case()
+    authority.current = replace(authority.current, version=authority.current.version + 1)
+    with pytest.raises(ClusterPublicationError, match="AUTHORITY_CONFLICT"):
+        service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert authority.mutations == ddl.dispatches == 0
+
+
+@pytest.mark.parametrize("status", [AuthorityMutationStatus.CONFLICT, AuthorityMutationStatus.OUTCOME_UNKNOWN])
+def test_only_cas_winner_dispatches(status: AuthorityMutationStatus) -> None:
+    plan, service, authority, ddl = _execution_case()
+    authority.status = status
+    with pytest.raises(ClusterPublicationError, match="CAS_"):
+        service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert authority.mutations == 1
+    assert ddl.dispatches == 0
+
+
+def test_execute_strict_winner_dispatches_once_and_returns_original_receipt() -> None:
+    plan, service, authority, ddl = _execution_case()
+    receipt = service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert ddl.dispatches == 1
+    assert receipt.authority.operation_id == plan.operation_id
+    assert authority.current.record.phase is AuthorityPhase.COMPLETED
+
+
+def test_crash_after_cas_reconciles_without_redispatch() -> None:
+    plan, service, authority, ddl = _execution_case()
+    ddl.raise_after_dispatch = True
+    receipt = service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert ddl.dispatches == 1
+    assert receipt.authority.operation_id == plan.operation_id
+    assert authority.current.record.phase is AuthorityPhase.COMPLETED
+
+
+def test_completed_operation_replays_receipt_without_dispatch() -> None:
+    plan, service, authority, ddl = _execution_case()
+    original = service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    replay = service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert replay.authority.operation_id == original.authority.operation_id
+    assert replay.authority.phase is AuthorityPhase.COMPLETED
+    assert ddl.dispatches == 1
+
+
+def test_completed_replay_rejects_missing_replica() -> None:
+    plan, service, authority, ddl = _execution_case()
+    service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    service.catalog.missing_host = True
+    with pytest.raises(ClusterPublicationError, match="PUBLICATION_UNKNOWN"):
+        service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert authority.current.record.phase is AuthorityPhase.COMPLETED
+    assert ddl.dispatches == 1
+
+
+def test_reentry_after_dispatch_reconciles_without_second_ddl() -> None:
+    plan, service, authority, ddl = _execution_case()
+    dispatched = plan.record.dispatching(token=plan.token, query_digest=plan.query_digest)
+    authority.current = VersionedAuthorityRecord(dispatched, plan.authority_version + 1)
+    ddl.catalog.published = True
+    ddl.last_token = plan.token
+    ddl.dispatches = 1
+    receipt = service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert receipt.authority.phase is AuthorityPhase.COMPLETED
+    assert ddl.dispatches == 1
+
+
+def test_execute_rejects_changed_target_after_plan() -> None:
+    plan, service, authority, ddl = _execution_case()
+    service.catalog.candidate = _identity("other")
+    with pytest.raises(ClusterPublicationError, match="GENERATION_DIVERGED"):
+        service.execute_prepared_recovery(plan, confirmation_digest=plan.plan_digest)
+    assert authority.mutations == ddl.dispatches == 0
