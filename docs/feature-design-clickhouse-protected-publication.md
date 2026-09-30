@@ -9,11 +9,12 @@
 
 Last verified: 2026-09-30
 
-Proposed amendment: [self-service table compatibility](feature-design-clickhouse-table-compatibility.md)
-is `RESEARCHED`, not yet approved. It addresses server-rendered settings,
-method-specific compatibility and version-safe recovery. This parent's approved
-contract is not silently broadened; the amendment needs written approval and a
-revised implementation plan before settings-aware production changes.
+Approved amendment: [self-service table compatibility](feature-design-clickhouse-table-compatibility.md)
+was accepted on 2026-09-30. For the new binding it supersedes this page's
+no-SETTINGS profile, unchanged-selector assumption and new-enrollment storage
+version. Other invariants and historical versions remain unchanged. The revised
+[implementation plan](superpowers/plans/2026-09-30-clickhouse-table-compatibility.md)
+still needs review before settings-aware production changes.
 
 ## Executive summary
 

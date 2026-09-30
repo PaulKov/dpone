@@ -1,6 +1,8 @@
 # Feature design: self-service ClickHouse table compatibility
 
-- Status: RESEARCHED
+- Status: APPROVED
+- Implementation: [revised Native plan](superpowers/plans/2026-09-30-clickhouse-table-compatibility.md) and [path contract](agent-tasks/clickhouse-table-compatibility.yml), awaiting separate plan review
+- Decision: [ADR 0080](adr/0080-clickhouse-table-compatibility-policy.md)
 - Owner: dpone maintainers
 - Issue: settings-aware amendment to PR #249
 - Target release: unassigned; specification only, not route activation
@@ -37,10 +39,13 @@ Compatibility uncertainty is configurable: `block` by default, or `warn` to
 exclude an unverified method and continue through an independently verified
 alternative. This is not permission to send unverified mutation SQL.
 
-The user approved preparing this specification, not its as-yet unwritten
-implementation. The parent remains authoritative until this amendment is
-approved. This amendment proposes replacing its no-SETTINGS profile, unchanged
-selector assumption, and new-enrollment storage version; other safety rules stay.
+The maintainer approved this written specification with `approve` on 2026-09-30,
+after reviewing commit `5075a1e50ff7d1f3d670423fe196f970ab65e873`, including
+the default-block/optional-warn boundary. This amendment replaces the parent's
+no-SETTINGS profile, unchanged-selector assumption and new-enrollment storage
+version for the new binding; other safety rules stay. Approval is not evidence
+of implementation or certification. The revised implementation plan requires
+separate review before production edits.
 
 ## Personas and customer journey
 
@@ -718,8 +723,8 @@ No worker may interpret this area list as a wildcard write authorization.
 - [x] Alternatives and dated primary-source research are recorded.
 - [x] Test, certification, documentation, rollout and rollback criteria exist.
 - [x] Implementation ownership and required plan amendment are explicit.
-- [ ] Maintainer approves this written specification as `APPROVED`.
+- [x] Maintainer approves this written specification as `APPROVED`.
 - [ ] Revised implementation plan and exact path contract are separately reviewed.
 
-Ready for design review only. Implementation, live certification, production
-readiness and release readiness are not established by this document.
+Approved for implementation planning. Implementation, live certification,
+production readiness and release readiness are not established by this document.
