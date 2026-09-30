@@ -8,6 +8,13 @@ from hashlib import sha256
 from typing import Literal
 
 
+class PublicationUnknown(RuntimeError):
+    """Retain durable target exclusion; reconcile instead of retrying DDL."""
+
+    safe_to_retry = False
+    operator_verification_required = True
+
+
 class PublicationState(StrEnum):
     PREPARED = "prepared"
     CLAIMED = "claimed"

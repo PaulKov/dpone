@@ -22,7 +22,7 @@ owned_paths:
   - src/dpone/adapters/clickhouse_authority_sqlite.py
   - src/dpone/adapters/clickhouse_authority_execution_lock.py
   - src/dpone/adapters/clickhouse_native_publication.py
-  - src/dpone/runtime/sinks/clickhouse_authority_publisher.py
+  - src/dpone/adapters/clickhouse_authority_publisher.py
   - tests/test_clickhouse_authority_execution_lock.py
   - tests/test_clickhouse_native_publication.py
   - tests/test_clickhouse_authority_publisher.py
@@ -33,7 +33,9 @@ owned_paths:
   - docs/clickhouse-authority-journal.md
 integrator_owned_paths:
   - src/dpone/contracts/clickhouse_authority.py
-  - src/dpone/contracts/clickhouse_native_publication.py
+  - src/dpone/contracts/clickhouse_publication.py
+  - src/dpone/runtime/sinks/clickhouse_guarded_publication.py
+  - src/dpone/ports/clickhouse_publication_exclusion.py
   - src/dpone/ports/clickhouse_publication_transport.py
   - docs/feature-design-clickhouse-dpone-only-authority.md
   - docs/clickhouse-publication-methods.md
@@ -44,16 +46,16 @@ integrator_owned_paths:
   - mkdocs.yml
 read_only_paths:
   - src/dpone/ports/clickhouse_publication.py
-  - src/dpone/contracts/clickhouse_publication.py
-  - src/dpone/runtime/sinks/clickhouse_guarded_publication.py
   - src/dpone/adapters/clickhouse_publication_codec.py
   - tests/test_clickhouse_authority_sqlite.py
   - tests/test_clickhouse_authority_processes.py
   - tests/test_clickhouse_guarded_publication.py
   - docs/adr/0078-method-aware-clickhouse-publication.md
 forbidden_paths:
+  - src/dpone/contracts/clickhouse_publication.py
+  - src/dpone/runtime/sinks/clickhouse_guarded_publication.py
+  - src/dpone/ports/clickhouse_publication_exclusion.py
   - src/dpone/contracts/clickhouse_authority.py
-  - src/dpone/contracts/clickhouse_native_publication.py
   - src/dpone/ports/clickhouse_publication_transport.py
   - docs/feature-design-clickhouse-dpone-only-authority.md
   - docs/clickhouse-publication-methods.md

@@ -4,7 +4,7 @@
 
 **Goal:** Add one-shot native publication, per-target execution exclusion and conservative transport closure to the existing durable authority.
 
-**Architecture:** A runtime publisher consumes the original authority grant through narrow injected ports. A local lock adapter binds exclusion to the existing authority and canonical subject; a dedicated native adapter sends one fixed statement and positively consumes successful EndOfStream. Neither component becomes the full guarded backend or changes route selection.
+**Architecture:** A concrete authority/native publisher adapter consumes the original authority grant through narrow injected ports. A local lock adapter binds exclusion to the existing authority and canonical subject; a dedicated native adapter sends one fixed statement and positively consumes successful EndOfStream. Neither component becomes the full guarded backend or changes route selection. The existing method-selection/recovery kernel remains runtime.
 
 **Tech Stack:** Python, SQLite, POSIX `flock`, pinned `clickhouse-driver==0.2.10`, pytest, Docker Desktop Linux with ClickHouse `24.8.14.39`; no dependency changes.
 
@@ -42,13 +42,15 @@
 | Path | Responsibility |
 |---|---|
 | `src/dpone/contracts/clickhouse_authority.py` | Add immutable local storage identity; retain existing grant/state semantics |
-| `src/dpone/contracts/clickhouse_native_publication.py` | Frozen request and successful completion material, safe transport error |
-| `src/dpone/ports/clickhouse_publication_transport.py` | Minimal authority, exclusion/session and synchronous transport protocols |
+| `src/dpone/ports/clickhouse_publication_transport.py` | Synchronous transport protocol and its frozen command/completion/error values |
+| `src/dpone/ports/clickhouse_publication_exclusion.py` | Execution exclusion/session protocols, independent of authority DTOs |
+| `src/dpone/contracts/clickhouse_publication.py` | Canonical non-retryable unresolved outcome error |
+| `src/dpone/runtime/sinks/clickhouse_guarded_publication.py` | Preserve established error import by re-export; unchanged kernel behavior |
 | `src/dpone/adapters/clickhouse_authority_storage.py` | Validated read-only storage identity access |
 | `src/dpone/adapters/clickhouse_authority_sqlite.py` | Expose validated execution identity without new schema or grants |
 | `src/dpone/adapters/clickhouse_authority_execution_lock.py` | Stable private per-subject lock files and invocation-scoped exclusion |
 | `src/dpone/adapters/clickhouse_native_publication.py` | Explicit native connection, one send and packet completion |
-| `src/dpone/runtime/sinks/clickhouse_authority_publisher.py` | Original-intent validation and send/closure ordering |
+| `src/dpone/adapters/clickhouse_authority_publisher.py` | Concrete authority/native profile bridge, original-intent validation and send/closure ordering |
 | `tests/test_clickhouse_authority_execution_lock.py` | Thread/process/inode/session tests |
 | `tests/test_clickhouse_native_publication.py` | Request, driver packet and lifecycle tests |
 | `tests/test_clickhouse_authority_publisher.py` | Protected intent, CAS ambiguity, rendering and closure tests |
@@ -59,6 +61,20 @@
 
 Adapters import contracts/ports, never runtime. Runtime imports only contracts/ports and existing pure publication logic. Do not reuse generic connector retry code or add a registry. If a cohesive module cannot meet existing budgets, revise the responsibility map before adding files; do not split mechanically.
 
+**Implementation boundary correction:** independent architecture review found that
+the original combined port made the local lock depend on dispatch rights/native
+DTOs it never uses. The lock now consumes only the identity reader. The concrete
+publisher validates the pinned native infrastructure profile, so belongs in
+adapters, not the generic runtime kernel. This internal path correction preserves
+the existing `PublicationUnknown` import and all behavior; the publisher is new
+and unreleased. Consumer-owned persistence/identity protocols are local to their
+respective adapters. The wire request retains the validated `OperationBinding`,
+but copies only method/query ID/partition ID from the original intent; full
+catalog/content evidence never crosses the transport port. Wire DTOs and their
+single transport protocol are colocated. This revises the new, unpublished
+request constructor and import path; existing released APIs and persisted
+profiles stay unchanged. No budget/baseline relaxation is involved.
+
 ## Task 1: Authority-bound execution exclusion
 
 **Files:** Modify the three authority modules above; create the transport port, lock adapter and lock tests. Integrator owns shared contracts.
@@ -67,43 +83,43 @@ Adapters import contracts/ports, never runtime. Runtime imports only contracts/p
 
 - `AuthorityStorageIdentity(path: str, device: int, inode: int, deployment_id: str)` is frozen, local-only, not diagnostic/recovery authority.
 - `SQLitePublicationAuthority.execution_identity() -> AuthorityStorageIdentity` checks existing storage identity/settings before returning its original absolute location and inode. It never provisions storage.
-- `PublicationAuthority` protocol exposes only existing `binding`, `read`, `transport_state`, `begin_send`, `close_without_send`, `record_terminal` plus `execution_identity`; use the exact existing signatures when declaring these members.
+- Publisher-local `PublicationAuthority` exposes existing `binding`, `read`, `transport_state`, `begin_send`, `close_without_send`, `record_terminal`. Lock-local `PublicationIdentityReader` exposes only `execution_identity` and `binding`; use the exact existing signatures. Neither concrete adapter imports the other's private persistence capability.
 - `ExecutionSession.assert_current() -> None` rejects use after exit, from a different PID or thread, or after protected identity/binding replacement.
 - `PublicationExclusion.hold(operation_id: str) -> ContextManager[ExecutionSession]`.
-- `LocalPublicationExclusion(authority: PublicationAuthority)` implements that port. No caller-provided lock path or lock key.
+- `LocalPublicationExclusion(authority: PublicationIdentityReader)` implements that port. No caller-provided lock path or lock key.
 
-- [ ] Write `test_same_subject_threads_and_spawned_processes_conflict`: one holder wins, another receives `AuthorityConflict`, and independent subjects can hold concurrently. Use Events/barriers, not sleep-based ordering. Resolve subjects from the original bindings, not caller endpoint aliases or table UUIDs.
-- [ ] Write `test_lock_identity_and_session_fail_closed`: symlink/hardlink/non-private lock, replaced authority or lock inode, inherited PID, wrong thread and expired session are rejected. Killing a holder releases only the OS mutex; existing owner still blocks a second operation.
-- [ ] Run `uv run pytest tests/test_clickhouse_authority_execution_lock.py -q`; expect missing new API failures, retain the red result.
-- [ ] Implement identity access and the adapter. Derive a sibling filename `<authority-filename>.execution-<subject.key>.lock` under the existing private authority directory. Create/open with no symlink following, mode `0600`, validate regular file, owner, link count and descriptor/path identity; fsync newly created file and directory. Acquire a fresh descriptor using `LOCK_EX | LOCK_NB`, revalidate authority and binding after acquisition. Contention has no hidden retry. Normal release closes/unlocks but never unlinks the file. The protected directory is a deployment trust boundary, not protection against its owning OS user.
-- [ ] Run the new tests plus `tests/test_clickhouse_authority_sqlite.py` and `tests/test_clickhouse_authority_processes.py`; expect PASS, no schema or prior-state changes.
-- [ ] Commit only owned paths after verification; immediately update the existing PR description, or create/attach the appropriate PR if its lifecycle has changed. Never force-push or manufacture a merge commit.
+- [x] Write `test_same_subject_threads_and_spawned_processes_conflict`: one holder wins, another receives `AuthorityConflict`, and independent subjects can hold concurrently. Use Events/barriers, not sleep-based ordering. Resolve subjects from the original bindings, not caller endpoint aliases or table UUIDs.
+- [x] Write `test_lock_identity_and_session_fail_closed`: symlink/hardlink/non-private lock, replaced authority or lock inode, inherited PID, wrong thread and expired session are rejected. Killing a holder releases only the OS mutex; existing owner still blocks a second operation.
+- [x] Run `uv run pytest tests/test_clickhouse_authority_execution_lock.py -q`; expect missing new API failures, retain the red result.
+- [x] Implement identity access and the adapter. Derive a sibling filename `<authority-filename>.execution-<subject.key>.lock` under the existing private authority directory. Create/open with no symlink following, mode `0600`, validate regular file, owner, link count and descriptor/path identity; fsync newly created file and directory. Acquire a fresh descriptor using `LOCK_EX | LOCK_NB`, revalidate authority and binding after acquisition. Contention has no hidden retry. Normal release closes/unlocks but never unlinks the file. The protected directory is a deployment trust boundary, not protection against its owning OS user.
+- [x] Run the new tests plus `tests/test_clickhouse_authority_sqlite.py` and `tests/test_clickhouse_authority_processes.py`; expect PASS, no schema or prior-state changes.
+- [x] Commit only owned paths after verification; immediately update the existing PR description, or create/attach the appropriate PR if its lifecycle has changed. Never force-push or manufacture a merge commit.
 
 ## Task 2: Pinned synchronous native transport
 
-**Files:** Create native contracts, native adapter and native tests; extend the transport port only with the interface below.
+**Files:** Create native adapter and native tests; keep native wire DTOs and the transport protocol together in the transport port.
 
 **Interfaces:**
 
-- `NativePublicationRequest(binding: OperationBinding, intent: PublicationIntent)` is frozen and carries no caller SQL or settings. It verifies matching operation/subject/candidate, supported method and method-specific fields. The publisher additionally verifies selector consistency from the protected original. `statement: str | None` is a deterministic property for the four approved methods; no-op returns `None`.
+- `NativePublicationRequest(binding: OperationBinding, method, query_id: str, partition_id: str | None = None)` is frozen and carries no caller SQL/settings or catalog/content proof. It requires the validated binding, a supported method, canonical query-ID format and method-specific fields. The publisher verifies operation/subject/candidate and selector consistency from the protected original before copying these fields. Query identity is copied, never independently derived. `statement: str | None` is deterministic for the four approved methods; no-op returns `None`.
 - `NativePublicationCompletion(operation_id: str, query_id: str, server_id: str, statement_digest: str, server_version: tuple[int, int, int], server_revision: int, driver_version: str)` is frozen. Its `digest: str` hashes canonical sorted compact UTF-8 JSON with receipt profile `dpone.clickhouse.native-completion.v1`. Creation by a caller is not authority; only the injected trusted adapter's return is accepted.
 - `NativePublicationError(RuntimeError)` has `safe_to_retry=False`; public messages contain no credentials, source rows or raw vendor exception text.
 - `NativePublicationTransport.execute(request: NativePublicationRequest) -> NativePublicationCompletion` is synchronous, one request per invocation, no background work or application retries.
 - `NativePublicationEndpoint` is adapter-owned frozen configuration: registered `server_id`, literal IPv4 `host`, valid integer `port`, `user`, repr-hidden `password`, positive finite `connect_timeout`/`send_receive_timeout`, `secure=True`, optional `ca_certs` and `server_hostname`. TLS verification cannot be disabled. Explicit `secure=False` is limited to the documented isolated local test deployment. No environment discovery or arbitrary settings mapping.
 - `DirectNativePublicationTransport(endpoint: NativePublicationEndpoint)` implements the port; optional SDK import occurs on execution, not base import/help.
 
-- [ ] Write `test_fixed_statements_and_no_arbitrary_sql`: backtick-quoted simple identifiers, exact EXCHANGE/RENAME/REPLACE statements, stable original query ID and no-op zero driver calls. REPLACE always uses `PARTITION ID`, including `'all'`; validate canonical partition IDs against `[A-Za-z0-9_-]+` for this bounded transport profile, rejecting others before send entry. Never infer `tuple()` from `'all'`.
-- [ ] Write `test_native_requires_explicit_successful_eos`: progress/profile/log/empty-data packets may precede EOS; server exception, unexpected packet, nonempty result data, EOF, truncated packet and timeout never produce completion. Check receipt fields and deterministic digest.
-- [ ] Write `test_one_connection_one_query_no_reconnect`: validate version, literal IPv4, exact peer, no alternates/pool, one connect and at most one send; partial send failure has no second client, query or fallback. Base import works without the optional SDK; malformed config fails before socket use.
-- [ ] Run `uv run pytest tests/test_clickhouse_native_publication.py -q`; expect missing API failures.
-- [ ] Implement fixed rendering and field validation in the request contract without runtime/SDK imports; existing selector consistency remains the runtime publisher's responsibility. Keep native lifecycle in the adapter: privately create one pinned `Client` with the protected database, `compression=False`, `disable_reconnect=True` and no alternate hosts/round robin, whose constructor initializes `connection.context`; retain its one connection and never call `Client.execute`, `force_connect` or `get_connection` again. Call `connect()` once, check actual peer and server identity/version metadata, assert connected, send one `send_query(statement, query_id=..., params=None)`, then `send_external_tables(None)`. Consume native packets until successful EOS; disconnect in `finally`. No connection/client escapes the adapter. Require driver `0.2.10` and server version `(24, 8, 14)`; record actual revision and Docker build/image identity separately. A handshake cannot attest deployment `server_id`; registered endpoint/credentials remain an external prerequisite. The driver's implicit connect inside `send_query` must remain unreachable by exclusive connection ownership; tests count actual connect calls.
-- [ ] Implement the explicit DDL packet allowlist: END_OF_STREAM succeeds; EXCEPTION fails; PROGRESS, PROFILE_INFO, LOG, PROFILE_EVENTS and TIMEZONE_UPDATE are drained; DATA is accepted only with zero rows and zero columns. All other decoded packet types, including TOTALS/EXTREMES, fail closed. Record EOS only for this invocation, never from `is_query_executing=False` or generic return success. Per-socket timeouts are not advertised as a total wall-clock deadline.
-- [ ] Run the new module and `tests/test_clickhouse_exchange_retry_safety.py`; expect PASS without modifying generic connector behavior. Pin actual SDK interaction in tests as well as fake packet sequences.
-- [ ] Commit the verified task and refresh the PR description with scope and evidence, not a production-readiness claim.
+- [x] Write `test_fixed_statements_and_no_arbitrary_sql`: backtick-quoted simple identifiers, exact EXCHANGE/RENAME/REPLACE statements, stable original query ID and no-op zero driver calls. REPLACE always uses `PARTITION ID`, including `'all'`; validate canonical partition IDs against `[A-Za-z0-9_-]+` for this bounded transport profile, rejecting others before send entry. Never infer `tuple()` from `'all'`.
+- [x] Write `test_native_requires_explicit_successful_eos`: progress/profile/log/empty-data packets may precede EOS; server exception, unexpected packet, nonempty result data, EOF, truncated packet and timeout never produce completion. Check receipt fields and deterministic digest.
+- [x] Write `test_one_connection_one_query_no_reconnect`: validate version, literal IPv4, exact peer, no alternates/pool, one connect and at most one send; partial send failure has no second client, query or fallback. Base import works without the optional SDK; malformed config fails before socket use.
+- [x] Run `uv run pytest tests/test_clickhouse_native_publication.py -q`; expect missing API failures.
+- [x] Implement fixed rendering and field validation in the request contract without runtime/SDK imports; existing selector consistency remains the publisher adapter's responsibility. Keep native lifecycle in the adapter: privately create one pinned `Client` with the protected database, `compression=False`, `disable_reconnect=True` and no alternate hosts/round robin, whose constructor initializes `connection.context`; retain its one connection and never call `Client.execute`, `force_connect` or `get_connection` again. Call `connect()` once, check actual peer and server identity/version metadata, assert connected, send one `send_query(statement, query_id=..., params=None)`, then `send_external_tables(None)`. Consume native packets until successful EOS; disconnect in `finally`. No connection/client escapes the adapter. Require driver `0.2.10` and server version `(24, 8, 14)`; record actual revision and Docker build/image identity separately. A handshake cannot attest deployment `server_id`; registered endpoint/credentials remain an external prerequisite. The driver's implicit connect inside `send_query` must remain unreachable by exclusive connection ownership; tests count actual connect calls.
+- [x] Implement the explicit DDL packet allowlist: END_OF_STREAM succeeds; EXCEPTION fails; PROGRESS, PROFILE_INFO, LOG, PROFILE_EVENTS and TIMEZONE_UPDATE are drained; DATA is accepted only with zero rows and zero columns. All other decoded packet types, including TOTALS/EXTREMES, fail closed. Record EOS only for this invocation, never from `is_query_executing=False` or generic return success. Per-socket timeouts are not advertised as a total wall-clock deadline.
+- [x] Run the new module and `tests/test_clickhouse_exchange_retry_safety.py`; expect PASS without modifying generic connector behavior. Pin actual SDK interaction in tests as well as fake packet sequences.
+- [x] Commit the verified task and refresh the PR description with scope and evidence, not a production-readiness claim.
 
 ## Task 3: Grant-consuming publisher and conservative closure
 
-**Files:** Create the runtime publisher and its tests. No change to the existing eight-method backend port or publication kernel.
+**Files:** Create the concrete publisher adapter and its tests. No change to the existing eight-method backend port or publication kernel behavior; its established error import remains a re-export from the canonical contract.
 
 **Interfaces:**
 
@@ -111,15 +127,15 @@ Adapters import contracts/ports, never runtime. Runtime imports only contracts/p
 - `execute_once(grant: DispatchGrant) -> None` reopens the protected binding and journal; there is no caller intent, arbitrary SQL or grant cache.
 - `close_and_drain(operation_id: str) -> None` only closes transport under the same exclusion. Missing proof raises existing `PublicationUnknown` with `safe_to_retry=False`; this does not classify physical publication outcome.
 
-- [ ] Write `test_lost_begin_send_ack_sends_nothing`: inject failure after real SQLite commit, assert zero transport calls and persisted `MAY_HAVE_SENT`. Readback cannot authorize dispatch or change it to no-send.
-- [ ] Write `test_delayed_claimant_loses_to_close`: pause a claimant before lock acquisition, durably close from another process, then resume; assert zero sends and retained owner. Reject foreign/stale epoch/grant and divergent protected identity before transport.
-- [ ] Write `test_terminal_ack_loss_never_replays`: fail before and after terminal commit separately. Later closure succeeds only for the persisted original terminal; otherwise it raises unknown. Repeated closure does not append duplicate history. A different completion digest is rejected.
-- [ ] Write `test_noop_and_closure_state_matrix`: NOT_STARTED closes without send; both closed states are idempotent; MAY_HAVE_SENT raises unknown. No-op performs zero socket/SDK calls. Every result retains target ownership and blocks a successor. Cross-thread/fork session use fails.
-- [ ] Run `uv run pytest tests/test_clickhouse_authority_publisher.py -q`; expect missing API failures.
-- [ ] Implement this order under one exclusion session: reopen binding/entry, require claimed original and matching operation/epoch, construct validated request, assert current session, acknowledge `begin_send(grant)`, call transport exactly once, validate returned completion identity/profile/statement digest, persist `record_terminal(grant, completion.digest)`, release local mutex. All network activity occurs after acknowledged send entry; even a connect failure may therefore quarantine the operation. For no-op use no-send closure, never `begin_send`. Propagate interruption without false success; other post-entry failures become sanitized unknown. Lost terminal-write ACK is resolved only by a later protected read, not a second send.
-- [ ] Implement closure exactly as the state matrix; no KILL, query-log proof, PID/timeout inference, source reads or outcome observation. No pending background queue exists; any late entrant must still lose the durable CAS.
-- [ ] Run new tests with all foundation, codec and kernel tests; expect PASS. Verify no SQLite transaction spans a transport callback and no grant appears in repr, diagnostics or exception messages.
-- [ ] Commit verified paths and update the PR with the conservative availability cost.
+- [x] Write `test_lost_begin_send_ack_sends_nothing`: inject failure after real SQLite commit, assert zero transport calls and persisted `MAY_HAVE_SENT`. Readback cannot authorize dispatch or change it to no-send.
+- [x] Write `test_delayed_claimant_loses_to_close`: pause a claimant before lock acquisition, durably close from another process, then resume; assert zero sends and retained owner. Reject foreign/stale epoch/grant and divergent protected identity before transport.
+- [x] Write `test_terminal_ack_loss_never_replays`: fail before and after terminal commit separately. Later closure succeeds only for the persisted original terminal; otherwise it raises unknown. Repeated closure does not append duplicate history. A different completion digest is rejected.
+- [x] Write `test_noop_and_closure_state_matrix`: NOT_STARTED closes without send; both closed states are idempotent; MAY_HAVE_SENT raises unknown. No-op performs zero socket/SDK calls. Every result retains target ownership and blocks a successor. Cross-thread/fork session use fails.
+- [x] Run `uv run pytest tests/test_clickhouse_authority_publisher.py -q`; expect missing API failures.
+- [x] Implement this order under one exclusion session: reopen binding/entry, require claimed original and matching operation/epoch, construct validated request, assert current session, acknowledge `begin_send(grant)`, call transport exactly once, validate returned completion identity/profile/statement digest, persist `record_terminal(grant, completion.digest)`, release local mutex. All network activity occurs after acknowledged send entry; even a connect failure may therefore quarantine the operation. For no-op use no-send closure, never `begin_send`. Propagate interruption without false success; other post-entry failures become sanitized unknown. Lost terminal-write ACK is resolved only by a later protected read, not a second send.
+- [x] Implement closure exactly as the state matrix; no KILL, query-log proof, PID/timeout inference, source reads or outcome observation. No pending background queue exists; any late entrant must still lose the durable CAS.
+- [x] Run new tests with all foundation, codec and kernel tests; expect PASS. Verify no SQLite transaction spans a transport callback and no grant appears in repr, diagnostics or exception messages.
+- [x] Commit verified paths and update the PR with the conservative availability cost.
 
 ## Task 4: Actual Docker faults, documentation and integration gate
 

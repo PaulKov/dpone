@@ -72,6 +72,21 @@ def test_independent_subjects_do_not_share_lock(store):
         second.assert_current()
 
 
+def test_exclusion_needs_only_original_identity_and_binding(store):
+    from dpone.adapters.clickhouse_authority_execution_lock import PublicationIdentityReader
+
+    class IdentityReader:
+        def execution_identity(self):
+            return store.execution_identity()
+
+        def binding(self, operation_id):
+            return store.binding(operation_id)
+
+    reader: PublicationIdentityReader = IdentityReader()
+    with _exclusion(reader).hold("deployment:one") as session:
+        session.assert_current()
+
+
 def test_session_rejects_other_thread_and_use_after_exit(store):
     with _exclusion(store).hold("deployment:one") as session:
         with ThreadPoolExecutor(1) as executor, pytest.raises(AuthorityError):

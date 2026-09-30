@@ -14,7 +14,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from dpone.contracts.clickhouse_native_publication import (
+from dpone.ports.clickhouse_publication_transport import (
     NativePublicationCompletion,
     NativePublicationError,
     NativePublicationRequest,
@@ -113,12 +113,12 @@ class DirectNativePublicationTransport:
                     or not connection.connected
                 ):
                     raise NativePublicationError("Native peer or server version outside the pinned profile")
-                connection.send_query(statement, query_id=request.intent.query_id, params=None)
+                connection.send_query(statement, query_id=request.query_id, params=None)
                 connection.send_external_tables(None)
                 _drain(connection, packets)
                 completion = NativePublicationCompletion(
-                    request.intent.operation_id,
-                    request.intent.query_id,
+                    request.binding.operation_id,
+                    request.query_id,
                     endpoint.server_id,
                     hashlib.sha256(statement.encode("utf-8")).hexdigest(),
                     version,

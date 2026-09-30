@@ -29,13 +29,16 @@ a temporary private directory for learning, not production durability:
 ```python
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import json
 
 from dpone.adapters.clickhouse_authority_sqlite import SQLitePublicationAuthority
 from dpone.contracts.clickhouse_authority import AuthoritySubject
 
 with TemporaryDirectory() as sandbox:
     root = Path(sandbox)
-    path = root / "authority.db"
+    private = root / "authority"
+    private.mkdir(mode=0o700)
+    path = private / "authority.db"
     SQLitePublicationAuthority.provision(path, "example-deployment")
     authority = SQLitePublicationAuthority(path, "example-deployment")
     subject = AuthoritySubject("example-deployment", "registered-server", "analytics", "orders")
@@ -47,10 +50,14 @@ with TemporaryDirectory() as sandbox:
     reports = root / "reports"
     reports.mkdir()
     reopened.write_diagnostics("example-deployment:first", reports / "operation.json")
+    report = json.loads((reports / "operation.json").read_text(encoding="utf-8"))
+    assert report["owner_retained"] is True
+    print(report["state"], report["transport"], report["owner_retained"])
 ```
 
-The report has `state: registered`, `transport: not_started` and
-`owner_retained: true`. No query was sent. Provisioning an existing file raises
+Expected output is `registered not_started True`. The report has
+`owner_retained: true`; no query was sent. Both sibling demonstration directories
+are deleted on leaving the temporary block. Provisioning an existing file raises
 `AuthorityError`; startup never initializes a missing file. Use the original
 path and deployment identity on every restart. Do not put credentials in the
 deployment/server/operation identifiers.
@@ -75,6 +82,7 @@ failures are translated to `AuthorityError` by the authority adapter.
 |---|---|
 | `provision(path, deployment_id)` | Exclusive one-time initialization; does not reset existing files |
 | Constructor | Existing private DB only; verify deployment, schema, inode and WAL/FULL/FK settings |
+| `execution_identity()` | Validate local path/device/inode/deployment for exclusion; never grant SQL dispatch |
 | `acquire(operation_id, subject, candidate)` | Retain one owner; exact retry returns original binding; no TTL or release |
 | `binding(operation_id)` | Read protected prepublication registration; unknown operation raises |
 | `prepare(binding, intent)` | Store immutable canonical PREPARED intent; reject divergent reuse |
@@ -97,7 +105,7 @@ increment therefore cannot perform a second operation on the same target.
 
 `not_started` can transition to **either** `may_have_sent` **or**
 `closed_without_send`. Only one durable CAS wins. Once possibly sent, closure
-requires the future trusted publisher's terminal completion; it cannot be
+requires the [trusted native publisher's](clickhouse-native-publication.md) terminal completion; it cannot be
 converted to no-send. Closed states never reopen. A matching terminal receipt
 can be acknowledged idempotently; a different receipt is rejected.
 
@@ -126,9 +134,10 @@ protocol is required before repeatable production operation.
 
 `record_terminal` and `resolve` are trusted composition boundaries, not public
 operator recovery shortcuts. A fabricated digest or caller-supplied observation
-does not prove ClickHouse completion. The future backend must independently
-validate EndOfStream, the exact publisher, sealed candidate and target evidence
-before calling these methods. KILL, an empty process list or desired target rows
+does not prove ClickHouse completion. The native publisher validates EndOfStream
+and request identity before terminal persistence; the future complete backend
+must additionally prove sealed candidate and target evidence before resolution.
+KILL, an empty process list or desired target rows
 do not satisfy that obligation.
 
 Diagnostics are versioned UTF-8 JSON, atomically created with no overwrite. Use
@@ -155,7 +164,8 @@ claim/commit ambiguity, owner retention, exact revisions and atomic reports.
 Spawned-process tests race claims and send/close transitions and terminate before
 or after claim/send. Local Linux Docker uses a new owned volume and runner.
 
-Remaining gates: one-shot native transport, protected observer, candidate-writer
-join/seal, backend composition, durable ownership release, exact-commit live
-ClickHouse proof, and all ODBC pre-read memory/MSSQL/object-storage certification.
-No test of this foundation establishes those capabilities or release readiness.
+The [native publisher reference](clickhouse-native-publication.md) describes the
+next executable transport increment and its separate evidence scope. Remaining
+gates: protected observer, candidate-writer join/seal, backend composition,
+durable ownership release, deployment certification, and all ODBC pre-read
+memory/MSSQL/object-storage certification. No foundation test proves them.

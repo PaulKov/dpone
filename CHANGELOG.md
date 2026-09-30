@@ -4,11 +4,19 @@
 
 ### Added
 
+- Unbound ClickHouse native publication building blocks add per-subject local
+  execution exclusion, fixed REPLACE/EXCHANGE/RENAME requests, acknowledged
+  send-entry ordering and successful-EndOfStream closure with no SQL replay.
+  Added process/ACK/packet tests, an opt-in owned Docker fault fixture, Python
+  reference and quarantine runbook. Owner release, protected observation,
+  candidate sealing, complete backend composition and ODBC activation remain
+  unavailable; existing routes and authority storage versions are unchanged.
+
 - A single-host ClickHouse authority foundation provides create-once SQLite
   WAL/FULL storage, retained target ownership, strict versioned record encoding,
   acknowledged one-shot grants, send/close CAS and redacted atomic diagnostics.
   Process/crash tests cover races and lost acknowledgements. This is not yet a
-  concrete publication backend: SQL transport, independent observation, ownership
+  concrete publication backend: independent observation, ownership
   release and ODBC activation remain unavailable; existing routes are unchanged.
 
 - An unbound, dependency-injected ClickHouse publication kernel selects guarded

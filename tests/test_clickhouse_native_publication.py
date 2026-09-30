@@ -21,8 +21,7 @@ def _api():
     return importlib.import_module("dpone.adapters.clickhouse_native_publication")
 
 
-def request(method="replace_partition", partition="all"):
-    contract = importlib.import_module("dpone.contracts.clickhouse_native_publication")
+def original_publication(method="replace_partition", partition="all"):
     before = example_record().intent.before
     if method == "rename":
         before = replace(before, target=None)
@@ -36,10 +35,16 @@ def request(method="replace_partition", partition="all"):
             target=replace(before.target, partitions=(partition,)),
             candidate=replace(before.candidate, partitions=(partition,)),
         )
-    return contract.NativePublicationRequest(
+    return (
         OperationBinding("deployment:one", subject(), "candidate", 1),
         choose_publication("deployment:one", before),
     )
+
+
+def request(method="replace_partition", partition="all"):
+    contract = importlib.import_module("dpone.ports.clickhouse_publication_transport")
+    binding, intent = original_publication(method, partition)
+    return contract.NativePublicationRequest(binding, intent.method, intent.query_id, intent.partition_id)
 
 
 def endpoint(**changes):
@@ -133,12 +138,25 @@ def test_partition_id_outside_profile_rejected_before_transport(partition):
         request(partition=partition)
 
 
-def test_request_cannot_be_rebound():
-    original = request()
+def test_wire_request_does_not_carry_original_catalog_or_authority_grant():
+    from dataclasses import asdict
+
+    assert set(asdict(request())) == {"binding", "method", "query_id", "partition_id"}
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"binding": object()},
+        {"method": "DROP TABLE target"},
+        {"query_id": ""},
+        {"query_id": "foreign"},
+        {"method": "exchange", "partition_id": "all"},
+    ],
+)
+def test_invalid_wire_request_rejected(changes):
     with pytest.raises(ValueError):
-        replace(original, binding=replace(original.binding, candidate="elsewhere"))
-    with pytest.raises(ValueError):
-        replace(original, intent=replace(original.intent, operation_id="deployment:other"))
+        replace(request(), **changes)
 
 
 def test_native_requires_explicit_successful_eos(monkeypatch):
@@ -147,7 +165,7 @@ def test_native_requires_explicit_successful_eos(monkeypatch):
     completion = _api().DirectNativePublicationTransport(endpoint()).execute(original)
     assert probe.events == [
         "connect",
-        ("query", original.statement, {"query_id": original.intent.query_id, "params": None}),
+        ("query", original.statement, {"query_id": original.query_id, "params": None}),
         "end-data",
         3,
         6,
@@ -303,5 +321,5 @@ def test_real_driver_initialization_and_query_serialization(monkeypatch):
     assert calls == ["connect", "disconnect"]
     assert wire.getvalue()[0] == 1  # Actual native QUERY, not high-level execute.
     assert wire.getvalue().count(original.statement.encode()) == 1
-    assert original.intent.query_id.encode() in wire.getvalue()
+    assert original.query_id.encode() in wire.getvalue()
     assert "synthetic-secret" not in repr(endpoint())

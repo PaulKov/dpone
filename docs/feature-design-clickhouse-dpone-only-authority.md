@@ -302,7 +302,7 @@ production deployment authority.
 | Layer | Required evidence |
 |---|---|
 | Unit/contract | Aliases, divergent intents, version/CAS, zero retry, empty/stale partitions |
-| Fresh-process storage | Races, crash at each commit boundary, disk full/corruption/missing journal, stale backup refusal |
+| Fresh-process storage | Races, crash at each commit boundary, disk full/corruption/missing journal; external isolation evidence before backup restore, not automatic valid-backup detection |
 | Transport faults | Lost ACK before/after effect, paused-before-send claimant, delayed request, lost closure write, cancellation |
 | Local Docker | Actual REPLACE including `tuple()`, EXCHANGE, RENAME, no-op; UUID/content and restart quarantine assertions |
 | Deployment/security | All ingress/grants inventoried; candidate writers closed; protected persistent volume; no retrying proxy |
@@ -351,3 +351,10 @@ First executable planning increment:
 [durable authority foundation](superpowers/plans/2026-09-30-clickhouse-authority-foundation.md).
 It delivers the journal and transition rules; transport, observer and composition
 follow separately and are not represented as implemented by that increment.
+
+The approved [native publisher plan](superpowers/plans/2026-09-30-clickhouse-native-publisher.md)
+implements execution exclusion, one synchronous native request and conservative
+closure. Its [reference](clickhouse-native-publication.md) separates these
+building blocks from still-unimplemented observation/sealing/composition and
+owner release. This specification remains APPROVED until all of its scoped
+implementation and certification obligations are complete.

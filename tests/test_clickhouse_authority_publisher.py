@@ -4,17 +4,18 @@ import hashlib
 import multiprocessing
 import sqlite3
 from dataclasses import replace
+from pathlib import Path
 
 import pytest
 
 from dpone.adapters.clickhouse_authority_execution_lock import LocalPublicationExclusion
 from dpone.adapters.clickhouse_authority_sqlite import SQLitePublicationAuthority
 from dpone.contracts.clickhouse_authority import AuthorityConflict, TransportState
-from dpone.contracts.clickhouse_native_publication import NativePublicationCompletion
 from dpone.contracts.clickhouse_publication import PublicationState
+from dpone.ports.clickhouse_publication_transport import NativePublicationCompletion
 from dpone.runtime.sinks.clickhouse_guarded_publication import PublicationUnknown
 from tests.test_clickhouse_authority_sqlite import subject
-from tests.test_clickhouse_native_publication import request
+from tests.test_clickhouse_native_publication import original_publication
 
 
 class Transport:
@@ -33,8 +34,8 @@ class Transport:
         if self.error:
             raise self.error
         completion = NativePublicationCompletion(
-            original.intent.operation_id,
-            original.intent.query_id,
+            original.binding.operation_id,
+            original.query_id,
             "server",
             hashlib.sha256(original.statement.encode()).hexdigest(),
             (24, 8, 14),
@@ -45,18 +46,26 @@ class Transport:
 
 
 def publisher(store, transport):
-    from dpone.runtime.sinks.clickhouse_authority_publisher import AuthorityPublicationPublisher
+    from dpone.adapters.clickhouse_authority_publisher import AuthorityPublicationPublisher
 
     return AuthorityPublicationPublisher(store, LocalPublicationExclusion(store), transport)
+
+
+def test_publication_unknown_preserves_existing_runtime_import():
+    from dpone.contracts.clickhouse_publication import PublicationUnknown as CanonicalUnknown
+
+    assert PublicationUnknown is CanonicalUnknown
+    assert PublicationUnknown.safe_to_retry is False
+    assert PublicationUnknown.operator_verification_required is True
 
 
 def prepared_store(tmp_path, method="replace_partition"):
     path = tmp_path / "authority.db"
     SQLitePublicationAuthority.provision(path, "deployment")
     store = SQLitePublicationAuthority(path, "deployment")
-    original = request(method)
-    binding = store.acquire(original.binding.operation_id, original.binding.subject, original.binding.candidate)
-    entry = store.prepare(binding, original.intent)
+    original_binding, original_intent = original_publication(method)
+    binding = store.acquire(original_binding.operation_id, original_binding.subject, original_binding.candidate)
+    entry = store.prepare(binding, original_intent)
     return store, store.claim(entry)
 
 
@@ -228,3 +237,10 @@ def test_divergent_binding_rejected_before_transport(tmp_path, monkeypatch):
     with pytest.raises(PublicationUnknown):
         publisher(store, transport).execute_once(grant)
     assert not transport.requests
+
+
+def test_documented_offline_example_closes_without_send(capsys):
+    guide = Path(__file__).resolve().parents[1] / "docs/clickhouse-native-publication.md"
+    snippet = guide.read_text(encoding="utf-8").split("```python\n", 1)[1].split("```", 1)[0]
+    exec(compile(snippet, str(guide), "exec"), {})
+    assert capsys.readouterr().out == "closed_without_send True\n"

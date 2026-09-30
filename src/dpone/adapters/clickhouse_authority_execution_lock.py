@@ -13,6 +13,7 @@ import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Protocol
 
 from dpone.contracts.clickhouse_authority import (
     AuthorityConflict,
@@ -20,7 +21,14 @@ from dpone.contracts.clickhouse_authority import (
     AuthorityStorageIdentity,
     OperationBinding,
 )
-from dpone.ports.clickhouse_publication_transport import ExecutionSession, PublicationAuthority
+from dpone.ports.clickhouse_publication_exclusion import ExecutionSession
+
+
+class PublicationIdentityReader(Protocol):
+    """Consumer-owned read-only identity; no dispatch or journal mutation."""
+
+    def execution_identity(self) -> AuthorityStorageIdentity: ...
+    def binding(self, operation_id: str) -> OperationBinding: ...
 
 
 def _file_identity(info: os.stat_result) -> tuple[int, int]:
@@ -51,7 +59,7 @@ def _open_lock(path: Path) -> int:
 class _LocalSession:
     def __init__(
         self,
-        authority: PublicationAuthority,
+        authority: PublicationIdentityReader,
         identity: AuthorityStorageIdentity,
         binding: OperationBinding,
         path: Path,
@@ -82,7 +90,7 @@ class _LocalSession:
 class LocalPublicationExclusion:
     """Nonblocking exclusion with a fresh open file description for every hold."""
 
-    def __init__(self, authority: PublicationAuthority) -> None:
+    def __init__(self, authority: PublicationIdentityReader) -> None:
         self._authority = authority
 
     @contextmanager

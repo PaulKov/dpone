@@ -3,14 +3,8 @@
 from dataclasses import replace
 
 from dpone.contracts import clickhouse_publication as publication
+from dpone.contracts.clickhouse_publication import PublicationUnknown as PublicationUnknown
 from dpone.ports.clickhouse_publication import GuardedPublicationBackend
-
-
-class PublicationUnknown(RuntimeError):
-    """Retain durable target exclusion; reconcile instead of retrying DDL."""
-
-    safe_to_retry = False
-    operator_verification_required = True
 
 
 class GuardedClickHousePublication:

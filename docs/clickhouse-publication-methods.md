@@ -19,9 +19,11 @@ For targets written exclusively by dpone, the next binding is described
 in the [dpone-only authority design](feature-design-clickhouse-dpone-only-authority.md).
 Its single-host durable journal and conservative closure profile is APPROVED
 for implementation, not an implemented backend or an enabled route.
-The [authority journal foundation](clickhouse-authority-journal.md) now supplies
-storage/CAS building blocks; transport, protected observation and production
-composition remain separate, unimplemented gates.
+The [authority journal foundation](clickhouse-authority-journal.md) supplies
+storage/CAS building blocks. The [one-shot native publisher](clickhouse-native-publication.md)
+adds local execution exclusion and conservative transport closure. Protected
+observation, candidate sealing, owner release and production composition remain
+separate, unimplemented gates; no complete backend is bundled.
 
 ## Selection policy
 
@@ -159,6 +161,12 @@ respect the retained target authority and source snapshot ordering.
 
 ### Lost reply or process crash
 
+The steps below describe requirements for a future complete platform binding,
+not an executable recovery service bundled in this increment. The available
+native publisher can close transport only; it cannot resolve physical outcome
+or unlock the target. Use the [current closure runbook](runbooks/clickhouse-publication-closure.md)
+to inspect and retain the original operation safely.
+
 1. Preserve staging, object inventory, journal and authority. Do not manually
    exchange tables or repeat ALTER. Disable automatic DDL transport retries.
 2. Reopen the original operation under the same protected target ownership.
@@ -188,9 +196,12 @@ the old target. Retain receipts independently of data cleanup for audit/replay.
 
 - Unit selection/fault tests: `tests/test_clickhouse_guarded_publication.py`.
 - Compatibility: unchanged `test_clickhouse_full_refresh_publication*.py`.
-- Concrete protected backend, restart/CAS/fencing tests: required, not bundled.
-- Live `tuple()`, single partition, stale target partition, empty snapshot,
-  concurrent writers, queued requests and lost ACK: UNVERIFIED in this increment.
+- Foundation and native transport have scoped process/fault tests; the complete
+  protected backend and deployment credential fencing remain unimplemented.
+- Actual native methods and response-loss checks have an opt-in owned Docker
+  fixture described in the [native reference](clickhouse-native-publication.md).
+  A passing report applies only to its exact source/environment; it does not
+  certify production ingress, sealing, recovery finalization or the whole route.
 - Exact source/controller commit and MSSQL/object-storage/ClickHouse route proof:
   required before ODBC activation or a production-readiness claim.
 
