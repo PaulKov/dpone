@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from dpone.config.audit import select_audit_storage
 from dpone.config.load_config import LoadConfig
 from dpone.config.load_strategy import LoadStrategy, inject_source_budget, validate_endpoint_option_ownership
 from dpone.config.mssql_strategy_contract import (
@@ -56,6 +57,7 @@ class LoadConfigBuilder:
         base_path: Path | None = None,
         parse_tracer: ParseTracer | None = None,
     ) -> LoadConfig:
+        select_audit_storage(config)
         try:
             source_cfg = dict(config.get("source", {}) or {})
             sink_cfg = dict(config.get("sink", {}) or {})

@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from dpone.runtime.columnar_runtime_assembly import ColumnarRuntimeAssembly
-from dpone.runtime.etl.audit_policy import audit_policy
+from dpone.runtime.etl.audit_policy import audit_policy, require_selected_audit_bindings
 from dpone.runtime.route_runtime import RouteCapabilityOrchestrator, RuntimeRouteDecisionPublisher
 from dpone.runtime.state.load_step_audit import (
     ClickHouseLoadStepAuditStorage,
@@ -39,6 +39,7 @@ class RouteCapabilityRuntimeFactory:
         logger: Any | None = None,
         audit_bindings: RuntimeAuditBindings | None = None,
     ) -> RouteCapabilityOrchestrator | None:
+        require_selected_audit_bindings(load_config, audit_bindings)
         if not _route_capabilities_enabled(load_config):
             return None
         selected_steps = None
@@ -66,6 +67,7 @@ class LoadStepAuditStorageFactory:
     """Select SQL load-step audit storage for the configured sink."""
 
     def from_sink(self, sink: Any, load_config: LoadConfig) -> Any | None:
+        require_selected_audit_bindings(load_config, None)
         audit = _audit_options(load_config)
         if audit.get("enabled") is False:
             return None

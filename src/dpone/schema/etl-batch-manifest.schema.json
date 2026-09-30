@@ -3259,6 +3259,21 @@
                       "type": "object",
                       "additionalProperties": false,
                       "properties": {
+                        "storage": {
+                          "description": "Independent externally provisioned MSSQL audit; database and schema come from the verified deployment registry.",
+                          "type": "object",
+                          "additionalProperties": false,
+                          "required": ["type", "connection_ref"],
+                          "properties": {
+                            "type": {"const": "mssql"},
+                            "connection_ref": {
+                              "type": "string",
+                              "maxLength": 128,
+                              "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$"
+                            },
+                            "provisioning": {"const": "external"}
+                          }
+                        },
                         "enabled": {
                           "type": "boolean",
                           "default": true

@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
+from dpone.config.audit import AuditConfigError, resolve_mssql_audit_location, select_audit_storage
 from dpone.config.load_strategy import LoadStrategy
 from dpone.runtime.credentials.authority_resolution import (
     canonical_ref,
@@ -33,6 +34,7 @@ from .governed_database_authority import (
 from .runtime_context import RuntimeConnectionContext
 
 if TYPE_CHECKING:
+    from dpone.config.audit import ResolvedMssqlAuditLocation
     from dpone.config.load_config import LoadConfig
     from dpone.contracts.runtime_connection import ResolvedBindingConnection
     from dpone.ports.mssql_publication import PublicationAuthorityBinding
@@ -56,6 +58,8 @@ class RuntimeResolvedConnections:
     publication_binding: PublicationAuthorityBinding | None = None
     by_ref: Mapping[str, ResolvedBindingConnection] = field(default_factory=lambda: MappingProxyType({}))
     receipts: tuple[Mapping[str, Any], ...] = ()
+    audit: ResolvedBindingConnection | None = None
+    audit_location: ResolvedMssqlAuditLocation | None = None
 
 
 def resolve_runtime_connections(
@@ -68,6 +72,9 @@ def resolve_runtime_connections(
 
     source = mapping(config.get("source"))
     sink = mapping(config.get("sink"))
+    audit_selection = select_audit_storage(config)
+    if audit_selection != select_audit_storage({"sink": {"options": load_config.options}}):
+        raise AuditConfigError("audit selection differs between the compiled manifest and load config")
     publication_binding = select_publication_binding(
         sink, load_config=load_config, environment=context.environment if context else None
     )
@@ -76,6 +83,8 @@ def resolve_runtime_connections(
     object_storage = mapping(config.get("object_storage"))
     source_materialization_ref = _source_materialization_connection_ref(load_config)
     if context is None:
+        if audit_selection is not None:
+            raise AuditConfigError("audit.storage requires a verified runtime connection context")
         if source_materialization_ref is not None:
             raise error(
                 "DPONE_RUNTIME_CONNECTION_CONTEXT_REQUIRED",
@@ -101,6 +110,8 @@ def resolve_runtime_connections(
     )
 
     refs: dict[str, str] = {}
+    if audit_selection is not None:
+        refs["audit"] = audit_selection.connection_ref
     if publication_binding is not None:
         refs["publication_authority"] = publication_binding.connection_ref
     selected_source_ref = source_ref(source)
@@ -134,6 +145,15 @@ def resolve_runtime_connections(
     resolved_by_ref = {
         connection_ref: resolve(context, connection_ref) for connection_ref in sorted(set(refs.values()))
     }
+    audit_location = (
+        resolve_mssql_audit_location(audit_selection, resolved_by_ref[refs["audit"]])
+        if audit_selection is not None
+        else None
+    )
+    if audit_selection is not None and "state" in refs:
+        descriptor = resolved_by_ref[refs["state"]].descriptor
+        if descriptor is not None and descriptor.connection_type == "mssql":
+            raise AuditConfigError("audit.storage conflicts with the resolved MSSQL state audit pair")
     if publication_binding is not None:
         publication_binding.require_descriptor(resolved_by_ref[refs["publication_authority"]].descriptor)
     if "source" in refs:
@@ -165,6 +185,8 @@ def resolve_runtime_connections(
     )
     return RuntimeResolvedConnections(
         strict=True,
+        audit=resolved_by_ref[refs["audit"]] if "audit" in refs else None,
+        audit_location=audit_location,
         publication_binding=publication_binding,
         publication_authority=(
             resolved_by_ref[refs["publication_authority"]] if "publication_authority" in refs else None

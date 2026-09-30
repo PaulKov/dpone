@@ -9,10 +9,12 @@ if TYPE_CHECKING:
 
 
 from collections.abc import Callable, Mapping
+from contextlib import ExitStack
 from typing import Any
 
 from dpone.config.postgres_xmin_execution import require_postgres_xmin_execution_route
 from dpone.ports.runtime_hydrator import RuntimeBindings
+from dpone.runtime.bootstrap_audit import build_independent_audit_bindings
 from dpone.runtime.bootstrap_config import mapping_or_empty
 from dpone.runtime.bootstrap_load_identity import build_load_identity_service
 from dpone.runtime.bootstrap_mssql_authority import (
@@ -64,6 +66,18 @@ class DefaultRuntimeHydrator:
         config: Mapping[str, Any],
         load_config: LoadConfig,
     ) -> RuntimeBindings:
+        with ExitStack() as audit_ownership:
+            bindings = self._build(config=config, load_config=load_config, audit_ownership=audit_ownership)
+            audit_ownership.pop_all()
+            return bindings
+
+    def _build(
+        self,
+        *,
+        config: Mapping[str, Any],
+        load_config: LoadConfig,
+        audit_ownership: ExitStack,
+    ) -> RuntimeBindings:
         validate_replay_configuration(config)
         require_postgres_xmin_execution_route(load_config)
         sink_cfg = _canonical_endpoint_config(mapping_or_empty(config.get("sink")))
@@ -77,6 +91,11 @@ class DefaultRuntimeHydrator:
             config=runtime_config,
             load_config=load_config,
             context=context,
+        )
+        independent_audit = build_independent_audit_bindings(
+            connections=connections,
+            load_config=load_config,
+            ownership=audit_ownership,
         )
         publication_provider = build_runtime_publication_provider(
             connection=connections.publication_authority, binding=connections.publication_binding
@@ -181,6 +200,7 @@ class DefaultRuntimeHydrator:
         from dpone.runtime.process_logging import create_etl_logger
 
         etl_logger = create_etl_logger()
+        audit_bindings = independent_audit or getattr(state_bindings, "audit_bindings", None)
 
         return RuntimeBindings(
             source_obj=source_obj,
@@ -190,11 +210,15 @@ class DefaultRuntimeHydrator:
             xmin_handoff_state_storage=getattr(state_bindings, "xmin_handoff_state_storage", None),
             partition_checkpoint_store=state_bindings.partition_checkpoint_store,
             load_identity_service=build_load_identity_service(
-                audit_storage=getattr(state_bindings, "load_audit_storage", None),
+                audit_storage=(
+                    audit_bindings.loads
+                    if audit_bindings is not None
+                    else getattr(state_bindings, "load_audit_storage", None)
+                ),
                 etl_logger=etl_logger,
             ),
             credential_resolution_receipts=connections.receipts,
-            audit_bindings=getattr(state_bindings, "audit_bindings", None),
+            audit_bindings=audit_bindings,
         )
 
     @staticmethod

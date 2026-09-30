@@ -309,9 +309,80 @@ their legacy sink-based composition and extension call signatures. Extensions
 used with selected metadata must explicitly accept `audit_bindings`; unsupported
 extensions are not retried without it.
 
-An independent audit-only selection contract remains integration work.
-Do not enable fictitious source
-state or infer audit credentials from publication authority to select it.
+### Independent MSSQL audit with disabled state
+
+This unreleased option is for operators who need a durable metadata ledger for
+a stateless pipeline. It does not enable XMin, run-state, offsets or checkpoint
+tables, and is separate from publication authority. Existing manifests without
+the selector keep the legacy behavior described above.
+
+Configure the process as follows (endpoint fields are abbreviated; this is a
+configuration fragment, not a complete pipeline):
+
+```yaml
+state:
+  type: disabled
+sink:
+  options:
+    load_governance:
+      audit:
+        storage:
+          type: mssql
+          connection_ref: system-audit
+          provisioning: external
+        loads_table: dpone_load_audit
+        steps_table: __dpone__load_steps
+```
+
+Preparation and first execution:
+
+1. Add `system-audit` to the deployment-owned connection registry and verified
+   runtime binding. Its MSSQL descriptor must contain explicit `database` and
+   `schema`; credential defaults are not a substitute. For Airflow, include the
+   alias in the connection projection. Pack closure rejects a missing alias
+   even when state is disabled.
+2. Through your existing reviewed metadata deployment, provision both tables
+   against the canonical [load contract](https://github.com/PaulKov/dpone/blob/ca50907afd812d8deb98a6cbaf707a6e567e3a34/src/dpone/runtime/state/mssql_contract.py)
+   and [step contract/DDL](https://github.com/PaulKov/dpone/blob/ca50907afd812d8deb98a6cbaf707a6e567e3a34/src/dpone/runtime/state/mssql_load_step_audit.py).
+   The [load DDL renderer](https://github.com/PaulKov/dpone/blob/ca50907afd812d8deb98a6cbaf707a6e567e3a34/src/dpone/runtime/state/mssql_operational_ddl.py)
+   provides the corresponding create statement. These are implementation references,
+   not an automatic migration command; SQL catalog `nvarchar` lengths are bytes,
+   whereas DDL lengths are characters. This selector never creates or
+   alters a table, moves old history, grants rights, or provisions a database.
+   Retain historical tables and their lookup locations during any cutover.
+3. Use normal manifest checking and your deployment's verified runner. The
+   hydrator resolves the audit connection once, checks both catalogs before
+   building business endpoints, and transfers the pair to ordinary execution
+   and independently hydrated workers. Both load lifecycle and step/route
+   events use the selected relations. Read back new run/load IDs there to
+   verify routing; configuration acceptance alone is not execution evidence.
+
+`storage` is closed: only `type: mssql`, canonical `connection_ref`, and optional
+`provisioning: external` are accepted. Table names must be distinct unqualified
+SQL identifiers. Omitted names default to `dpone_load_audit` and
+`__dpone__load_steps`. Omitted `state_schema` inherits the registry; an explicit
+value must exactly match it. Unknown fields, raw connection credentials,
+source-side selection and simultaneous MSSQL state-owned audit are rejected.
+The manifest and compiled load configuration must select the same audit pair.
+
+A missing or drifted external table stops hydration before business I/O and
+closes the owned connection. Repair the catalog through its normal reviewed
+deployment, then start a new correctly configured execution; there is no
+runtime DDL fallback. Failure later in hydration also closes the audit
+connection. Normal runtime disposal closes it once after successful hydration.
+
+`audit.enabled: false`, `audit.mode: off`, or disabled load governance retain
+the selected load-identity ledger but do not construct the step store. They do
+not re-enable sink-based audit. A direct runtime extension must supply admitted
+`audit_bindings` for an explicit selector, including when step audit is off.
+
+This selector supports normal process/batch/flow/folder authoring. The existing
+closed dbt publish policy does **not** accept it; do not substitute an older dbt
+schema or a BCP/route certification claim. No publication-authority migration,
+distributed writer fence, or release readiness is established by this option.
+See [load governance](load-governance.md) for event meanings and the
+[MSSQL publication design](feature-design-mssql-publication-authority.md) for the
+separate activation requirements.
 
 ### One-shot repair authority
 

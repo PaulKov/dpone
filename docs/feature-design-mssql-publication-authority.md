@@ -169,6 +169,62 @@ overwriting it. Driver errors, credentials and local paths are not printed.
 
 ## Algorithm and transaction boundaries
 
+### Independent audit binding — implementation refinement
+
+The approved system-storage work also requires audit selection without enabling
+source checkpoints. This section specifies that additive wiring; it does not
+change publication authority, authorize a history migration, or imply a released
+feature. It is not an additional maintainer approval receipt.
+
+```yaml
+state:
+  type: disabled
+sink:
+  options:
+    load_governance:
+      audit:
+        storage:
+          type: mssql
+          connection_ref: system-audit
+          provisioning: external
+        loads_table: dpone_load_audit
+        steps_table: __dpone__load_steps
+```
+
+`audit.storage` is a closed object: `type: mssql` and a canonical nonempty
+`connection_ref` are required; `provisioning` is optional and only `external`
+is supported. Null, malformed, unknown or misplaced source-side selectors fail
+before connector construction. No raw credentials, `reuse`, location overrides
+or fallback to publication, source or sink credentials are accepted.
+
+The verified registry descriptor owns a required MSSQL database and schema.
+An explicitly authored `audit.state_schema` must match that schema exactly;
+omission inherits it, not the legacy default. Load/step names are distinct,
+unqualified SQL identifiers, defaulting to the two names above. The runtime
+preflights both existing table contracts before source/sink construction and
+does not create, alter, reset or move tables. Partial admission or later failed
+hydration closes its owned connector; each worker hydrates a separate pair.
+
+Disabled source state stays disabled: no state alias, xmin, run or checkpoint
+store is fabricated. An independent selector cannot silently override an
+MSSQL state's automatic audit binding; conflicting double selection fails
+before storage construction. Without the selector all current defaults remain.
+The existing selected-pair policy remains: disabled step auditing produces no
+step store while retaining the selected load identity ledger.
+
+Config, rendered batch, flow/folder compilation and direct runtime entrypoints
+share admission. Airflow projection includes the audit alias independently of
+state and rejects a missing projection. A selected runtime pair may not be
+replaced by business-sink audit. Versioned dbt publish policies remain unchanged
+and reject this selector; adding it there requires its own compatible policy
+version and certification, not modification of frozen schema bytes.
+
+Acceptance includes malformed-selector parity, registry/context/alias/type
+failures, zero DDL on missing or drifted external load/step tables, unchanged
+disabled state, ordered source-free admission, one connector close on failure,
+worker ownership and no-selector backward compatibility. Existing histories are
+preserved; deployment and migration still require their separate gates.
+
 The operator-provisioned `dpone_cluster_publication_authority` slot table and
 `dpone_cluster_publication_events` append-only table form one versioned catalog.
 Slot key, positive revision, operation, phase, canonical payload bytes/hash and

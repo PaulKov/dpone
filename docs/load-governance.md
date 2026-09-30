@@ -291,8 +291,8 @@ sink:
         state_schema: ops
 ```
 
-For governed ClickHouse and SQL Server loads, audit is enabled by default. The
-runtime creates/writes `<state_schema>.__dpone__loads` and
+For governed ClickHouse and SQL Server loads, audit is enabled by default. In
+the legacy sink-based path, runtime creates/writes `<state_schema>.__dpone__loads` and
 `<state_schema>.__dpone__load_steps` through the sink connector. Step rows contain
 stable phase/status/timing fields plus `details_json` with rows, schema width,
 projection evidence, quality gate results and finalization counters. When a
@@ -311,7 +311,14 @@ whether the step physically moved rows or only finalized already staged data. Us
 only for explicit opt-out. The same behavior is used by CLI, Python API,
 Docker, local runs and Airflow pack/KPO.
 
-For SQL Server, `state_schema` is a schema in the database selected by the sink
+An explicit MSSQL state binding uses its selected load/step pair. Stateless
+pipelines can select an independent, externally provisioned MSSQL metadata pair
+with `audit.storage`; see the [configuration and first-execution guide](state.md#independent-mssql-audit-with-disabled-state).
+That path validates deployment-owned coordinates and both catalogs before
+business I/O, never infers audit from the sink, and does not create source state.
+It does not automatically migrate legacy history or enable publication recovery.
+
+For SQL Server's legacy sink-based path, `state_schema` is a schema in the database selected by the sink
 connection; it is not a database selector. A sink connection with default
 database `Example_System` plus `state_schema: dbo` writes the canonical relations
 `[Example_System].[dbo].[__dpone__loads]` and

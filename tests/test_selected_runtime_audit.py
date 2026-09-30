@@ -44,6 +44,32 @@ class _ForbiddenSink:
         raise AssertionError("selected audit must not inspect the business connector")
 
 
+@pytest.mark.parametrize("consumer", ["lifecycle", "route"])
+@pytest.mark.parametrize("enabled", [True, False])
+def test_explicit_audit_selector_without_hydrated_pair_never_falls_back(consumer, enabled):
+    from dpone.runtime.route_runtime_factory import RouteCapabilityRuntimeFactory
+    from tests.test_route_capability_runtime_factory import _AssemblySpy
+
+    config = _mssql_config()
+    config.options["load_governance"]["audit"] = {
+        "enabled": enabled,
+        "storage": {"type": "mssql", "connection_ref": "metadata", "provisioning": "external"},
+    }
+    with pytest.raises(RuntimeConfigurationError, match="audit"):
+        if consumer == "lifecycle":
+            RuntimeDecisionLifecycle(
+                load_governance_service=LoadGovernanceService(),
+                load_identity_service=LoadIdentityService(),
+                logger=None,
+            ).configure_audit_storage(sink=_ForbiddenSink(), load_config=config)
+        else:
+            RouteCapabilityRuntimeFactory(columnar_assembly=_AssemblySpy()).build(
+                load_config=config,
+                source=object(),
+                sink=_ForbiddenSink(),
+            )
+
+
 @pytest.mark.parametrize("missing", ["loads", "connector"])
 def test_selected_audit_rejects_missing_endpoint_ownership(missing):
     fields = {"loads": object(), "steps": None, "connector": object()}

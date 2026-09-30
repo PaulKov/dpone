@@ -4,6 +4,13 @@
 
 ### Added
 
+- Add independent MSSQL load/step audit selection for normal pipeline authoring,
+  including sources with disabled state. A closed `audit.storage` selector uses
+  the verified registry's database/schema and external catalog admission before
+  business endpoints. Missing bindings or drift fail without sink fallback or
+  runtime DDL; connection ownership is retained across hydration failures and
+  normal disposal. Existing unselected manifests and closed dbt policies are
+  unchanged. This performs no history or publication-authority migration.
 - Add an unactivated MSSQL publication-authority foundation: immutable binding
   identity, exact catalog admission, append-only event history, versioned CAS and
   commit-acknowledged dispatch permits. Local SQL Server fault tests cover
@@ -51,8 +58,7 @@
   carry a preflighted load/step audit pair through hydration, normal execution
   and independently hydrated worker lanes. Governance and route events use that
   pair without business-sink fallback, preserve in-process evidence, and reject
-  conflicting stores. Audit-only selection for state-disabled pipelines remains
-  unavailable; this change performs no history migration.
+  conflicting stores. This change performs no history migration.
 - Bind clustered publication and cleanup dispatch permits to the exact phase,
   payload and rendered DDL intent. Consume each process-local permit once,
   before transport, including concurrent reuse and lost transport replies;

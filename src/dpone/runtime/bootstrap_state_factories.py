@@ -226,15 +226,16 @@ def build_mssql_load_audit_storage(
 ) -> Any:
     """Resolve and preflight the canonical three-part MSSQL audit table."""
 
-    storage = state_factory.create_mssql_load_audit_storage(
-        mssql_connector=connector,
-        state_table=location.audit_table,
+    from dpone.runtime.bootstrap_audit import build_mssql_load_audit
+
+    return build_mssql_load_audit(
+        state_factory,
+        connector,
+        table=location.audit_table,
         schema=location.location.schema,
         database=location.location.database,
         provisioning=location.provisioning,
     )
-    storage.create_load_table()
-    return storage
 
 
 __all__ = [

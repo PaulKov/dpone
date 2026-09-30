@@ -17,6 +17,7 @@ from dpone.runtime.etl.audit_policy import (
     audit_policy,
     is_clickhouse_connector,
     is_mssql_connector,
+    require_selected_audit_bindings,
 )
 
 if TYPE_CHECKING:
@@ -42,6 +43,7 @@ class RuntimeDecisionLifecycle:
         self._audit_bindings = audit_bindings
 
     def configure_audit_storage(self, *, sink: Any, load_config: LoadConfig) -> None:
+        require_selected_audit_bindings(load_config, self._audit_bindings)
         policy = audit_policy(load_config)
         if not policy.enabled:
             return
