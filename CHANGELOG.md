@@ -22,12 +22,16 @@
 - Add the internal owner-private, bounded atomic plan-file adapter for the
   upcoming publication operator workflow. Concurrent writers cannot overwrite
   an existing plan; ambiguous directory-sync outcomes preserve completed
-  evidence for readback. Operator commands are not yet activated.
+  evidence for readback. Workload migration is not activated.
 - Add an internal versioned catalog plan/apply service with exact endpoint and
   DDL confirmation. It creates only an absent publication catalog, serializes
   cooperating setup invocations, validates structure within the DDL transaction
   and provides read-only outcome inspection. Existing or partial objects are
-  never repaired implicitly. Public operator commands remain unavailable.
+  never repaired implicitly. Add thin unreleased `publication-authority schema
+  plan|apply|inspect` commands using the deployment runner's verified runtime
+  context, owner-private canonical plans and redacted JSON. Scope confirmation
+  precedes credential resolution; no arbitrary connection or SQL fallback is
+  accepted. Schema readiness does not authorize workload migration.
 - Add unactivated guarded-retirement policy, service and an admitted MSSQL
   absent-only store. Retirement preserves original replica bytes in immutable
   history, records `RETIRED_UNPUBLISHED` rather than publication success, and
@@ -36,7 +40,7 @@
   retain the original retirement event and permanently reject its operation ID;
   fresh work checks every predecessor replica and competes through exact CAS
   with an isolated new candidate. Trusted deployment observation, public
-  manifest selection and operator CLI integration remain required before activation.
+  manifest selection and retirement CLI integration remain required before activation.
 
 ### Fixed
 

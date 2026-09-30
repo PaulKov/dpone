@@ -13,9 +13,9 @@ deployment coordinates. Approval is not implementation or live certification.
 
 This branch currently provides the unactivated binding, catalog admission,
 native SQL authority adapter, shared normal/replay runtime composition, and an
-internal endpoint-admitted schema plan/apply service.
+endpoint-admitted schema plan/apply/inspect service with a thin draft CLI.
 Public manifests still reject the proposed option; no existing workload switches
-backend. Legacy adoption, prepared-recovery integration, operator commands and
+backend. Legacy adoption/retirement operator commands, prepared-recovery integration and
 end-to-end ClickHouse recovery acceptance remain required before activation.
 Do not configure this option against a released runtime.
 
@@ -83,14 +83,15 @@ avoid committing or rolling back a caller's business transaction. Legacy
 manifests retain their prior composition. Unsupported local/external or non-full-
 refresh selections fail before transport instead of silently falling back.
 
-Proposed operator commands are `publication-authority schema plan|apply` and
-`adopt plan|apply`; they delegate to application services shared with Python.
+The draft branch implements `publication-authority schema plan|apply|inspect`;
+`adopt plan|apply` remains proposed. They delegate to application services shared
+with Python.
 Plan is read-only; apply requires the exact plan digest and environment
 admission. Outputs are versioned, redacted JSON with ready/blocked/in_progress/
 completed, reason codes and identity digests. Exit 0 means requested mode
 completed, 2 a proven block, 1 operational failure/unknown. Plan files are
-atomic and refuse overwrite by default. These commands remain unavailable
-until implemented; examples must not imply current release support.
+atomic and refuse overwrite by default. Schema commands are not released yet;
+adoption/retirement commands and workload activation remain unavailable.
 
 The internal plan-file adapter writes bounded owner-private files on a local
 POSIX filesystem: flush the full temporary file, link its final name without
@@ -127,8 +128,44 @@ or an automatic second attempt. Explicit read-only inspection can establish
 whether the exact catalog exists. It cannot authorize a workload cutover or
 legacy retirement. Local SQL tests exercise concurrent setup, rollback after
 both table creations and loss of the acknowledgement after a real commit.
-The CLI/composition entry point from deployment configuration remains unfinished;
-the internal Python service is not a released operator command.
+The draft CLI now composes this service from the exact init-fetch-pinned runtime
+connection context. It has no independent manifest, raw connection string,
+caller-supplied SQL or arbitrary binding JSON fallback. The trusted deployment
+runner supplies `DPONE_RUNTIME_CONNECTION_CONTEXT` and its pinned init-fetch
+plan exactly as for runtime execution. These local artifacts do not themselves
+establish deployment signature verification: that remains the runner's existing
+strict init-fetch admission responsibility. Do not run against self-authored
+replacement context files.
+
+The logical connection reference resolves through the admitted binding set and
+registry. Database, schema, service namespace and endpoint pin come from that
+descriptor; the requested environment must exactly match the verified context.
+Planning resolves credentials in memory and performs read-only SQL admission,
+then atomically saves the canonical plan only for an absent or exact catalog.
+The plan contains no credential values. A changed binding, endpoint pin or DDL
+version rejects an old plan before SQL execution. Apply validates the explicit
+digest and saved environment before reading the context or resolving credentials.
+
+Unreleased operator examples, inside the deployment-controlled execution context:
+
+```bash
+dpone publication-authority schema plan --connection-ref metadata \
+  --environment test --plan-file ./publication-schema.json
+# Review the private file and the returned plan_digest before applying.
+dpone publication-authority schema apply --environment test \
+  --plan-file ./publication-schema.json --confirm-digest <reviewed-sha256>
+dpone publication-authority schema inspect --environment test \
+  --plan-file ./publication-schema.json
+```
+
+All three commands emit `dpone.publication-schema-result.v1` JSON. Exit 0 means
+read-only readiness/inspection or acknowledged catalog setup, never workload
+publication or cutover. Exit 2 denotes an established scope/catalog block; exit
+1 denotes an operational failure or unknown outcome. After a lost apply response,
+use `inspect`, not an automatic repeated apply. `ready/catalog_absent` means the
+catalog does not exist; only `completed/catalog_exact` proves exact readback.
+Plan file errors may leave a durable file; preserve and inspect it rather than
+overwriting it. Driver errors, credentials and local paths are not printed.
 
 ## Algorithm and transaction boundaries
 

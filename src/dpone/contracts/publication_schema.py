@@ -7,6 +7,7 @@ endpoint admission, or permission to change existing catalog objects.
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import re
 from dataclasses import asdict, dataclass
@@ -43,6 +44,14 @@ class PublicationSchemaPlan:
     @property
     def digest(self) -> str:
         return hashlib.sha256(self.payload.encode()).hexdigest()
+
+    def confirms(self, value: object) -> bool:
+        """Reject malformed confirmations without a Unicode comparison error."""
+        return (
+            isinstance(value, str)
+            and re.fullmatch(r"[0-9a-f]{64}", value) is not None
+            and hmac.compare_digest(value, self.digest)
+        )
 
 
 def decode_schema_plan(raw: bytes) -> PublicationSchemaPlan:

@@ -8,7 +8,6 @@ lock. Existing objects are never altered, dropped or silently repaired.
 from __future__ import annotations
 
 import hashlib
-import hmac
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -73,7 +72,7 @@ class MssqlPublicationSchema:
         A subsequent invocation always re-admits existing objects first.
         """
         self._require_plan(plan)
-        if not isinstance(confirmation_digest, str) or not hmac.compare_digest(confirmation_digest, plan.digest):
+        if not plan.confirms(confirmation_digest):
             raise ValueError("exact publication schema confirmation required")
         return self._run(apply=True)
 
