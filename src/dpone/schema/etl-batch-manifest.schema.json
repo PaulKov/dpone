@@ -2903,6 +2903,54 @@
               "markdownDescription": "Настройки логирования и дедупликации",
               "additionalProperties": false,
               "properties": {
+                "publication_authority": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "backend",
+                    "connection_ref",
+                    "database",
+                    "schema",
+                    "service_id",
+                    "environment"
+                  ],
+                  "properties": {
+                    "backend": {
+                      "const": "mssql"
+                    },
+                    "connection_ref": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z0-9](?:[A-Za-z0-9_.-]{0,126}[A-Za-z0-9])?$"
+                    },
+                    "database": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    },
+                    "schema": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^[A-Za-z_][A-Za-z0-9_]*$"
+                    },
+                    "service_id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^(?![\\s\\S]*[\\u0000-\\u001F\\u007F-\\u009F])\\S(?:.*\\S)?$"
+                    },
+                    "environment": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 128,
+                      "pattern": "^(?![\\s\\S]*[\\u0000-\\u001F\\u007F-\\u009F])\\S(?:.*\\S)?$"
+                    }
+                  },
+                  "description": "Select an independently provisioned MSSQL publication authority for bounded internal replicated ClickHouse full_refresh. Requires verified environment, endpoint binding and external catalog admission; no runtime provisioning or legacy fallback."
+                },
                 "durable_quality_replay": {
                   "type": "boolean",
                   "default": false,

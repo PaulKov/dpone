@@ -13,6 +13,7 @@ from dataclasses import dataclass, fields
 from typing import Any
 
 from dpone.contracts.clickhouse_cluster_publication import canonical_json, digest_payload
+from dpone.contracts.credential_env import is_valid_connection_ref
 from dpone.contracts.mssql_object_name import safe_mssql_identifier
 from dpone.contracts.runtime_connection import ResolvedConnectionDescriptor
 
@@ -48,6 +49,8 @@ class PublicationAuthorityBinding:
                 raise ValueError(f"publication_authority.{field.name}: invalid identity")
         if self.backend != "mssql":
             raise ValueError("publication_authority.backend: unsupported backend")
+        if not is_valid_connection_ref(self.connection_ref):
+            raise ValueError("publication_authority.connection_ref: canonical alias required")
         if not safe_mssql_identifier(self.database) or not safe_mssql_identifier(self.schema):
             raise ValueError("publication_authority: unsafe database/schema identifier")
 

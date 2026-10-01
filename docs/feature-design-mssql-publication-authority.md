@@ -14,8 +14,9 @@ deployment coordinates. Approval is not implementation or live certification.
 This branch currently provides the unactivated binding, catalog admission,
 native SQL authority adapter, shared normal/replay runtime composition, and an
 endpoint-admitted schema plan/apply/inspect service with a thin draft CLI.
-Public manifests still reject the proposed option; no existing workload switches
-backend. An internal native prepared-recovery service reuses normal publication
+The branch accepts the closed selector in single, batch, flow and folder
+authoring; this is unreleased and does not migrate any existing workload.
+An internal native prepared-recovery service reuses normal publication
 reconciliation and cleanup through that same provider. Its application now binds
 verified context and both endpoints to private plans; draft recovery CLI parsing
 fails closed without an injected trusted observer. Guarded legacy retirement
@@ -62,6 +63,49 @@ declared location must agree with its admitted registry metadata. The factory
 resolves publication credentials independently of disabled xmin state. Old
 manifests keep their old behavior outside explicitly migrated target scopes.
 Explicit selection never falls back to ClickHouse legacy authority.
+
+### Authoring and deployment closure
+
+For an admitted internal replicated ClickHouse `full_refresh`, add this options
+fragment to the existing sink (all names below are synthetic):
+
+```yaml
+publication_authority:
+  backend: mssql
+  connection_ref: metadata-main
+  database: Example_Metadata
+  schema: ops
+  service_id: example-service
+  environment: test
+```
+
+Supply the existing bounded `sink.strategy.max_source_bytes` and internal
+replicated `physical_design` as well. The selector alone does not admit a route.
+Do not use it on local/external replication, an unbounded load, or
+`partition_replace`: the latter is not the cluster full-refresh publication
+protocol. With no selector, existing strategy behavior is unchanged. Closed
+dbt publish policy versions do not gain this option implicitly.
+
+Before packaging, configure the logical alias in the deployment connection
+projection even if source checkpoint state is disabled. Both environment and
+secret-volume projections require this independent dependency. The connection
+registry must declare the same MSSQL database/schema and the reviewed endpoint
+policy described below; runtime admission does not create or repair the catalog.
+Do not put credentials in the selector.
+
+Compilation preserves the selector in the effective load options. Runtime
+rejects a missing or conflicting normalized copy before resolving credentials,
+and verifies the environment against trusted deployment context. Source/root
+placement, null, unknown binding fields and noncanonical connection aliases are
+errors, not requests to use the legacy backend. Replay configuration identity
+is checked only after semantic validation. Static schemas reject control
+characters and whitespace boundaries; semantic validation also enforces
+Python's full Unicode printable-character rules.
+Replay configuration identity
+includes backend, service, environment and database/schema; the logical alias
+is excluded because resolved physical authority is separately endpoint-bound.
+Alias rotation therefore preserves identity only when the actual admitted
+endpoint and storage namespace remain unchanged.
 
 Slot identity binds stable service ID, environment and existing target key.
 Changing an alias or rotating credentials does not create a different slot.
@@ -459,8 +503,9 @@ and SQL CAS authenticate the retained first event, permanently rejecting its
 retired operation ID even after a later operation completes. A new operation
 checks the unchanged healthy predecessor before source I/O, then acquires the
 slot through exact CAS with an isolated fresh candidate. Draft operator parsing
-and application composition are available; the trusted deployment observer and
-public manifest activation remain unavailable.
+and application composition are available; public selection is implemented on
+this branch, but the trusted deployment observer and workload activation remain
+unavailable.
 
 ### Intent and alternatives
 

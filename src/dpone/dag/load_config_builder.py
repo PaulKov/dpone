@@ -16,6 +16,7 @@ from dpone.config.postgres_mssql_wire_contract import (
     PostgresMssqlWireContractError,
     normalize_postgres_mssql_wire,
 )
+from dpone.config.publication_authority import validate_publication_configuration
 from dpone.config.reconciliation import ReconciliationConfigError, normalize_reconciliation
 from dpone.contracts.api_sources import get_api_source_defaults
 from dpone.contracts.connector_declarations import canonical_endpoint_type
@@ -58,6 +59,7 @@ class LoadConfigBuilder:
         parse_tracer: ParseTracer | None = None,
     ) -> LoadConfig:
         select_audit_storage(config)
+        validate_publication_configuration(config)
         try:
             source_cfg = dict(config.get("source", {}) or {})
             sink_cfg = dict(config.get("sink", {}) or {})

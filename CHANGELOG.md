@@ -4,6 +4,14 @@
 
 ### Added
 
+- Expose the closed MSSQL `publication_authority` selector in single, batch,
+  flow and folder authoring for bounded internal replicated ClickHouse
+  `full_refresh`. Preserve it through compilation and require its independent
+  Airflow connection even when source state is disabled. Reject misplaced or
+  contradictory normalized selections before credential resolution; bind replay
+  identity to the storage namespace, excluding the logical credential alias.
+  Unsupported routes and frozen dbt policy versions remain unchanged. This
+  unreleased selection does not migrate workloads or certify live recovery.
 - Compose guarded legacy retirement with an endpoint-admitted SQL history store,
   exact private outer plan and pre-bound persistent attempt journal. Add draft
   `publication-authority retire plan|apply|verify` parsing and redacted results;

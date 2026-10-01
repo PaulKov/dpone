@@ -6,6 +6,10 @@ from collections.abc import Mapping
 from typing import Any
 
 from dpone.config.load_strategy import SOURCE_BYTE_BUDGET_OPTION
+from dpone.config.publication_authority import (
+    normalized_publication_selection,
+    select_publication_authority,
+)
 from dpone.ports.clickhouse_cluster_publication import (
     clickhouse_cluster_admission_input,
     evaluate_clickhouse_cluster_admission,
@@ -14,13 +18,15 @@ from dpone.ports.mssql_publication import PublicationAuthorityBinding
 
 
 def select_publication_binding(
-    sink: Mapping[str, Any], *, load_config: Any, environment: str | None
+    config: Mapping[str, Any], *, load_config: Any, environment: str | None
 ) -> PublicationAuthorityBinding | None:
     """Fail closed before credential/connector I/O for an unsupported route."""
-    options = sink.get("options", {})
-    if not isinstance(options, Mapping) or "publication_authority" not in options:
+    binding = select_publication_authority(config)
+    if binding != normalized_publication_selection(load_config.options):
+        raise ValueError("publication_authority: compiled manifest and load config differ")
+    if binding is None:
         return None
-    binding = PublicationAuthorityBinding.from_mapping(options["publication_authority"])
+    sink = config["sink"]
     if environment is None or environment != binding.environment:
         raise ValueError("publication_authority: verified environment mismatch or unavailable")
     decision = evaluate_clickhouse_cluster_admission(

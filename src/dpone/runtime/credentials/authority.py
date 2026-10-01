@@ -76,7 +76,7 @@ def resolve_runtime_connections(
     if audit_selection != select_audit_storage({"sink": {"options": load_config.options}}):
         raise AuditConfigError("audit selection differs between the compiled manifest and load config")
     publication_binding = select_publication_binding(
-        sink, load_config=load_config, environment=context.environment if context else None
+        config, load_config=load_config, environment=context.environment if context else None
     )
     state = mapping(config.get("state"))
     proxy = mapping(config.get("bigquery_proxy"))

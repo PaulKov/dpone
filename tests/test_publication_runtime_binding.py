@@ -43,6 +43,10 @@ def setup(*, environment="test", selected=True):
             }
         },
     }
+    if selected:
+        load.options.update(
+            publication_authority=asdict(_BINDING), sink_options={"publication_authority": asdict(_BINDING)}
+        )
     return events, context, config, load
 
 
