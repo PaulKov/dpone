@@ -1,8 +1,9 @@
 # ADR 0080: Separate ClickHouse configuration identity and method compatibility
 
-- Status: Accepted for staged implementation; approved plan prerequisites in progress
+- Status: Accepted; current-state correction approved, structural prerequisite unmet
 - Date: 2026-09-30
-- Approval: maintainer approval of the written table-compatibility specification
+- Amended: 2026-10-01
+- Approval: maintainer approval of the written table-compatibility specification and explicit approval of the current-state correction
 
 ## Context
 
@@ -16,14 +17,18 @@ express a method-compatible pair whose complete configuration identities differ.
 ## Decision
 
 Implement the [approved specification](../feature-design-clickhouse-table-compatibility.md)
-through its [separate implementation plan](../superpowers/plans/2026-09-30-clickhouse-table-compatibility.md).
+through its [implementation plan under revision](../superpowers/plans/2026-09-30-clickhouse-table-compatibility.md).
 
 1. Separate canonical table configuration, per-method compatibility, desired
    target configuration, object identity, provenance and content evidence.
 2. Keep one closed typed settings registry. Preserve supported existing settings
    by default; require explicit `design_change="replace"` for intended changes.
-   Omitted defaults need verified historical configuration provenance, not just
-   the server's current global values. Unknown settings remain blocking.
+   For the exact certified plain-MergeTree 24.8.14.39 profile, resolve omitted
+   values from cached current defaults plus complete persisted overrides, bound
+   to actual endpoint/topology and a complete bracketed observation on one
+   non-reconnecting connection. Current globals alone remain insufficient;
+   unknown settings remain blocking. No pre-creation history is required for a
+   genuinely unmanaged existing table, including one created manually.
 3. Default `on_unverified_compatibility` to `block`. In explicit `warn` mode an
    unverified preferred method may be excluded in favor of an independently
    verified alternative, with a durable warning. This is not permission to run
@@ -37,6 +42,11 @@ through its [separate implementation plan](../superpowers/plans/2026-09-30-click
 6. Protect actual preflight through publication with one namespace-bound
    execution session. Candidate creation and metadata verification precede
    opening the source. Recovery never reconstructs a source or send capability.
+7. Distinguish current configuration from historical part compatibility, and
+   first-use inspection from recovery. Missing or uncertain original-operation
+   authority cannot be replaced by a fresh store or a new current-state snapshot.
+   Remove the planned configuration-epoch provider/bootstrap journal, not the
+   operation journal or its retained ownership semantics.
 
 This amends only the new binding's settings, selection and version decisions in
 ADRs 0078/0079. Their historical contracts are unchanged.
@@ -44,11 +54,16 @@ ADRs 0078/0079. Their historical contracts are unchanged.
 ## Consequences
 
 Supported refreshes require no hand-copied settings or user-selected SQL method.
-Some tables still fail closed because omitted defaults cannot be established.
-The plan therefore starts with a real controlled-bootstrap provenance probe,
-including an existing-table positive case, before dependent implementation.
-An injected deployment evidence source is not a claim of universal production
-ingress enforcement; the initial concrete certification is owned Docker only.
+Some tables still fail closed because required current facts, a supported profile
+or method compatibility cannot be established. The plan requires a manually
+created-table positive case, current-default/override and historical-part tests,
+connection/drift rejection and original-operation recovery checks. Raw owned-Docker
+characterization exists; production resolver and publisher certification do not.
+The old epoch experiments remain historical evidence, not a universal admission
+requirement. A new pre-enrollment observation after restart is allowed; an enrolled
+operation retains its original frozen state and source-free recovery restrictions.
+No automatic target ALTER, server restart/reset or manual history reconstruction
+is introduced. This is not universal production ingress enforcement.
 
 The unfinished implementation already fails strict graph budgets. An explicit
 structural feasibility gate precedes expansion: module counts, moving imports
@@ -64,7 +79,10 @@ certify a whole route. Terminal historical records do not certify future writes.
 
 - Special-case `index_granularity = 8192`: incomplete public policy.
 - Ignore or pass through unrecognized settings: unverifiable identity.
-- Trust current global defaults for historical tables: missing provenance.
+- Trust current global defaults alone, without complete overrides and pinned
+  protected observations: insufficient current-state evidence.
+- Require dpone CREATE/ATTACH history for every existing table: superseded by
+  pinned-source and live evidence for the approved current-state resolver.
 - Implement `warn` as an unsafe force flag or trial-SQL fallback: uncertain
   effects and false recovery confidence.
 - Reuse old version labels with new selection rules: changed historical meaning.

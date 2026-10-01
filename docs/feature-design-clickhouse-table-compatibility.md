@@ -1,24 +1,28 @@
 # Feature design: self-service ClickHouse table compatibility
 
 - Status: APPROVED
-- Implementation: [approved Native plan](superpowers/plans/2026-09-30-clickhouse-table-compatibility.md) and [path contract](agent-tasks/clickhouse-table-compatibility.yml); structural prerequisite failed, dependent implementation not started
+- Implementation: [Native plan under revision](superpowers/plans/2026-09-30-clickhouse-table-compatibility.md) and [path contract](agent-tasks/clickhouse-table-compatibility.yml); structural prerequisite failed, dependent implementation not started
 - Decision: [ADR 0080](adr/0080-clickhouse-table-compatibility-policy.md)
 - Owner: dpone maintainers
-- Issue: settings-aware amendment to PR #249
+- Issue: settings-aware amendment to PR #249, continued in PR #258
 - Target release: unassigned; specification only, not route activation
 - Parent: [protected publication design](feature-design-clickhouse-protected-publication.md)
-- Code baseline inspected: `efa734b67cdf905c8502e5befa5fc686a28bc2e3`, plus the preserved uncommitted candidate-transport work
+- Historical design baseline inspected: `efa734b67cdf905c8502e5befa5fc686a28bc2e3`, plus the preserved uncommitted candidate-transport work
+- Current integration baseline: `71180d081163455cf7ede1a40935eae512479960`; this amendment changes design documents, not runtime behavior
 
-Last verified: 2026-09-30
+Approval reconciled: 2026-10-01. Source/live research below was verified on 2026-09-30.
 
 ## Research correction: first-use existing tables
 
-**Status: RESEARCHED amendment, awaiting maintainer approval.** The approved
-historical-epoch algorithm below is preserved as the decision record; it must
-not be promoted into a universal requirement that dpone created the target.
-New pinned-source and live evidence supports a smaller current-state resolver.
-Dependent production implementation remains blocked by the structural gate and
-this pending algorithm correction; this section is not an implementation claim.
+**Status: APPROVED amendment.** On 2026-10-01 the maintainer explicitly approved
+admitting manually created, genuinely unmanaged tables through verified current
+state, while retaining the original-operation journal requirement for recovery.
+This supersedes the earlier pre-creation configuration-epoch requirement, not
+operation ownership, historical readers or the required safety checks. The
+normative algorithm below incorporates that decision; historical epoch research
+remains preserved as research. Dependent production implementation still needs
+a reviewed feasible plan and passing structural gate. Approval is not an
+implementation or certification claim.
 
 ### Evidence and correction
 
@@ -47,7 +51,7 @@ provider cannot manufacture CREATE coverage. It does **not** establish that
 all safe publication methods or tables need that provider. Its remaining epoch
 tests are retained as scoped research, not universal admission requirements.
 
-### Proposed algorithm amendment
+### Approved algorithm amendment
 
 1. Preserve original-authority ownership checks and the continuously held
    two-name exclusion. An externally created, genuinely unmanaged table is
@@ -86,10 +90,11 @@ reconstructs execution permission from observation evidence.
 
 ### Implementation and acceptance impact
 
-If approved, remove the planned deployment-epoch port/provider and bootstrap
-journal from the production dependency map. Keep the resolver in the already
-planned descriptor/catalog/observer owners. Update Task 1 and its exact path
-contract before executing Tasks 2–7; do not merely relabel the old epoch tests.
+Remove the planned deployment-epoch port/provider and bootstrap journal from
+the production dependency map. Keep the resolver in the planned descriptor/
+catalog/observer owners. Reconcile Task 1 and its exact path contract, then
+review the structurally feasible revised plan before executing Tasks 2–7; do
+not merely relabel the old epoch tests.
 Preserve historical artifacts and existing version readers unless a separate
 compatibility change is explicitly approved.
 
@@ -142,6 +147,9 @@ version for the new binding; other safety rules stay. Approval is not evidence
 of implementation or certification. The revised implementation plan at commit
 `9553698e8374df4e4af0c5c2a4e4cc0f4cd9acda` was subsequently separately approved.
 Its provenance and structural feasibility gates precede dependent production edits.
+The current-state correction was separately approved on 2026-10-01. That decision
+does not approve the later hypothetical compact file map or waive the failed
+structural prerequisite; the revised execution plan still requires review.
 
 ## Personas and customer journey
 
@@ -165,6 +173,9 @@ Its provenance and structural feasibility gates precede dependent production edi
 3. **Configure:** provide the same operation identity, target, candidate and
    typed row/key design required by the parent. Settings are optional. For an
    existing supported table, omission means preserve, not reset to defaults.
+   A manually created, genuinely unmanaged table needs no dpone CREATE receipt
+   or reconstructed DDL history. A retained or uncertain prior dpone operation
+   instead requires its original authority and source-free recovery.
 4. **Execute:** call `publish_new` once. Read-only preflight is automatic and
    precedes source access. No separate plan command, hash copying, SQL selection
    or interactive confirmation is required.
@@ -424,26 +435,34 @@ TTL, replication, materialized views or other independent restrictions.
 ### Resolving defaults without guessing
 
 `system.merge_tree_settings` describes global settings, not every table's
-effective configuration. A current global value alone cannot establish the
-history of an already loaded table. Resolution follows these rules:
+effective configuration. A current global value alone is insufficient: the
+certified resolver also needs complete persisted overrides, a supported exact
+server profile and a protected, complete current observation. It establishes
+currently loaded configuration, not historical part formats. Resolution follows
+these rules:
 
 1. Use explicit table metadata, including values inserted by the server into
    stored DDL. On pinned 24.8.14.39, `index_granularity` is such a value; 8192 is
    observed data, never a parser exception.
-2. For omitted supported settings, use only a certified resolver for that exact
-   server version and a verified deployment configuration epoch. The deployment
-   contract excludes untracked default reloads/changes during the loaded-table
-   lifetime and the operation. Capture the actual defaults and their provenance,
-   not just built-in constants or a caller's assertion of equivalence.
+2. For the pinned plain-MergeTree profile on 24.8.14.39, resolve supported values
+   from the server's cached current defaults overlaid by complete persisted
+   table overrides. Capture the resolver/profile identity, actual endpoint and
+   catalog facts. Do not substitute built-in constants, a user assertion, a
+   configuration-file value or a CREATE-history requirement for this evidence.
+   A manually created, genuinely unmanaged table is eligible for the same check.
 3. The profile includes the pinned default baseline for the remaining global
    settings. Unexpected global deviations are classified by the same registry;
    unknown deviations block. A default catalog fingerprint is not permission to
-   accept unreviewed settings or infer per-table values.
+   accept unreviewed settings. Verify actual disks/volumes, not only the policy
+   name. Acquire the complete bracketed metadata/defaults observation on one
+   non-reconnecting native connection to the actual direct endpoint. A break,
+   incomplete visibility, mismatch or unsupported engine/version invalidates it.
 4. If effective values or their provenance cannot be established, return
    `settings_provenance_unverified`. Do not alter/restart the server, patch the
    target, silently assume defaults, or demand users copy SQL as a workaround.
-   The diagnostic identifies the missing deployment evidence for the platform
-   owner. First-use enrollment of an existing table is not unconditional adoption.
+   The diagnostic identifies the concrete missing current-state fact or profile
+   limitation. A fresh pre-enrollment snapshot is allowed; retained or uncertain
+   operation ownership still requires the original authority, never a new store.
 5. Pin the resolved supported values explicitly in the candidate CREATE, then
    read back and verify its actual configuration before opening the source.
    Recheck deployment context and table descriptors before sealing and sending.
@@ -453,20 +472,20 @@ the required observer already exists. A profile may ship only when omitted and
 explicit settings are demonstrated equivalent under its documented conditions.
 User-entered timestamps or hashes are not a substitute for that demonstration.
 
-An admissible epoch is produced by the trusted deployment bootstrap: it records
-the complete immutable MergeTree configuration effective before tables were
-created/attached in a specific server incarnation, and enforces no untracked
-configuration reload or change during that incarnation. Runtime automatically
-checks the provider's incarnation/configuration binding and current catalog;
-restart, reload or missing creation/attach coverage invalidates that evidence.
-Generating a fingerprint for an already running server cannot backfill history.
-This is a one-time platform integration, not a per-load questionnaire. The
-revised implementation plan must name the concrete provenance provider,
-collector, verification fields and negative tests, and demonstrate a positive
-existing-table case, before dependent implementation starts. If that mechanism
-is unavailable, the profile remains unavailable for tables needing inherited
-settings resolution; do not replace it with a self-attested JSON flag. Adding
-that provider does not authorize restarting or changing the user's server.
+A restart or connection loss invalidates an in-flight snapshot; it does not make
+all pre-existing tables permanently ineligible. Before enrollment, collect a
+fresh complete observation under the certified profile. After enrollment, keep
+the frozen plan, retained ownership and existing source-free recovery rules;
+do not use a fresh snapshot to reconstruct execution permission. Recheck context
+and descriptors at seal and pre-send. Current settings never replace independent
+historical-part compatibility evidence required by a method.
+
+There is no production deployment-epoch provider, bootstrap journal or table
+creation-history certificate in this algorithm. The earlier epoch experiments
+remain an auditable decision record, not admission tests for manually created
+tables. The existing operation journal is a different requirement and remains
+mandatory for recovery. Neither this correction nor its tests authorize target
+ALTER, server restart/reset, manual SQL copying or a settings-provenance force flag.
 
 ## Detailed algorithm
 
@@ -607,7 +626,7 @@ returns a source-free `operation_not_found` result without creating records.
 | Reason | Explanation to user | Safe next action |
 |---|---|---|
 | `unsupported_setting` | This profile cannot establish the setting's publication safety | Use a certified profile supporting it; do not strip it from the target |
-| `settings_provenance_unverified` | Effective inherited settings cannot be established | Platform owner validates the missing configuration epoch/evidence |
+| `settings_provenance_unverified` | The certified resolver lacks a complete current-state fact or supported profile | Follow the reported visibility/profile diagnostic; before enrollment repeat fresh preflight, otherwise inspect the original operation; do not reconstruct CREATE history |
 | `design_change_requires_replace` | Request changes the existing design, not only data | Review the structured diff and deliberately request `replace` if intended |
 | `configuration_changed` | Table or configuration context changed during this operation | Inspect the retained original operation; do not start a replacement run |
 | `candidate_design_mismatch` | Server-created candidate does not match the resolved plan | Inspect retained candidate and diagnostics; source remains unopened if detected after CREATE |
@@ -644,9 +663,10 @@ appropriate, not classes solely to wrap functions.
 | Small typed profile plus per-method predicates | Auditable, extensible, automatic ordinary path | Explicit supported subset and certification work | Adopt |
 | General SQL AST/plugin framework or user-defined safety rules | Maximum flexibility | Excess complexity and unreviewed trust boundary | Defer |
 
-An additive ADR is required after approval, superseding only the relevant
-settings/selection/version clauses of ADRs 0078/0079 for the new binding. Old
-ADRs and readers remain meaningful. Do not relabel the whole parent implemented.
+[ADR 0080](adr/0080-clickhouse-table-compatibility-policy.md) records the approved
+additive decision, superseding only the relevant settings/selection/version
+clauses of ADRs 0078/0079 for the new binding. Old ADRs and readers remain
+meaningful. Do not relabel the whole parent implemented.
 
 Quality planning must address the already observed strict graph-budget failures
 in the unfinished candidate implementation. One integrator must revise cohesive
@@ -717,8 +737,9 @@ clone arbitrary unvalidated DDL, enable async INSERT, execute user-supplied SQL,
 modify global settings, broaden grants or drop retained resources automatically.
 Use fixed rendering from typed values and independent actual metadata readback.
 
-Configuration epochs and all-writer inventory are deployment assumptions plus
-observable checks, not cryptographic proof that admins cannot bypass them.
+The certified direct-endpoint profile and all-writer/configuration inventory
+combine deployment assumptions with observable checks; they are not cryptographic
+proof that admins cannot bypass them. No pre-creation epoch certificate is required.
 Collect evidence automatically where possible; invalidate cached readiness on
 version, endpoint, inventory, configuration or authority-identity changes.
 Never cache a successful compatibility plan as a future mutation grant.
@@ -728,7 +749,7 @@ Never cache a successful compatibility plan as a future mutation grant.
 | Layer | Required cases | Acceptance/evidence |
 |---|---|---|
 | Unit | Complete parsing, order/quoting normalization, duplicates, unknown settings, bool/int/overflow boundaries | Canonical vectors and exact rejection reasons |
-| Defaults | Explicit/omitted equivalent values; changed global defaults, unavailable provenance, table loaded under different context | Equivalence only when proved; no assumed 8192 |
+| Defaults | Manually created unmanaged table without CREATE receipt; explicit/omitted equivalents; cached defaults plus overrides; reload/restart/ALTER/RESET with persistent data; incomplete or drifting current observations | Equivalence only when proved; no assumed 8192 or reconstructed history; retained operation authority unchanged |
 | Settings families | At least 4096 and 8192, adaptive/non-adaptive, byte lower bound, Compact/Wide, local storage validation | Positive and negative tests per registry entry |
 | Planning | Preserve/default/explicit replace, absent vs empty target, same content with changed desired design, unknown capability | Deterministic method table; zero source calls on metadata rejection |
 | Warning mode | Default block; warn plus verified EXCHANGE; warn without safe alternative; known incompatibility; non-applicable method; shared-safety unknown | Only proven alternative may execute; structured warning retained; no blind send or mode change on recovery |
@@ -779,8 +800,9 @@ language contracts, strict MkDocs and the rendered first-success navigation.
 
 ## Rollout and rollback
 
-1. Maintainer approves this written amendment, then the revised implementation
-   plan and concrete path contract. Current unfinished code stays preserved.
+1. Record the approved specification and 2026-10-01 current-state correction;
+   review a structurally feasible revised implementation plan and concrete path
+   contract before execution. Current unfinished code stays preserved.
 2. Implement separate versions with old golden vectors intact, characterize
    default provenance, and resolve existing quality-gate failures honestly.
 3. Certify the complete profile on the exact final commit in owned Docker;
@@ -794,8 +816,8 @@ reverse EXCHANGE, target ALTER or new operation over retained names.
 
 ## Agent execution boundaries
 
-Root is the sole integrator/shared-file owner. The approved implementation plan
-and exact path contract govern execution; area names below are not independent
+Root is the sole integrator/shared-file owner. The implementation plan and exact
+path contract govern execution after revision review; area names below are not independent
 write authorization. Its structural prerequisite has not passed, so no
 dependent settings-aware production implementation is authorized to proceed.
 
@@ -821,7 +843,9 @@ No worker may interpret this area list as a wildcard write authorization.
 - [x] Test, certification, documentation, rollout and rollback criteria exist.
 - [x] Implementation ownership and required plan amendment are explicit.
 - [x] Maintainer approves this written specification as `APPROVED`.
-- [x] Revised implementation plan and exact path contract are separately reviewed.
+- [x] Historical 2026-09-30 implementation plan and exact path contract were separately reviewed.
+- [x] Maintainer approves the current-state correction on 2026-10-01.
+- [ ] Structurally feasible current-state execution plan and path contract are reviewed.
 
 Approved for staged implementation subject to the plan's prerequisites. Implementation, live certification,
 production readiness and release readiness are not established by this document.

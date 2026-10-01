@@ -10,9 +10,9 @@
 
 **Spec:** [Approved table-compatibility amendment](../../feature-design-clickhouse-table-compatibility.md), [protected-publication parent](../../feature-design-clickhouse-protected-publication.md), [ADR 0080](../../adr/0080-clickhouse-table-compatibility-policy.md).
 
-**Status:** APPROVED; Task 1 structural feasibility FAILED. The maintainer separately approved this written plan and its path contract with `approve` after commit `9553698e8374df4e4af0c5c2a4e4cc0f4cd9acda`. Native execution remains selected; root is the sole writer. Dependent production implementation has not started. The execution record below distinguishes observed failure from hypothetical projections.
+**Status:** DRAFT reconciliation of the approved current-state correction; Task 1 structural feasibility remains FAILED. The maintainer approved the historical plan/path contract after commit `9553698e8374df4e4af0c5c2a4e4cc0f4cd9acda`, then explicitly approved the current-state algorithm on 2026-10-01. A structurally feasible revised execution map still requires review before dependent production work. Native execution remains selected; root is the sole writer. Historical approvals and failed evidence are preserved, not reclassified as implementation success.
 
-**Base:** `5075a1e50ff7d1f3d670423fe196f970ab65e873`, branch `codex/clickhouse-native-publisher-locale-base`, PR #249. The [new task contract](../../agent-tasks/clickhouse-table-compatibility.yml) takes precedence only for this increment after plan review.
+**Base:** Current integration `71180d081163455cf7ede1a40935eae512479960`, branch `codex/clickhouse-publisher-linear-integration`, PR #258. Original base `5075a1e50ff7d1f3d670423fe196f970ab65e873` and PR #249 remain historical references. The [task contract](../../agent-tasks/clickhouse-table-compatibility.yml) takes precedence only for this increment after revision review.
 
 ## Global Constraints
 
@@ -25,13 +25,14 @@
 - A source failure is not exhaustion. Pre-PREPARED restart is inspection-only, even when SEALED. At/after PREPARED recovery uses frozen intent, transport closure and protected observations, never source or SQL replay.
 - No stock ODBC activation, CLI/manifest changes, dependency/version changes, merge, tag or release in this increment.
 - Keep the current scalar/type/key restrictions. Encoded-byte bounds do not certify upstream ODBC allocation, driver buffers or RSS.
+- First-use genuinely unmanaged tables may have been created manually. Use the certified current-state resolver; no CREATE receipt, configuration-epoch provider or bootstrap journal. Retained/uncertain operation ownership still requires its original authority.
 - Budgets come from `docs/benchmarks/quality_budgets.yml` and existing strict graph gates. No threshold/baseline relaxation, hidden imports, proxy-only modules, arbitrary merges or artificial graph padding.
 - Commands below abbreviate the environment as `uv run`; execute with `--frozen --extra postgres --extra gcp --extra columnar --extra dbt-mssql --extra accel --extra clickhouse`. Do not alter `uv.lock`.
-- Each implementation task ends with focused evidence, a scoped commit and an immediate update to existing PR #249. Never stage all current changes indiscriminately.
+- Each implementation task ends with focused evidence, a scoped commit and an immediate update to continuation PR #258. Preserve PR #249 and never stage all current changes indiscriminately.
 
 ## Review Focus
 
-1. An omitted historical default must not be inferred from a newly restarted server with identical-looking globals; test incarnation, reload and coverage loss in Tasks 1–2.
+1. Current loaded settings are not historical part settings. Tasks 1–2 must admit a manually created unmanaged table without a CREATE receipt, resolve cached defaults plus complete overrides, and reject broken/incomplete bracketed reads. A fresh pre-enrollment snapshot after restart must not revive an enrolled operation.
 2. A competing operation can use this target as its candidate before enrollment; test two-name locking, cross-role races and uninterrupted binding in Task 3.
 3. A known incompatible REPLACE fact must not conceal a shared unknown; test verdict precedence, strict/warn alternatives and late rejection in Tasks 2 and 6.
 4. Equal content under different configurations must not become NOOP, and REPLACE must preserve the target's actual configuration; test all four explicit after-states in Tasks 2 and 5.
@@ -39,10 +40,13 @@
 
 ## Boundaries, estimates and feasibility gate
 
-The current unfinished tree measures clustering `0.18341116714046293` and
-strict cross-layer ratio `0.300842835894893`; both gates fail. These are diagnostic
-observations, not passing evidence. A read-only contraction analysis found no
-honest narrow Task-3 merge that fixes them: candidate enrollment plus request
+The preserved unfinished tree at integration `71180d08` measures clustering
+`0.18349604284239973` and strict cross-layer ratio `0.3009910802775025`; both
+gates fail. Clean-commit CI, excluding the two unfinished modules, separately
+measures `0.18290554243552043` and `0.3006153235410877`, also FAIL. Earlier
+September 30 measurements remain in the historical Task 1 record below. These
+are diagnostic observations, not passing evidence. A read-only contraction
+analysis found no honest narrow Task-3 merge that fixes them: candidate enrollment plus request
 persistence is already 444 SLOC; combining gateway and transport crosses the
 orchestration/I/O boundary and worsens clustering.
 
@@ -64,12 +68,11 @@ write list. Existing helper names listed without a directory are adapter files.
 
 | Owner and files under `src/dpone/` | Responsibility and estimated SLOC per file |
 |---|---|
-| `contracts/clickhouse_table_descriptor.py` | Immutable descriptor, settings facts and epoch references; 160–260 |
+| `contracts/clickhouse_table_descriptor.py` | Immutable descriptor, current-settings evidence and observation context; 160–260 |
 | `contracts/clickhouse_compatibility.py` | Closed settings registry, desired-design resolution and pure per-method policy; 220–350 |
 | `contracts/clickhouse_publication_v3.py` | Request, preview/resolved/selected plan and explicit frozen intent/after-state; 180–300 |
-| `ports/clickhouse_deployment_epoch.py`, `ports/clickhouse_protected_publication.py` | Injected provenance and session-scoped lifecycle capabilities; 40–120 each |
-| `adapters/clickhouse_deployment_epoch.py` | Protected epoch journal verification against injected platform observations; 180–300 |
-| `adapters/clickhouse_table_descriptor.py` | Complete settings-aware catalog decoding; 150–260 |
+| `ports/clickhouse_protected_publication.py` | Session-scoped lifecycle capabilities; 40–120 |
+| `adapters/clickhouse_table_descriptor.py` | Complete settings-aware catalog decoding and pinned current-state resolution; 150–260 |
 | `adapters/clickhouse_publication_codec_v3.py` | Closed canonical v3 wire and semantic validation; 200–320 |
 | `adapters/clickhouse_candidate_v3.py`, `adapters/clickhouse_publication_journal_v3.py` | v3 enrollment/lifecycle and atomic selected PREPARED/publication CAS; 220–350 each |
 | `adapters/clickhouse_candidate_requests_v3.py` | v3 request-context validation around shared request CAS; 120–220 |
@@ -84,61 +87,54 @@ write list. Existing helper names listed without a directory are adapter files.
 | `adapters/clickhouse_publication_diagnostics.py` | Immutable redacted external diagnostics; 120–220 |
 
 Adapters never import runtime. Pure policy imports only contracts/stdlib. The
-explicit example is the composition root. No default factory or automatic
-provenance provider is registered. Refactoring old persistence is permitted only
+explicit example is the composition root. No default factory or
+deployment-epoch provider is introduced. Refactoring old persistence is permitted only
 to extract the same version-neutral mechanisms for genuine v2/v3 reuse, with
 old golden tests unchanged; old semantic policy and codec remain read-only.
 
-## Task 1: Prove historical defaults and structural feasibility
+## Task 1: Prove current-state resolution and structural feasibility
 
-**Files:** Create `tests/integration/clickhouse_table_compatibility_probe.py`,
+**Files:** Maintain and extend `tests/integration/clickhouse_table_compatibility_probe.py`,
 `tests/integration/clickhouse_table_compatibility_support.py` and
 `tests/integration/test_clickhouse_table_compatibility_live.py`. Record generated
 artifacts under `test_artifacts/clickhouse-table-compatibility-<run-id>/`.
 No production implementation precedes this prerequisite's result.
 
-**Interfaces and trust boundary:** The concrete certification provider is
-`OwnedDockerEpochSource` in the support module. It implements the future
-`DeploymentEpochSource.observe(subject: AuthoritySubject, table_uuid: str | None)
--> DeploymentEpochEvidence` capability. `DeploymentEpochEvidence` is an immutable
-descriptor-contract value with producer/profile ID, original journal identity,
-deployment/endpoint/server/version/incarnation, epoch revision/head digest,
-complete canonical bootstrap configuration, captured globals and acknowledged
-CREATE/ATTACH coverage for an existing database/table UUID. No caller field such
-as `trusted=True` substitutes for evidence.
+**Interfaces and trust boundary:** `CurrentSettingsEvidence`, owned by the
+planned descriptor contract, records resolver/profile identity, actual endpoint,
+server/version and connection context, complete cached defaults, persisted table
+overrides, database/table identities and actual disks/volumes. The native catalog
+supplies complete before/after facts on one non-reconnecting connection; the
+descriptor resolver verifies and normalizes them. This value is observation
+evidence, not enrollment or execution permission. No caller success flag, copied
+SQL or configuration-history certificate substitutes for it.
 
-The production-facing verifier will be `VerifiedDeploymentEpochSource(journal:
-Path, platform: DeploymentEpochSource)` in `adapters/clickhouse_deployment_epoch.py`.
-It verifies the original protected append-only epoch journal and live platform
-facts. `observe` returns evidence or raises a typed provenance error; it does not
-provision the deployment. The Docker implementation is certification-only, not
-a production Docker dependency. The platform owner remains responsible for
-exclusive privileged access, complete configuration inputs and controlled
-creation. This does not prove resistance to a malicious same-user administrator.
+The existing test-only epoch source and negative CREATE-coverage tests remain
+scoped historical research. They do not define production admission and must
+not be mechanically relabeled as current-state tests. There is no planned
+production `DeploymentEpochSource` or bootstrap-journal adapter. Docker remains
+the approved certification environment, not a runtime dependency.
 
-- [ ] Write the probe's negative-first test
-  `test_omitted_defaults_require_precreation_epoch`: an existing table without
-  acknowledged CREATE/ATTACH coverage is rejected, even when current globals
-  match. Never backfill proof for existing old test containers.
-- [ ] Run that test with `uv run pytest -m integration_live
-  tests/integration/test_clickhouse_table_compatibility_live.py -k precreation -vv`;
-  record the expected missing-producer failure separately from a live PASS.
-- [ ] Implement controlled bootstrap in the support producer: exclusive private
-  original epoch journal before a fresh owned incarnation, pinned image and all
-  configuration inputs, then server/version/globals readback and acknowledged
-  activation. Frame records with sequence, checksum and durable append; reject
-  incomplete tail, replacement, truncation and invalidation. Do not create a
-  generic journal framework or put credentials in evidence.
-- [ ] Create a target with `index_granularity=4096`, leaving another supported
-  setting omitted, only through that producer. Record positive server completion,
-  database/table UUID and acknowledged coverage; then open the proof in a separate
-  runtime process and establish the inherited effective values. Lost CREATE or
-  journal acknowledgement must leave coverage unusable.
-- [ ] Probe the exact server's persisted defaults, adaptive/nonadaptive settings,
-  joint bounds, Compact/Wide parts, local storage policy and REPLACE constraints.
-  Save actual CREATE/SHOW CREATE, system tables/columns/settings/parts, image,
-  driver/Python/SQLite identities and server responses. Restart/reload/config
-  change invalidates the old epoch, including an identical-looking restart.
+- [ ] Retain and extend the positive characterization
+  `test_pinned_restart_and_alter_resolve_preexisting_table_settings`: manually
+  created table, no dpone CREATE receipt, preserved UUID/data, omitted and explicit
+  settings. Exercise another supported granularity such as 4096.
+- [ ] Before implementing the production resolver, add focused RED cases for
+  incomplete metadata, unsupported engine/version, unknown global/table settings,
+  wrong actual endpoint/topology, connection break and before/after drift.
+  Distinguish server characterization from production resolver certification.
+- [ ] In fresh task-owned Docker, observe cached-default/override behavior across
+  real reload, restart, ALTER and RESET with persistent rows and actual Wide/Compact
+  parts. Record source/image/server/driver identities and observations; changing
+  the test server does not authorize reconfiguring a user's server.
+- [ ] Read a manually created target from an independent process using complete
+  protected facts, without CREATE coverage. Reject an interrupted bracketed read;
+  allow a fresh pre-enrollment observation. Preserve original-operation recovery
+  after enrollment or uncertain ownership.
+- [ ] Probe adaptive/nonadaptive settings, joint bounds, mixed historical parts,
+  local storage and REPLACE constraints separately. Current settings do not prove
+  the settings under which every old part was produced. Save actual catalog,
+  defaults, overrides, part observations and server responses.
 - [ ] Run positive and negative probe cases; emit `prerequisite-probe.json` with
   explicit PASS/FAIL/UNVERIFIED per condition and the source tree identity. No
   successful mocked probe substitutes for the real existing-table positive case.
@@ -149,9 +145,9 @@ creation. This does not prove resistance to a malicious same-user administrator.
   Proceed only on a defensible within-budget projection. No new imports or files
   may be introduced merely to change graph denominators.
 - [ ] Commit the probe and its reviewed conclusions, preserve raw immutable
-  artifacts, and update PR #249. Task 2 is blocked if either prerequisite fails.
+  artifacts, and update PR #258. Task 2 is blocked if either prerequisite fails.
 
-### Task 1 execution record: structural prerequisite not passed
+### Historical Task 1 execution record: September 30 structural attempt
 
 The structural branch was checked before creating the live provenance fixture.
 The repository's actual strict tests returned two FAIL and two PASS in 19.90 s.
@@ -177,8 +173,8 @@ Local reproducible evidence is in
 `architecture-baseline.log`. The JSON identifies HEAD plus every working-tree
 Python source hash, including the preserved uncommitted candidate work.
 
-Task 1 is incomplete. Docker Desktop availability was checked, but no new
-container was created and no live probe was run: provenance is SKIP/UNVERIFIED,
+At that attempt, Task 1 was incomplete. Docker Desktop availability was checked,
+but no new container was created and no live probe was run: provenance is SKIP/UNVERIFIED,
 not PASS. No settings-aware production source, thresholds, baselines or old
 evidence were changed. The next implementation decision needs a concrete
 cohesive boundary redesign and amended exact path ownership; changing a module's
@@ -189,19 +185,22 @@ layer label or allowing two more imports alone is not a demonstrated solution.
 > Continuation note: the independent test-only branch now includes a positive
 > current-settings characterization for a manually created table, persistent
 > restart, ALTER/RESET and real part layouts. This corrects the premise that a
-> pre-creation epoch is universally necessary. See the [RESEARCHED resolver
+> pre-creation epoch is universally necessary. See the [approved resolver
 > amendment](../../feature-design-clickhouse-table-compatibility.md#research-correction-first-use-existing-tables).
-> It awaits approval and does not supersede the approved algorithm silently.
+> The user approved this correction on October 1; no further approval of the
+> same resolver decision is required. This plan's revised executable boundary
+> map still requires review and demonstrated structural feasibility.
 > Task 1 remains incomplete: structural feasibility still fails, and these raw
 > server tests are not certification of the production descriptor or publisher.
 > Existing historical evidence and the failed structural record above remain.
 
-**Files:** Create the three contract modules and descriptor/epoch adapters above,
-`ports/clickhouse_deployment_epoch.py`; modify grammar and observation profile.
+**Files:** Create the three contract modules and descriptor adapter above;
+modify grammar and observation profile. No deployment-epoch port or provider
+is part of the revised implementation map.
 Tests: `tests/test_clickhouse_table_descriptor.py`,
 `tests/test_clickhouse_compatibility_policy.py`,
 `tests/test_clickhouse_compatibility_plan.py`,
-`tests/test_clickhouse_deployment_epoch.py`; extend existing grammar/profile tests
+`tests/test_clickhouse_current_settings.py`; extend existing grammar/profile tests
 without changing v1 vectors.
 
 **Interfaces:**
@@ -210,14 +209,20 @@ without changing v1 vectors.
   `configuration_digest` from UUID/database identity, provenance and content.
   `ManagedSettings` is an immutable sorted tuple of registry-defined names and
   strictly typed values; no mutable caller mapping survives construction.
-  This module also owns `CatalogSnapshotV2` and `ObservedRow` catalog facts.
+  This module also owns `CatalogSnapshotV2`, `CurrentSettingsEvidence` and
+  `ObservedRow` catalog facts.
+- `resolve_current_settings(snapshot: CatalogSnapshotV2) -> CurrentSettingsEvidence`
+  in the descriptor adapter validates the complete pinned-profile, bracketed
+  catalog facts. It requires cached defaults, persisted overrides and actual
+  endpoint/topology/connection identity, not a CREATE-history provider or a
+  caller-supplied success flag. These facts do not issue execution authority.
 - `ProtectedPublicationRequestV3(operation_id: str, subject: AuthoritySubject,
   candidate: str, design: CandidateDesign, limits: ObservationLimits, *,
   settings: Mapping[str, int | bool | str], design_change: Literal["preserve",
   "replace"] = "preserve", on_unverified_compatibility: Literal["block", "warn"]
   = "block")` freezes settings; the public default for `settings` is empty.
 - `resolve_design(request: ProtectedPublicationRequestV3, target:
-  TableDescriptor | None, epoch: DeploymentEpochEvidence) -> TableDescriptor`
+  TableDescriptor | None, settings_context: CurrentSettingsEvidence) -> TableDescriptor`
   is pure. Existing empty tables are present; absent targets use certified
   defaults. Explicit change overlays overrides on preserved target settings.
 - `evaluate_methods(before: PublicationObservationV3, desired: TableDescriptor,
@@ -227,8 +232,8 @@ without changing v1 vectors.
   yields a method, explicit `ExpectedPostState` and actual fallback warnings.
 - `CompatibilityPolicy` is the built-in immutable registry/selector revision
   plus the request's frozen mode, not user-supplied rules. `PublicationObservationV3`
-  contains subject, epoch, target absence or descriptor/content, and candidate
-  descriptor/content. `ExpectedPostState` explicitly records each name's absence
+  contains subject, current settings context, target absence or descriptor/content,
+  and candidate descriptor/content. `ExpectedPostState` explicitly records each name's absence
   or UUID/configuration/content; it is not a replacement `design_digest` shortcut.
 - `CompatibilityPlan` has preview/resolved/selected variants, policy ID/digest,
   mode, descriptor and provenance digests, method verdicts and diagnostics.
@@ -247,8 +252,8 @@ without changing v1 vectors.
   `index_granularity_bytes=0` is the supported nonadaptive mode. Test certified
   joint constraints, not a blanket zero ban. Cover 4096 and 8192 equivalently.
 - [ ] Write RED policy tests for omitted/explicit defaults with and without
-  verified epoch, preservation/equivalent overrides, explicit design changes,
-  absent versus empty target, and incompatible storage/configuration.
+  complete current-state evidence, preservation/equivalent overrides, explicit
+  design changes, absent versus empty target, and incompatible storage/configuration.
 - [ ] Add a parameterized selection matrix: RENAME to absence; NOOP only with
   same desired configuration and content evidence; conservative REPLACE only
   with equal resolved managed settings and complete single-partition coverage;
@@ -261,7 +266,7 @@ without changing v1 vectors.
   not unknown. Noop/rename shared requirements cannot be bypassed by warn.
 - [ ] Run `uv run pytest tests/test_clickhouse_table_descriptor.py
   tests/test_clickhouse_compatibility_policy.py tests/test_clickhouse_compatibility_plan.py
-  tests/test_clickhouse_deployment_epoch.py -q`; retain RED results.
+  tests/test_clickhouse_current_settings.py -q`; retain RED results.
 - [ ] Implement the interfaces using one closed registry with typed bounds,
   provenance requirements and machine-readable reason metadata. Parse complete
   statements and render every resolved managed value explicitly for the
@@ -320,7 +325,8 @@ persistence only for characterized common-mechanism extraction. Tests:
   sorted acquisition, no phantom owner on preflight rejection, inode replacement,
   copied store, thread/fork inheritance and expired/bound-session mismatch.
 - [ ] Write RED transaction tests for resolved enrollment without future content;
-  selected+PREPARED atomicity; seal/profile/epoch mismatch; lost enrollment,
+  selected+PREPARED atomicity; seal/profile/settings-context or original
+  authority-epoch mismatch; lost enrollment,
   selected, claim and completion acknowledgements; no grant from readback.
 - [ ] Run `uv run pytest tests/test_clickhouse_candidate_v3.py
   tests/test_clickhouse_publication_codec_compatibility.py
@@ -407,8 +413,9 @@ dispatch/closure paths. Tests: `tests/test_clickhouse_native_catalog.py`,
   actual partition IDs through fixed queries, not caller SQL.
 - `ProtectedObserverV2.observe(binding, session: BoundExecutionSession,
   resolved_plan: CompatibilityPlan) -> PublicationObservationV3` captures
-  metadata/epoch before and after bounded content reads, using each table's own
-  supported schema. Reject drift or incomplete facts; no server count-only seal.
+  metadata/current settings context before and after bounded content reads,
+  using each table's own supported schema. Reject drift or incomplete facts;
+  no server count-only seal.
 - `CandidateSealServiceV3.seal(invocation, session) -> SealedObservationV2`
   irreversibly closes admission, joins every accepted request, verifies normal
   source exhaustion and CREATE completion, independently compares expected and
@@ -426,7 +433,8 @@ dispatch/closure paths. Tests: `tests/test_clickhouse_native_catalog.py`,
 
 - [ ] Write RED observer tests for complete metadata and per-table schemas,
   adaptive/history facts, real partition IDs, scan-budget exhaustion, late
-  settings/UUID/epoch drift, dependency uncertainty and binary content parity.
+  settings/UUID/connection-context drift, dependency uncertainty and binary
+  content parity.
 - [ ] Write RED seal tests for paused accepted writers, late registration,
   source exception/close failure, incomplete or ambiguous requests and lost seal
   acknowledgement. No readback restores a seal-producing capability.
@@ -444,9 +452,10 @@ dispatch/closure paths. Tests: `tests/test_clickhouse_native_catalog.py`,
   tests/test_clickhouse_guarded_publication_v3.py tests/test_clickhouse_guarded_backend.py -q`.
 - [ ] Implement fixed catalog reads, observer/seal, backend and v3 kernel using
   Task 2's selected post-state. Keep the old kernel/codec/selector unchanged.
-  Require epoch and session validity at observation, seal and pre-send.
+  Require current settings-context and session validity at observation, seal
+  and pre-send; retain the independent original-authority epoch checks.
 - [ ] Run GREEN plus old guarded-publication/native-publisher suites and graph/
-  module gates. Commit only this cohesive increment; update PR #249.
+  module gates. Commit only this cohesive increment; update PR #258.
 
 ## Task 6: One-call API and actionable diagnostics
 
@@ -534,8 +543,11 @@ and create `tests/integration/clickhouse_table_compatibility_faults.py`.
   and recovery advice authored, linking to the generated reference.
 - [ ] Complete discover → platform preparation → one-call publish → optional
   preview → outcome/diagnostics → original-operation recovery → upgrade journey.
-  Separate platform/bootstrap responsibilities from a data engineer's zero-copy
-  settings path. Show block, successful verified warning alternative, shared
+  Separate platform/access responsibilities from a data engineer's zero-copy
+  settings path. Include a manually created, genuinely unmanaged existing table
+  with no CREATE receipt: complete current-state verification can admit it;
+  retained or uncertain ownership requires the original authority workflow.
+  Show block, successful verified warning alternative, shared
   unknown rejection and late retained operation. Explain optional preview versus
   final selection and all four publication methods; link from existing guides.
 - [ ] Run focused example/reference/docs tests. State staged Python-only scope
@@ -556,8 +568,8 @@ and create `tests/integration/clickhouse_table_compatibility_faults.py`.
   nonadaptive/Compact/Wide cases and all four methods, verifying rows, UUIDs,
   complete settings and expected old/candidate resources.
 - [ ] Activate actual lost-response, paused writer, competing cross-role owner,
-  changed configuration/epoch and crash/fresh-process cases. Include empty and
-  stale partitions, warn alternative and late strict rejection. Record original
+  changed configuration/connection context and crash/fresh-process cases. Include
+  empty and stale partitions, warn alternative and late strict rejection. Record original
   journal, phase, fault receipt and mutation/source counters; recovery must have
   zero source and zero mutation replay. Mock-only checks cannot pass this gate.
 - [ ] Save `summary.json`, JUnit, source commit/tree identity, image/server/driver/
@@ -570,7 +582,7 @@ and create `tests/integration/clickhouse_table_compatibility_faults.py`.
 - [ ] Obtain fresh-context independent correctness/compatibility/data-loss/test/
   docs/evidence review. Fix findings with regression tests; any source correction
   invalidates exact-commit certification and requires rerun on the new commit.
-- [ ] Update PR #249 with scoped PASS/FAIL/SKIP/N/A/UNVERIFIED evidence and remaining
+- [ ] Update PR #258 with scoped PASS/FAIL/SKIP/N/A/UNVERIFIED evidence and remaining
   gates. Do not merge or release. Completion requires both architectural gates
   and the approved scoped live evidence, not only a green focused suite.
 
@@ -582,7 +594,11 @@ Task 3; CREATE/INSERT → Task 4; seal/selection/recovery → Task 5; self-servi
 diagnostics → Task 6; documentation/certification/rollout → Task 7. Each Review
 Focus case has an owning regression test. No old evidence becomes new evidence.
 
-The specification and this plan are approved. Execute Native with root as sole
-writer. Task 1 is an explicit
-feasibility gate: provenance and graph compliance are not yet certified, and a
-failed result must not be silently treated as permission for later tasks.
+The specification and October 1 current-state correction are approved. The
+reconciled execution plan remains DRAFT until a structurally feasible boundary
+map and amended path contract pass review. Retain the selected Native execution
+mode with root as sole writer; do not ask for the same resolver approval again.
+Task 1 still requires complete current-state characterization and a passing
+whole-plan projection. Production resolver certification follows implementation
+on the exact final commit. A failed prerequisite must not be silently treated
+as permission for later tasks.

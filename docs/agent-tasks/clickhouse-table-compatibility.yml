@@ -3,12 +3,14 @@ task_id: DPONE-CLICKHOUSE-TABLE-COMPATIBILITY
 title: Settings-aware protected ClickHouse publication with explicit compatibility policy
 goal: Implement the approved self-service amendment after plan review and prerequisite feasibility gates
 specification: docs/feature-design-clickhouse-table-compatibility.md
-base_commit: 5075a1e50ff7d1f3d670423fe196f970ab65e873
+base_commit: 71180d081163455cf7ede1a40935eae512479960
 integrator: root
 acceptance_criteria:
   - The specification is approved and the revised plan is separately reviewed before execution
   - Root remains sole writer with preserved Native execution and a fresh independent final reviewer
-  - Positive owned-Docker historical-default provenance and defensible whole-plan graph projection precede dependent production changes
+  - Positive owned-Docker current-state characterization and defensible whole-plan graph projection precede dependent production changes
+  - First-use manually created unmanaged tables need no CREATE receipt while original-operation authority remains mandatory for recovery
+  - The pinned resolver uses complete cached defaults plus persisted overrides and actual topology on a bracketed non-reconnecting observation
   - Preserve existing committed Tasks 1 and 2 and unfinished Task 3 without changing historical evidence
   - Closed typed settings policy preserves verified existing settings without manual copies
   - Unknown applicable compatibility blocks by default and warn only selects an independently verified alternative
@@ -25,7 +27,6 @@ public_contract_impact:
   surfaces: [Python API, observation v2, authority v3, guarded publication v3, diagnostic JSON, documentation]
   migration_required: false
 owned_paths:
-  - src/dpone/adapters/clickhouse_deployment_epoch.py
   - src/dpone/adapters/clickhouse_table_descriptor.py
   - src/dpone/adapters/clickhouse_publication_codec_v3.py
   - src/dpone/adapters/clickhouse_candidate_v3.py
@@ -55,7 +56,7 @@ owned_paths:
   - tests/test_clickhouse_table_descriptor.py
   - tests/test_clickhouse_compatibility_policy.py
   - tests/test_clickhouse_compatibility_plan.py
-  - tests/test_clickhouse_deployment_epoch.py
+  - tests/test_clickhouse_current_settings.py
   - tests/test_clickhouse_observation_profile.py
   - tests/test_clickhouse_design_grammar.py
   - tests/test_clickhouse_candidate_v3.py
@@ -94,7 +95,6 @@ integrator_owned_paths:
   - src/dpone/contracts/clickhouse_table_descriptor.py
   - src/dpone/contracts/clickhouse_compatibility.py
   - src/dpone/contracts/clickhouse_publication_v3.py
-  - src/dpone/ports/clickhouse_deployment_epoch.py
   - src/dpone/ports/clickhouse_protected_publication.py
   - docs/feature-design-clickhouse-table-compatibility.md
   - docs/feature-design-clickhouse-protected-publication.md
@@ -138,7 +138,6 @@ forbidden_paths:
   - src/dpone/contracts/clickhouse_table_descriptor.py
   - src/dpone/contracts/clickhouse_compatibility.py
   - src/dpone/contracts/clickhouse_publication_v3.py
-  - src/dpone/ports/clickhouse_deployment_epoch.py
   - src/dpone/ports/clickhouse_protected_publication.py
   - docs/feature-design-clickhouse-table-compatibility.md
   - docs/feature-design-clickhouse-protected-publication.md
@@ -172,7 +171,8 @@ required_checks:
     - Import rules, layer metrics, strict cross-layer graph, clustering and exact-SHA module-size gates
     - Docs links, generated references, compatibility, language contracts and isolated strict MkDocs
   live:
-    - Fresh task-owned Docker Desktop controlled-bootstrap provenance with an existing-table positive case
+    - Fresh task-owned Docker Desktop current-state resolution for a manually created unmanaged table without CREATE history
+    - Cached defaults and complete overrides with persistent reload/restart/ALTER/RESET characterization and independent historical-part checks
     - Exact commit and pinned image, server, driver and SQLite identities with checksummed evidence
     - Actual settings and part-layout matrix and all four methods with rows, UUIDs and full configuration checks
     - Real response loss, paused writer, cross-role concurrency, configuration drift and fresh-process zero-replay recovery
@@ -187,6 +187,6 @@ stop_conditions:
   - A live check requires unapproved credentials or environment.
   - Another writer owns the same semantic contract.
   - The revised implementation plan has not been reviewed by the maintainer.
-  - Historical-default provenance or structural feasibility prerequisite has not passed.
+  - Current-state characterization or structural feasibility prerequisite has not passed.
   - A proposed action changes old semantic readers, weakens budgets or mutates historical evidence.
   - A proposed action releases retained owners, cleans up candidates, enables a stock route or publishes a release.
