@@ -16,9 +16,11 @@ native SQL authority adapter, shared normal/replay runtime composition, and an
 endpoint-admitted schema plan/apply/inspect service with a thin draft CLI.
 Public manifests still reject the proposed option; no existing workload switches
 backend. An internal native prepared-recovery service reuses normal publication
-reconciliation and cleanup through that same provider. Legacy adoption/retirement
-operator commands, prepared-recovery application/CLI integration and
-end-to-end ClickHouse recovery acceptance remain required before activation.
+reconciliation and cleanup through that same provider. Its application now binds
+verified context and both endpoints to private plans; draft recovery CLI parsing
+fails closed without an injected trusted observer. Legacy adoption/retirement
+operator commands, deployment-observer integration and end-to-end ClickHouse
+recovery acceptance remain required before activation.
 Do not configure this option against a released runtime.
 
 The local opt-in test
@@ -225,8 +227,64 @@ expired plan remains readable but grants no fresh safety. No credentials, SQL,
 observer or dispatch permit is serialized. The SQL adapter and operator reuse
 the same pure envelope decoder; the existing runtime import remains compatible.
 The bound provider preserves the selected native capability on one admitted
-handle, with unchanged locking and failed-admission invalidation. This codec and
-scope wrapper do not activate a CLI command or a deployment observer.
+handle, with unchanged locking and failed-admission invalidation. The codec and
+scope wrapper supply no deployment observer.
+
+### Native operator composition — unreleased, deployment adapter required
+
+`PreparedRecoveryApplication` composes the real catalog/DDL adapters and shared
+recovery service. The deployment runner explicitly injects the trusted held
+observer. Without it, planning returns `blocked/held_recovery_observer_required`
+before context loading, credential resolution or connector construction. No
+observer, import path, freeze boolean or arbitrary SQL is accepted from CLI
+arguments, environment variables or saved JSON.
+
+The read-only planning journey takes authority and sink logical references, exact
+environment, cluster/database/target, operation ID, native preparation revision
+and a new private plan path. Both references resolve only through the init-fetch
+verified context. The authority location, service and endpoint pin come from the
+closed registry policy shared with catalog setup. Context subjects must have the
+loader's exact `sha256:<64 lowercase hex>` format; the plan stores those 64 hex
+digits, not a caller-supplied subject.
+
+The owned ClickHouse connection must use native transport and the selected
+registry database. Its non-secret endpoint projection includes contract version,
+native transport, host, effective port/TLS, server UUID, database name and Atomic
+database UUID. UUIDs are canonicalized, nonzero and observed read-only. This
+endpoint digest binds confirmation; it is not exclusion evidence. The same handle
+serves catalog observations and DDL. Planning closes it before publishing the
+exclusive owner-private plan. No business source is constructed.
+
+Execution decodes bounded canonical bytes and checks the **outer** confirmation
+and requested environment before credentials. It verifies the current context
+subject and registry authority scope, then re-observes the physical target
+endpoint before native authority access. The application passes the saved inner
+plan/digest to `execute`, never calls `plan` again, and therefore can reconcile
+already advanced or completed phases. All effects still require fresh service
+admission and held observation. It returns `completed` only after the service's
+terminal proof and successful target disposal. A close failure remains
+`outcome_unknown/recovery_requires_inspection`, with the plan retained; it is not
+permission for an unconditional DDL retry. Driver messages and private paths are
+not emitted in application result JSON.
+
+Unlike normal business runtime preflight, this source-free operator may perform
+read-only target identity admission before SQL catalog admission. This rejects a
+changed physical sink before opening the authority; the shared recovery service
+still requires SQL catalog and native-origin admission before any CAS or DDL.
+There is no business extraction or publication during endpoint admission.
+
+`publication-authority recover plan|execute` exposes thin, source-free argument
+parsing and help. Exit codes are 0 for ready/completed, 2 for a proven scope block,
+and 1 for an unknown observation/operation. The standalone CLI deliberately has
+no deployment observer and cannot perform recovery. An admitted deployment
+runner calls `PreparedRecoveryApplication(safety=trusted_observer, ...)` with its
+actual implementation; no synthetic observer is a production recipe. An outer
+plan digest can be reviewed without becoming a dispatch permit. Existing
+`publication-authority schema` commands retain their behavior and reuse the
+registry scope resolver. Production observer integration and live acceptance
+remain required; scripted application tests are not their substitute.
+
+### Held observation and normal lifecycle
 
 For PREPARED, the trusted observer must cover every replica exactly once, from
 no later than the original preparation through the current observation boundary,

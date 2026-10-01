@@ -12,18 +12,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from dpone.adapters.publication_plan_file import read_private_plan, write_private_plan
-from dpone.contracts.publication_authority_binding import PublicationAuthorityBinding
+from dpone.app.publication_operator_context import OperatorScopeBlocked as _ScopeBlocked
+from dpone.app.publication_operator_context import resolve_authority, verified_context
 from dpone.contracts.publication_schema import decode_schema_plan
-from dpone.runtime.credentials.runtime_context import RuntimeConnectionContextLoader
 from dpone.runtime.publication_authority_composition import build_publication_schema
 
 if TYPE_CHECKING:
     from dpone.contracts.runtime_connection import ResolvedBindingConnection
     from dpone.runtime.state.mssql_publication_schema import MssqlPublicationSchema
-
-
-class _ScopeBlocked(ValueError):
-    """Only application-owned fixed reason codes; never driver exception text."""
 
 
 class PublicationSchemaApplication:
@@ -87,29 +83,8 @@ class PublicationSchemaApplication:
             return _result("outcome_unknown", "schema_operation_requires_inspection", digest)
 
     def _service(self, connection_ref: str, environment: str) -> MssqlPublicationSchema:
-        context = RuntimeConnectionContextLoader().load(self._environ)
-        if context is None:
-            raise _ScopeBlocked("verified_runtime_context_required")
-        if context.environment != environment:
-            raise _ScopeBlocked("runtime_environment_differs")
-        resolved = context.resolver.resolve(connection_ref)
-        descriptor = resolved.descriptor
-        if descriptor is None or descriptor.connection_type != "mssql":
-            raise _ScopeBlocked("mssql_registry_binding_required")
-        properties = descriptor.properties
-        policy = properties.get("publication_authority")
-        if not isinstance(policy, Mapping):
-            raise _ScopeBlocked("deployment_endpoint_pin_required")
-        binding = PublicationAuthorityBinding.from_mapping(
-            {
-                "backend": "mssql",
-                "connection_ref": connection_ref,
-                "database": properties.get("database"),
-                "schema": properties.get("schema"),
-                "service_id": policy.get("service_id"),
-                "environment": environment,
-            }
-        )
+        context = verified_context(self._environ, environment)
+        resolved, binding, _ = resolve_authority(context, connection_ref)
         return build_publication_schema(
             connection=resolved,
             binding=binding,

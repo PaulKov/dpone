@@ -4,12 +4,20 @@
 
 ### Added
 
+- Compose native recovery from the verified deployment context, one admitted SQL
+  authority provider and one owned native ClickHouse handle. Outer confirmation,
+  environment/context and physical endpoint checks precede effects; close failures
+  remain unknown and saved plans are never overwritten. Add thin unreleased
+  `publication-authority recover plan|execute` parsing and redacted results.
+  Standalone CLI execution remains blocked without a trusted held observer; a
+  deployment runner must inject it into the application. This does not enable
+  legacy retirement, manifest selection or certify a live recovery route.
 - Add internal bounded canonical native recovery plans bound to exact authority,
   verified-context subject and sink identity. Preserve the existing inner digest
   and historical observation time; malformed or changed plans fail closed.
   The saved plan supplies neither fresh safety nor a dispatch permit. Shared
   envelope decoding and a typed single-handle authority provider prepare operator
-  composition without activating a CLI, public selector or deployment observer.
+  composition without activating a public selector or deployment observer.
 
 - Add an internal source-free native PREPARED recovery service using the same
   admitted SQL provider and normal publication/cleanup lifecycle. Exact plan

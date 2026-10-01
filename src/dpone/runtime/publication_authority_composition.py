@@ -116,7 +116,7 @@ class _PublicationConnections:
         environment: str,
         factory: Callable[[ResolvedBindingConnection], Any] | None,
     ) -> None:
-        self.pin = _require_deployment_pin(connection, binding, environment)
+        self.pin = require_publication_endpoint_pin(connection, binding, environment)
         self._connection = connection
         self._factory = factory if factory is not None else ResolvedConnectorFactory.create
 
@@ -160,9 +160,10 @@ def build_runtime_publication_provider(
     return provider
 
 
-def _require_deployment_pin(
+def require_publication_endpoint_pin(
     connection: ResolvedBindingConnection, binding: PublicationAuthorityBinding, environment: str
 ) -> str:
+    """Validate registry-owned SQL scope without opening a connector."""
     binding.require_descriptor(connection.descriptor)
     if environment != binding.environment or connection.credentials.database != binding.database:
         raise ValueError("publication_authority: runtime environment/storage differs")
