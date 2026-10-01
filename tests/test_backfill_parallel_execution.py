@@ -174,11 +174,14 @@ def _open_test_process_lane(worker_id, payload, operation_lease_factory):
             [
                 sys.executable,
                 "-c",
-                "import signal,time; signal.signal(signal.SIGTERM, signal.SIG_IGN); time.sleep(30)",
+                "import os,signal,sys; from pathlib import Path; "
+                "signal.signal(signal.SIGTERM, signal.SIG_IGN); "
+                "Path(sys.argv[1]).write_text(str(os.getpid()), encoding='utf-8'); signal.pause()",
+                str(payload["descendant_armed_path"]),
             ]
         )
         Path(str(payload["descendant_pid_path"])).write_text(str(descendant.pid), encoding="utf-8")
-        time.sleep(30)
+        descendant.wait()
     if str(payload.get("mode") or "") == "bootstrap_descendant_exit":
         descendant = subprocess.Popen(  # noqa: S603 - exact test interpreter, no shell.
             [
@@ -1175,11 +1178,42 @@ def test_native_lane_exit_stops_dispatch_and_receipt_resume_does_not_repeat_sour
 
 
 @pytest.mark.skipif(os.name != "posix", reason="POSIX process groups are required")
-def test_bootstrap_timeout_terminates_descendants_before_any_chunk_claim(tmp_path: Path) -> None:
+def test_bootstrap_timeout_terminates_descendants_before_any_chunk_claim(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A timeout after arming must kill the real group without claiming work."""
+
     events_path = tmp_path / "events.jsonl"
     descendant_pid_path = tmp_path / "descendant.pid"
+    descendant_armed_path = tmp_path / "descendant.armed"
     claims: list[int] = []
     descendant_pid: int | None = None
+    real_await_ready = process_lane_parent.await_ready
+
+    def await_armed_ready(lanes, *, timeout_seconds):
+        activation_deadline = time.monotonic() + 30.0
+        clock_started = False
+
+        def bootstrap_time():
+            nonlocal clock_started
+            if not clock_started:
+                clock_started = True
+                return 0.0
+            if time.monotonic() >= activation_deadline:
+                raise AssertionError("Descendant fixture did not arm; cleanup scenario was not exercised")
+            if descendant_pid_path.exists() and descendant_armed_path.exists():
+                pid = descendant_pid_path.read_text(encoding="utf-8")
+                if pid.isdecimal() and descendant_armed_path.read_text(encoding="utf-8") == pid:
+                    return timeout_seconds + 1.0
+            return 0.0
+
+        # Advance only the bootstrap observer's clock after the fault is armed.
+        # Shutdown and the real watchdog keep the unmodified time module.
+        with monkeypatch.context() as bootstrap_patch:
+            bootstrap_patch.setattr(process_lane_processes, "time", SimpleNamespace(monotonic=bootstrap_time))
+            return real_await_ready(lanes, timeout_seconds=timeout_seconds)
+
+    monkeypatch.setattr(process_lane_parent, "await_ready", await_armed_ready)
 
     try:
         summary = run_process_chunk_lanes(
@@ -1191,6 +1225,7 @@ def test_bootstrap_timeout_terminates_descendants_before_any_chunk_claim(tmp_pat
                     "events_path": str(events_path),
                     "mode": "bootstrap_descendant_hang",
                     "descendant_pid_path": str(descendant_pid_path),
+                    "descendant_armed_path": str(descendant_armed_path),
                 },
             ),
             claim_chunk=lambda worker, chunk, capture: claims.append(chunk) or _dispatch(worker, chunk, capture),
@@ -1203,12 +1238,17 @@ def test_bootstrap_timeout_terminates_descendants_before_any_chunk_claim(tmp_pat
         )
 
         descendant_pid = int(descendant_pid_path.read_text(encoding="utf-8"))
+        assert descendant_armed_path.read_text(encoding="utf-8") == str(descendant_pid)
+        assert any(event["event"] == "lane_opened" for event in _events(events_path))
         assert claims == []
         assert not _pid_is_running(descendant_pid)
         assert summary.lanes_started == 1
         assert summary.lanes[0].process_group_id == summary.lanes[0].pid
         assert any("timeout=true" in error for error in summary.errors)
     finally:
+        if descendant_pid is None and descendant_pid_path.exists():
+            pid = descendant_pid_path.read_text(encoding="utf-8")
+            descendant_pid = int(pid) if pid.isdecimal() else None
         if descendant_pid is not None:
             with suppress(ProcessLookupError):
                 os.kill(descendant_pid, signal.SIGKILL)
