@@ -29,6 +29,7 @@ from dpone.runtime.sinks.clickhouse_cluster_publication_recovery import (
     reconcile_existing,
     require_first_publication_complete,
     require_pre_dispatch_generation,
+    require_published_target_rows,
     require_retired_predecessor,
     settle_prior_publication,
 )
@@ -274,6 +275,8 @@ class ClickHouseClusterFullRefreshPublicationService:
         facts = self._catalog.generations(
             resolved.cluster, record.database, record.target, record.candidate, inventory.hosts
         )
+        contracts.require_replica_inventory(facts, inventory.hosts)
+        require_published_target_rows(self._catalog, resolved.cluster, record, inventory.hosts)
         states = tuple(classify_replica(fact, desired=record.desired, predecessor=record.predecessor) for fact in facts)
         if current.record.phase is AuthorityPhase.CLEANUP_DISPATCHING:
             self._finish_dispatched_cleanup(authority, current, resolved.cluster, inventory.hosts, states)
@@ -316,6 +319,7 @@ class ClickHouseClusterFullRefreshPublicationService:
         after = self._catalog.generations(
             resolved.cluster, record.database, record.target, record.candidate, inventory.hosts
         )
+        contracts.require_replica_inventory(after, inventory.hosts)
         after_states = tuple(
             classify_replica(fact, desired=record.desired, predecessor=record.predecessor) for fact in after
         )

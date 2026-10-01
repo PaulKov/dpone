@@ -4,6 +4,13 @@
 
 ### Added
 
+- Add an internal source-free native PREPARED recovery service using the same
+  admitted SQL provider and normal publication/cleanup lifecycle. Exact plan
+  confirmation, a mandatory held deployment observer and fresh physical/DDL
+  evidence gate effects. Unknown CAS never dispatches; lost DDL replies and
+  resumed phases never redispatch. Quality-bearing and empty-load recovery stay
+  blocked without original policy proof. No public activation or permissive
+  observer is supplied; component tests are not live route certification.
 - Add independent MSSQL load/step audit selection for normal pipeline authoring,
   including sources with disabled state. A closed `audit.storage` selector uses
   the verified registry's database/schema and external catalog admission before
@@ -58,6 +65,10 @@
 
 ### Fixed
 
+- Require exact replica observation coverage before cluster publication
+  reconciliation and cleanup, and verify published target row counts before
+  predecessor cleanup. Missing observations or lost target rows preserve the
+  previous generation rather than failing only after its deletion.
 - Add explicit database and external-provisioning support to the internal
   MSSQL step-audit adapter and route wrapper. Scope metadata, migrations and
   inserts to one location; reject external schema drift without DDL and write

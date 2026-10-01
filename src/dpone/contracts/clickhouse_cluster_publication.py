@@ -360,6 +360,15 @@ def one_generation_identity(facts: Sequence[ReplicaGeneration], role: str) -> Ge
     return value
 
 
+def require_replica_inventory(facts: Sequence[ReplicaGeneration], hosts: Sequence[str]) -> None:
+    """Do not reduce physical observations to states before checking coverage."""
+    expected = tuple(sorted(hosts))
+    if not expected or len(set(expected)) != len(expected) or tuple(sorted(item.host for item in facts)) != expected:
+        raise ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_GENERATION_UNKNOWN", "every admitted replica must be observed exactly once"
+        )
+
+
 def optional_generation_identity(facts: Sequence[ReplicaGeneration], role: str) -> GenerationIdentity | None:
     values = {getattr(item, role) for item in facts}
     if len(values) != 1:

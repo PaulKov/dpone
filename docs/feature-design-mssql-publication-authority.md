@@ -15,7 +15,9 @@ This branch currently provides the unactivated binding, catalog admission,
 native SQL authority adapter, shared normal/replay runtime composition, and an
 endpoint-admitted schema plan/apply/inspect service with a thin draft CLI.
 Public manifests still reject the proposed option; no existing workload switches
-backend. Legacy adoption/retirement operator commands, prepared-recovery integration and
+backend. An internal native prepared-recovery service reuses normal publication
+reconciliation and cleanup through that same provider. Legacy adoption/retirement
+operator commands, prepared-recovery application/CLI integration and
 end-to-end ClickHouse recovery acceptance remain required before activation.
 Do not configure this option against a released runtime.
 
@@ -197,6 +199,51 @@ observing that core is not an authentication of the policy or its acceptance.
 The read returns a bounded receipt, but finding the earliest operation event
 may scan retained history for that target. A concurrent cooperating CAS writer
 waits for the read transaction to release the current-slot lock.
+
+### Shared native recovery service — internal checkpoint
+
+`PreparedRecoveryService` receives the selected native authority provider, the
+existing ClickHouse catalog/DDL capabilities and a mandatory deployment-owned
+`PreparedRecoverySafetyObserver`. It does not construct a Keeper backend or
+resolve arbitrary caller connections. There is no permissive observer default.
+
+Planning is read-only and requires the exact current native PREPARED version.
+The plan binds the original SQL time/payload, endpoint-inclusive binding digest,
+target, inventory and deterministic publication intent. Its digest is a scope
+confirmation, not an admission credential. Execute checks confirmation before
+service I/O, re-admits the provider and re-reads native origin before and inside
+the held safety interval. Stored evidence never replaces fresh observation.
+
+For PREPARED, the trusted observer must cover every replica exactly once, from
+no later than the original preparation through the current observation boundary,
+with no gaps, matching publication DDL, pending requests, active mutations or
+other writers. Its authenticated freeze identifies and excludes every other
+writer, including manual and restarted workers. SQL UTC time is only a coverage
+bound, not cross-system clock or history authentication. Exiting the service
+hold does not release deployment exclusion. A production observer and its live
+acceptance are still required; operator JSON or a boolean cannot supply one.
+
+The winning exact CAS alone yields a consumable dispatch permit. Conflict or
+lost CAS acknowledgement stops without DDL. Lost DDL replies are reconciled
+against the original exact retained entry, never dispatched again. Resuming
+DISPATCHING/COMMITTED/CLEANUP_DISPATCHING reuses the normal lifecycle without
+requiring absence of its own DDL. All reads and effects remain operation-bound
+and held; loss of the hold stops progress, including after a possible effect.
+
+Before predecessor cleanup, the shared lifecycle requires exact replica coverage
+and published target counts equal to the admitted staged count. Missing hosts or
+lost rows preserve the predecessor. Returning COMPLETED additionally requires a
+fresh healthy desired target on every replica, no candidate, exact row counts
+and terminal publication/owned cleanup entries. As in normal publication, a
+terminal DDL failure with proven physical completion is reconcilable; it is not
+silently retried. If no cleanup was dispatched, no synthetic cleanup receipt is
+invented. These checks do not prove row-wise data quality.
+
+The current internal service rejects zero-row and quality-bearing recovery until
+the original empty-load policy and quality governance can be authenticated.
+It reads no source and does not rerun a workload. Component tests use synthetic
+in-memory state/transport with the real DDL adapter; they are not a live
+ClickHouse/deployment certificate or permission to activate the option.
 
 ### Independent audit binding — implementation refinement
 
