@@ -63,7 +63,6 @@ class LoadConfigBuilder:
         try:
             source_cfg = dict(config.get("source", {}) or {})
             sink_cfg = dict(config.get("sink", {}) or {})
-            runtime_cfg = dict(config.get("runtime", {}) or {})
 
             source_type = source_cfg.get("type", "postgres")
             canonical_source_type = canonical_endpoint_type(str(source_type))
@@ -278,7 +277,7 @@ class LoadConfigBuilder:
                 raise DagConfigurationError(str(exc)) from exc
             reconciliation_policy = inject_runtime_contract_options(
                 config=config,
-                runtime_config=runtime_cfg,
+                runtime_config=dict(config.get("runtime", {}) or {}),
                 options=options,
                 reconciliation_options=reconciliation_options,
                 parse_tracer=parse_tracer,
