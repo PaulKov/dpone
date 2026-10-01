@@ -11,7 +11,7 @@ import re
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import suppress
 from threading import RLock
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from uuid import UUID
 
 from dpone.ports.clickhouse_cluster_publication import contracts as c
@@ -31,9 +31,10 @@ _IDENTITY_SQL = (
     "SELECT CONVERT(nvarchar(128),SERVERPROPERTY('ServerName')),DB_NAME(),"
     "CONVERT(varchar(36),database_guid) FROM sys.database_recovery_status WHERE database_id=DB_ID()"
 )
+AuthorityT = TypeVar("AuthorityT", bound="ClusterPublicationAuthorityPort")
 
 
-class BoundPublicationAuthorityProvider:
+class BoundPublicationAuthorityProvider(Generic[AuthorityT]):
     """One binding across sink databases; readiness re-admits external storage.
 
     The factory owns structural admission and closes its observer. Services get
@@ -41,9 +42,9 @@ class BoundPublicationAuthorityProvider:
     Failed re-admission invalidates the previous handle, never falls back.
     """
 
-    def __init__(self, factory: Callable[[], ClusterPublicationAuthorityPort]) -> None:
+    def __init__(self, factory: Callable[[], AuthorityT]) -> None:
         self._factory = factory
-        self._authority: ClusterPublicationAuthorityPort | None = None
+        self._authority: AuthorityT | None = None
         self._lock = RLock()
 
     def ensure(self, cluster: str, database: str, hosts: Sequence[str]) -> None:
@@ -52,7 +53,7 @@ class BoundPublicationAuthorityProvider:
             self._authority = None
             self._authority = self._factory()
 
-    def for_database(self, database: str) -> ClusterPublicationAuthorityPort:
+    def for_database(self, database: str) -> AuthorityT:
         del database
         with self._lock:
             if self._authority is None:
@@ -144,7 +145,7 @@ class _PublicationConnections:
 
 def build_runtime_publication_provider(
     *, connection: ResolvedBindingConnection | None, binding: PublicationAuthorityBinding | None
-) -> BoundPublicationAuthorityProvider | None:
+) -> BoundPublicationAuthorityProvider[MssqlPublicationAuthority] | None:
     """Preflight the independent store before any source/sink is constructed."""
     if binding is None:
         if connection is not None:

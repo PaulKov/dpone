@@ -12,7 +12,11 @@ import time
 from collections.abc import Callable
 from typing import TYPE_CHECKING
 
-from dpone.contracts.prepared_recovery import PreparedRecoveryPlan, require_unpublished_safety
+from dpone.contracts.prepared_recovery import (
+    PreparedRecoveryPlan,
+    recovery_dispatch_token,
+    require_unpublished_safety,
+)
 from dpone.ports.clickhouse_cluster_publication import (
     ClusterPublicationCatalogPort,
     ClusterPublicationDdlPort,
@@ -84,7 +88,7 @@ class PreparedRecoveryService:
             return PreparedRecoveryPlan(
                 preparation,
                 observed,
-                self._token(preparation),
+                recovery_dispatch_token(preparation),
                 self._ddl.publication_query_digest(preparation.prepared.record, cluster=self._cluster),
             )
 
@@ -94,7 +98,7 @@ class PreparedRecoveryService:
             raise ValueError("exact recovery plan confirmation required")
         original = plan.preparation.prepared.record
         self._require_origin(plan.preparation, original.target_key, original.operation_id)
-        if plan.preparation.current != plan.preparation.prepared or plan.dispatch_token != self._token(
+        if plan.preparation.current != plan.preparation.prepared or plan.dispatch_token != recovery_dispatch_token(
             plan.preparation
         ):
             raise ValueError("recovery plan preparation or intent changed")
@@ -221,14 +225,3 @@ class PreparedRecoveryService:
         ):
             raise ValueError("recovery requires exact healthy replica inventory")
         require_pre_dispatch_generation(self._catalog, self._cluster, record)
-
-    def _token(self, preparation: NativePublicationPreparation) -> str:
-        record = preparation.prepared.record
-        suffix = c.digest_payload(
-            {
-                "binding": self._binding,
-                "preparation": record.payload_sha256,
-                "version": preparation.prepared.version,
-            }
-        )
-        return f"dpone-recovery-v1-{record.operation_id[:20]}-publish-{record.dispatch_epoch + 1}-{suffix}"

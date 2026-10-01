@@ -10,6 +10,7 @@ from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
 from threading import Lock
 from typing import Any
+from uuid import UUID
 
 from dpone._compat import StrEnum
 
@@ -212,6 +213,38 @@ class AuthorityRecord:
     quality_evidence: str | None = None
     quality_reader: str | None = None
     authority_write_id: str | None = None
+
+    @classmethod
+    def from_payload(cls, raw: bytes) -> AuthorityRecord:
+        """Decode exact canonical bytes, not origin/ownership or a dispatch permit."""
+        if not isinstance(raw, bytes) or not 0 < len(raw) <= 1024 * 1024:
+            raise ValueError("invalid publication envelope size")
+        data = json.loads(raw.decode("utf-8"))
+        data["phase"] = AuthorityPhase(data["phase"])
+        data["desired"] = GenerationIdentity(**data["desired"])
+        if data.get("predecessor") is not None:
+            data["predecessor"] = GenerationIdentity(**data["predecessor"])
+        record = cls(**data)
+        if record.payload.encode() != raw:
+            raise ValueError("noncanonical publication envelope")
+        if record.schema_version not in {SCHEMA_VERSION, QUALITY_SCHEMA_VERSION}:
+            raise ValueError("unsupported publication envelope")
+        if (record.schema_version == QUALITY_SCHEMA_VERSION) != (record.quality_evidence is not None):
+            raise ValueError("publication quality schema differs")
+        record.desired.validate()
+        if record.predecessor is not None:
+            record.predecessor.validate()
+        for value in (record.dispatch_epoch, record.staged_rows):
+            if type(value) is not int or not 0 <= value < 2**63 - 1:
+                raise ValueError("invalid publication count/epoch")
+        if not isinstance(record.operation_id, str) or not 0 < len(record.operation_id) <= 128:
+            raise ValueError("invalid publication operation identity")
+        if (
+            record.authority_write_id is not None
+            and UUID(hex=record.authority_write_id).hex != record.authority_write_id
+        ):
+            raise ValueError("invalid publication write identity")
+        return record
 
     @property
     def payload(self) -> str:

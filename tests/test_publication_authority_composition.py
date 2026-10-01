@@ -196,6 +196,20 @@ def test_bound_provider_rejects_failed_readmission_without_stale_cached_authorit
         provider.for_database("Business")
 
 
+def test_native_provider_keeps_origin_observation_and_mutation_on_one_admitted_handle():
+    from tests.test_native_prepared_recovery import Authority, Catalog
+
+    authority = Authority(Catalog())
+    provider = api().BoundPublicationAuthorityProvider[Authority](lambda: authority)
+    provider.ensure("cluster", "analytics", ("one", "two"))
+    observed = provider.for_database("analytics")
+    original = observed.read_native_preparation(
+        authority.current.record.target_key, authority.current.record.operation_id
+    )
+    assert original.prepared == authority.current
+    assert observed is provider.for_database("other") is authority
+
+
 def test_schema_operator_plans_without_early_catalog_or_connector_admission():
     operator = api().build_publication_schema(
         connection=connection(),

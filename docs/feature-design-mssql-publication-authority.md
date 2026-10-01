@@ -214,6 +214,20 @@ confirmation, not an admission credential. Execute checks confirmation before
 service I/O, re-admits the provider and re-reads native origin before and inside
 the held safety interval. Stored evidence never replaces fresh observation.
 
+The internal `PreparedRecoveryOperatorPlan` wraps that unchanged inner digest
+with the full authority binding, SQL endpoint pin, verified connection-context
+subject, logical sink reference and non-secret sink endpoint identity. Its outer
+confirmation cannot be substituted for the inner service confirmation. The
+bounded canonical codec preserves UTC microseconds and exact original revision;
+it rejects duplicate/unknown fields, coercion, changed intent and incomplete
+saved observations. It checks historical evidence at its saved boundary, so an
+expired plan remains readable but grants no fresh safety. No credentials, SQL,
+observer or dispatch permit is serialized. The SQL adapter and operator reuse
+the same pure envelope decoder; the existing runtime import remains compatible.
+The bound provider preserves the selected native capability on one admitted
+handle, with unchanged locking and failed-admission invalidation. This codec and
+scope wrapper do not activate a CLI command or a deployment observer.
+
 For PREPARED, the trusted observer must cover every replica exactly once, from
 no later than the original preparation through the current observation boundary,
 with no gaps, matching publication DDL, pending requests, active mutations or

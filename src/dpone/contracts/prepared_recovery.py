@@ -5,6 +5,7 @@ held observer can authenticate writer exclusion and complete attributable histor
 constructing a value or possessing its digest grants no permission to execute.
 """
 
+import hashlib
 import re
 from dataclasses import asdict, dataclass
 from math import floor
@@ -49,10 +50,27 @@ class PreparedRecoveryPlan:
     dispatch_query_digest: str
 
     @property
-    def digest(self) -> str:
+    def payload(self) -> str:
         value = asdict(self)
         value["preparation"]["prepared_at"] = self.preparation.prepared_at.isoformat()
-        return c.digest_payload({"contract": "dpone.native-prepared-recovery.v1", "plan": value})
+        return c.canonical_json({"contract": "dpone.native-prepared-recovery.v1", "plan": value})
+
+    @property
+    def digest(self) -> str:
+        return hashlib.sha256(self.payload.encode()).hexdigest()
+
+
+def recovery_dispatch_token(preparation: NativePublicationPreparation) -> str:
+    """Deterministic intent identity, not permission to submit that intent."""
+    record = preparation.prepared.record
+    suffix = c.digest_payload(
+        {
+            "binding": preparation.binding_digest,
+            "preparation": record.payload_sha256,
+            "version": preparation.prepared.version,
+        }
+    )
+    return f"dpone-recovery-v1-{record.operation_id[:20]}-publish-{record.dispatch_epoch + 1}-{suffix}"
 
 
 def require_unpublished_safety(

@@ -4,6 +4,13 @@
 
 ### Added
 
+- Add internal bounded canonical native recovery plans bound to exact authority,
+  verified-context subject and sink identity. Preserve the existing inner digest
+  and historical observation time; malformed or changed plans fail closed.
+  The saved plan supplies neither fresh safety nor a dispatch permit. Shared
+  envelope decoding and a typed single-handle authority provider prepare operator
+  composition without activating a CLI, public selector or deployment observer.
+
 - Add an internal source-free native PREPARED recovery service using the same
   admitted SQL provider and normal publication/cleanup lifecycle. Exact plan
   confirmation, a mandatory held deployment observer and fresh physical/DDL

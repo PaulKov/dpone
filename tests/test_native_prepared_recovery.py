@@ -180,10 +180,11 @@ class Safety:
         return self.alter(value)
 
 
-def rig():
+def rig(*, binding="a" * 64):
     module = import_module("dpone.runtime.sinks.clickhouse_prepared_recovery")
     catalog = Catalog()
     authority = Authority(catalog)
+    authority.binding = binding
     provider, safety = Provider(authority), Safety(catalog)
     ddl = ClickHouseClusterPublicationDdl(catalog, catalog)
     service = module.PreparedRecoveryService(
@@ -191,7 +192,7 @@ def rig():
         provider=provider,
         ddl=ddl,
         safety=safety,
-        binding_digest="a" * 64,
+        binding_digest=binding,
         cluster="cluster",
         database="analytics",
         clock=lambda: 130,
