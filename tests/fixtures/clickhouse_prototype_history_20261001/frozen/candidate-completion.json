@@ -1,0 +1,18 @@
+{
+  "digest": "3a1d43c37c92e3923f72261688ca58ec33a27f401fc388ab607cd19a791893e9",
+  "fields": {
+    "driver_version": "0.2.10",
+    "kind": "insert",
+    "operation_id": "deployment:one",
+    "payload_digest": "41f0c4e67eb5e58614ae0edbcf6973e22056b101bc573339a6b23c906927b471",
+    "query_id": "dpone-candidate-913883d7ec6f32607b1bd9f65cd1f40af5bf9d65c69387660d0072b2cf3ec863",
+    "server_id": "server",
+    "server_revision": 54468,
+    "server_version": [
+      24,
+      8,
+      14
+    ],
+    "statement_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}

@@ -1,0 +1,170 @@
+[
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"replace_partition\",\"operation_id\":\"deployment:one\",\"partition_id\":\"all\",\"reason\":\"single_complete_partition\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"prepared\"}",
+    "method": "replace_partition",
+    "sha256": "588931581309da860eaacb80a6672b208513015b056c5e1794293c3d4b285184",
+    "state": "prepared"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"replace_partition\",\"operation_id\":\"deployment:one\",\"partition_id\":\"all\",\"reason\":\"single_complete_partition\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"claimed\"}",
+    "method": "replace_partition",
+    "sha256": "5c809ce5819e2af2b1ed474c30b7a1c96212c1637588e4842f7a1f3c9fdc5d37",
+    "state": "claimed"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"replace_partition\",\"operation_id\":\"deployment:one\",\"partition_id\":\"all\",\"reason\":\"single_complete_partition\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"unknown\"}",
+    "method": "replace_partition",
+    "sha256": "b5689dcdb76e3f0975ebd0ba40ba41fdd2a800316db65f39f5bc2c6c1a5c482e",
+    "state": "unknown"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"replace_partition\",\"operation_id\":\"deployment:one\",\"partition_id\":\"all\",\"reason\":\"single_complete_partition\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"unknown\"}",
+    "method": "replace_partition",
+    "sha256": "58bc08e6d9b3da3f9a4c26b05f2c8de560a058c3cbcf053c6c1b35eb253792a3",
+    "state": "unknown"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"replace_partition\",\"operation_id\":\"deployment:one\",\"partition_id\":\"all\",\"reason\":\"single_complete_partition\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"committed\"}",
+    "method": "replace_partition",
+    "sha256": "6efb0abe16584e555c1d6b326e8f0046bfe13c2f101048152094ee6f1063ed13",
+    "state": "committed"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"replace_partition\",\"operation_id\":\"deployment:one\",\"partition_id\":\"all\",\"reason\":\"single_complete_partition\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"not_published\"}",
+    "method": "replace_partition",
+    "sha256": "3ac2b91ec93066121e21d14322e6157bd6a662fd6eba205c1c09444962df8fb2",
+    "state": "not_published"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":null},\"method\":\"rename\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"target_absent\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"prepared\"}",
+    "method": "rename",
+    "sha256": "25e209fdd46b479013073d247791b8d116dfec320e31e5c60b2a2feea6cfe597",
+    "state": "prepared"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":null},\"method\":\"rename\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"target_absent\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"claimed\"}",
+    "method": "rename",
+    "sha256": "053399a1e3c8f3682cb1406d69a54800a1ec9b9a17cdb40cad8f1e55bc6eb03d",
+    "state": "claimed"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":null},\"method\":\"rename\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"target_absent\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"unknown\"}",
+    "method": "rename",
+    "sha256": "846b1271f292729031d16f907afca6914ab5edfdf38cbcf496c22e0db9e7427e",
+    "state": "unknown"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":null},\"method\":\"rename\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"target_absent\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"unknown\"}",
+    "method": "rename",
+    "sha256": "995babe004e32b6decc35f899ddf35ebdca0b4cff28a4ca69e07acc703350224",
+    "state": "unknown"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":null},\"method\":\"rename\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"target_absent\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"committed\"}",
+    "method": "rename",
+    "sha256": "47c2270c127c014741fc8602fc4aa4491e6008bb5d984920926702c5dd76c029",
+    "state": "committed"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":null},\"method\":\"rename\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"target_absent\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"not_published\"}",
+    "method": "rename",
+    "sha256": "e2b81f052d9a0143dfdcfc522a58ca3cded52f996202bc8df51f9295951dd0f4",
+    "state": "not_published"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"noop\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"identical_snapshot\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"prepared\"}",
+    "method": "noop",
+    "sha256": "f62a45a9c0ee6f84d5acaef0da59ca7508208d050ea77bcfa8fc2517cefda4a8",
+    "state": "prepared"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"noop\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"identical_snapshot\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"claimed\"}",
+    "method": "noop",
+    "sha256": "b10027d9578c0cfe3b36378e2086c5606bf6cdef70593884649725e285d6a5e4",
+    "state": "claimed"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"noop\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"identical_snapshot\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"unknown\"}",
+    "method": "noop",
+    "sha256": "e4e6dfe2627994eee7eca1371348bb21db32a621d254c81503c841b36dcdda5b",
+    "state": "unknown"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"noop\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"identical_snapshot\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"unknown\"}",
+    "method": "noop",
+    "sha256": "7a9bb33de0ef65fe02682ffe7a039623c0d74ac762ba8d41fb689ad0cfd225e7",
+    "state": "unknown"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"noop\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"identical_snapshot\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"committed\"}",
+    "method": "noop",
+    "sha256": "64864cfc9bfdcf3035e3de04ff3d2dafd854dc4f7896f265dcdb75f5315dfadb",
+    "state": "committed"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"noop\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"identical_snapshot\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"not_published\"}",
+    "method": "noop",
+    "sha256": "68ba61fd0e9a0df71bcc571f9668f2d957426e48a147a35b97be9c6e119e0be8",
+    "state": "not_published"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"exchange\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"design_changed\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"prepared\"}",
+    "method": "exchange",
+    "sha256": "ecdfd277b182e9acfa275d95628855a27418f5e578465dfc4ac8ef70e19359c1",
+    "state": "prepared"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"exchange\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"design_changed\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"claimed\"}",
+    "method": "exchange",
+    "sha256": "94ba1d8984ad83f9fb5a06cb09ffd4b1af0b820a686c58ec9297a37e16ad8c51",
+    "state": "claimed"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"exchange\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"design_changed\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"unknown\"}",
+    "method": "exchange",
+    "sha256": "26cfe4b9e83a9118da43a372049895aecfa8e21b29b2364eb2a80861ce006831",
+    "state": "unknown"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"exchange\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"design_changed\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"unknown\"}",
+    "method": "exchange",
+    "sha256": "4fd9f2eacd082f05b042135896fa1e8d7bfbb7271b354b45274b5e18c7485054",
+    "state": "unknown"
+  },
+  {
+    "claim_granted": true,
+    "encoded": "{\"claim_granted\":true,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"exchange\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"design_changed\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"committed\"}",
+    "method": "exchange",
+    "sha256": "3cb4316b59ae161ff057fba66d4a287c11f86b645ebf48d4413e5dea368eded1",
+    "state": "committed"
+  },
+  {
+    "claim_granted": false,
+    "encoded": "{\"claim_granted\":false,\"intent\":{\"before\":{\"candidate\":{\"content_digest\":\"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\"design_digest\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":2,\"uuid\":\"new\"},\"catalog_complete\":true,\"database_engine\":\"Atomic\",\"side_effects_safe\":true,\"subject\":[\"server\",\"db\",\"target\",\"candidate\"],\"target\":{\"content_digest\":\"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\"design_digest\":\"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\"engine\":\"MergeTree\",\"partitions\":[\"all\"],\"rows\":1,\"uuid\":\"old\"}},\"method\":\"exchange\",\"operation_id\":\"deployment:one\",\"partition_id\":null,\"reason\":\"design_changed\"},\"schema_version\":\"dpone.clickhouse.guarded-publication.v2\",\"state\":\"not_published\"}",
+    "method": "exchange",
+    "sha256": "e56738810ab8b2ba46834288efca50fc4bd21609fc8905e94ea13d7cbc1657ee",
+    "state": "not_published"
+  }
+]

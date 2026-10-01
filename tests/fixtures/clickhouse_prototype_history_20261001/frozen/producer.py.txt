@@ -1,0 +1,168 @@
+"""Create synthetic pre-consolidation vectors, never touch an existing store.
+
+This is a one-time preservation producer, not a live certificate or a future
+test oracle. Every imported dpone/test producer must match the frozen commit.
+Only a newly created private output directory may receive generated fixtures.
+"""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import json
+import platform
+import sqlite3
+import subprocess
+import sys
+from dataclasses import asdict, replace
+from datetime import datetime, timezone
+from pathlib import Path
+
+ROOT = Path(subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip())
+sys.path.insert(0, str(ROOT))
+
+from dpone.adapters.clickhouse_authority_sqlite import SQLitePublicationAuthority
+from dpone.adapters.clickhouse_publication_codec import decode_record, encode_record
+from dpone.contracts.clickhouse_native_publication import NativePublicationCompletion
+from dpone.contracts.clickhouse_publication import PublicationRecord, PublicationState, choose_publication
+from tests.test_clickhouse_candidate_sqlite import (
+    complete_create,
+    completion,
+    enrollment,
+    mutation,
+    request,
+    store,
+)
+from tests.test_clickhouse_publication_codec import example_record
+
+SOURCE_COMMIT = "5a36601e26fb826ed4ea1b4a08aca722d366ffec"
+
+
+def source_manifest() -> dict[str, str]:
+    manifest = {}
+    for name, module in tuple(sys.modules.items()):
+        source = getattr(module, "__file__", None)
+        selected = name in {"dpone", "tests"} or name.startswith(("dpone.", "tests.test_clickhouse_"))
+        if source is None or not selected:
+            continue
+        path = Path(source).resolve()
+        if path.suffix != ".py":
+            continue
+        relative = path.relative_to(ROOT).as_posix()
+        original = subprocess.check_output(["git", "show", f"{SOURCE_COMMIT}:{relative}"], cwd=ROOT)
+        actual = path.read_bytes()
+        if original != actual:
+            raise RuntimeError(f"Producer differs from frozen source: {relative}")
+        manifest[relative] = hashlib.sha256(actual).hexdigest()
+    return dict(sorted(manifest.items()))
+
+
+def create_json(path: Path, value: object) -> None:
+    with path.open("x", encoding="utf-8") as stream:
+        stream.write(json.dumps(value, sort_keys=True, indent=2, allow_nan=False) + "\n")
+
+
+def freeze_records(destination: Path) -> None:
+    observed = example_record().intent.before
+    assert observed.target is not None and observed.candidate is not None
+    cases = {
+        "replace_partition": observed,
+        "rename": replace(observed, target=None),
+        "noop": replace(observed, candidate=replace(observed.target, uuid="new")),
+        "exchange": replace(observed, candidate=replace(observed.candidate, design_digest="d" * 64)),
+    }
+    states = (
+        (PublicationState.PREPARED, False),
+        (PublicationState.CLAIMED, True),
+        (PublicationState.UNKNOWN, False),
+        (PublicationState.UNKNOWN, True),
+        (PublicationState.COMMITTED, True),
+        (PublicationState.NOT_PUBLISHED, False),
+    )
+    vectors = []
+    for method, observation in cases.items():
+        intent = choose_publication("deployment:one", observation)
+        assert intent.method == method
+        for state, claimed in states:
+            value = PublicationRecord(intent, state, claimed)
+            payload = encode_record(value)
+            assert decode_record(payload) == value
+            vectors.append({"method": method, "state": state, "claim_granted": claimed,
+                            "encoded": payload, "sha256": hashlib.sha256(payload.encode()).hexdigest()})
+    create_json(destination / "publication-records.json", vectors)
+
+
+def freeze_v1(destination: Path, phase: str) -> None:
+    private = destination / f"v1-{phase}"
+    private.mkdir(mode=0o700)
+    path = private / "authority.db"
+    SQLitePublicationAuthority.provision(path, "deployment")
+    authority = SQLitePublicationAuthority(path, "deployment")
+    value = request()
+    binding = authority.acquire(value.operation_id, value.subject, value.candidate)
+    entry = authority.prepare(binding, example_record().intent)
+    if phase != "prepared":
+        grant = authority.claim(entry)
+        assert grant is not None
+        authority.begin_send(grant)
+        if phase == "terminal":
+            receipt = NativePublicationCompletion(value.operation_id, entry.record.intent.query_id, "server",
+                                                  "b" * 64, (24, 8, 14), 54468, "0.2.10")
+            authority.record_terminal(grant, receipt.digest)
+            create_json(destination / "native-completion.json", {"fields": asdict(receipt), "digest": receipt.digest})
+    create_json(destination / f"v1-{phase}-diagnostics.json", authority.diagnostics(value.operation_id))
+
+
+def freeze_v2(destination: Path, phase: str) -> None:
+    private = destination / f"v2-{phase}"
+    private.mkdir(mode=0o700)
+    authority = store(private)
+    value = request()
+    with authority.enroll(value, enrollment(value)) as invocation:
+        writes = complete_create(authority, invocation)
+        insert = mutation(invocation, "insert", 1)
+        grant = writes.register(invocation, insert)
+        writes.begin_send(grant)
+        if phase == "closed":
+            receipt = completion(insert)
+            writes.record_terminal(grant, receipt)
+            authority.source_exhausted(invocation)
+            authority.close_admission(value.operation_id)
+            create_json(destination / "candidate-completion.json", {"fields": asdict(receipt), "digest": receipt.digest})
+    create_json(destination / f"v2-{phase}-diagnostics.json", authority.diagnostics(value.operation_id))
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("destination", type=Path)
+    destination = parser.parse_args().destination.absolute()
+    initial_sources = source_manifest()
+    destination.mkdir(mode=0o700)  # Deliberately fails when output already exists.
+    freeze_records(destination)
+    for phase in ("prepared", "may-have-sent", "terminal"):
+        freeze_v1(destination, phase)
+    for phase in ("may-have-sent", "closed"):
+        freeze_v2(destination, phase)
+    final_sources = source_manifest()
+    if any(final_sources.get(path) != digest for path, digest in initial_sources.items()):
+        raise RuntimeError("Producer changed while freezing history")
+    with (destination / "producer.py.txt").open("xb") as stream:
+        stream.write(Path(__file__).read_bytes())
+    files = {path.relative_to(destination).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+             for path in sorted(destination.rglob("*")) if path.is_file()}
+    create_json(destination / "provenance.json", {
+        "source_commit": SOURCE_COMMIT, "producer_sources": final_sources,
+        "producer_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+        "generated_at_utc": datetime.now(timezone.utc).isoformat(),
+        "python": platform.python_version(), "sqlite": sqlite3.sqlite_version,
+        "kind": "synthetic_pre_consolidation_fixtures", "live_certificate": False,
+        "coverage": "24 publication JSON variants, 3 v1 and 2 v2 quiesced synthetic stores; no seal or v3",
+        "limitations": "Synthetic positive completion only; no actual transport or EOS proof; random grant hashes are frozen bytes, not reusable grants",
+        "files_sha256": files,
+    })
+    print(json.dumps({"destination": str(destination), "files": len(files), "source_files": len(final_sources),
+                      "source_commit": SOURCE_COMMIT, "live_certificate": False}, sort_keys=True))
+
+
+if __name__ == "__main__":
+    main()

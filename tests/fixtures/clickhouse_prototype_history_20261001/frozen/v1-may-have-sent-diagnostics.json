@@ -1,0 +1,53 @@
+{
+  "binding": {
+    "candidate": "candidate",
+    "epoch": 1,
+    "operation_id": "deployment:one",
+    "subject": {
+      "database": "db",
+      "deployment_id": "deployment",
+      "server_id": "server",
+      "target": "target"
+    }
+  },
+  "claim_granted": true,
+  "completion_digest": null,
+  "history": [
+    {
+      "event": "acquire",
+      "observation_digest": null,
+      "record_digest": null,
+      "revision": 0,
+      "transport": "not_started"
+    },
+    {
+      "event": "prepare",
+      "observation_digest": null,
+      "record_digest": "588931581309da860eaacb80a6672b208513015b056c5e1794293c3d4b285184",
+      "revision": 1,
+      "transport": "not_started"
+    },
+    {
+      "event": "claim",
+      "observation_digest": null,
+      "record_digest": "5c809ce5819e2af2b1ed474c30b7a1c96212c1637588e4842f7a1f3c9fdc5d37",
+      "revision": 2,
+      "transport": "not_started"
+    },
+    {
+      "event": "begin_send",
+      "observation_digest": null,
+      "record_digest": "5c809ce5819e2af2b1ed474c30b7a1c96212c1637588e4842f7a1f3c9fdc5d37",
+      "revision": 3,
+      "transport": "may_have_sent"
+    }
+  ],
+  "method": "replace_partition",
+  "owner_retained": true,
+  "query_id": "dpone-publication-13f8d5e07724f680a3437b6a03ca268fe29e00f84d0005c40bf037b177d84565",
+  "reason": "single_complete_partition",
+  "revision": 3,
+  "schema_version": "dpone.clickhouse.authority-diagnostics.v1",
+  "state": "claimed",
+  "transport": "may_have_sent"
+}

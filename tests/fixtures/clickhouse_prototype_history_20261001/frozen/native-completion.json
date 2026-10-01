@@ -1,0 +1,16 @@
+{
+  "digest": "88899bb5645b333dbfc037af22962e50e891639adadf9543deac061892f8fc95",
+  "fields": {
+    "driver_version": "0.2.10",
+    "operation_id": "deployment:one",
+    "query_id": "dpone-publication-13f8d5e07724f680a3437b6a03ca268fe29e00f84d0005c40bf037b177d84565",
+    "server_id": "server",
+    "server_revision": 54468,
+    "server_version": [
+      24,
+      8,
+      14
+    ],
+    "statement_digest": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+  }
+}

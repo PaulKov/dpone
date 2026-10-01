@@ -1,0 +1,42 @@
+{
+  "accepted_query_ids": [
+    "dpone-candidate-d723c514ef31dda11428e03feb6eb3ccbcb0da140f42a67f3afd87dc36fd5710",
+    "dpone-candidate-913883d7ec6f32607b1bd9f65cd1f40af5bf9d65c69387660d0072b2cf3ec863"
+  ],
+  "accepted_requests": 2,
+  "admission_closed": false,
+  "authority_version": "dpone.clickhouse.authority.v2",
+  "binding": {
+    "candidate": "candidate",
+    "epoch": 1,
+    "operation_id": "deployment:one",
+    "subject": {
+      "database": "db",
+      "deployment_id": "deployment",
+      "server_id": "server",
+      "target": "target"
+    }
+  },
+  "expected_encoded_bytes": 0,
+  "expected_rows": 0,
+  "lifecycle": "loading",
+  "observation_kind": "not_observed",
+  "owner_retained": true,
+  "phase": "prepublication",
+  "profile_digest": "705d8483c684fe6522425ceed0a6fc38d95fc669150f408e1c81887875158f46",
+  "publication_state": null,
+  "reason": null,
+  "revision": 5,
+  "safe_to_retry": false,
+  "schema_version": "dpone.clickhouse.protected-publication-status.v1",
+  "sealed": false,
+  "source_exhausted": false,
+  "succeeded_query_ids": [
+    "dpone-candidate-d723c514ef31dda11428e03feb6eb3ccbcb0da140f42a67f3afd87dc36fd5710"
+  ],
+  "succeeded_requests": 1,
+  "uncertain_query_ids": [
+    "dpone-candidate-913883d7ec6f32607b1bd9f65cd1f40af5bf9d65c69387660d0072b2cf3ec863"
+  ],
+  "uncertain_requests": 1
+}
