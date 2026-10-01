@@ -3,7 +3,7 @@
 - Status: Accepted; current-state correction approved, structural prerequisite unmet
 - Date: 2026-09-30
 - Amended: 2026-10-01
-- Approval: maintainer approval of the written table-compatibility specification and explicit approval of the current-state correction
+- Approval: maintainer approval of the written table-compatibility specification, current-state correction and unpublished-prototype consolidation
 
 ## Context
 
@@ -37,8 +37,11 @@ through its [implementation plan under revision](../superpowers/plans/2026-09-30
    append the selected method and explicit expected post-state atomically with
    PREPARED only after verified candidate sealing. Freeze the policy and mode.
 5. Introduce explicit observation v2, guarded-publication v3 and authority v3
-   bindings. Preserve all previous readers, defaults, bytes and recovery rules;
-   do not reinterpret old records, migrate stores or adopt retained names.
+   bindings. Under the [approved consolidation amendment](../feature-design-clickhouse-prototype-consolidation.md),
+   use one current execution model and strict historical inspection instead of
+   retaining each unpublished prototype engine/default. Preserve all published
+   contracts and historical bytes. Do not reinterpret old records, migrate
+   stores, recreate historical mutation authority or adopt retained names.
 6. Protect actual preflight through publication with one namespace-bound
    execution session. Candidate creation and metadata verification precede
    opening the source. Recovery never reconstructs a source or send capability.
@@ -49,7 +52,10 @@ through its [implementation plan under revision](../superpowers/plans/2026-09-30
    operation journal or its retained ownership semantics.
 
 This amends only the new binding's settings, selection and version decisions in
-ADRs 0078/0079. Their historical contracts are unchanged.
+ADRs 0078/0079. Their historical record meanings remain unchanged. The explicit
+2026-10-01 consolidation approval supersedes the obligation to keep every
+unpublished experimental execution stack operational, not published compatibility
+or any required safety proof.
 
 ## Consequences
 

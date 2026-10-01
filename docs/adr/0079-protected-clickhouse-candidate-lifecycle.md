@@ -4,6 +4,13 @@
 - Date: 2026-09-30
 - Approval: maintainer acceptance of the written protected-publication supplement
 
+The implementation-version obligations below were superseded on 2026-10-01 by
+the approved [unpublished-prototype consolidation](../feature-design-clickhouse-prototype-consolidation.md)
+and [ADR 0080 amendment](0080-clickhouse-table-compatibility-policy.md). Preserve
+published contracts and historical record meanings/bytes, not each unpublished
+mutation engine or provisioning default. The candidate safety invariants remain
+in force; this supersession does not authorize cleanup or owner release.
+
 ## Context
 
 [ADR 0078](0078-method-aware-clickhouse-publication.md) defines the unbound

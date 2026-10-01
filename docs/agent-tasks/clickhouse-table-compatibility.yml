@@ -1,7 +1,11 @@
+# HISTORICAL / SUSPENDED: the maintainer approved unpublished-prototype
+# consolidation on 2026-10-01. This additive v1/v2/v3 contract is not current
+# write authorization. Preserve it as planning history until a reviewed,
+# measured consolidated path contract replaces it.
 schema_version: 1
 task_id: DPONE-CLICKHOUSE-TABLE-COMPATIBILITY
-title: Settings-aware protected ClickHouse publication with explicit compatibility policy
-goal: Implement the approved self-service amendment after plan review and prerequisite feasibility gates
+title: Historical additive ClickHouse compatibility plan - suspended pending consolidation
+goal: Preserve prior path and validation history; no execution under this superseded map
 specification: docs/feature-design-clickhouse-table-compatibility.md
 base_commit: 71180d081163455cf7ede1a40935eae512479960
 integrator: root
@@ -181,6 +185,7 @@ required_outputs: [implementation, tests, documentation_impact, completion_repor
 completion_statuses:
   allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
 stop_conditions:
+  - This historical task contract is suspended; a reviewed consolidated replacement is required before execution.
   - Required edit falls outside owned_paths.
   - Approved specification is missing or contradicted.
   - Public-contract impact is larger than declared.

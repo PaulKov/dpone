@@ -12,6 +12,12 @@
 
 Approval reconciled: 2026-10-01. Source/live research below was verified on 2026-09-30.
 
+Approved implementation amendment: [unpublished-prototype consolidation](feature-design-clickhouse-prototype-consolidation.md).
+On 2026-10-01 the maintainer authorized one current execution model for the
+unpublished PR #249/#258 prototypes. Published dpone contracts and immutable
+historical bytes remain protected; separate old prototype execution engines and
+their provisioning defaults need not be preserved. The structural gate still applies.
+
 ## Research correction: first-use existing tables
 
 **Status: APPROVED amendment.** On 2026-10-01 the maintainer explicitly approved
@@ -361,16 +367,19 @@ boundary does not authorize continuation through readback.
 
 ### Compatibility and migration
 
-Do not reinterpret `design_digest`, change the existing selector or regenerate
-historical bytes under their old identifiers. The old publication codec
-recomputes the old selector on read; changing it in place can invalidate old
-records. Preserve v1/v2 store opening, strict codecs, defaults and recovery.
+Do not reinterpret `design_digest` or regenerate historical bytes under old
+identifiers. Historical decoding retains the original validation and selector
+semantics; it does not rerun current policy against old records. Under the
+[approved consolidation amendment](feature-design-clickhouse-prototype-consolidation.md),
+preserve strict historical inspection, not every unpublished mutation-capable
+engine or provisioning default. Published dpone behavior remains unchanged.
 
-The new composition provisions v3 explicitly for previously unmanaged names;
-low-level v1 defaults do not change. It does not adopt existing v1/v2-owned
-targets or silently upgrade stores. Refuse incompatible/unknown versions with
-the original store untouched. Rollback means stop new admissions and retain
-compatible reader availability, not downgrade or recreate an authority file.
+The one current composition provisions v3 explicitly for eligible unmanaged
+names. It does not adopt old-owned targets or silently upgrade stores. Refuse
+incompatible/unknown ownership with the original store untouched. Rollback means
+stop new admissions and retain historical inspection and source availability,
+not downgrade or recreate an authority file. Historical inspection never issues
+new source, send or cleanup authority.
 
 ## Descriptor and settings policy
 
@@ -755,7 +764,7 @@ Never cache a successful compatibility plan as a future mutation grant.
 | Warning mode | Default block; warn plus verified EXCHANGE; warn without safe alternative; known incompatibility; non-applicable method; shared-safety unknown | Only proven alternative may execute; structured warning retained; no blind send or mode change on recovery |
 | Lifecycle | Candidate readback before source, drift at every observation/send boundary, lost enrollment/CREATE/INSERT/seal/claim ACK, cancellation | Original owner retained, no fabricated seal/grant or replay |
 | Recovery | All methods, actual UUID/configuration/content after-state, crash before/after PREPARED, older/unknown profiles | Source-free original-version interpretation |
-| Compatibility | Existing v1/v2 serialized vectors/default APIs, strict old decoding and opening, wrong-version stores | Historical bytes unchanged; no migration |
+| Compatibility | Published API/default contracts, immutable historical prototype vectors, strict read-only inspection and wrong-version stores | Published behavior and historical bytes unchanged; no migration or historical mutation authority |
 | Live Docker | Exact pinned server/driver; real settings/parts, all four methods, zero-row and stale-partition cases, real drift/lost-response/restart | Exact source commit/tree, image digests, catalog/content snapshots, journal, counters, JUnit and checksums |
 | UX/docs | One-call publish, optional plan, all diagnostic next actions, original-operation recovery | Executable example and scripted manual-action counts |
 | Quality/security | Actual strict graph/module/import gates, full non-live suite, secrets/log privacy and bounded inputs | No weakened budget or hidden dependency |
@@ -803,7 +812,7 @@ language contracts, strict MkDocs and the rendered first-success navigation.
 1. Record the approved specification and 2026-10-01 current-state correction;
    review a structurally feasible revised implementation plan and concrete path
    contract before execution. Current unfinished code stays preserved.
-2. Implement separate versions with old golden vectors intact, characterize
+2. Implement one current model with strict historical readers and old golden vectors intact, characterize
    default provenance, and resolve existing quality-gate failures honestly.
 3. Certify the complete profile on the exact final commit in owned Docker;
    obtain an independent fresh-context review and fix blocking findings.
@@ -838,7 +847,8 @@ No worker may interpret this area list as a wildcard write authorization.
 - [x] User problem, default journey and manual-action targets are explicit.
 - [x] Settings, provenance, compatibility and desired state are distinct.
 - [x] Algorithm, failures, method table and recovery identity are specified.
-- [x] Existing versions are preserved without silent migration.
+- [x] Published contracts and historical bytes are preserved without silent migration.
+- [x] Maintainer authorizes consolidation of unpublished execution prototypes on 2026-10-01.
 - [x] Alternatives and dated primary-source research are recorded.
 - [x] Test, certification, documentation, rollout and rollback criteria exist.
 - [x] Implementation ownership and required plan amendment are explicit.

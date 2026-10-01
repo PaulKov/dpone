@@ -4,6 +4,15 @@
 
 **Goal:** Finish the protected single-operation Python publisher with automatic settings preservation, explicit compatibility policy and source-free recovery.
 
+**2026-10-01 consolidation amendment:** The maintainer explicitly authorized
+[one current implementation for unpublished PR #249/#258 prototypes](../../feature-design-clickhouse-prototype-consolidation.md).
+The old additive v1/v2/v3 file map and prototype-default preservation requirements
+below are now historical planning evidence, not the current execution map. Keep
+published compatibility and historical readers/bytes. A measured consolidated
+map and replacement exact path contract must be reviewed before source edits;
+the failed projections below remain failed. This note does not authorize route
+activation, finalization, owner release or a release.
+
 **Architecture:** Separate configuration identity, method compatibility and desired post-state. Resolve settings from protected facts, freeze a resolved plan at enrollment, then atomically bind selection to the seal and PREPARED record in an explicit v3 authority. Reuse version-neutral native transport and durability mechanisms without reinterpreting historical records.
 
 **Tech Stack:** Python, SQLite WAL/FULL, POSIX flock, clickhouse-driver 0.2.10, ClickHouse 24.8.14.39, pytest and owned Docker Desktop Linux; no dependency upgrade.
@@ -14,7 +23,12 @@
 
 **Base:** Current integration `71180d081163455cf7ede1a40935eae512479960`, branch `codex/clickhouse-publisher-linear-integration`, PR #258. Original base `5075a1e50ff7d1f3d670423fe196f970ab65e873` and PR #249 remain historical references. The [task contract](../../agent-tasks/clickhouse-table-compatibility.yml) takes precedence only for this increment after revision review.
 
-## Global Constraints
+## Historical additive-plan constraints
+
+The [old task contract](../../agent-tasks/clickhouse-table-compatibility.yml) is
+explicitly suspended. The following constraints and file map preserve the prior
+plan for review; prototype-default preservation is superseded by the approved
+consolidation amendment. They are not current source-edit authorization.
 
 - One POSIX host, persistent original private authority, direct node, Atomic database, plain MergeTree and dpone-only mutations; no production ingress enforcement claim.
 - Preserve committed parent Tasks 1–2 and unfinished Task 3 files. This plan replaces the remaining work in [the prior plan](2026-09-30-clickhouse-protected-publication.md), not its historical progress or evidence.

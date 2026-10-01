@@ -558,6 +558,7 @@ nav:
       - Feature design - dpone-only ClickHouse authority: feature-design-clickhouse-dpone-only-authority.md
       - Feature design - protected ClickHouse publication: feature-design-clickhouse-protected-publication.md
       - Feature design - self-service ClickHouse table compatibility: feature-design-clickhouse-table-compatibility.md
+      - Feature amendment - unpublished ClickHouse prototype consolidation: feature-design-clickhouse-prototype-consolidation.md
       - ClickHouse authority journal foundation: clickhouse-authority-journal.md
       - ClickHouse one-shot native publisher: clickhouse-native-publication.md
       - ClickHouse transport closure runbook: runbooks/clickhouse-publication-closure.md

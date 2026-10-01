@@ -9,6 +9,12 @@
 
 Last verified: 2026-09-30
 
+Implementation compatibility was amended on 2026-10-01 by the approved
+[unpublished-prototype consolidation](feature-design-clickhouse-prototype-consolidation.md).
+This page retains the historical staged design. Its requirement to keep separate
+operational prototype versions/defaults is superseded; published compatibility,
+historical bytes and all candidate/publication safety invariants remain protected.
+
 Approved amendment: [self-service table compatibility](feature-design-clickhouse-table-compatibility.md)
 was accepted on 2026-09-30. For the new binding it supersedes this page's
 no-SETTINGS profile, unchanged-selector assumption and new-enrollment storage
