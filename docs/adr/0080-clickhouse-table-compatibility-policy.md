@@ -70,6 +70,15 @@ structural feasibility gate precedes expansion: module counts, moving imports
 or adding forwarding modules cannot manufacture architectural compliance. No
 budget or historical evidence is weakened to complete this work.
 
+The independent [native-boundary refactor](../superpowers/plans/2026-10-01-clickhouse-native-boundary.md)
+shares only a read-only endpoint shape and the existing pinned peer predicate
+within the native-driver integration owner. The public endpoint dataclass stays
+at its original path. Publication and candidate transports retain their distinct
+connection lifecycle, deadlines, response handling and error boundaries. This
+removes the unfinished candidate's concrete publication-adapter dependency; it
+does not satisfy the whole-feature graph gate or implement observation v2 or
+guarded publication v3. No user setup or migration step changes.
+
 The single-host/direct-node/plain-MergeTree/dpone-only constraints remain. This
 is a staged Python building block, not stock ODBC activation, owner release,
 cleanup, checkpoint finalization or release authorization. `warn` does not

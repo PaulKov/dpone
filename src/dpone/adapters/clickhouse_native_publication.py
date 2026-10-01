@@ -14,7 +14,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from dpone.adapters.clickhouse_native_driver import isolate_native_logging
+from dpone.adapters.clickhouse_native_driver import isolate_native_logging, matches_native_peer
 from dpone.contracts.clickhouse_native_publication import (
     NativePublicationCompletion,
     NativePublicationError,
@@ -108,12 +108,7 @@ class DirectNativePublicationTransport:
                 connection.connect()
                 info = connection.server_info
                 version = (info.version_major, info.version_minor, info.version_patch)
-                if (
-                    connection.socket.getpeername() != (endpoint.host, endpoint.port)
-                    or version != (24, 8, 14)
-                    or info.name != "ClickHouse"
-                    or not connection.connected
-                ):
+                if not matches_native_peer(connection, endpoint, version, info):
                     raise NativePublicationError("Native peer or server version outside the pinned profile")
                 connection.send_query(statement, query_id=request.query_id, params=None)
                 connection.send_external_tables(None)

@@ -1,0 +1,70 @@
+schema_version: 1
+task_id: DPONE-CLICKHOUSE-NATIVE-BOUNDARY
+title: Share the pinned native peer boundary without merging transport lifecycles
+goal: Remove a concrete transport dependency through a behavior-preserving internal prerequisite refactor
+specification: docs/superpowers/plans/2026-10-01-clickhouse-native-boundary.md
+base_commit: dd6d1d31a37435e066b072cf2254f2c47e8d220f
+integrator: root
+acceptance_criteria:
+  - Root is sole writer under the isolated internal-refactor exception
+  - Existing endpoint class identity, public constructors, SQL, receipts and error surfaces are preserved
+  - The shared predicate observes existing peer facts and never connects, sends, retries or creates authority
+  - Candidate depends on a structural endpoint interface rather than the concrete publication adapter
+  - Transport-specific logging, deadlines, stream admission, response and teardown behavior remain separate
+  - Unfinished candidate source and tests remain preserved and outside the tracked prerequisite commit
+  - Full graph and suite failures are reported honestly without budget changes or activation claims
+  - An independent fresh-context reviewer verifies the final scoped diff
+public_contract_impact:
+  level: none
+  surfaces: []
+  migration_required: false
+owned_paths:
+  - src/dpone/adapters/clickhouse_native_driver.py
+  - src/dpone/adapters/clickhouse_native_publication.py
+  - src/dpone/adapters/clickhouse_native_candidate.py
+  - tests/test_clickhouse_native_driver.py
+  - tests/test_clickhouse_native_candidate.py
+  - docs/superpowers/plans/2026-10-01-clickhouse-native-boundary.md
+  - docs/agent-tasks/clickhouse-native-boundary.yml
+integrator_owned_paths:
+  - docs/adr/0080-clickhouse-table-compatibility-policy.md
+read_only_paths:
+  - src/dpone/contracts
+  - src/dpone/ports
+  - tests/test_clickhouse_native_publication.py
+  - docs/benchmarks/quality_budgets.yml
+  - docs/layer_metrics_baseline.json
+  - docs/module_size_baseline.json
+  - docs/agent-tasks/clickhouse-table-compatibility.yml
+forbidden_paths:
+  - pyproject.toml
+  - uv.lock
+  - CHANGELOG.md
+  - mkdocs.yml
+  - .github/workflows
+  - tests/conftest.py
+  - docs/adr/0080-clickhouse-table-compatibility-policy.md
+shared_file_owner: root
+dependencies: [DPONE-CLICKHOUSE-TABLE-COMPATIBILITY]
+required_checks:
+  focused:
+    - Behavioral RED then GREEN for the shared peer predicate and candidate import isolation
+    - All native driver, publication and candidate tests with existing byte/privacy/error cases
+    - Task contract schema validation and preservation of unrelated unfinished work
+  broad:
+    - Change-aware selector, Ruff, mypy, imports, layers, module size and full non-live pytest
+    - Strict architecture gates with observed metrics and no threshold or baseline changes
+    - Docs links, language contracts and strict MkDocs
+  live:
+    - N/A for this internal prerequisite; no claim of new live transport or route certification
+required_outputs: [implementation, tests, documentation_impact, completion_report]
+completion_statuses:
+  allowed: [PASS, FAIL, SKIP, N/A, UNVERIFIED]
+stop_conditions:
+  - Required edit falls outside owned_paths.
+  - Approved specification is missing or contradicted.
+  - Public-contract impact is larger than declared.
+  - A live check requires unapproved credentials or environment.
+  - Another writer owns the same semantic contract.
+  - Transport ownership, endpoint validation, public errors, codec semantics or grants must change.
+  - A proposed action activates a route, relaxes a budget, rewrites old evidence or publishes a release.

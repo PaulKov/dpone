@@ -5,8 +5,56 @@ import inspect
 import io
 import logging
 from concurrent.futures import ThreadPoolExecutor
+from types import SimpleNamespace
 
 import pytest
+
+
+@pytest.mark.parametrize(
+    ("peer", "version", "name", "connected", "expected"),
+    [
+        (("127.0.0.1", 9000), (24, 8, 14), "ClickHouse", True, True),
+        (("127.0.0.2", 9000), (24, 8, 14), "ClickHouse", True, False),
+        (("127.0.0.1", 9001), (24, 8, 14), "ClickHouse", True, False),
+        (("127.0.0.1", 9000), (25, 8, 14), "ClickHouse", True, False),
+        (("127.0.0.1", 9000), (24, 9, 14), "ClickHouse", True, False),
+        (("127.0.0.1", 9000), (24, 8, 15), "ClickHouse", True, False),
+        (("127.0.0.1", 9000), (24, 8, 14), "Other", True, False),
+        (("127.0.0.1", 9000), (24, 8, 14), "ClickHouse", False, False),
+    ],
+)
+def test_native_peer_profile_without_connecting_or_sending(peer, version, name, connected, expected):
+    from dpone.adapters import clickhouse_native_driver as boundary
+
+    # No connect/send/retry methods: the predicate may only inspect captured facts
+    # and the already-owned socket. Each transport retains lifecycle ownership.
+    connection = SimpleNamespace(socket=SimpleNamespace(getpeername=lambda: peer), connected=connected)
+    endpoint = SimpleNamespace(host="127.0.0.1", port=9000)
+    info = SimpleNamespace(name=name)
+    assert boundary.matches_native_peer(connection, endpoint, version, info) is expected
+
+
+def test_native_peer_lookup_error_propagates_to_transport_boundary():
+    from dpone.adapters import clickhouse_native_driver as boundary
+
+    failure = OSError("private-socket-marker")
+
+    def unavailable():
+        raise failure
+
+    connection = SimpleNamespace(socket=SimpleNamespace(getpeername=unavailable))
+    endpoint = SimpleNamespace(host="127.0.0.1", port=9000)
+    with pytest.raises(OSError) as caught:
+        boundary.matches_native_peer(connection, endpoint, (24, 8, 14), SimpleNamespace(name="ClickHouse"))
+    assert caught.value is failure
+
+
+def test_native_peer_mismatch_short_circuits_later_checks():
+    from dpone.adapters import clickhouse_native_driver as boundary
+
+    connection = SimpleNamespace(socket=SimpleNamespace(getpeername=lambda: ("127.0.0.2", 9000)))
+    endpoint = SimpleNamespace(host="127.0.0.1", port=9000)
+    assert boundary.matches_native_peer(connection, endpoint, (24, 8, 14), object()) is False
 
 
 def test_transport_suppresses_real_driver_query_and_log_payload(monkeypatch, caplog):

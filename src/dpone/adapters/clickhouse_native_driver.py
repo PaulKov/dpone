@@ -1,4 +1,4 @@
-"""Private logging boundary for the audited clickhouse-driver 0.2.10 methods.
+"""Shared pinned-native peer and private-logging integration boundary.
 
 The SDK logs raw packet/error/query text through module globals. Rebind only
 the owned connection's logging methods to private globals; preserve their exact
@@ -8,7 +8,62 @@ logger is changed. This is a pinned integration seam, not a general patch API.
 
 import logging
 from types import FunctionType, MethodType
-from typing import Any
+from typing import Any, Protocol
+
+
+class _NativeEndpoint(Protocol):
+    """Read-only transport input shape, not endpoint validation or authority.
+
+    Composition supplies an already-validated endpoint. Structural typing keeps
+    candidate I/O independent of the publication adapter without relocating its
+    existing public endpoint dataclass. No SDK import or connection occurs here.
+    """
+
+    @property
+    def server_id(self) -> str: ...
+
+    @property
+    def host(self) -> str: ...
+
+    @property
+    def port(self) -> int: ...
+
+    @property
+    def user(self) -> str: ...
+
+    @property
+    def password(self) -> str: ...
+
+    @property
+    def connect_timeout(self) -> float: ...
+
+    @property
+    def send_receive_timeout(self) -> float: ...
+
+    @property
+    def secure(self) -> bool: ...
+
+    @property
+    def ca_certs(self) -> str | None: ...
+
+    @property
+    def server_hostname(self) -> str | None: ...
+
+
+def matches_native_peer(connection: Any, endpoint: _NativeEndpoint, version: tuple[int, int, int], info: Any) -> bool:
+    """Inspect the owned socket and captured handshake facts without sending.
+
+    Callers retain the captured ``info`` and ``version`` for their receipts.
+    Preserve short-circuit ordering and propagate lookup errors to each
+    transport's distinct sanitization boundary. This is not completion proof.
+    """
+    return not (
+        connection.socket.getpeername() != (endpoint.host, endpoint.port)
+        or version != (24, 8, 14)
+        or info.name != "ClickHouse"
+        or not connection.connected
+    )
+
 
 LOGGING_METHODS = (
     "force_connect",
