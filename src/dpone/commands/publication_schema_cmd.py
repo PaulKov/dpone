@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from dpone.commands.func_command import CommandGroup, FuncCommand
 from dpone.commands.output_json import write_json
 from dpone.commands.prepared_recovery_cmd import prepared_recovery_command
+from dpone.commands.publication_retirement_cmd import publication_retirement_command
 
 if TYPE_CHECKING:
     import logging
@@ -32,7 +33,7 @@ def publication_authority_command() -> CommandGroup:
         build_parser=lambda sub: sub.add_parser(
             "publication-authority", help="Explicit publication catalog operations"
         ),
-        subcommands=[schema, prepared_recovery_command()],
+        subcommands=[schema, prepared_recovery_command(), publication_retirement_command()],
         subdest="publication_authority_action",
     )
 

@@ -27,6 +27,19 @@ class PublicationRetirementAttempts(Protocol):
     def claim(self, operation_key: str) -> bool: ...
 
 
+class PublicationRetirementAttemptJournal(PublicationRetirementAttempts, Protocol):
+    """Pre-admitted persistent attempts, bound into an operator plan.
+
+    Local identity alone cannot certify persistence or exclusion. Deployment
+    must admit this capability once for every runner; paths cannot be chosen
+    by an operator to reclaim an unknown attempt.
+    """
+
+    def require_ready(self) -> str:
+        """Recheck readiness and return the canonical directory identity digest."""
+        ...
+
+
 class HeldRetirementObservation(Protocol):
     """Authenticate observations while deployment owns exclusion of all writers.
 

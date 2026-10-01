@@ -18,9 +18,11 @@ Public manifests still reject the proposed option; no existing workload switches
 backend. An internal native prepared-recovery service reuses normal publication
 reconciliation and cleanup through that same provider. Its application now binds
 verified context and both endpoints to private plans; draft recovery CLI parsing
-fails closed without an injected trusted observer. Legacy adoption/retirement
-operator commands, deployment-observer integration and end-to-end ClickHouse
-recovery acceptance remain required before activation.
+fails closed without an injected trusted observer. Guarded legacy retirement
+now has separate plan/apply/verify application and draft CLI composition, bound
+to an existing SQL catalog and a fixed private attempt journal. Both operator
+journeys still require deployment-observer integration and end-to-end ClickHouse
+acceptance before activation; standalone commands cannot create that authority.
 Do not configure this option against a released runtime.
 
 The local opt-in test
@@ -456,8 +458,9 @@ label a retired envelope as an ordinary publication. Operation-aware admission
 and SQL CAS authenticate the retained first event, permanently rejecting its
 retired operation ID even after a later operation completes. A new operation
 checks the unchanged healthy predecessor before source I/O, then acquires the
-slot through exact CAS with an isolated fresh candidate. The operator command,
-trusted deployment observer and public manifest activation remain unavailable.
+slot through exact CAS with an isolated fresh candidate. Draft operator parsing
+and application composition are available; the trusted deployment observer and
+public manifest activation remain unavailable.
 
 ### Intent and alternatives
 
@@ -526,8 +529,8 @@ path from the preserved unpublished candidate and the existing target.
 
 ### Public behavior and acceptance
 
-Proposed `publication-authority retire plan|apply` delegates to a shared
-application service. Plan never mutates a database; apply requires the exact
+Draft `publication-authority retire plan|apply|verify` delegates to a shared
+application service. Plan never mutates a database; apply and verify require the exact
 plan digest. Versioned redacted results distinguish `retired_unpublished` from
 `publication_completed`; exit 0 means only the requested retirement mode was
 verified, 2 means a proven block, and 1 means failure or unknown outcome. Local
@@ -544,6 +547,28 @@ directory to retry. This journal is not a distributed fence: deployment still
 owns writer exclusion, while SQL owns absent-slot and subsequent CAS ordering.
 A missing/unavailable journal fails closed. Deployment of this composition,
 including its journal persistence, is an activation prerequisite.
+
+The application accepts an already admitted observer and journal as injected
+capabilities, not user-provided observation JSON or a CLI journal path. Plan
+arguments are `--connection-ref`, `--environment` and `--plan-file`; apply and
+verify use `--environment`, `--plan-file` and `--confirm-digest`. The saved
+outer plan binds the exact verified-context subject, SQL binding/endpoint,
+original retirement provenance and journal directory identity. Confirmation
+and environment are checked before credentials; journal drift is checked before
+opening SQL. Catalog admission is read-only and its connection closes before
+the retirement service receives the store. Every later SQL session rechecks
+the endpoint pin. No native create/CAS or target DDL capability is exposed.
+
+The local journal requires an existing canonical absolute owner-only (`0700`)
+directory. It freezes path/device/inode/owner identity at admission and uses one
+opened directory descriptor for temporary creation, exclusive marker publication,
+cleanup and directory fsync. Replacing the pathname cannot redirect that claim;
+an observed replacement blocks progression while preserving any published marker.
+The identity hash is **not** evidence that a directory is persistent, shared or
+deployment-admitted. Provision and certify the fixed runner storage separately;
+never use a new directory or remove a marker to recover an unknown outcome.
+The standalone CLI therefore blocks without an injected trusted observer/journal.
+Application tests use scripted SQL boundaries and do not certify a live cutover.
 
 An expired plan cannot authorize an insert. Read-only verification may renew the
 deployment freeze and historical coverage while retaining the exact original

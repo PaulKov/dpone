@@ -4,6 +4,13 @@
 
 ### Added
 
+- Compose guarded legacy retirement with an endpoint-admitted SQL history store,
+  exact private outer plan and pre-bound persistent attempt journal. Add draft
+  `publication-authority retire plan|apply|verify` parsing and redacted results;
+  standalone use remains blocked without trusted deployment capabilities. Journal
+  claims are directory-descriptor-bound and survive ambiguous acknowledgements;
+  replanning cannot reclaim an attempted operation. This does not activate a
+  manifest backend, certify deployment persistence or mark a workload successful.
 - Compose native recovery from the verified deployment context, one admitted SQL
   authority provider and one owned native ClickHouse handle. Outer confirmation,
   environment/context and physical endpoint checks precede effects; close failures

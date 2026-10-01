@@ -17,6 +17,7 @@ from uuid import UUID
 from dpone.ports.clickhouse_cluster_publication import contracts as c
 from dpone.runtime.credentials.resolved_connector_factory import ResolvedConnectorFactory
 from dpone.runtime.state.mssql_publication_authority import MssqlPublicationAuthority
+from dpone.runtime.state.mssql_publication_retirement import MssqlPublicationRetirement
 from dpone.runtime.state.mssql_publication_schema import MssqlPublicationSchema
 
 if TYPE_CHECKING:
@@ -81,6 +82,37 @@ def build_publication_authority(
     try:
         return MssqlPublicationAuthority(
             catalog_connector=catalog, session_factory=sessions.session, binding=binding, endpoint_identity=sessions.pin
+        )
+    finally:
+        try:
+            catalog.close()
+        except Exception:
+            raise ValueError("publication_authority: catalog session close failed") from None
+
+
+def build_publication_retirement(
+    *,
+    connection: ResolvedBindingConnection,
+    binding: PublicationAuthorityBinding,
+    environment: str,
+    clock: Callable[[], int],
+    connector_factory: Callable[[ResolvedBindingConnection], Any] | None = None,
+) -> MssqlPublicationRetirement:
+    """Admit the existing catalog for history-only, absent-slot retirement.
+
+    Each dedicated session rechecks the same deployment-owned endpoint pin.
+    This capability neither provisions storage nor creates native operations.
+    The catalog reader is disposed before the caller receives the store.
+    """
+    sessions = _PublicationConnections(connection, binding, environment, connector_factory)
+    catalog = sessions.connector()
+    try:
+        return MssqlPublicationRetirement(
+            catalog_connector=catalog,
+            session_factory=sessions.session,
+            binding=binding,
+            endpoint_identity=sessions.pin,
+            clock=clock,
         )
     finally:
         try:

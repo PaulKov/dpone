@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import os
 import stat
-import tempfile
 from pathlib import Path
+from uuid import uuid4
 
 MAX_PLAN_BYTES = 1024 * 1024
 
@@ -24,26 +24,43 @@ def write_private_plan(path: Path, content: bytes) -> None:
     trusted local parent directory; no distributed-filesystem durability claim.
     """
     _require_posix()
+    directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        write_private_plan_at(directory, path.name, content)
+    finally:
+        os.close(directory)
+
+
+def write_private_plan_at(directory: int, name: str, content: bytes) -> None:
+    """Publish exclusively relative to one caller-owned directory descriptor.
+
+    Every filesystem operation, including cleanup and durability acknowledgement,
+    uses that descriptor. Renaming/replacing its former path cannot redirect a
+    write. Admission and lifetime of the directory remain the caller's concern.
+    """
+    _require_posix()
+    if not isinstance(name, str) or not name or name in {".", ".."} or "/" in name or "\x00" in name:
+        raise ValueError("publication plan requires a single file name")
     if not isinstance(content, bytes) or not 0 < len(content) <= MAX_PLAN_BYTES:
         raise ValueError("publication plan must contain bounded nonempty bytes")
-    descriptor, temporary = tempfile.mkstemp(prefix=".dpone-plan-", dir=path.parent)
+    temporary = f".dpone-plan-{uuid4().hex}"
+    descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, 0o600, dir_fd=directory)
     try:
         with os.fdopen(descriptor, "wb") as output:
             os.fchmod(output.fileno(), 0o600)
             output.write(content)
             output.flush()
             os.fsync(output.fileno())
-        os.link(temporary, path, follow_symlinks=False)
-        os.unlink(temporary)
-        directory = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
-        try:
-            os.fsync(directory)
-        finally:
-            os.close(directory)
+        os.link(temporary, name, src_dir_fd=directory, dst_dir_fd=directory, follow_symlinks=False)
+        os.unlink(temporary, dir_fd=directory)
+        os.fsync(directory)
     finally:
         # Only the uniquely created temporary path belongs to this invocation.
         # Never remove the final path after a failed durability acknowledgement.
-        Path(temporary).unlink(missing_ok=True)
+        try:
+            os.unlink(temporary, dir_fd=directory)
+        except FileNotFoundError:
+            pass
 
 
 def read_private_plan(path: Path) -> bytes:
