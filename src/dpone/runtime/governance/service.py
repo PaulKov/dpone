@@ -93,6 +93,13 @@ class LoadGovernanceService:
         if callable(set_delegate):
             set_delegate(audit_storage)
 
+    def bind_audit_storage(self, audit_storage: LoadStepAuditStorage) -> None:
+        """Bind selected metadata storage without silently retaining another sink."""
+
+        from dpone.runtime.governance.audit_tap import bind_selected_audit_storage
+
+        self._audit_storage = bind_selected_audit_storage(self._audit_storage, audit_storage)
+
     def run_pre_hooks(
         self,
         *,

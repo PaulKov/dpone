@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from dpone.config.audit import select_audit_storage
 from dpone.config.load_config import LoadConfig
 from dpone.config.load_strategy import LoadStrategy, inject_source_budget, validate_endpoint_option_ownership
 from dpone.config.mssql_strategy_contract import (
@@ -15,6 +16,7 @@ from dpone.config.postgres_mssql_wire_contract import (
     PostgresMssqlWireContractError,
     normalize_postgres_mssql_wire,
 )
+from dpone.config.publication_authority import validate_publication_configuration
 from dpone.config.reconciliation import ReconciliationConfigError, normalize_reconciliation
 from dpone.contracts.api_sources import get_api_source_defaults
 from dpone.contracts.connector_declarations import canonical_endpoint_type
@@ -56,10 +58,11 @@ class LoadConfigBuilder:
         base_path: Path | None = None,
         parse_tracer: ParseTracer | None = None,
     ) -> LoadConfig:
+        select_audit_storage(config)
+        validate_publication_configuration(config)
         try:
             source_cfg = dict(config.get("source", {}) or {})
             sink_cfg = dict(config.get("sink", {}) or {})
-            runtime_cfg = dict(config.get("runtime", {}) or {})
 
             source_type = source_cfg.get("type", "postgres")
             canonical_source_type = canonical_endpoint_type(str(source_type))
@@ -274,7 +277,7 @@ class LoadConfigBuilder:
                 raise DagConfigurationError(str(exc)) from exc
             reconciliation_policy = inject_runtime_contract_options(
                 config=config,
-                runtime_config=runtime_cfg,
+                runtime_config=dict(config.get("runtime", {}) or {}),
                 options=options,
                 reconciliation_options=reconciliation_options,
                 parse_tracer=parse_tracer,

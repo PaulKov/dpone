@@ -6,7 +6,8 @@ from typing import Protocol
 from dpone.gitops.airflow_models import GitOpsAirflowImageContract, GitOpsAirflowImageContractReport
 from dpone.gitops.models import GitOpsIssue
 from dpone.gitops.paths import GitOpsPathValidationError, safe_relative_path
-from dpone.ports.filesystem import FileSystem
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsFileContext
 from dpone.services.gitops.views import GitOpsView, build_gitops_meta
 
 
@@ -14,9 +15,8 @@ class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsAirflowImageContractContext(Protocol):
+class GitOpsAirflowImageContractContext(GitOpsFileContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
 
 
 class GitOpsAirflowImageContractService:

@@ -6,6 +6,7 @@ import contextlib
 from collections.abc import Iterator
 from typing import TYPE_CHECKING, Any
 
+from dpone.contracts import RuntimeConfigurationError
 from dpone.runtime.decision_audit import (
     CompositeDecisionPublisher,
     DecisionAuditPolicy,
@@ -16,10 +17,12 @@ from dpone.runtime.etl.audit_policy import (
     audit_policy,
     is_clickhouse_connector,
     is_mssql_connector,
+    require_selected_audit_bindings,
 )
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
+    from dpone.ports.runtime_hydrator import RuntimeAuditBindings
 
 
 class RuntimeDecisionLifecycle:
@@ -31,15 +34,27 @@ class RuntimeDecisionLifecycle:
         load_governance_service: Any,
         load_identity_service: Any,
         logger: Any | None,
+        audit_bindings: RuntimeAuditBindings | None = None,
     ) -> None:
         self._load_governance_service = load_governance_service
         self._load_identity_service = load_identity_service
         self._logger = logger
         self._summary = RuntimeDecisionSummary()
+        self._audit_bindings = audit_bindings
 
     def configure_audit_storage(self, *, sink: Any, load_config: LoadConfig) -> None:
+        require_selected_audit_bindings(load_config, self._audit_bindings)
         policy = audit_policy(load_config)
         if not policy.enabled:
+            return
+        if self._audit_bindings is not None:
+            selected = self._audit_bindings
+            steps = selected.require_steps()
+            current = self._load_identity_service.audit_storage
+            if current is not None and current is not selected.loads:
+                raise RuntimeConfigurationError("Selected runtime audit conflicts with load identity storage")
+            self._load_governance_service.bind_audit_storage(steps)
+            self._load_identity_service.audit_storage = selected.loads
             return
         connector = getattr(sink, "connector", None)
         if is_mssql_connector(connector):

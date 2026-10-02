@@ -5,8 +5,20 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any
 
+from dpone.config.audit import select_audit_storage
+from dpone.contracts import RuntimeConfigurationError
+
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
+    from dpone.ports.runtime_hydrator import RuntimeAuditBindings
+
+
+def require_selected_audit_bindings(load_config: LoadConfig, bindings: RuntimeAuditBindings | None) -> None:
+    """Explicit storage cannot silently revert to business-sink audit inference."""
+
+    selection = select_audit_storage({"sink": {"options": load_config.options}})
+    if selection is not None and bindings is None:
+        raise RuntimeConfigurationError("Selected audit.storage requires an admitted runtime audit binding")
 
 
 class AuditPolicy:

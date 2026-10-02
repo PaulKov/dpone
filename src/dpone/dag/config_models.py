@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
     from dpone.contracts.process_types import DependencyConfig, TransformConfig
+    from dpone.ports.runtime_hydrator import RuntimeAuditBindings
 
 
 from dataclasses import dataclass, field
@@ -58,6 +59,7 @@ class ETLProcessConfig:
     partition_checkpoint_store: Any | None = None
     load_identity_service: Any | None = None
     credential_resolution_receipts: tuple[dict[str, Any], ...] = ()
+    audit_bindings: RuntimeAuditBindings | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -81,6 +83,7 @@ class ETLProcessConfig:
         self.xmin_handoff_state_storage = getattr(bindings, "xmin_handoff_state_storage", None)
         self.partition_checkpoint_store = bindings.partition_checkpoint_store
         self.load_identity_service = getattr(bindings, "load_identity_service", None)
+        self.audit_bindings = getattr(bindings, "audit_bindings", None)
         self.credential_resolution_receipts = tuple(
             dict(receipt) for receipt in bindings.credential_resolution_receipts
         )

@@ -162,6 +162,7 @@ def open_backfill_process_lane(worker_id: int, payload: Any, operation_lease_fac
             source=bindings.source_obj,
             sink=bindings.sink_obj,
             logger=bindings.etl_logger,
+            audit_bindings=getattr(bindings, "audit_bindings", None),
         )
         processor = _processor(
             bindings,
@@ -194,6 +195,7 @@ def close_runtime_bindings(bindings: Any) -> None:
         getattr(getattr(bindings, "source_obj", None), "connector", None),
         getattr(getattr(bindings, "sink_obj", None), "connector", None),
         getattr(getattr(getattr(bindings, "sink_obj", None), "state_storage", None), "connector", None),
+        getattr(getattr(bindings, "audit_bindings", None), "connector", None),
     )
     closed: set[int] = set()
     for connector in connectors:

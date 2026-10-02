@@ -15,7 +15,8 @@ from dpone.gitops.airflow_k8s_smoke_runner import (
 )
 from dpone.gitops.models import GitOpsIssue
 from dpone.gitops.paths import GitOpsPathValidationError, safe_relative_path
-from dpone.ports.filesystem import FileSystem
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsFileContext
 from dpone.services.gitops.views import GitOpsView, build_gitops_meta
 
 _SOURCE = "dpone gitops airflow k8s-smoke"
@@ -25,9 +26,8 @@ class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsAirflowK8sSmokeContext(Protocol):
+class GitOpsAirflowK8sSmokeContext(GitOpsFileContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
 
 
 class GitOpsAirflowK8sSmokeService:

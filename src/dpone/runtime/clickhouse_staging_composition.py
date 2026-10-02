@@ -29,6 +29,7 @@ from dpone.runtime.storage_policy import StoragePreflightService
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
+    from dpone.ports.clickhouse_cluster_publication import ClusterPublicationAuthorityProviderPort
     from dpone.ports.clickhouse_connector import ClickHouseConnectorPort
     from dpone.runtime.sinks.load_result import LoadResult
 
@@ -96,6 +97,7 @@ def build_clickhouse_staging_components(
     create_planned_staging_table: Callable[[LoadConfig, Sequence[tuple[str, str]]], None],
     count_rows: Callable[[LoadConfig], int],
     mutations_sync: Callable[[LoadConfig], int],
+    authority_provider: ClusterPublicationAuthorityProviderPort | None = None,
 ) -> ClickHouseStagingComponents:
     """Wire service, decoder and finalizer in their existing construction order.
 
@@ -125,7 +127,9 @@ def build_clickhouse_staging_components(
         count_rows=count_rows,
         mutations_sync=mutations_sync,
     )
-    full_refresh_publication = ClickHouseFullRefreshPublicationRouter.from_connector(connector)
+    full_refresh_publication = ClickHouseFullRefreshPublicationRouter.from_connector(
+        connector, authority_provider=authority_provider
+    )
     return ClickHouseStagingComponents(validated_file, decoder, finalizer, full_refresh_publication)
 
 

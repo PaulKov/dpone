@@ -15,10 +15,12 @@ from . import (
 )
 from .base import Command
 from .func_command import FuncCommand
+from .publication_schema_cmd import publication_authority_command
 
 
 def top_level_commands() -> list[Command]:
     return [
+        publication_authority_command(),
         FuncCommand("doctor", doctor_cmd.register_parser, doctor_cmd.cmd_doctor),
         FuncCommand("init", init_cmd.register_parser, init_cmd.cmd_init),
         FuncCommand("plan", plan_cmd.register_parser, plan_cmd.cmd_plan),

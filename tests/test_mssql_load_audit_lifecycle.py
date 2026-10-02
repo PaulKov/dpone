@@ -47,7 +47,10 @@ def test_runtime_lifecycle_materializes_mssql_load_and_step_audit_in_dbo() -> No
     rendered = "\n".join(query for query, _ in connector.queries)
     assert "OBJECT_ID(N'dbo.__dpone__loads'" in rendered
     assert "MERGE [dbo].[__dpone__loads]" in rendered
-    assert "OBJECT_ID(N'dbo.__dpone__load_steps'" in rendered
+    assert any(
+        "IF OBJECT_ID(?, N'U') IS NULL" in query and params == ("[dbo].[__dpone__load_steps]",)
+        for query, params in connector.queries
+    )
     assert "INSERT INTO [dbo].[__dpone__load_steps]" in rendered
     assert any(params and len(params) > 1 and params[1] == "committed" for _, params in connector.queries)
 

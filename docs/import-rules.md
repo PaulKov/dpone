@@ -66,6 +66,19 @@ These rules are intentionally pragmatic:
 - they protect the most valuable boundaries now;
 - they still allow some transitional dependencies while refactoring continues.
 
+### GitOps application context capabilities
+
+GitOps services inherit the minimum injected I/O capability from
+`dpone.services.gitops.context`: `GitOpsFileContext` provides `fs`;
+`GitOpsYamlContext` adds `yaml`. Service-specific contexts retain their own
+settings and dependencies. These are structural protocols, not factories,
+service locators, or permission to construct replacement clients.
+
+Existing service-module port aliases remain available. Resolve the full public
+context schema with `typing.get_type_hints(Context)`, which includes inherited
+fields; `Context.__annotations__` contains only locally declared fields.
+No runtime policy, CLI output, injected endpoint, or publication gate changes.
+
 ## How to run the checks
 
 ### Pytest

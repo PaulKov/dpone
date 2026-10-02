@@ -7,14 +7,15 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Protocol
 
-from dpone.ports.filesystem import FileSystem
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsFileContext
 
 CheckFactory = Callable[[str, bool, str, str, str], Any]
 IssueFactory = Callable[[str, str, str], Any]
 
 
-class GitOpsAirflowConnectionBridgePlanPreflightContext(Protocol):
-    fs: FileSystem
+class GitOpsAirflowConnectionBridgePlanPreflightContext(GitOpsFileContext, Protocol):
+    """Service scope using caller-owned I/O capabilities."""
 
 
 @dataclass(frozen=True, slots=True)

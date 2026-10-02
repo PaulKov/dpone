@@ -63,6 +63,8 @@ def require_first_publication_complete(
 
     record = current.record
     facts = catalog.generations(cluster, record.database, record.target, record.candidate, inventory.hosts)
+    contracts.require_replica_inventory(facts, inventory.hosts)
+    require_published_target_rows(catalog, cluster, record, inventory.hosts)
     states = tuple(contracts.classify_replica(fact, desired=record.desired, predecessor=None) for fact in facts)
     if set(states) != {contracts.ReplicaPublicationState.COMMITTED} or publication_entry.state_for(
         inventory.hosts
@@ -78,6 +80,25 @@ def require_first_publication_complete(
 def candidate_readiness_deadline() -> float:
     """Start one monotonic budget shared by pre-authority and pre-DDL checks."""
     return time.monotonic() + DEFAULT_WAIT_SECONDS
+
+
+def require_retired_predecessor(
+    catalog: ClusterPublicationCatalogPort, cluster: str, record: contracts.AuthorityRecord
+) -> None:
+    """Admit fresh work only while every retained predecessor remains unchanged.
+
+    No fresh candidate exists at pre-source admission. The old candidate is
+    retained evidence, not the baseline for a new load or a cleanup request.
+    """
+    inventory = catalog.inventory(cluster)
+    contracts.require_inventory(record, inventory)
+    facts = catalog.generations(cluster, record.database, record.target, record.candidate, inventory.hosts)
+    if tuple(sorted(fact.host for fact in facts)) != inventory.hosts or any(
+        fact.target != record.predecessor or (fact.target is not None and not fact.target_healthy) for fact in facts
+    ):
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED", "retired predecessor is not exact and healthy"
+        )
 
 
 def require_pre_dispatch_generation(
@@ -117,6 +138,7 @@ def _generation_readiness(
     contracts.require_inventory(record, inventory)
     catalog.require_atomic_database(cluster, record.database, inventory.hosts)
     facts = catalog.generations(cluster, record.database, record.target, record.candidate, inventory.hosts)
+    contracts.require_replica_inventory(facts, inventory.hosts)
     if (
         contracts.one_generation_identity(facts, "candidate") != record.desired
         or contracts.optional_generation_identity(facts, "target") != record.predecessor
@@ -170,6 +192,7 @@ def reconcile_existing(
     )
     queue_state = entry.state_for(hosts)
     observed = catalog.generations(cluster, record.database, record.target, record.candidate, hosts)
+    contracts.require_replica_inventory(observed, hosts)
     states = tuple(
         contracts.classify_replica(item, desired=record.desired, predecessor=record.predecessor) for item in observed
     )
@@ -195,3 +218,63 @@ def reconcile_existing(
         result = authority.compare_and_swap(current, committed)
         current = require_verified_mutation(result, permit=False)
     return ClusterFullRefreshReceipt.from_authority(current, cluster)
+
+
+def require_completed_publication(
+    catalog: ClusterPublicationCatalogPort,
+    ddl: ClusterPublicationDdlPort,
+    current: contracts.VersionedAuthorityRecord,
+    *,
+    cluster: str,
+) -> None:
+    """Fresh physical and exact retained-DDL proof, not a COMPLETED flag alone.
+
+    A terminal DDL failure with proven physical completion retains the normal
+    lifecycle semantics. Missing, duplicate or active replica evidence does not.
+    """
+    record = current.record
+    if record.phase is not contracts.AuthorityPhase.COMPLETED:
+        raise contracts.ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_PUBLICATION_UNKNOWN", "not completed")
+    inventory = catalog.inventory(cluster)
+    inventory.validate()
+    contracts.require_inventory(record, inventory)
+    catalog.require_atomic_database(cluster, record.database, inventory.hosts)
+    facts = catalog.generations(cluster, record.database, record.target, record.candidate, inventory.hosts)
+    contracts.require_replica_inventory(facts, inventory.hosts)
+    if any(
+        item.target != record.desired or item.target_healthy is not True or item.candidate is not None for item in facts
+    ):
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED", "completed target or cleanup is not exact"
+        )
+    require_published_target_rows(catalog, cluster, record, inventory.hosts)
+    intents = [(record.ddl_entry, record.ddl_correlation_token, record.ddl_query_digest)]
+    if any((record.cleanup_entry, record.cleanup_correlation_token, record.cleanup_query_digest)):
+        intents.append((record.cleanup_entry, record.cleanup_correlation_token, record.cleanup_query_digest))
+    for entry_id, token, digest in intents:
+        entry = require_exact_ddl_entry(
+            ddl,
+            cluster,
+            entry_id=entry_id,
+            token=token,
+            query_digest=digest,
+            error_code="DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN",
+        )
+        if entry.state_for(inventory.hosts) not in {
+            contracts.QueueState.TERMINAL_SUCCESS,
+            contracts.QueueState.TERMINAL_FAILURE,
+        }:
+            raise contracts.ClusterPublicationError(
+                "DPONE_CLICKHOUSE_CLUSTER_DDL_UNKNOWN", "completed publication lacks terminal per-replica DDL"
+            )
+
+
+def require_published_target_rows(
+    catalog: ClusterPublicationCatalogPort, cluster: str, record: contracts.AuthorityRecord, hosts: tuple[str, ...]
+) -> None:
+    """Preserve the predecessor when the published target's rows are unproven."""
+    counts = catalog.candidate_counts(cluster, record.database, record.target)
+    if set(counts) != set(hosts) or any(
+        type(value) is not int or value != record.staged_rows for value in counts.values()
+    ):
+        raise contracts.ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_GENERATION_DIVERGED", "target rows differ")

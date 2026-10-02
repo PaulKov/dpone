@@ -17,13 +17,14 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import fields
+from dataclasses import asdict, fields
 from hashlib import sha256
 from types import MappingProxyType
 from typing import cast
 
 from dpone.config.load_config import LoadConfig
 from dpone.config.load_strategy import LoadStrategy
+from dpone.config.publication_authority import normalized_publication_selection
 from dpone.runtime.quality_replay_contracts import canonical_json_bytes, validate_normalized_replay_selection
 
 CONTRACT_VERSION = "dpone.quality.replay.identity.v1"
@@ -118,7 +119,13 @@ def admission_digest(load_config: LoadConfig) -> str:
     projection = {name: getattr(load_config, name) for name in _LOAD_FIELDS if name != "options"}
     projection["load_strategy"] = load_config.load_strategy.value
     validate_normalized_replay_selection(load_config.options)
-    projection["options"] = _options(load_config.options)
+    binding = normalized_publication_selection(load_config.options)
+    publication_identity = asdict(binding) if binding is not None else None
+    if publication_identity is not None:
+        # Resolved physical authority is independently endpoint-bound. A logical
+        # credential alias is not a publication storage identity.
+        publication_identity.pop("connection_ref")
+    projection["options"] = _options(load_config.options, publication_identity=publication_identity)
     return _digest({"contract_version": CONTRACT_VERSION, "configuration": _json_value(projection)})
 
 
@@ -202,13 +209,24 @@ def validate_effective_plan(admission_config: LoadConfig, record: Mapping[str, o
     return expected
 
 
-def _options(options: object, depth: int = 0, *, location: str = "root") -> dict[str, object]:
+def _options(
+    options: object,
+    depth: int = 0,
+    *,
+    location: str = "root",
+    publication_identity: dict[str, object] | None = None,
+) -> dict[str, object]:
     if type(options) is not dict or depth > _MAX_DEPTH:
         raise QualityReplayIdentityError()
     projection: dict[str, object] = {}
     for key, value in options.items():
         if type(key) is not str:
             raise QualityReplayIdentityError()
+        if key == "publication_authority":
+            if location not in {"root", "sink_options"} or publication_identity is None:
+                raise QualityReplayIdentityError()
+            projection[key] = publication_identity
+            continue
         if key in EXCLUDED_COMPOSITION_OPTIONS:
             if location not in {"root", "sink_options"} or type(value) is not bool:
                 raise QualityReplayIdentityError()
@@ -222,7 +240,9 @@ def _options(options: object, depth: int = 0, *, location: str = "root") -> dict
         if key == "interval":
             projection[key] = _interval_identity(value)
         elif key in {"source_options", "sink_options"}:
-            projection[key] = _options(value, depth + 1, location=key if depth == 0 else "nested")
+            projection[key] = _options(
+                value, depth + 1, location=key if depth == 0 else "nested", publication_identity=publication_identity
+            )
         else:
             projection[key] = _json_value(value)
         if key == "normalization" and (not isinstance(value, dict) or value.get("enabled", False)):

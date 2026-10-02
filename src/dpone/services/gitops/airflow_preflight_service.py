@@ -7,10 +7,11 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Protocol
 
-from dpone.ports.filesystem import FileSystem
-from dpone.ports.yaml_codec import YamlCodec
 from dpone.services.gitops.airflow_artifact_index_service import build_airflow_artifact_index
 from dpone.services.gitops.airflow_pod_doctor_service import GitOpsAirflowPodDoctorService
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsYamlContext
+from dpone.services.gitops.context import YamlCodec as YamlCodec
 from dpone.services.gitops.views import GitOpsView, build_gitops_meta
 
 
@@ -18,10 +19,8 @@ class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsAirflowPreflightContext(Protocol):
+class GitOpsAirflowPreflightContext(GitOpsYamlContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
-    yaml: YamlCodec
 
 
 class GitOpsAirflowPreflightService:

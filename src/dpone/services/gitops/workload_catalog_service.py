@@ -11,7 +11,8 @@ from dpone.gitops.workload_catalog_models import (
     GitOpsWorkloadDefinition,
     issue,
 )
-from dpone.ports.filesystem import FileSystem
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsFileContext
 from dpone.services.gitops.views import GitOpsView, build_gitops_meta
 
 
@@ -19,9 +20,8 @@ class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsWorkloadCatalogContext(Protocol):
+class GitOpsWorkloadCatalogContext(GitOpsFileContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
 
 
 @dataclass(frozen=True, slots=True)

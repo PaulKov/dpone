@@ -256,6 +256,134 @@ compares both the previous XMin value and revision, then increments revision in
 the same transaction. This is required because several valid PostgreSQL
 snapshots can share the same safe XMin while a long transaction is open.
 
+### SQL Server step-audit adapter
+
+The internal `MSSQLLoadStepAuditStorage` adapter accepts keyword-only
+`database` and `provisioning` coordinates, independently of the connector's
+default database. Its route-decision wrapper preserves these coordinates.
+The legacy constructor still defaults to `etl_state.__dpone__load_steps` and
+runtime provisioning; existing callers retain additive migrations for
+`error_message` and nullable `finished_at`.
+
+With `provisioning="external"`, `create_step_table()` is a read-only admission
+check, not permission to create or alter anything. It validates the exact
+column set, SQL types, lengths, datetime precision, nullability and column
+metadata in the selected database before INSERT. Missing or drifted tables
+block the write. Step history is append-only at this adapter boundary: the
+contract requires no unique step index because multiple events for the same
+step are valid. It does not certify table permissions or install an immutable
+history trigger.
+
+All catalog queries, runtime migrations and INSERTs use that same normalized
+database/schema/table. JSON and error text remain parameters; the INSERT
+supplies the server UTC load timestamp explicitly, so an external table's
+default expression cannot determine it. An admission failure is not cached as
+readiness and does not trigger an implicit repair or retry.
+
+For an existing explicit MSSQL state binding (excluding the separate generic
+target-atomic transaction ledger), bootstrap now admits a paired load/step audit
+store. Both use the selected state connector, database, schema and provisioning
+policy. The pair is carried through hydration into ordinary execution and each
+freshly hydrated thread/process lane. Worker disposal closes its own metadata
+connector once, including when it is shared with a business endpoint.
+
+With audit enabled, omitted `load_governance.audit.state_schema` and
+`loads_table` inherit the selected state schema and audit table. Explicit values
+must match; conflicting values fail before audit DDL. `steps_table` defaults to
+`__dpone__load_steps` and must be unqualified and distinct from the selected
+load, run, checkpoint, Kafka-offset and receipt/repair table names, including
+configured checkpoint/offset overrides. Names reserved by state are not reused
+for audit even when that state relation has a separate schema override.
+External provisioning requires both relations to pass their respective catalog
+contracts before any source or sink is built. Failed pair admission closes its
+owned connector and returns no partially usable bindings. It does not roll back
+runtime-provisioned tables or rewrite historical audit records.
+
+Governance preserves the in-process outcome collector while forwarding each
+step once to the selected durable store. Route decisions use that same relation;
+neither consumer derives replacement audit storage from the business sink.
+Missing steps or conflicting injected stores fail closed. Disabled audit does
+not require or create the step relation and does not enable sink fallback; the
+pre-existing state load-ledger behavior is retained. Unselected runtimes retain
+their legacy sink-based composition and extension call signatures. Extensions
+used with selected metadata must explicitly accept `audit_bindings`; unsupported
+extensions are not retried without it.
+
+### Independent MSSQL audit with disabled state
+
+This unreleased option is for operators who need a durable metadata ledger for
+a stateless pipeline. It does not enable XMin, run-state, offsets or checkpoint
+tables, and is separate from publication authority. Existing manifests without
+the selector keep the legacy behavior described above.
+
+Configure the process as follows (endpoint fields are abbreviated; this is a
+configuration fragment, not a complete pipeline):
+
+```yaml
+state:
+  type: disabled
+sink:
+  options:
+    load_governance:
+      audit:
+        storage:
+          type: mssql
+          connection_ref: system-audit
+          provisioning: external
+        loads_table: dpone_load_audit
+        steps_table: __dpone__load_steps
+```
+
+Preparation and first execution:
+
+1. Add `system-audit` to the deployment-owned connection registry and verified
+   runtime binding. Its MSSQL descriptor must contain explicit `database` and
+   `schema`; credential defaults are not a substitute. For Airflow, include the
+   alias in the connection projection. Pack closure rejects a missing alias
+   even when state is disabled.
+2. Through your existing reviewed metadata deployment, provision both tables
+   against the canonical [load contract](https://github.com/PaulKov/dpone/blob/ca50907afd812d8deb98a6cbaf707a6e567e3a34/src/dpone/runtime/state/mssql_contract.py)
+   and [step contract/DDL](https://github.com/PaulKov/dpone/blob/ca50907afd812d8deb98a6cbaf707a6e567e3a34/src/dpone/runtime/state/mssql_load_step_audit.py).
+   The [load DDL renderer](https://github.com/PaulKov/dpone/blob/ca50907afd812d8deb98a6cbaf707a6e567e3a34/src/dpone/runtime/state/mssql_operational_ddl.py)
+   provides the corresponding create statement. These are implementation references,
+   not an automatic migration command; SQL catalog `nvarchar` lengths are bytes,
+   whereas DDL lengths are characters. This selector never creates or
+   alters a table, moves old history, grants rights, or provisions a database.
+   Retain historical tables and their lookup locations during any cutover.
+3. Use normal manifest checking and your deployment's verified runner. The
+   hydrator resolves the audit connection once, checks both catalogs before
+   building business endpoints, and transfers the pair to ordinary execution
+   and independently hydrated workers. Both load lifecycle and step/route
+   events use the selected relations. Read back new run/load IDs there to
+   verify routing; configuration acceptance alone is not execution evidence.
+
+`storage` is closed: only `type: mssql`, canonical `connection_ref`, and optional
+`provisioning: external` are accepted. Table names must be distinct unqualified
+SQL identifiers. Omitted names default to `dpone_load_audit` and
+`__dpone__load_steps`. Omitted `state_schema` inherits the registry; an explicit
+value must exactly match it. Unknown fields, raw connection credentials,
+source-side selection and simultaneous MSSQL state-owned audit are rejected.
+The manifest and compiled load configuration must select the same audit pair.
+
+A missing or drifted external table stops hydration before business I/O and
+closes the owned connection. Repair the catalog through its normal reviewed
+deployment, then start a new correctly configured execution; there is no
+runtime DDL fallback. Failure later in hydration also closes the audit
+connection. Normal runtime disposal closes it once after successful hydration.
+
+`audit.enabled: false`, `audit.mode: off`, or disabled load governance retain
+the selected load-identity ledger but do not construct the step store. They do
+not re-enable sink-based audit. A direct runtime extension must supply admitted
+`audit_bindings` for an explicit selector, including when step audit is off.
+
+This selector supports normal process/batch/flow/folder authoring. The existing
+closed dbt publish policy does **not** accept it; do not substitute an older dbt
+schema or a BCP/route certification claim. No publication-authority migration,
+distributed writer fence, or release readiness is established by this option.
+See [load governance](load-governance.md) for event meanings and the
+[MSSQL publication design](feature-design-mssql-publication-authority.md) for the
+separate activation requirements.
+
 ### One-shot repair authority
 
 Mass-delete guard overrides and full repair baselines use an expiring

@@ -28,6 +28,10 @@ class ClusterPublicationCatalogPort(Protocol):
 
 class ClusterPublicationAuthorityPort(Protocol):
     def read_versioned(self, target_key: str) -> contracts.VersionedAuthorityRecord | None: ...
+    def read_for_operation(self, target_key: str, operation_id: str) -> contracts.VersionedAuthorityRecord | None:
+        """Authenticate admission history and reject permanently retired IDs."""
+        ...
+
     def create_if_absent(self, record: contracts.AuthorityRecord) -> contracts.AuthorityMutationResult: ...
     def compare_and_swap(
         self, current: contracts.VersionedAuthorityRecord, desired: contracts.AuthorityRecord
@@ -36,6 +40,12 @@ class ClusterPublicationAuthorityPort(Protocol):
 
 class ClusterPublicationBootstrapPort(Protocol):
     def ensure(self, cluster: str, database: str, hosts: Sequence[str]) -> None: ...
+
+
+class ClusterPublicationAuthorityProviderPort(ClusterPublicationBootstrapPort, Protocol):
+    """Select one authority and admit its storage without sink bootstrap DDL."""
+
+    def for_database(self, database: str) -> ClusterPublicationAuthorityPort: ...
 
 
 class ClusterPublicationDdlPort(Protocol):
@@ -49,6 +59,14 @@ class ClusterPublicationDdlPort(Protocol):
     def drop_predecessor(
         self, record: contracts.AuthorityRecord, permit: contracts.DispatchPermit, *, cluster: str
     ) -> None: ...
+
+
+def reject_unproven_retirement(record: contracts.AuthorityRecord) -> None:
+    """Backends without retained retirement provenance cannot adopt that phase."""
+    if record.phase is contracts.AuthorityPhase.RETIRED_UNPUBLISHED:
+        raise contracts.ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_RETIREMENT_UNSUPPORTED", "authority cannot authenticate retirement history"
+        )
 
 
 def require_exact_ddl_entry(

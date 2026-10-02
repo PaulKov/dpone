@@ -6,9 +6,11 @@ import hashlib
 import json
 import re
 from collections.abc import Sequence
-from dataclasses import asdict, dataclass, replace
+from dataclasses import asdict, dataclass, field, replace
 from enum import Enum
+from threading import Lock
 from typing import Any
+from uuid import UUID
 
 from dpone._compat import StrEnum
 
@@ -33,6 +35,7 @@ class AuthorityPhase(StrEnum):
     COMMITTED = "COMMITTED"
     CLEANUP_DISPATCHING = "CLEANUP_DISPATCHING"
     COMPLETED = "COMPLETED"
+    RETIRED_UNPUBLISHED = "RETIRED_UNPUBLISHED"
 
 
 class AuthorityMutationStatus(StrEnum):
@@ -211,12 +214,44 @@ class AuthorityRecord:
     quality_reader: str | None = None
     authority_write_id: str | None = None
 
+    @classmethod
+    def from_payload(cls, raw: bytes) -> AuthorityRecord:
+        """Decode exact canonical bytes, not origin/ownership or a dispatch permit."""
+        if not isinstance(raw, bytes) or not 0 < len(raw) <= 1024 * 1024:
+            raise ValueError("invalid publication envelope size")
+        data = json.loads(raw.decode("utf-8"))
+        data["phase"] = AuthorityPhase(data["phase"])
+        data["desired"] = GenerationIdentity(**data["desired"])
+        if data.get("predecessor") is not None:
+            data["predecessor"] = GenerationIdentity(**data["predecessor"])
+        record = cls(**data)
+        if record.payload.encode() != raw:
+            raise ValueError("noncanonical publication envelope")
+        if record.schema_version not in {SCHEMA_VERSION, QUALITY_SCHEMA_VERSION}:
+            raise ValueError("unsupported publication envelope")
+        if (record.schema_version == QUALITY_SCHEMA_VERSION) != (record.quality_evidence is not None):
+            raise ValueError("publication quality schema differs")
+        record.desired.validate()
+        if record.predecessor is not None:
+            record.predecessor.validate()
+        for value in (record.dispatch_epoch, record.staged_rows):
+            if type(value) is not int or not 0 <= value < 2**63 - 1:
+                raise ValueError("invalid publication count/epoch")
+        if not isinstance(record.operation_id, str) or not 0 < len(record.operation_id) <= 128:
+            raise ValueError("invalid publication operation identity")
+        if (
+            record.authority_write_id is not None
+            and UUID(hex=record.authority_write_id).hex != record.authority_write_id
+        ):
+            raise ValueError("invalid publication write identity")
+        return record
+
     @property
     def payload(self) -> str:
         values = asdict(self)
-        for field in ("quality_evidence", "quality_reader", "authority_write_id"):
-            if values[field] is None:
-                del values[field]
+        for name in ("quality_evidence", "quality_reader", "authority_write_id"):
+            if values[name] is None:
+                del values[name]
         return canonical_json(values)
 
     @property
@@ -241,12 +276,40 @@ class VersionedAuthorityRecord:
 
 @dataclass(frozen=True, slots=True)
 class DispatchPermit:
-    """In-memory proof that this call won an acknowledged, verified CAS."""
+    """One-shot, process-local capability from an acknowledged, verified CAS.
+
+    Consumption precedes transport invocation and is never undone on error.
+    A readback must not recreate a permit: only the winning write can issue it.
+    This capability is not a serialized authority record or a security token.
+    """
 
     target_key: str
     operation_id: str
     fence_token: str
     dispatch_epoch: int
+    effect_digest: str
+    _lock: Any = field(default_factory=Lock, init=False, repr=False, compare=False)
+    _consumed: bool = field(default=False, init=False, repr=False, compare=False)
+
+    @classmethod
+    def for_record(cls, record: AuthorityRecord) -> DispatchPermit:
+        if record.phase is AuthorityPhase.RETIRED_UNPUBLISHED:
+            raise ValueError("retired publication has no dispatch permit")
+        # The receipt's write UUID differs from the caller's desired payload;
+        # every business/effect field remains bound, including correlation.
+        return cls(
+            record.target_key,
+            record.operation_id,
+            record.fence_token,
+            record.dispatch_epoch,
+            replace(record, authority_write_id=None).payload_sha256,
+        )
+
+    def consume(self) -> None:
+        with self._lock:
+            if self._consumed:
+                raise ValueError("cluster publication dispatch permit already consumed")
+            object.__setattr__(self, "_consumed", True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -328,6 +391,15 @@ def one_generation_identity(facts: Sequence[ReplicaGeneration], role: str) -> Ge
     if value is None:
         raise ClusterPublicationError("DPONE_CLICKHOUSE_CLUSTER_GENERATION_UNKNOWN", f"{role} is absent")
     return value
+
+
+def require_replica_inventory(facts: Sequence[ReplicaGeneration], hosts: Sequence[str]) -> None:
+    """Do not reduce physical observations to states before checking coverage."""
+    expected = tuple(sorted(hosts))
+    if not expected or len(set(expected)) != len(expected) or tuple(sorted(item.host for item in facts)) != expected:
+        raise ClusterPublicationError(
+            "DPONE_CLICKHOUSE_CLUSTER_GENERATION_UNKNOWN", "every admitted replica must be observed exactly once"
+        )
 
 
 def optional_generation_identity(facts: Sequence[ReplicaGeneration], role: str) -> GenerationIdentity | None:

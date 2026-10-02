@@ -8,16 +8,16 @@ import yaml
 from dpone.gitops.changed_files import resolve_changed_files
 from dpone.gitops.workload_catalog import WorkloadCatalogResolver
 from dpone.gitops.workload_impact import AffectedWorkloadResolver
-from dpone.ports.filesystem import FileSystem
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsFileContext
 
 
 class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsGitLabChildPipelineContext(Protocol):
+class GitOpsGitLabChildPipelineContext(GitOpsFileContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
 
 
 class GitOpsGitLabChildPipelineService:

@@ -1,7 +1,7 @@
 """Strict authority-backed quality storage for managed cluster generations.
 
-This adapter is explicitly composed with a KeeperMap authority. It does not
-bootstrap or migrate tables. A durable read guard fences managed slot reuse;
+This adapter is explicitly composed with an admitted strict authority. It does
+not bootstrap or migrate tables. A durable read guard fences managed slot reuse;
 unmanaged writes remain outside the managed-publication contract.
 """
 
@@ -14,7 +14,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, replace
 from threading import Lock
 from time import monotonic
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from dpone.ports.clickhouse_cluster_publication import contracts, require_verified_mutation
 from dpone.runtime.governance.quality_execution import QualityExecutionSnapshot
@@ -29,6 +29,9 @@ from dpone.runtime.quality_replay_contracts import (
 from dpone.runtime.quality_replay_contracts import contracts as quality_contracts
 from dpone.runtime.sinks.clickhouse_cluster_publication_identity import cluster_name, operation_id
 
+if TYPE_CHECKING:
+    from dpone.ports.clickhouse_cluster_publication import ClusterPublicationBootstrapPort
+
 QualityReplayCapsule = quality_contracts.QualityReplayCapsule
 ReplayQualityEvidenceError = quality_contracts.ReplayQualityEvidenceError
 canonical_quality_json = quality_contracts.canonical_quality_json
@@ -37,11 +40,19 @@ canonical_quality_json = quality_contracts.canonical_quality_json
 class ClickHouseReplayQualityStore(QualityReplayStore):
     """Bind producer evidence to one exact candidate and publication record."""
 
-    def __init__(self, catalog: Any, authority_factory: Any, *, target_acceptance_reader: Any = None) -> None:
+    def __init__(
+        self,
+        catalog: Any,
+        authority_factory: Any,
+        *,
+        target_acceptance_reader: Any = None,
+        authority_readiness: ClusterPublicationBootstrapPort | None = None,
+    ) -> None:
         self._target_reader = target_acceptance_reader
         self._retained: set[str] = set()
         self._catalog = catalog
         self._authority_factory = authority_factory
+        self._authority_readiness = authority_readiness
         self._pending: dict[tuple[str, str], dict[str, Any]] = {}
         self._lock = Lock()
         self._guards: dict[str, str] = {}
@@ -69,6 +80,9 @@ class ClickHouseReplayQualityStore(QualityReplayStore):
     def require_ready(self, load_config: Any) -> None:
         cluster = cluster_name(load_config)
         inventory = self._catalog.inventory(cluster)
+        if self._authority_readiness is not None:
+            self._authority_readiness.ensure(cluster, str(load_config.target_schema), inventory.hosts)
+            return
         authority = self._authority_factory(str(load_config.target_schema))
         authority.require_ready(cluster, str(load_config.target_schema), inventory.hosts)
 

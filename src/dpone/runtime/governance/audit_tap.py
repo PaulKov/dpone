@@ -11,6 +11,7 @@ if TYPE_CHECKING:
 from datetime import datetime
 from typing import Any
 
+from dpone.contracts import RuntimeConfigurationError
 from dpone.runtime.runtime_throughput import enrich_step_details_with_throughput
 from dpone.security_redaction import redact_public_text, redact_public_value
 
@@ -33,10 +34,30 @@ class RuntimeLoadStepAuditCollector:
         if self._delegate is not None:
             self._delegate.record_step(record)
 
+    def bind_delegate(self, delegate: LoadStepAuditStorage) -> None:
+        """Retain collection while enforcing one explicitly selected durable store."""
+
+        if delegate is self or (self._delegate is not None and self._delegate is not delegate):
+            raise RuntimeConfigurationError("Selected runtime audit conflicts with collector delegate")
+        self._delegate = delegate
+
     def to_jsonable(self) -> list[dict[str, Any]]:
         """Return latest per-step records suitable for compact runtime evidence."""
 
         return [_record_to_jsonable(record) for record in _latest_records(self.records)]
+
+
+def bind_selected_audit_storage(
+    current: LoadStepAuditStorage | None, selected: LoadStepAuditStorage
+) -> LoadStepAuditStorage:
+    """Retain a collector and enforce one selected durable store by identity."""
+
+    if isinstance(current, RuntimeLoadStepAuditCollector):
+        current.bind_delegate(selected)
+        return current
+    if current is None or current is selected:
+        return selected
+    raise RuntimeConfigurationError("Selected runtime audit conflicts with governance storage")
 
 
 def _latest_records(records: list[LoadStepAuditRecord]) -> tuple[LoadStepAuditRecord, ...]:

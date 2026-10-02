@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from dpone.contracts.runtime_connection import ResolvedBindingConnection
+    from dpone.ports.clickhouse_cluster_publication import ClusterPublicationAuthorityProviderPort
     from dpone.runtime.storage_policy import RuntimeStoragePolicy
 
 
@@ -14,6 +15,7 @@ from typing import Any
 
 from dpone.config.env import ENV_CODE
 from dpone.contracts.api_sources import get_api_source_defaults
+from dpone.runtime.credentials.publication_binding import require_publication_provider
 from dpone.runtime.errors import RuntimeConfigurationError
 from dpone.runtime.quality_replay_contracts import replay_selection
 
@@ -66,9 +68,11 @@ class RuntimeEndpointFactory:
         proxy_connection: ResolvedBindingConnection | None = None,
         shared_bq_connector: Any = None,
         runtime_storage_policy: RuntimeStoragePolicy | None = None,
+        publication_authority_provider: ClusterPublicationAuthorityProviderPort | None = None,
     ) -> Any:
         """Build a sink without consulting an ambient credential backend."""
 
+        require_publication_provider(sink_cfg, selected_provider=publication_authority_provider)
         if not sink_cfg:
             raise RuntimeConfigurationError("Не задан блок sink")
         selected_replay = replay_selection(sink_cfg.get("options", {}), sink_type=str(sink_cfg.get("type") or ""))
@@ -96,6 +100,11 @@ class RuntimeEndpointFactory:
             proxy_connection=proxy_connection,
             runtime_storage_policy=runtime_storage_policy,
             **({"durable_quality_replay": True} if selected_replay else {}),
+            **(
+                {"publication_authority_provider": publication_authority_provider}
+                if publication_authority_provider is not None
+                else {}
+            ),
         )
 
     @staticmethod
@@ -174,6 +183,7 @@ class RuntimeEndpointFactory:
         proxy_config: Mapping[str, Any] | None = None,
         runtime_storage_policy: RuntimeStoragePolicy | None = None,
     ) -> Any:
+        require_publication_provider(sink_cfg)
         from dpone.runtime.credentials.factory import SinkFactory
 
         if not sink_cfg:

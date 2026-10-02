@@ -6,6 +6,11 @@ from pathlib import Path
 from typing import Any
 
 from dpone.config import ENV_CODE
+from dpone.config.audit import AuditConfigError, select_audit_storage
+from dpone.config.publication_authority import (
+    PublicationSelectionError,
+    validate_publication_configuration,
+)
 from dpone.governance.quality import QualityGatePolicy
 from dpone.manifest.airflow_resources import reject_process_airflow_resources, reject_process_resource_declaration
 from dpone.manifest.batch_dependencies import _normalize_depends_on, _validate_unique_names
@@ -133,6 +138,11 @@ class BatchManifestCompiler:
                 cfg = self._renderer.render(cfg, render_ctx)
                 cfg = self._ensure_dict(cfg, "process_rendered", manifest_path)
                 reject_process_resource_declaration(cfg, field=f"compiled_processes[{len(compiled)}]")
+                try:
+                    select_audit_storage(cfg)
+                    validate_publication_configuration(cfg)
+                except (AuditConfigError, PublicationSelectionError) as exc:
+                    raise ManifestConfigurationError(str(exc)) from exc
                 if "quality" in cfg:
                     cfg["quality"] = self._validated_quality(
                         cfg["quality"],

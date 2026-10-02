@@ -13,6 +13,7 @@ from dpone.contracts.runtime_connection import (
 from dpone.contracts.source_physical_identity import SourcePhysicalIdentity
 from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
 from dpone.runtime.bootstrap_state_models import RuntimeStateBindings
+from dpone.runtime.credentials.authority import RuntimeResolvedConnections
 from dpone.runtime.credentials.config import CredentialsConfig
 from dpone.runtime.credentials.resolved_connector_factory import ResolvedConnectorFactory
 from dpone.runtime.state.factory import StateFactory
@@ -126,7 +127,7 @@ def test_production_hydration_uses_only_target_identity_and_generic_four_object_
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     state_connector = object()
-    connections = SimpleNamespace(
+    connections = RuntimeResolvedConnections(
         strict=True,
         source=_connection("postgres", database="source", schema="public"),
         sink=_connection("mssql", database="DWH", schema="dbo"),
@@ -206,7 +207,9 @@ def test_production_hydration_uses_only_target_identity_and_generic_four_object_
 def test_key_snapshot_route_keeps_xmin_storage_factory(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    state_connector = object()
+    from tests.test_mssql_step_audit_location import _CatalogConnector
+
+    state_connector = _CatalogConnector(database="Example_System", schema="governance", table="__dpone__load_steps")
     xmin_storage = SimpleNamespace(atomicity="target_atomic", provisioning="external")
     calls: list[str] = []
 
@@ -256,6 +259,8 @@ def test_key_snapshot_route_keeps_xmin_storage_factory(
 
     assert calls == ["xmin"]
     assert bindings.xmin_state_storage is xmin_storage
+    assert bindings.audit_bindings.steps.connector is state_connector
+    assert state_connector.writes == []
 
 
 def test_initial_backfill_composes_generic_chunks_and_dedicated_xmin_handoff(
@@ -351,7 +356,7 @@ def test_strict_key_snapshot_hydration_binds_database_authority_to_xmin(
         def build_run_state_storage(**_kwargs) -> None:
             return None
 
-    connections = SimpleNamespace(
+    connections = RuntimeResolvedConnections(
         strict=True,
         source=_connection("postgres", database="source", schema="public"),
         sink=_connection("mssql", database="DWH", schema="dbo"),

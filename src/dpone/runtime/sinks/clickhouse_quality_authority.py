@@ -20,7 +20,7 @@ from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any, NoReturn
 
-from dpone.ports.clickhouse_cluster_publication import contracts
+from dpone.ports.clickhouse_cluster_publication import contracts, reject_unproven_retirement
 
 _COLUMNS = (
     ("target_key", "String"),
@@ -118,6 +118,7 @@ class ClickHouseQualityKeeperMapAuthority:
     def create_if_absent(self, record: contracts.AuthorityRecord) -> contracts.AuthorityMutationResult:
         """Strict insert once: existing keys cannot be silently replaced."""
         self._require_ready()
+        reject_unproven_retirement(record)
         sql = (
             f"INSERT INTO {self._qualified} "
             "(target_key, operation_id, fence_token, phase, dispatch_epoch, payload, payload_sha256) "
@@ -132,6 +133,8 @@ class ClickHouseQualityKeeperMapAuthority:
         """Update only the exact observed target, Keeper version and publication fence."""
         self._require_ready()
         before = current.record
+        reject_unproven_retirement(before)
+        reject_unproven_retirement(desired)
         if desired.target_key != before.target_key or type(current.version) is not int or current.version < 0:
             _reject("INVALID", "authority CAS identity or version is invalid")
         sql = (
@@ -150,6 +153,12 @@ class ClickHouseQualityKeeperMapAuthority:
             "expected_phase": before.phase.value,
         }
         return self._mutate_once(sql, params, desired, prior_version=current.version)
+
+    def read_for_operation(self, target_key: str, operation_id: str) -> contracts.VersionedAuthorityRecord | None:
+        current = self.read_versioned(target_key)
+        if current is not None:
+            reject_unproven_retirement(current.record)
+        return current
 
     def _mutate_once(
         self, sql: str, params: dict[str, Any], desired: contracts.AuthorityRecord, *, prior_version: int | None
@@ -181,12 +190,7 @@ class ClickHouseQualityKeeperMapAuthority:
             return contracts.AuthorityMutationResult(contracts.AuthorityMutationStatus.CONFLICT, observed=observed)
         permit = None
         if desired.phase in {contracts.AuthorityPhase.DISPATCHING, contracts.AuthorityPhase.CLEANUP_DISPATCHING}:
-            permit = contracts.DispatchPermit(
-                target_key=desired.target_key,
-                operation_id=desired.operation_id,
-                fence_token=desired.fence_token,
-                dispatch_epoch=desired.dispatch_epoch,
-            )
+            permit = contracts.DispatchPermit.for_record(desired)
         return contracts.AuthorityMutationResult(
             contracts.AuthorityMutationStatus.VERIFIED, observed=observed, permit=permit
         )

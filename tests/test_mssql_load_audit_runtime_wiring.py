@@ -16,12 +16,14 @@ from dpone.ports.runtime_hydrator import RuntimeBindings
 from dpone.runtime.bootstrap_hydrator import DefaultRuntimeHydrator
 from dpone.runtime.bootstrap_runner import DefaultProcessRunner
 from dpone.runtime.bootstrap_state import RuntimeStateBootstrap
+from dpone.runtime.credentials.authority import RuntimeResolvedConnections
 from dpone.runtime.credentials.config import CredentialsConfig
 from dpone.runtime.credentials.resolved_connector_factory import ResolvedConnectorFactory
 from dpone.runtime.errors import RuntimeConfigurationError
 from dpone.runtime.lineage.audit import LoadIdentityService
 from dpone.runtime.sinks.load_result import AtomicCommitOutcome, LoadResult
 from dpone.runtime.state.factory import StateFactory
+from tests.test_mssql_step_audit_location import _CatalogConnector
 
 
 @pytest.mark.parametrize(
@@ -36,7 +38,7 @@ def test_resolved_mssql_audit_is_preflighted_at_exact_registry_location(
     database: str,
     schema: str,
 ) -> None:
-    connector = object()
+    connector = _CatalogConnector(database=database, schema=schema, table="__dpone__load_steps")
     events: list[tuple[str, object]] = []
     audit_storage = _PreflightAuditStorage(events)
 
@@ -77,6 +79,10 @@ def test_resolved_mssql_audit_is_preflighted_at_exact_registry_location(
     )
 
     assert bindings.load_audit_storage is audit_storage
+    assert bindings.audit_bindings.loads is audit_storage
+    assert bindings.audit_bindings.steps.connector is connector
+    assert len(connector.reads) == 2
+    assert connector.writes == []
     assert bindings.xmin_state_storage.location["run_table"] == "dpone_run_state"
     assert bindings.xmin_state_storage.location["audit_table"] == "dpone_load_audit"
     assert events == [
@@ -99,7 +105,7 @@ def test_hydrator_exposes_one_identity_service_bound_to_state_audit(
 ) -> None:
     audit_storage = object()
     state_bootstrap = _HydratorStateBootstrap(audit_storage)
-    connections = SimpleNamespace(
+    connections = RuntimeResolvedConnections(
         strict=True,
         source=None,
         sink=None,
@@ -389,7 +395,7 @@ def _build_target_atomic_runtime(
     state_connector: object | None,
     target_connector: object | None,
 ) -> RuntimeBindings:
-    connections = SimpleNamespace(
+    connections = RuntimeResolvedConnections(
         strict=True,
         source=None,
         sink=_resolved_mssql_connection(database="DWH_Dev", schema="sample_metrics"),

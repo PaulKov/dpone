@@ -37,6 +37,9 @@ class _Authority:
     def read_versioned(self, target_key):
         return self.current
 
+    def read_for_operation(self, target_key, operation_id):
+        return self.read_versioned(target_key)
+
     def create_if_absent(self, record):
         self.current = VersionedAuthorityRecord(record, 0)
         return AuthorityMutationResult(AuthorityMutationStatus.VERIFIED, self.current)
@@ -48,9 +51,7 @@ class _Authority:
 
         permit = None
         if desired.phase.value.endswith("DISPATCHING"):
-            permit = DispatchPermit(
-                desired.target_key, desired.operation_id, desired.fence_token, desired.dispatch_epoch
-            )
+            permit = DispatchPermit.for_record(desired)
         return AuthorityMutationResult(AuthorityMutationStatus.VERIFIED, self.current, permit)
 
 

@@ -6,6 +6,8 @@ from collections.abc import Iterable, Mapping, Sequence
 from copy import deepcopy
 from typing import Any
 
+from dpone.config.audit import select_audit_storage
+from dpone.config.publication_authority import select_publication_authority
 from dpone.contracts.credential_resolution import is_valid_connection_ref
 
 _CLOSED_PROJECTION_MODES = frozenset({"kubernetes_secret_volume", "env"})
@@ -34,6 +36,12 @@ def required_runtime_connection_refs(processes: Iterable[object]) -> tuple[str, 
     refs: set[str] = set()
     for process in processes:
         config = _mapping(getattr(process, "raw_config", None))
+        audit = select_audit_storage(config)
+        if audit is not None:
+            refs.add(audit.connection_ref)
+        publication = select_publication_authority(config)
+        if publication is not None:
+            refs.add(publication.connection_ref)
         for field in ("source", "sink", "bigquery_proxy"):
             _add_connection_ref(refs, _mapping(config.get(field)))
         _add_source_materialization_work_ref(refs, _mapping(config.get("source")))

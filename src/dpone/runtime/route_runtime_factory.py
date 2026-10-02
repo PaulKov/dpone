@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from dpone.runtime.columnar_runtime_assembly import ColumnarRuntimeAssembly
+from dpone.runtime.etl.audit_policy import audit_policy, require_selected_audit_bindings
 from dpone.runtime.route_runtime import RouteCapabilityOrchestrator, RuntimeRouteDecisionPublisher
 from dpone.runtime.state.load_step_audit import (
     ClickHouseLoadStepAuditStorage,
@@ -14,6 +15,7 @@ from dpone.runtime.state.load_step_audit import (
 
 if TYPE_CHECKING:
     from dpone.config.load_config import LoadConfig
+    from dpone.ports.runtime_hydrator import RuntimeAuditBindings
 
 
 class RouteCapabilityRuntimeFactory:
@@ -26,7 +28,7 @@ class RouteCapabilityRuntimeFactory:
         audit_storage_factory: Any | None = None,
     ) -> None:
         self._columnar_assembly = columnar_assembly or ColumnarRuntimeAssembly()
-        self._audit_storage_factory = audit_storage_factory or LoadStepAuditStorageFactory()
+        self._audit_storage_factory = audit_storage_factory
 
     def build(
         self,
@@ -35,17 +37,25 @@ class RouteCapabilityRuntimeFactory:
         source: Any,
         sink: Any,
         logger: Any | None = None,
+        audit_bindings: RuntimeAuditBindings | None = None,
     ) -> RouteCapabilityOrchestrator | None:
+        require_selected_audit_bindings(load_config, audit_bindings)
         if not _route_capabilities_enabled(load_config):
             return None
+        selected_steps = None
+        if audit_bindings is not None and audit_policy(load_config).enabled:
+            selected_steps = audit_bindings.require_steps()
         assembly = self._columnar_assembly.build(load_config=load_config, source=source, sink=sink)
         if assembly is None:
             return None
+        if audit_bindings is None:
+            factory = self._audit_storage_factory or LoadStepAuditStorageFactory()
+            selected_steps = factory.from_sink(sink, load_config)
         return RouteCapabilityOrchestrator(
             candidate_provider=assembly.candidate_provider,
             probe_runner=assembly.probe_runner,
             publisher=RuntimeRouteDecisionPublisher(
-                audit_storage=self._audit_storage_factory.from_sink(sink, load_config),
+                audit_storage=selected_steps,
                 logger=logger,
             ),
             executors=assembly.executors,
@@ -57,6 +67,7 @@ class LoadStepAuditStorageFactory:
     """Select SQL load-step audit storage for the configured sink."""
 
     def from_sink(self, sink: Any, load_config: LoadConfig) -> Any | None:
+        require_selected_audit_bindings(load_config, None)
         audit = _audit_options(load_config)
         if audit.get("enabled") is False:
             return None

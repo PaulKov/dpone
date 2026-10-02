@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from contextlib import suppress
 from typing import TYPE_CHECKING, Any, Protocol
 
+from dpone.ports.runtime_hydrator import RuntimeAuditBindings
 from dpone.runtime.errors import RuntimeConfigurationError
+from dpone.runtime.etl.audit_policy import audit_policy
 
 if TYPE_CHECKING:
+    from dpone.config.load_config import LoadConfig
     from dpone.config.state import ResolvedMssqlStateConfig
 
 
@@ -156,6 +160,65 @@ def build_kafka_offset_state_storage(
     return None
 
 
+def build_mssql_audit_bindings(
+    state_factory: Any,
+    connector: Any,
+    location: ResolvedMssqlStateConfig,
+    load_config: LoadConfig,
+    *,
+    state_cfg: Mapping[str, Any],
+) -> RuntimeAuditBindings:
+    """Admit the selected load/step pair before business I/O; never return half a pair."""
+
+    from dpone.runtime.state.mssql_load_step_audit import MSSQLLoadStepAuditStorage
+
+    try:
+        policy = audit_policy(load_config)
+        steps = None
+        if policy.enabled:
+            governance = load_config.options.get("load_governance")
+            audit = governance.get("audit") if isinstance(governance, Mapping) else None
+            if isinstance(audit, Mapping):
+                for field, expected in (
+                    ("state_schema", location.location.schema),
+                    ("loads_table", location.audit_table),
+                ):
+                    if field in audit and audit[field] != expected:
+                        raise RuntimeConfigurationError(f"Selected MSSQL audit conflicts with audit.{field}")
+            checkpoint_cfg = state_cfg.get("partition_checkpoint_table", {})
+            kafka_cfg = state_cfg.get("kafka_table") or state_cfg.get("table", {})
+            state_tables = (
+                location.audit_table,
+                location.run_table,
+                location.location.table,
+                location.location.receipt_table,
+                location.location.repair_authority_table,
+                location.location.repair_consumption_table,
+                str(checkpoint_cfg.get("name", "dpone_partition_checkpoints")),
+                str(kafka_cfg.get("kafka_name", "etl_kafka_offsets")),
+            )
+            if "." in policy.steps_table or policy.steps_table.strip().casefold() in {
+                table.casefold() for table in state_tables
+            }:
+                raise RuntimeConfigurationError("Selected MSSQL step audit requires a distinct unqualified table")
+            steps = MSSQLLoadStepAuditStorage(
+                connector,
+                database=location.location.database,
+                schema=location.location.schema,
+                table=policy.steps_table,
+                provisioning=location.provisioning,
+            )
+        loads = build_mssql_load_audit_storage(state_factory, connector, location)
+        if steps is not None:
+            steps.create_step_table()
+        return RuntimeAuditBindings(loads=loads, steps=steps, connector=connector)
+    except Exception:
+        # Hydration did not transfer ownership to runtime bindings.
+        with suppress(Exception):
+            connector.close()
+        raise
+
+
 def build_mssql_load_audit_storage(
     state_factory: Any,
     connector: Any,
@@ -163,15 +226,16 @@ def build_mssql_load_audit_storage(
 ) -> Any:
     """Resolve and preflight the canonical three-part MSSQL audit table."""
 
-    storage = state_factory.create_mssql_load_audit_storage(
-        mssql_connector=connector,
-        state_table=location.audit_table,
+    from dpone.runtime.bootstrap_audit import build_mssql_load_audit
+
+    return build_mssql_load_audit(
+        state_factory,
+        connector,
+        table=location.audit_table,
         schema=location.location.schema,
         database=location.location.database,
         provisioning=location.provisioning,
     )
-    storage.create_load_table()
-    return storage
 
 
 __all__ = [

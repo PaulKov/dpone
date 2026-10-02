@@ -4,15 +4,113 @@
 
 ### Added
 
+- Expose the closed MSSQL `publication_authority` selector in single, batch,
+  flow and folder authoring for bounded internal replicated ClickHouse
+  `full_refresh`. Preserve it through compilation and require its independent
+  Airflow connection even when source state is disabled. Reject misplaced or
+  contradictory normalized selections before credential resolution; bind replay
+  identity to the storage namespace, excluding the logical credential alias.
+  Unsupported routes and frozen dbt policy versions remain unchanged. This
+  unreleased selection does not migrate workloads or certify live recovery.
+- Compose guarded legacy retirement with an endpoint-admitted SQL history store,
+  exact private outer plan and pre-bound persistent attempt journal. Add draft
+  `publication-authority retire plan|apply|verify` parsing and redacted results;
+  standalone use remains blocked without trusted deployment capabilities. Journal
+  claims are directory-descriptor-bound and survive ambiguous acknowledgements;
+  replanning cannot reclaim an attempted operation. This does not activate a
+  manifest backend, certify deployment persistence or mark a workload successful.
+- Compose native recovery from the verified deployment context, one admitted SQL
+  authority provider and one owned native ClickHouse handle. Outer confirmation,
+  environment/context and physical endpoint checks precede effects; close failures
+  remain unknown and saved plans are never overwritten. Add thin unreleased
+  `publication-authority recover plan|execute` parsing and redacted results.
+  Standalone CLI execution remains blocked without a trusted held observer; a
+  deployment runner must inject it into the application. This does not enable
+  legacy retirement, manifest selection or certify a live recovery route.
+- Add internal bounded canonical native recovery plans bound to exact authority,
+  verified-context subject and sink identity. Preserve the existing inner digest
+  and historical observation time; malformed or changed plans fail closed.
+  The saved plan supplies neither fresh safety nor a dispatch permit. Shared
+  envelope decoding and a typed single-handle authority provider prepare operator
+  composition without activating a public selector or deployment observer.
+
+- Add an internal source-free native PREPARED recovery service using the same
+  admitted SQL provider and normal publication/cleanup lifecycle. Exact plan
+  confirmation, a mandatory held deployment observer and fresh physical/DDL
+  evidence gate effects. Unknown CAS never dispatches; lost DDL replies and
+  resumed phases never redispatch. Quality-bearing and empty-load recovery stay
+  blocked without original policy proof. No public activation or permissive
+  observer is supplied; component tests are not live route certification.
+- Add independent MSSQL load/step audit selection for normal pipeline authoring,
+  including sources with disabled state. A closed `audit.storage` selector uses
+  the verified registry's database/schema and external catalog admission before
+  business endpoints. Missing bindings or drift fail without sink fallback or
+  runtime DDL; connection ownership is retained across hydration failures and
+  normal disposal. Existing unselected manifests and closed dbt policies are
+  unchanged. This performs no history or publication-authority migration.
+- Add an unactivated MSSQL publication-authority foundation: immutable binding
+  identity, exact catalog admission, append-only event history, versioned CAS and
+  commit-acknowledged dispatch permits. Local SQL Server fault tests cover
+  competing writers and lost acknowledgements. Manifest selection, legacy
+  adoption and end-to-end ClickHouse recovery are not yet enabled. Internal
+  runtime composition shares the admitted binding across publication, quality
+  replay and cloned sinks, validates the SQL endpoint on every owned session,
+  and rejects unsupported selections before source I/O. Existing manifests
+  retain their backend selection.
+- Add internal native-preparation observation from the selected SQL authority's
+  immutable operation history. Current/root, exact earliest preparation and its
+  predecessor are read under one acknowledged transaction; binding, generation,
+  phase/epoch/revision and quality-core substitutions fail closed. The observation
+  contains no dispatch permit or quality/absent-DDL proof and does not activate
+  recovery. SQL Server tests exercise initial, later and post-retirement origins,
+  exact operation IDs and concurrent writer exclusion during the read.
 - Add explicit `exact_raw_rows` source semantics for bounded native delivery
   from ReplacingMergeTree, preserving query-visible versions and duplicates
   without `FINAL`. A pinned native TLS session binds relation, read settings,
   policies and part provenance to existing target-local identity and EOF
   evidence; recovery validates this evidence before target access and does not
   reopen the source. Existing plain MergeTree defaults remain unchanged.
+- Add the internal owner-private, bounded atomic plan-file adapter for the
+  upcoming publication operator workflow. Concurrent writers cannot overwrite
+  an existing plan; ambiguous directory-sync outcomes preserve completed
+  evidence for readback. Workload migration is not activated.
+- Add an internal versioned catalog plan/apply service with exact endpoint and
+  DDL confirmation. It creates only an absent publication catalog, serializes
+  cooperating setup invocations, validates structure within the DDL transaction
+  and provides read-only outcome inspection. Existing or partial objects are
+  never repaired implicitly. Add thin unreleased `publication-authority schema
+  plan|apply|inspect` commands using the deployment runner's verified runtime
+  context, owner-private canonical plans and redacted JSON. Scope confirmation
+  precedes credential resolution; no arbitrary connection or SQL fallback is
+  accepted. Schema readiness does not authorize workload migration.
+- Add unactivated guarded-retirement policy, service and an admitted MSSQL
+  absent-only store. Retirement preserves original replica bytes in immutable
+  history, records `RETIRED_UNPUBLISHED` rather than publication success, and
+  grants no dispatch permit. A private persistent attempt journal blocks repeat
+  writes after an unknown outcome. Operation-aware reads and SQL mutations
+  retain the original retirement event and permanently reject its operation ID;
+  fresh work checks every predecessor replica and competes through exact CAS
+  with an isolated new candidate. Trusted deployment observation, public
+  manifest selection and retirement CLI integration remain required before activation.
 
 ### Fixed
 
+- Require exact replica observation coverage before cluster publication
+  reconciliation and cleanup, and verify published target row counts before
+  predecessor cleanup. Missing observations or lost target rows preserve the
+  previous generation rather than failing only after its deletion.
+- Add explicit database and external-provisioning support to the internal
+  MSSQL step-audit adapter and route wrapper. Scope metadata, migrations and
+  inserts to one location; reject external schema drift without DDL and write
+  the server timestamp explicitly. Existing explicit MSSQL state bindings now
+  carry a preflighted load/step audit pair through hydration, normal execution
+  and independently hydrated worker lanes. Governance and route events use that
+  pair without business-sink fallback, preserve in-process evidence, and reject
+  conflicting stores. This change performs no history migration.
+- Bind clustered publication and cleanup dispatch permits to the exact phase,
+  payload and rendered DDL intent. Consume each process-local permit once,
+  before transport, including concurrent reuse and lost transport replies;
+  readback never recreates permission to dispatch.
 - Forward a configured ClickHouse `ca_cert` to the native driver's CA option,
   preserving certificate and hostname verification for private authorities.
 - Build the SqlClient companion with the pinned .NET SDK in runtime-image

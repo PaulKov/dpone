@@ -137,6 +137,36 @@ def test_lost_read_ack_fresh_session_reconciles_and_completes_without_redispatch
     assert rig.ddl.dispatches == rig.ddl.cleanup_dispatches == 1
 
 
+def test_fresh_load_after_retirement_seals_its_own_quality_and_finishes_normally():
+    from tests.test_clickhouse_cluster_retirement_runtime import RetainedAuthority
+
+    rig = Rig()
+    retired = RetainedAuthority(rig.catalog).current
+    rig.authority.current = replace(retired, record=replace(retired.record, operation_id="retired-original"))
+    assert rig.service.prepare_admission(rig.config) == rig.config
+    rig.publish(complete=True)
+    assert rig.authority.current.record.phase.value == "COMPLETED"
+    capsule = rig.capsule()
+    assert capsule.state == "COMPLETE"
+    assert capsule.core["binding"]["operation_id"] == rig.authority.current.record.operation_id
+    assert capsule.core["binding"]["operation_id"] != "retired-original"
+    assert capsule.core["binding"]["desired"]["uuid"] == "new"
+    assert rig.ddl.dispatches == rig.ddl.cleanup_dispatches == 1
+
+
+def test_retirement_without_fresh_quality_cannot_dispatch_a_new_candidate():
+    from tests.test_clickhouse_cluster_retirement_runtime import RetainedAuthority
+
+    rig = Rig()
+    retired = RetainedAuthority(rig.catalog).current
+    rig.authority.current = replace(retired, record=replace(retired.record, operation_id="retired-original"))
+    current = rig.authority.current
+    with pytest.raises(ReplayQualityEvidenceError, match="REQUIRED"):
+        rig.service.publish(rig.config, rig.candidate, staged_rows=2)
+    assert rig.authority.current == current
+    assert rig.ddl.dispatches == rig.ddl.cleanup_dispatches == 0
+
+
 def test_successful_publication_supports_two_fresh_replays_without_mutation():
     rig = Rig()
     rig.publish(complete=True)
