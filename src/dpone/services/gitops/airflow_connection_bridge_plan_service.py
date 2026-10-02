@@ -6,7 +6,8 @@ from importlib import import_module
 from pathlib import Path
 from typing import Any, Protocol
 
-from dpone.ports.filesystem import FileSystem
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsFileContext
 from dpone.services.gitops.views import GitOpsView, build_gitops_meta
 
 
@@ -14,9 +15,8 @@ class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsAirflowConnectionBridgePlanContext(Protocol):
+class GitOpsAirflowConnectionBridgePlanContext(GitOpsFileContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
 
 
 class GitOpsAirflowConnectionBridgePlanService:

@@ -8,7 +8,8 @@ from dpone.gitops.lock_verify import GitOpsLockVerifier
 from dpone.gitops.models import GitOpsIssue, GitOpsVerifyReport
 from dpone.gitops.paths import safe_relative_path
 from dpone.gitops.verify import GitOpsPlanVerifier, resolve_repo_relative_root
-from dpone.ports.filesystem import FileSystem
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsFileContext
 from dpone.services.gitops.views import GitOpsView, build_gitops_meta
 
 
@@ -16,9 +17,8 @@ class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsVerifyContext(Protocol):
+class GitOpsVerifyContext(GitOpsFileContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
 
 
 class GitOpsVerifyService:

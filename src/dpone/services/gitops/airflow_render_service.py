@@ -9,13 +9,14 @@ from dpone.gitops.airflow_doctor import GitOpsAirflowDoctor
 from dpone.gitops.airflow_models import GitOpsAirflowArtifact, GitOpsAirflowRenderReport
 from dpone.gitops.models import GitOpsIssue
 from dpone.gitops.paths import GitOpsPathValidationError, safe_relative_path
-from dpone.ports.filesystem import FileSystem
-from dpone.ports.yaml_codec import YamlCodec
 from dpone.services.gitops.airflow_render_catalog import (
     airflow_render_artifact_paths,
     run_spec_exec_command,
 )
 from dpone.services.gitops.airflow_render_writer import GitOpsAirflowArtifactWriter
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsYamlContext
+from dpone.services.gitops.context import YamlCodec as YamlCodec
 from dpone.services.gitops.views import GitOpsView, build_gitops_meta
 
 
@@ -23,10 +24,8 @@ class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsAirflowRenderContext(Protocol):
+class GitOpsAirflowRenderContext(GitOpsYamlContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
-    yaml: YamlCodec
 
 
 class GitOpsAirflowRenderService:

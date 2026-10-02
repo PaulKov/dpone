@@ -20,7 +20,6 @@ from dpone.gitops.paths import GitOpsPathValidationError
 from dpone.gitops.workload_catalog import WorkloadCatalogResolver
 from dpone.gitops.workload_catalog_models import GitOpsWorkloadCatalogIssue, GitOpsWorkloadCatalogReport, issue
 from dpone.gitops.workload_impact import AffectedWorkloadResolver
-from dpone.ports.filesystem import FileSystem
 from dpone.services.gitops.airflow_compact_pack_paths import (
     dag_spec_dir as _dag_spec_dir,
 )
@@ -34,6 +33,8 @@ from dpone.services.gitops.airflow_compact_pack_paths import (
     pack_output_path_under as _pack_output_path,
 )
 from dpone.services.gitops.airflow_compact_pack_reconcile_build import build_reconcile_artifacts
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsFileContext
 from dpone.services.gitops.views import GitOpsView, build_gitops_meta
 
 
@@ -41,9 +42,8 @@ class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsAirflowCompactPackContext(Protocol):
+class GitOpsAirflowCompactPackContext(GitOpsFileContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
 
 
 class _DagSpecArtifactWriter(Protocol):

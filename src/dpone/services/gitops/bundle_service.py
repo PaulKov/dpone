@@ -19,9 +19,10 @@ from dpone.gitops.models import (
 )
 from dpone.gitops.paths import GitOpsPathValidationError, safe_relative_path
 from dpone.gitops.rendering import render_gitops_bundle_markdown
-from dpone.ports.filesystem import FileSystem
-from dpone.ports.yaml_codec import YamlCodec
 from dpone.services.gitops.affected_service import GitOpsAffectedService
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsYamlContext
+from dpone.services.gitops.context import YamlCodec as YamlCodec
 from dpone.services.gitops.verify_service import GitOpsVerifyService
 from dpone.services.gitops.views import GitOpsView, build_gitops_meta
 
@@ -30,10 +31,8 @@ class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsBundleContext(Protocol):
+class GitOpsBundleContext(GitOpsYamlContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
-    yaml: YamlCodec
 
 
 class GitOpsBundleService:

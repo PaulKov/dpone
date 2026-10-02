@@ -19,8 +19,9 @@ from dpone.gitops.airflow_runtime_profile_paths import (
     resolve_runtime_profile_paths,
 )
 from dpone.gitops.airflow_runtime_profile_policy import GitOpsAirflowRuntimeProfilePolicy
-from dpone.ports.filesystem import FileSystem
-from dpone.ports.yaml_codec import YamlCodec
+from dpone.services.gitops.context import FileSystem as FileSystem
+from dpone.services.gitops.context import GitOpsYamlContext
+from dpone.services.gitops.context import YamlCodec as YamlCodec
 from dpone.services.gitops.views import GitOpsView, build_gitops_meta
 
 
@@ -28,10 +29,8 @@ class _GitOpsSettings(Protocol):
     repo_root: Path
 
 
-class GitOpsAirflowRuntimeProfileContext(Protocol):
+class GitOpsAirflowRuntimeProfileContext(GitOpsYamlContext, Protocol):
     settings: _GitOpsSettings
-    fs: FileSystem
-    yaml: YamlCodec
 
 
 class GitOpsAirflowRuntimeProfileService:
