@@ -26,7 +26,7 @@ jobs:
       DPONE_TEST_USE_INSTALLED_PACKAGE: "1"
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -149,7 +149,7 @@ jobs:
 
       - name: Upload architecture fitness evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: architecture-fitness
           path: test_artifacts/architecture-fitness/architecture_fitness.json
@@ -243,7 +243,7 @@ jobs:
 
       - name: Upload Airflow public contract evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: airflow-v1-public-contract
           path: test_artifacts/airflow-v1-public-contract-freeze/
@@ -281,7 +281,7 @@ jobs:
             --output test_artifacts/ci-quality/shard-manifest.json
 
       - name: Upload exact test population
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: quality-test-population
           path: test_artifacts/ci-quality/
@@ -306,7 +306,7 @@ jobs:
         shard-index: [0, 1, 2, 3, 4, 5, 6, 7]
     steps:
       - name: Checkout exact candidate
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -368,7 +368,7 @@ jobs:
           exit "$test_status"
 
       - name: Upload shard evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: quality-shard-${{ matrix.python-version }}-${{ matrix.shard-index }}
           path: |
@@ -398,7 +398,7 @@ jobs:
           test "$SHARDS_RESULT" = success
 
       - name: Checkout exact candidate
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
@@ -417,7 +417,7 @@ jobs:
         run: uv sync --locked --all-extras
 
       - name: Download exact interpreter shard evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           pattern: quality-shard-${{ matrix.python-version }}-*
           path: test_artifacts/ci-quality/shards
@@ -454,7 +454,7 @@ jobs:
 
       - name: Upload combined coverage
         if: matrix.python-version == '3.12'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: coverage
           path: |
@@ -480,13 +480,13 @@ jobs:
           test "$QUALITY_RESULT" = success
 
       - name: Checkout exact candidate
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Download exact 3.12 aggregate evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: coverage
           path: test_artifacts/ci-quality/aggregate
@@ -537,7 +537,7 @@ jobs:
           PY
 
       - name: Upload immutable timing evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: ci-quality-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: test_artifacts/ci-quality/timing.json
@@ -558,7 +558,7 @@ jobs:
         python-version: ["3.11", "3.12"]
     steps:
       - name: Checkout exact candidate
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -614,7 +614,7 @@ jobs:
       artifact_digest: "${{ steps.governance-upload.outputs.artifact-digest }}"
     steps:
       - name: Checkout exact candidate
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -643,7 +643,7 @@ jobs:
 
       - name: Upload agent governance evidence
         id: governance-upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: agent-governance-gate
           path: test_artifacts/agent-policy/agent_governance_gate.json
@@ -662,7 +662,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333
         with:
           artifact-ids: "${{ needs.governance-source.outputs.artifact_id }}"
           path: test_artifacts/agent-policy/attested-governance
@@ -698,7 +698,7 @@ jobs:
       DPONE_IT_PG_PASSWORD: dpone
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
@@ -727,7 +727,7 @@ jobs:
       head_sha: ${{ steps.plan.outputs.head_sha }}
     steps:
       - name: Checkout exact candidate
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -772,7 +772,7 @@ jobs:
               output.write(f"classification={plan['classification']}\nhead_sha={plan['head_sha']}\n")
           PY
       - name: Upload acceptance plan
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: acceptance-plan
           path: test_artifacts/acceptance/plan.json
@@ -791,7 +791,7 @@ jobs:
       HEAD_SHA: ${{ needs.acceptance-plan.outputs.head_sha }}
     steps:
       - name: Checkout exact candidate
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ needs.acceptance-plan.outputs.head_sha }}
@@ -828,7 +828,7 @@ jobs:
             --output test_artifacts/acceptance-contracts/receipt.json
       - name: Upload scheduling acceptance evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: acceptance-contracts
           path: test_artifacts/acceptance-contracts/
@@ -882,7 +882,7 @@ jobs:
       HEAD_SHA: ${{ needs.acceptance-plan.outputs.head_sha }}
     steps:
       - name: Checkout exact candidate
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           ref: ${{ needs.acceptance-plan.outputs.head_sha }}
@@ -928,7 +928,7 @@ jobs:
             --output test_artifacts/bounded-window-smoke/receipt.json
       - name: Upload synthetic window evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: bounded-window-smoke
           path: test_artifacts/bounded-window-smoke/

@@ -51,7 +51,7 @@ jobs:
           esac
 
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ env.DPONE_CANDIDATE_SHA }}
@@ -175,14 +175,14 @@ jobs:
           PY
 
       - name: Upload immutable candidate wheels
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: airflow-distributions-${{ env.DPONE_CANDIDATE_SHA }}
           path: dist-airflow/
           if-no-files-found: error
 
       - name: Upload official Helm render evidence
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: airflow-helm-ack-mounts-${{ env.DPONE_CANDIDATE_SHA }}
           path: test_artifacts/airflow-helm/
@@ -253,7 +253,7 @@ jobs:
             cosmos-version: "1.15.0"
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ env.DPONE_CANDIDATE_SHA }}
@@ -269,7 +269,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Download immutable candidate wheels
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: airflow-distributions-${{ env.DPONE_CANDIDATE_SHA }}
           path: dist-airflow
@@ -513,7 +513,7 @@ jobs:
 
       - name: Upload junit artifact
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: airflow-compat-junit-${{ matrix.airflow-version }}-py${{ matrix.python-version }}
           path: airflow-compat-junit.xml
@@ -521,7 +521,7 @@ jobs:
 
       - name: Upload parse SLO evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: airflow-parse-slo-${{ matrix.airflow-version }}-py${{ matrix.python-version }}
           path: test_artifacts/airflow-provider-parse/*.json
@@ -539,7 +539,7 @@ jobs:
         python-version: ["3.11", "3.12"]
     steps:
       - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           ref: ${{ env.DPONE_CANDIDATE_SHA }}
@@ -555,7 +555,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Download immutable candidate wheels
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: airflow-distributions-${{ env.DPONE_CANDIDATE_SHA }}
           path: dist-runtime
@@ -713,7 +713,7 @@ jobs:
 
       - name: Upload runtime wheel evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: runtime-wheel-${{ env.DPONE_CANDIDATE_SHA }}-py${{ matrix.python-version }}
           path: test_artifacts/runtime-wheel/

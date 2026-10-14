@@ -26,7 +26,7 @@ jobs:
       producer_run_attempt: ${{ steps.verifier-stage.outputs.producer_run_attempt }}
     steps:
       - name: Checkout exact release commit
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: ${{ github.sha }}
           fetch-depth: 1
@@ -57,7 +57,7 @@ jobs:
 
       - name: Upload immutable closed release verifier
         id: verifier-upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-verifier-${{ github.run_id }}-${{ github.run_attempt }}
           path: ${{ runner.temp }}/release-verifier/
@@ -80,7 +80,7 @@ jobs:
       evidence_artifact_digest: ${{ steps.preflight-upload.outputs.artifact-digest }}
     steps:
       - name: Checkout complete release history
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -153,7 +153,7 @@ jobs:
           PY
 
       - name: Download immutable closed release verifier
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.verifier.outputs.artifact_id }}
           digest-mismatch: error
@@ -379,7 +379,7 @@ jobs:
       - name: Upload release preflight evidence
         id: preflight-upload
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-preflight-${{ github.run_id }}-${{ github.run_attempt }}
           path: test_artifacts/release-preflight/
@@ -398,7 +398,7 @@ jobs:
       candidates_artifact_digest: ${{ steps.candidates-upload.outputs.artifact-digest }}
     steps:
       - name: Checkout exact release commit
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv
         uses: astral-sh/setup-uv@37802adc94f370d6bfd71619e3f0bf239e1f3b78 # v7
@@ -503,7 +503,7 @@ jobs:
 
       - name: Upload immutable release candidates
         id: candidates-upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-candidates
           path: |
@@ -528,7 +528,7 @@ jobs:
       supply_chain_artifact_digest: ${{ steps.supply-chain-upload.outputs.artifact-digest }}
     steps:
       - name: Download immutable release candidates
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.build.outputs.candidates_artifact_id }}
           digest-mismatch: error
@@ -585,7 +585,7 @@ jobs:
 
       - name: Upload local supply-chain evidence
         id: supply-chain-upload
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-supply-chain-local
           path: test_artifacts/supply-chain/
@@ -680,7 +680,7 @@ jobs:
           PY
 
       - name: Download immutable closed release verifier
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.verifier.outputs.artifact_id }}
           digest-mismatch: error
@@ -771,21 +771,21 @@ jobs:
               raise SystemExit("closed release verifier tree is not exact")
           PY
       - name: Download immutable release candidates
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.build.outputs.candidates_artifact_id }}
           digest-mismatch: error
           path: .
 
       - name: Download local supply-chain evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.build-supply-chain-evidence.outputs.supply_chain_artifact_id }}
           digest-mismatch: error
           path: test_artifacts/supply-chain
 
       - name: Download immutable release preflight authority
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.preflight.outputs.evidence_artifact_id }}
           digest-mismatch: error
@@ -886,7 +886,7 @@ jobs:
           PY
 
       - name: Attest release artifacts
-        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6 # v4
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
           subject-path: |
             dist/*.whl
@@ -920,7 +920,7 @@ jobs:
       - name: Upload release attestation evidence
         id: attestation-upload
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-attestation-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: test_artifacts/supply-chain/
@@ -1010,7 +1010,7 @@ jobs:
           PY
 
       - name: Download immutable closed release verifier
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.verifier.outputs.artifact_id }}
           digest-mismatch: error
@@ -1101,14 +1101,14 @@ jobs:
               raise SystemExit("closed release verifier tree is not exact")
           PY
       - name: Download immutable release candidates
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.build.outputs.candidates_artifact_id }}
           digest-mismatch: error
           path: .
 
       - name: Download immutable release preflight authority
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.preflight.outputs.evidence_artifact_id }}
           digest-mismatch: error
@@ -1215,7 +1215,7 @@ jobs:
 
       - name: Upload pre-publication evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-pre-publication-${{ github.run_id }}-${{ github.run_attempt }}
           path: test_artifacts/release-pre-publication/
@@ -1235,10 +1235,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout exact release commit
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download immutable release candidates
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.build.outputs.candidates_artifact_id }}
           digest-mismatch: error
@@ -1275,7 +1275,7 @@ jobs:
 
       - name: Upload PyPI resolver smoke evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: pypi-resolver-smoke-${{ github.run_id }}-${{ github.run_attempt }}
           path: test_artifacts/pypi-release-smoke/
@@ -1367,7 +1367,7 @@ jobs:
           PY
 
       - name: Download immutable closed release verifier
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.verifier.outputs.artifact_id }}
           digest-mismatch: error
@@ -1458,21 +1458,21 @@ jobs:
               raise SystemExit("closed release verifier tree is not exact")
           PY
       - name: Download immutable release candidates
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.build.outputs.candidates_artifact_id }}
           digest-mismatch: error
           path: .
 
       - name: Download release attestation evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.attest.outputs.attestation_artifact_id }}
           digest-mismatch: error
           path: test_artifacts/supply-chain
 
       - name: Download immutable release preflight authority
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           artifact-ids: ${{ needs.preflight.outputs.evidence_artifact_id }}
           digest-mismatch: error
@@ -1572,7 +1572,7 @@ jobs:
           PY
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3
         with:
           body_path: release_notes.md
           files: |
@@ -1584,7 +1584,7 @@ jobs:
 
       - name: Upload GitHub Release publication evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         with:
           name: release-github-publication-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: test_artifacts/release-pre-publication/
