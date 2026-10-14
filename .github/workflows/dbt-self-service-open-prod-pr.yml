@@ -119,7 +119,7 @@ jobs:
           fi
 
       - name: Check out the prod audit repository
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           repository: ${{ inputs.prod-repository }}
           ref: ${{ inputs.prod-base-branch }}
@@ -181,7 +181,7 @@ jobs:
           python -m pip install "dpone==${DPONE_TRUSTED_VERSION}"
 
       - name: Download the exact dev release
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.release-artifact-name }}
           path: ${{ github.workspace }}/.dpone-ci/dev-release
@@ -206,7 +206,7 @@ jobs:
             --format json > "${GITHUB_WORKSPACE}/.dpone-ci/mirror-integrity.json"
 
       - name: Download exact dev runtime evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         with:
           name: ${{ inputs.dev-evidence-artifact-name }}
           path: ${{ github.workspace }}/.dpone-ci/dev-evidence
